@@ -49,7 +49,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // 오른쪽으로 90도 돌리기 (돌린 그림을 새 파일로 저장 — 메모의 되돌리기로 원래대로)
   let turning = false;
   const rotate = onRotate ? svgBtn('오른쪽으로 90도 돌리기', ROTATE_ICON, async () => {
-    if (inking || turning) return;
+    if (inking || turning || moving) return;
     turning = true;
     rotate.disabled = true;
     // 누르자마자 화면에서 먼저 돌려 보이고(화면에 맞게 줄여), 새 파일은 그 뒤에서 만든다
@@ -170,6 +170,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // 장 넘기기: 지금 장은 미끄러져 나가고, 새 장은 반대쪽에서 들어온다
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let sliding = 0;
+  let moving = false; // 지금 장이 미끄러져 나가는 중 (i 는 이미 새 장, 화면은 아직 앞 장) — 이 동안 장 단추는 받지 않는다
   const glide = (t, ms = 180) => {
     img.style.transition = `transform ${ms}ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity ${ms}ms ease-out`;
     img.style.transform = `translateX(${t}px)`;
@@ -179,6 +180,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     const dir = k > i ? 1 : -1;
     const w = stage.clientWidth;
     const job = ++sliding;
+    moving = false; // 앞 미끄럼은 그만 (아래 timeout 이 job 이 달라 돌지 않으므로 여기서 푼다)
     i = k;
     if (still || z.s > 1) {
       show();
@@ -186,8 +188,10 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     }
     glide(-dir * w * 0.6);
     img.style.opacity = '0';
+    moving = true;
     setTimeout(() => {
       if (job !== sliding) return;
+      moving = false;
       show();
       img.style.transition = 'none';
       img.style.transform = `translateX(${dir * w * 0.35}px)`;
@@ -222,6 +226,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   }
   note.hidden = true;
   async function act(fn) {
+    if (moving) return; // 넘어가는 중 — 보이는 장과 고르는 장이 다르다
     try {
       const msg = await fn(i);
       if (msg) say(msg);
@@ -231,7 +236,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   }
   // 이 장 빼기 → 남은 장으로 (다 빼면 닫힘) · 알림의 "되돌리기" 로 되살림
   function removePage() {
-    if (inking) return;
+    if (inking || moving) return;
     const left = onDelete(i);
     if (!left) return;
     if (!left.length) {
@@ -329,7 +334,9 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       zoomTo(z.s * (d / gesture.d), m.x, m.y);
       gesture.d = d;
       gesture.m = m;
-    } else if (gesture.kind === 'swipe' && !still && !turning) {
+    } else if (gesture.kind === 'swipe' && !still && !turning && !moving) {
+      if (!gesture.follow) sliding++; // 들어오는 움직임의 마무리(transform 비우기)가 끄는 그림을 제자리로 튕기지 않게
+      gesture.follow = true;
       let t = e.clientX - gesture.x;
       if ((t > 0 && i === 0) || (t < 0 && i === images.length - 1)) t /= 3; // 끝 장은 덜 따라온다
       img.style.transition = 'none';
@@ -359,7 +366,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       go(dx < 0 ? 1 : -1);
       return;
     }
-    if (g.kind === 'swipe' && img.style.transform) {
+    if (g.kind === 'swipe' && img.style.transform && !moving) { // 넘어가는 중이면 그 움직임에 맡긴다 (여기서 끊으면 새 장이 뜨지 않았다)
       glide(0); // 넘기지 않으면 제자리로
       const job = ++sliding;
       setTimeout(() => {
@@ -389,7 +396,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // ---------- 그리기 ----------
   let inking = null; // { svg, surface, toolbar, hist }
   function startInk() {
-    if (inking || turning || !img.naturalWidth) return;
+    if (inking || turning || moving || !img.naturalWidth) return;
     sliding++; // 넘기는 움직임이 남아 있으면 멈춘다 (그리기판이 움직이는 그림 자리에 맞춰지지 않게)
     img.style.transition = '';
     img.style.opacity = '';

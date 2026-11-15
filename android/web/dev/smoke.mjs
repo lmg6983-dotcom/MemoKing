@@ -1478,6 +1478,13 @@ try {
       text = '사과 (pdftotext 없음)';
     }
     check('보내기 PDF: 글자가 그대로 들어감', text.includes('사과') && text.includes('목록 바꾸기'), text.slice(0, 200));
+    // 긴 메모는 한 쪽에서 잘리지 않고 여러 쪽으로 (예전: 여백 표 한 칸에 담겨 한 쪽만 나왔다)
+    const lp = await ctx.newPage();
+    await lp.setContent(pdfHtml.replace('</main>', `${'<p>긴 메모 줄</p>'.repeat(200)}</main>`), { waitUntil: 'load' });
+    const longPdf = await lp.pdf({ preferCSSPageSize: true });
+    await lp.close();
+    const pages = (longPdf.toString('latin1').match(/\/Type\s*\/Page\b/g) ?? []).length;
+    check('보내기 PDF: 긴 메모는 여러 쪽', pages > 1, `${pages}쪽`);
   }
   await back();
   await page.waitForTimeout(300);

@@ -502,7 +502,7 @@ async function pasteClipboardFiles(text) {
     try {
       const ed = editor;
       const items = await ed.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
-      if (editor !== ed) return; // 묻는 사이에 메모를 닫거나 바꿨다
+      if (editor !== ed) return setStatus(UI.fileNotAdded); // 묻는 사이에 메모를 닫거나 바꿨다
       ed.insertItems(items, { atCursor: true });
       flush();
       setStatus(files.length > 1 ? `파일 ${files.length}개를 붙여 넣었어요` : '붙여 넣었어요');
@@ -537,7 +537,7 @@ async function pickAndInsert(accept) {
   try {
     setStatus(`파일 ${files.length}개 추가 중`);
     const items = await ed.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
-    if (editor !== ed) return; // 묻는 사이에 메모를 닫거나 바꿨다
+    if (editor !== ed) return setStatus(UI.fileNotAdded); // 묻는 사이에 메모를 닫거나 바꿨다
     // 쓰던 자리가 있으면 그 자리에, 아니면(키보드를 내리고 버튼만 누름) 메모 끝에
     //   (+ 를 펼치면 키보드를 닫으므로, 펼칠 때 쓰던 중이었는지를 본다)
     const typing = addFromCursor || el.editorRoot.contains(document.activeElement);
@@ -1200,6 +1200,7 @@ function setupPanels() {
  */
 export async function openNote(memoId, options = {}) {
   findBar.close(); // 다른 메모를 열면 찾기는 새로
+  saveFails = 0; // 저장 다시 해 보기는 메모마다 새로 (앞 메모에서 다 써 버려 이 메모는 다시 해 보지 않았다)
   setupPanels();
   if (opening) {
     // 잠긴 메모의 비밀번호 화면이 떠 있는 채로 다른 메모를 고르면: 그 화면을 닫고 고른 메모로 (뒤로 가기를 기다리지 않게)
