@@ -905,14 +905,14 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .card.swipe-ready { box-shadow: 0 0 0 2px var(--rec), var(--shadow-card); }
 /* "지우기" 딱지는 밀기 시작할 때 미리 만들어 두고 문턱에서 보이기만 — 문턱을 넘는 순간 새로 그리느라 걸리지 않게 */
 .card.swiping::before {
-  content: "지우기"; position: absolute; top: 10px; right: 10px; z-index: 3;
+  content: "지우기"; position: absolute; top: 10px; left: 10px; z-index: 3; /* 오른쪽으로 밀어 지우므로 카드의 왼쪽 끝에 */
   padding: 2px 8px; border-radius: 999px; background: var(--rec); color: var(--on-rec); font-size: 12px; font-weight: 800;
   opacity: 0; transform: scale(0.85); transition: opacity 0.12s, transform 0.12s var(--ease-out);
 }
 .card.swiping.swipe-ready::before { opacity: 1; transform: none; }
 /* 태블릿: 오른쪽으로 밀면 열기 (지우기는 왼쪽으로만) — 안내는 카드 왼쪽 안에 (옆 메모 칸에 가리지 않게) */
 .card.swipe-open.swipe-ready { box-shadow: 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
-.card.swipe-open.swipe-ready::before { content: attr(data-open-label); right: auto; left: 10px; background: var(--brand-yellow); color: var(--on-brand); }
+.card.swipe-open.swipe-ready::before { content: attr(data-open-label); left: auto; right: 10px; background: var(--brand-yellow); color: var(--on-brand); }
 .note-screen.trashing { animation: note-trash 0.26s var(--ease-out) forwards; transform-origin: 85% 100%; }
 @keyframes note-trash { to { opacity: 0; transform: translateY(30%) scale(0.35) rotate(-6deg); border-radius: 40px; } }
 
