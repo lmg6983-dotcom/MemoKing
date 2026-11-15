@@ -1012,7 +1012,9 @@ el.editorRoot.addEventListener('pointerdown', (e) => {
 }, true);
 
 let wantMoveBound = false;
+let autoMove = false; // 꾹 눌러 저절로 옮기기가 됐는가 (놓으면 글 고치기로 되돌린다)
 function applyMode(mode, { user = false, quiet = false } = {}) {
+  if (user && !quiet) autoMove = false; // 다이얼을 직접 돌렸으면 그 방식 그대로 (놓아도 되돌리지 않는다)
   el.screen.dataset.touchMode = mode;
   // 글 고치기에서만 고칠 수 있다 — 옮기기·그리기에서 펜을 대도 커서 막대·손글씨 아이콘이 생기지 않게 (고칠 칸이 없으므로)
   editor?.setEditable(mode === 'edit');
@@ -1039,7 +1041,7 @@ function applyMode(mode, { user = false, quiet = false } = {}) {
   if (mode === 'draw') annotation?.enter();
   else if (annotation?.active) annotation.exit();
   // 고치기로 돌렸으면 바로 쓸 수 있게 (커서는 있던 자리)
-  if (user && mode === 'edit' && editor) editor.focus();
+  if (user && !quiet && mode === 'edit' && editor) editor.focus(); // 조용히 돌아온 것(옮기기를 마침 · 글을 눌러 고치기로)은 키보드를 올리지 않는다 — 글을 누른 때는 그 자리에 따로 커서
   if (user && mode === 'move') tutEvent('mode-moved');
 }
 // 아래쪽 안내 (그리기 도구 막대와 같은 흰 모양) — 잠깐 떴다 사라진다
@@ -1121,8 +1123,21 @@ function setupKnob() {
   // 글 고치기에서 콘텐츠를 꾹 누르면 옮기기 방식으로 (block-move.js) — 다이얼도 함께 돌아간다
   if (!wantMoveBound) {
     wantMoveBound = true;
+    // 저절로 옮기기가 된 것(내가 다이얼을 돌린 것이 아님)은 놓으면 다시 글 고치기로 — 글을 이어 쓰려고 다이얼을 다시 돌리지 않게
     window.addEventListener('mk:want-move', () => {
-      if (knob?.mode === 'edit' && !el.screen.hidden) knob.set('move');
+      if (knob?.mode !== 'edit' || el.screen.hidden) return;
+      knob.set('move', { quiet: true });
+      autoMove = true;
+      showGuideOnce('auto-move', '꾹 누르면 옮길 수 있어요. 놓으면 다시 글 고치기로 돌아와요', '옮기기');
+    });
+    window.addEventListener('mk:move-done', () => {
+      if (!autoMove) return;
+      autoMove = false;
+      if (knob?.mode === 'move') setTimeout(() => knob?.mode === 'move' && knob.set('edit', { quiet: true }), 0);
+    });
+    // 사진을 처음 한 번 누르면: 크게 보려면 두 번 (파일 칩과 같게)
+    window.addEventListener('mk:media-tapped', () => {
+      if (!el.screen.hidden) showGuideOnce('double-tap-media', '사진은 두 번 누르면 크게 봐요. 한 번 누르면 복사 · 저장 단추가 떠요', '사진 크게 보기');
     });
   }
   // 다이얼은 아래쪽 막대들(도구막대 · 추천 태그 줄) 바로 위 — 키보드가 올라와 막대가 움직여도 따라간다

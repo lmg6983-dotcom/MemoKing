@@ -236,6 +236,7 @@ function mediaView(node, view, getPos) {
       const now = Date.now();
       if (now - lastTap > DOUBLE_TAP_MS) {
         lastTap = now;
+        window.dispatchEvent(new CustomEvent('mk:media-tapped')); // 휴대폰: 처음 한 번 "두 번 누르면 크게" 안내 (note-view.js)
         return;
       }
       lastTap = 0;
