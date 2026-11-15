@@ -281,6 +281,7 @@ export function showDeleteButton(view, { pos, node, target, label = '이 내용 
   const del = { view, btn, extras, pos, node, target, markTarget, state: view.state, place, setMark: persist ? (on) => !on && setMark(false) : setMark, persist, follow, rescroll: () => { scroller = scrollParent(del.target); } };
   place();
   if (!persist) setMark(true);
+  document.dispatchEvent(new CustomEvent('mk:tools', { detail: { view, target } })); // 그림 · 동영상이면 크기 손잡이도 함께 (media-resize.js)
   // 누르면 그 일을 하고 ✓ (실패하면 !, 저장을 그만두면 그대로) — 다시 누르면 다시 (실패한 뒤 다시 해 보기 등)
   const action = (b, icon, run, doneText) => {
     let busy = false;
@@ -410,6 +411,7 @@ export function hideDeleteButton(now = false) {
   if (!del) return;
   current = null;
   clearTimeout(del.timer);
+  document.dispatchEvent(new CustomEvent('mk:tools-hide'));
   window.removeEventListener('scroll', del.place, true);
   if (!del.view.isDestroyed) del.setMark(false);
   del.target.classList?.remove('mk-ink-armed'); // 손 메모: 단추가 거둬지면 다시 처음 누르기부터

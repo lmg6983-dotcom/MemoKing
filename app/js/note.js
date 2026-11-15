@@ -711,6 +711,7 @@ api.on('stt:speakers', async ({ src, text }) => {
   setStatus('말한 사람을 나눴어요');
 });
 
+$('list-btn').addEventListener('click', () => api.win.showList());
 $('show-list').addEventListener('click', () => {
   api.win.showList();
   closeMenu();

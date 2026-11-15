@@ -12,7 +12,8 @@ import {
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
-import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, isAlbumPageTitle, isInkedAlbumTitle, inkedAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE } from './core/memo-file.js';
+import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, isAlbumPageTitle, isInkedAlbumTitle, inkedAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE, mediaWidthOf, plainAlt } from './core/memo-file.js';
+import { mediaResizePlugin } from './media-resize.js';
 import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkForDark } from './core/ink.js';
 import { getStroke } from '../vendor/perfect-freehand.js';
 import { openInkEditor } from './ink-editor.js';
@@ -162,7 +163,13 @@ function mediaView(node, view, getPos) {
     const label = document.createElement('span');
     label.className = 'mk-media-label';
     label.title = '잡고 끌어서 옮기기';
-    label.textContent = alt || baseName(String(src).split('/').pop() ?? '') || (kind === 'video' ? '동영상' : '소리');
+    label.textContent = plainAlt(alt) || baseName(String(src).split('/').pop() ?? '') || (kind === 'video' ? '동영상' : '소리');
+    // 동영상 크기 (설명 끝의 "|50%" — media-resize.js 로 끌어서 바꾼다)
+    const vw = kind === 'video' ? mediaWidthOf(alt) : null;
+    if (vw) {
+      dom.classList.add('mk-sized');
+      dom.style.width = `${vw}%`;
+    }
     dom.append(label);
     const el = document.createElement(kind);
     el.preload = 'metadata';
@@ -206,8 +213,14 @@ function mediaView(node, view, getPos) {
   const album = isAlbumTitle(title);
   dom.className = album ? `mk-image mk-album-img${isAlbumPageTitle(title) ? ' mk-album-page' : ''}` : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
   dom.src = vaultUrl(src);
-  dom.alt = alt ?? '';
+  dom.alt = plainAlt(alt);
   if (title && !album) dom.title = title;
+  // 크기 (설명 끝의 "|50%" — media-resize.js 로 끌어서 바꾼다). 묶음 사진은 묶음 모양 그대로
+  const w = album ? null : mediaWidthOf(alt);
+  if (w) {
+    dom.classList.add('mk-sized');
+    dom.style.width = `${w}%`;
+  }
   dom.onerror = () => dom.classList.add('broken');
   // 누르면 크게 보기 — 묶음 사진은 누른 장부터 넘겨 보고, 한 장짜리 그림도 같은 보기로
   dom.addEventListener('click', (e) => {
@@ -2190,6 +2203,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(tableAutoFit)
     .use(tableResize) // 읽기 전용(PDF)에서도 열 너비가 보이게 (끌기는 편집할 때만)
     .use(tableExtras)
+    .use($prose(() => (readOnly ? new Plugin({}) : mediaResizePlugin()))) // 사진 · 동영상 양옆 손잡이로 크기 (보기만 하는 편집기는 없음)
     .use(tagSuggest) // 자동완성 목록이 떠 있을 때 Enter·↑↓ 를 먼저 받는다
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(keepIndentPlugin)

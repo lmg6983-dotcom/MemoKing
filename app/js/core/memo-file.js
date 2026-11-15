@@ -234,6 +234,25 @@ const isLocalPath = (src) => !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWit
 export const ALBUM_TITLE = 'album';
 export const ALBUM_PAGE_TITLE = 'album page';
 export const isAlbumTitle = (t) => /^album( page)?( ink)?$/.test(t ?? '');
+
+// 사진 · 동영상 크기: 그 줄 폭의 % 를 설명(alt) 끝에 "|50%" 로 (Obsidian 의 ![설명|300] 처럼 — 휴대폰 · PC 화면 폭이 달라 px 대신 %)
+const SIZE_RE = /\|(\d{1,3})%$/;
+export const MIN_MEDIA_PCT = 15;
+/** 설명에 적힌 크기 (%) — 없으면 null (줄 폭에 맞춤) */
+export function mediaWidthOf(alt) {
+  const m = SIZE_RE.exec(String(alt ?? ''));
+  if (!m) return null;
+  const v = Number(m[1]);
+  return v >= MIN_MEDIA_PCT && v < 100 ? v : null;
+}
+/** 크기 표시를 뺀 설명 (화면 · 파일 이름에 보일 것) */
+export const plainAlt = (alt) => String(alt ?? '').replace(SIZE_RE, '');
+/** 설명에 크기를 적는다 (100% 이상 · 없음이면 크기 표시를 지운다) */
+export function withMediaWidth(alt, pct) {
+  const base = plainAlt(alt);
+  const v = Math.round(Number(pct));
+  return Number.isFinite(v) && v >= MIN_MEDIA_PCT && v < 100 ? `${base}|${v}%` : base;
+}
 export const isAlbumPageTitle = (t) => /^album page( ink)?$/.test(t ?? '');
 export const isInkedAlbumTitle = (t) => /^album( page)? ink$/.test(t ?? '');
 export const inkedAlbumTitle = (t) => (isInkedAlbumTitle(t) ? t : `${t} ink`);
