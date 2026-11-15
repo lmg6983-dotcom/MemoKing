@@ -845,10 +845,20 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 
 /* ---------- 보내기 (글 · 그림 · PDF) ---------- */
 /* PDF · 인쇄 내용 크기 (app.js openPrint) — A4 첫 쪽을 시트 폭에 맞춰 줄여 보인다 */
-.print-preview { position: relative; width: min(100%, 280px); aspect-ratio: 794 / 1123; margin: 0 auto 12px; overflow: hidden; border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
-.print-preview iframe { position: absolute; top: 0; left: 0; width: 794px; height: 1123px; border: 0; transform: scale(var(--fit, 0.35)); transform-origin: 0 0; pointer-events: none; }
+.print-preview { position: relative; width: min(100%, 280px); aspect-ratio: var(--page-ratio, 794 / 1123); margin: 0 auto 12px; overflow: hidden; border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
+.print-preview iframe { position: absolute; top: 0; left: 0; width: var(--page-pw, 794px); height: var(--page-ph, 1123px); border: 0; transform: scale(var(--fit, 0.35)); transform-origin: 0 0; pointer-events: none; }
 .print-size .seg { margin-bottom: 8px; }
 .print-label { margin: 6px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+body.sheet-open .mk-date-chip { visibility: hidden; } /* 시트가 열리면 메모의 날짜 알약은 숨긴다 (시트 제목 위에 겹쳤다) */
+/* PC PDF 만들기 창과 같은 고르기: 종이 · 비율 칩, 방향, 직접 입력 */
+.print-summary { margin: -4px 0 8px; font-size: 12.5px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.print-panel { margin: 8px 0 4px; }
+.print-panel[hidden] { display: none; }
+.print-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.print-chips button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-1, var(--bg)); color: var(--text); font: inherit; font-size: 13.5px; }
+.print-chips button[aria-checked="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 700; }
+.print-size-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.print-size-row input { width: 76px; height: 40px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; text-align: right; }
 .print-range { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; color: var(--muted); }
 .print-range input { flex: 1; accent-color: var(--brand-yellow); }
 .print-range output { min-width: 3.2em; font-weight: 700; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }

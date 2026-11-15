@@ -2468,8 +2468,9 @@ function renderUpdateDialog(st) {
     : '';
   updateEl.error.hidden = st.status !== 'error';
   updateEl.error.textContent = st.status === 'error' ? st.message ?? '' : '';
-  updateEl.go.textContent = ready ? '지금 재시작' : downloading ? '받는 중' : st.status === 'error' ? '다시 확인' : '받기';
-  updateEl.go.disabled = downloading;
+  updateEl.go.textContent = ready && st.restarting ? '곧 다시 시작해요' : ready ? '지금 재시작' : downloading ? '받는 중' : st.status === 'error' ? '다시 확인' : '받기';
+  updateEl.go.disabled = downloading || Boolean(ready && st.restarting); // 받기를 누른 것은 다 받으면 저절로 설치하고 다시 켠다 (updater.js)
+  if (downloading) updateEl.progressText.textContent += ' · 다 받으면 다시 시작해요';
   updateEl.later.textContent = ready ? '나중에 (끝낼 때 설치)' : downloading ? UI.updCloseKeep : '나중에';
 }
 

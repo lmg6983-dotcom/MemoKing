@@ -345,20 +345,36 @@
     <p id="share-busy" class="wait" hidden><span class="spinner"></span><span id="share-busy-text">만드는 중</span></p>
   </section>
 
-  <!-- PDF·인쇄: 종이에 담을 내용 크기 고르기 (첫 쪽 미리보기) -->
+  <!-- PDF로 저장 · 인쇄: PC 의 PDF 만들기 창과 같은 고르기 · 같은 말 (첫 쪽 미리보기) -->
   <section id="print-sheet" class="sheet print-sheet" role="dialog" aria-labelledby="print-sheet-title" hidden>
     <div class="sheet-grip"></div>
-    <h3 id="print-sheet-title" class="sheet-title">인쇄할 크기</h3>
+    <h3 id="print-sheet-title" class="sheet-title">PDF로 저장</h3>
     <div class="print-preview" id="print-preview" aria-hidden="true"><iframe id="print-frame" title="첫 쪽 미리보기" tabindex="-1" sandbox="allow-same-origin"></iframe></div>
-    <p class="print-label">글자 크기</p>
-    <div class="print-size">
-      <div class="seg" id="print-size-seg" role="radiogroup" aria-label="글자 크기">
-        <button type="button" data-scale="0.8" aria-checked="false">작게</button>
-        <button type="button" data-scale="1" aria-checked="true">보통</button>
-        <button type="button" data-scale="1.2" aria-checked="false">크게</button>
-        <button type="button" data-scale="1.45" aria-checked="false">아주 크게</button>
+    <p id="print-summary" class="print-summary" aria-live="polite"></p>
+    <p class="print-label">크기</p>
+    <div class="seg" id="print-kind" role="radiogroup" aria-label="크기 고르는 방법">
+      <button type="button" data-kind="paper" aria-checked="true">종이</button>
+      <button type="button" data-kind="ratio" aria-checked="false">카드 비율</button>
+      <button type="button" data-kind="custom" aria-checked="false">직접 입력</button>
+    </div>
+    <div class="print-panel" data-print-panel="paper">
+      <div class="print-chips" id="print-papers" role="radiogroup" aria-label="종이"></div>
+      <div class="seg small" id="print-orientation" role="radiogroup" aria-label="방향">
+        <button type="button" data-o="portrait" aria-checked="true">세로</button>
+        <button type="button" data-o="landscape" aria-checked="false">가로</button>
       </div>
-      <label class="print-range"><span>직접</span><input type="range" id="print-scale" min="50" max="200" step="5" value="100" aria-label="글자 크기 (퍼센트)"><output id="print-scale-out">100%</output></label>
+    </div>
+    <div class="print-panel" data-print-panel="ratio" hidden>
+      <div class="print-chips" id="print-ratios" role="radiogroup" aria-label="비율"></div>
+      <label class="print-range"><span>긴 변</span><input type="range" id="print-long" min="80" max="300" step="5" value="150" aria-label="긴 변 (mm)"><output id="print-long-out">150mm</output></label>
+    </div>
+    <div class="print-panel" data-print-panel="custom" hidden>
+      <div class="print-size-row">
+        <label>가로 <input type="number" id="print-cw" min="50" max="1200" step="1" value="100" inputmode="numeric"> mm</label>
+        <span aria-hidden="true">×</span>
+        <label>세로 <input type="number" id="print-ch" min="50" max="1200" step="1" value="150" inputmode="numeric"> mm</label>
+      </div>
+      <label class="setting-row"><input type="checkbox" id="print-lock" class="switch" role="switch" checked><span>비율 유지</span></label>
     </div>
     <p class="print-label">여백</p>
     <div class="print-size">
@@ -370,9 +386,21 @@
       </div>
       <label class="print-range"><span>직접</span><input type="range" id="print-margin" min="0" max="40" step="1" value="16" aria-label="여백 (mm)"><output id="print-margin-out">16mm</output></label>
     </div>
+    <p class="print-label">글자 크기</p>
+    <div class="print-size">
+      <div class="seg" id="print-size-seg" role="radiogroup" aria-label="글자 크기">
+        <button type="button" data-scale="0.8" aria-checked="false">작게</button>
+        <button type="button" data-scale="1" aria-checked="true">보통</button>
+        <button type="button" data-scale="1.2" aria-checked="false">크게</button>
+        <button type="button" data-scale="1.45" aria-checked="false">아주 크게</button>
+      </div>
+      <label class="print-range"><span>직접</span><input type="range" id="print-scale" min="50" max="200" step="5" value="100" aria-label="글자 크기 (퍼센트)"><output id="print-scale-out">100%</output></label>
+    </div>
+    <label class="setting-row"><input type="checkbox" id="print-bg" class="switch" role="switch"><span>메모 색 바탕</span></label>
+    <label class="setting-row"><input type="checkbox" id="print-date" class="switch" role="switch" checked><span>날짜 표시</span></label>
     <label class="setting-row print-fit-row"><input type="checkbox" id="print-fit" class="switch" role="switch" checked><span>그림을 쪽 안에 맞추기</span></label>
     <p id="print-busy" class="wait" hidden><span class="spinner"></span><span>PDF를 만드는 중</span></p>
-    <button type="button" class="btn primary print-go" id="print-go">PDF로 공유</button>
+    <button type="button" class="btn primary print-go" id="print-go">PDF로 저장</button>
   </section>
 
   <!-- 다른 앱에서 받은 소리 파일: 받아쓸지 그때마다 고르기 -->

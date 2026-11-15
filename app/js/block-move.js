@@ -387,8 +387,9 @@ export function createBlockMove({ readOnly = false } = {}) {
           tap = event.touches.length === 1 && t ? { x: t.clientX, y: t.clientY, at: Date.now(), target: event.target } : null;
           cancelHold();
           if (!canDrag()) {
-            // 글 고치기: 파일 칩 · 링크 카드 · 수식은 꾹 눌러 단추 (옮기기 방식에서는 꾹 누르면 들어 올림)
-            const host = tap && event.target instanceof Element ? event.target.closest(HOLD_TARGET) : null;
+            // 글 고치기: 콘텐츠(사진 · 파일 칩 · 링크 카드 · 수식 · 소리 · 동영상)를 꾹 누르면 옮기기 방식으로 바꾸고 바로 들어 올린다
+            //   (휴대폰 화면이 mk:want-move 를 받아 다이얼을 옮기기로 — 받는 곳이 없으면 예전처럼 단추 줄)
+            const host = tap && event.target instanceof Element ? event.target.closest(`${HOLD_TARGET}, ${TAP_TARGET}`) : null;
             const block = host && view.dom.contains(host) ? blockFromTarget(view, host) : null;
             if (block && isContentBlock(block.node) && touchMode() === 'edit') {
               hold = { x: t.clientX, y: t.clientY };
@@ -398,7 +399,9 @@ export function createBlockMove({ readOnly = false } = {}) {
                 if (view.isDestroyed || mover?.busy()) return;
                 haptic(12);
                 swallowOpen(view);
-                mover?.showDelete(block, { showMs: TAP_SHOW_MS });
+                window.dispatchEvent(new CustomEvent('mk:want-move'));
+                if (canDrag()) mover?.press(event, 'touch'); // 손가락은 그대로 — 옮기기 방식의 짧은 누르기로 곧 들린다
+                else mover?.showDelete(block, { showMs: TAP_SHOW_MS });
               }, HOLD_SHOW_MS);
             }
             return false;
@@ -683,6 +686,7 @@ class Mover {
     window.removeEventListener(io.up, p.up, LISTEN);
     if (io.cancel) window.removeEventListener(io.cancel, p.up, LISTEN);
     if (p.marked && !keepMark && !this.view.isDestroyed) this.decorate([]);
+    if (!keepMark) window.dispatchEvent(new CustomEvent('mk:move-done')); // 들기 전에 손을 뗐거나 밀었다 — 저절로 옮기기가 됐으면 되돌린다
   }
 
   lift(p) {
@@ -902,6 +906,7 @@ class Mover {
     document.body.classList.remove('mk-block-dragging', 'mk-block-compact');
     delete document.body.dataset.dragGain;
     this.drag = null;
+    window.dispatchEvent(new CustomEvent('mk:move-done')); // 휴대폰: 꾹 눌러 저절로 옮기기가 됐으면 놓은 뒤 글 고치기로 (note-view.js)
     // 끈 뒤 따라오는 클릭(파일 열기·링크 열기)은 먹는다
     const swallow = (e) => {
       e.preventDefault();

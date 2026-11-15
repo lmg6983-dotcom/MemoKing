@@ -34,6 +34,8 @@ export function notesText(notes) {
   return decodeEntities(raw.replace(/<\/(p|li|h\d)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')).replace(/[ \t]*\n[\s]*\n/g, '\n').trim().slice(0, 4000);
 }
 
+const RESTART_DELAY_MS = 1500; // 다 받은 뒤 다시 시작하기까지 ("곧 다시 시작해요" 를 읽을 틈)
+
 export class Updater {
   /**
    * @param {{ send: (channel: string, payload: any) => void, settings: object, saveSettings: () => void,
@@ -81,8 +83,14 @@ export class Updater {
     });
     u.on('download-progress', (p) => this.set({ status: 'downloading', percent: Math.round(p.percent ?? 0), transferred: p.transferred ?? 0, total: p.total ?? 0, bytesPerSecond: p.bytesPerSecond ?? 0 }));
     u.on('update-downloaded', (info) => {
-      this.set({ status: 'ready', version: info.version, notes: notesText(info.releaseNotes) || this.state.notes });
+      this.set({ status: 'ready', version: info.version, notes: notesText(info.releaseNotes) || this.state.notes, restarting: this.installAfter === true });
       this.announce('update:ready');
+      if (this.installAfter) {
+        // "받기" 를 눌러 받은 것: 다 받으면 저절로 설치하고 다시 켠다 (예전에는 "지금 재시작" 을 한 번 더 눌러야 했다)
+        this.installAfter = false;
+        const t = setTimeout(() => Promise.resolve(this.installNow()).catch((err) => console.warn('[update] 설치', err)), RESTART_DELAY_MS); // "곧 다시 시작해요" 를 잠깐 보여 준 뒤
+        t.unref?.();
+      }
     });
     u.on('error', (err) => {
       console.warn('[update]', err);
@@ -145,6 +153,7 @@ export class Updater {
 
   async download() {
     if (!this.updater || this.state.status !== 'available') return this.state;
+    this.installAfter = true; // 다 받으면 설치하고 다시 켠다 (update-downloaded)
     this.set({ status: 'downloading', percent: 0 });
     try {
       await this.updater.downloadUpdate();

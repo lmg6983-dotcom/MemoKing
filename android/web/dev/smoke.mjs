@@ -1419,13 +1419,30 @@ try {
   await page.tap('[data-memo-action="share"]');
   await page.tap('[data-share="pdf"]');
   await page.waitForSelector('#print-sheet:not([hidden])');
-  check('PDF: 먼저 내용 크기 고르기 (작게·보통·크게·아주 크게 + 직접)', (await page.locator('#print-size-seg [data-scale]').count()) === 4 && await page.isVisible('#print-scale'));
+  check('PDF: 글자 크기 고르기 (작게·보통·크게·아주 크게 + 직접)', (await page.locator('#print-size-seg [data-scale]').count()) === 4 && await page.isVisible('#print-scale'));
+  // PC PDF 만들기 창과 같은 고르기 · 같은 말: 크기(종이 · 카드 비율 · 직접 입력) · 방향 · 여백 · 메모 색 바탕 · 날짜 표시
+  {
+    const words = await page.evaluate(() => ({ title: document.getElementById('print-sheet-title').textContent, go: document.getElementById('print-go').textContent,
+      kinds: [...document.querySelectorAll('#print-kind [data-kind]')].map((b) => b.textContent).join('|'), papers: [...document.querySelectorAll('#print-papers [data-paper]')].map((b) => b.textContent).join('|') }));
+    await page.tap('#print-papers [data-paper="a5"]');
+    await page.tap('#print-orientation [data-o="landscape"]');
+    await page.tap('#print-bg');
+    await page.waitForTimeout(500);
+    const pv = await page.$eval('#print-frame', (f) => ({ size: /@page \{ size: 210mm 148mm;/.test(f.srcdoc), bg: /class="[^"]*with-bg/.test(f.srcdoc), date: f.srcdoc.includes('print-date') }));
+    check('PDF: PC 와 같은 고르기 · 같은 말 (PDF로 저장 · 종이/카드 비율/직접 입력 · A4/A5/B5/레터 · A5 가로 · 메모 색 바탕 · 날짜)', words.title === 'PDF로 저장' && words.go === 'PDF로 저장'
+      && words.kinds === '종이|카드 비율|직접 입력' && words.papers === 'A4|A5|B5|레터' && pv.size && pv.bg && pv.date, JSON.stringify({ words, pv }));
+    // 다음 점검을 위해 A4 세로 · 바탕 없음으로 되돌린다
+    await page.tap('#print-papers [data-paper="a4"]');
+    await page.tap('#print-orientation [data-o="portrait"]');
+    await page.tap('#print-bg');
+    await page.waitForTimeout(300);
+  }
   await page.tap('#print-size-seg [data-scale="1.2"]');
   await page.waitForTimeout(400);
   check('PDF: 크기를 고르면 미리보기도 그 크기로', /zoom: 1\.2/.test(await page.$eval('#print-frame', (f) => f.srcdoc)) && (await page.textContent('#print-scale-out')) === '120%');
   await shot('09b-print-size');
   {
-    const on = await page.$eval('#print-frame', (f) => f.srcdoc.includes('class="print-page fit-images"'));
+    const on = await page.$eval('#print-frame', (f) => /class="print-page fit-images/.test(f.srcdoc));
     await page.tap('#print-fit');
     await page.waitForTimeout(400);
     const off = await page.$eval('#print-frame', (f) => !f.srcdoc.includes('fit-images'));
@@ -1659,13 +1676,24 @@ try {
   await setMode('edit');
   {
     const ib2 = await page.locator('img.mk-image').first().boundingBox();
-    await touch('touchStart', ib2.x + 40, ib2.y + 40);
-    await page.waitForTimeout(80);
-    await touch('touchEnd', ib2.x + 40, ib2.y + 40);
+    const tapImg = async () => {
+      await touch('touchStart', ib2.x + 40, ib2.y + 40);
+      await page.waitForTimeout(60);
+      await touch('touchEnd', ib2.x + 40, ib2.y + 40);
+    };
+    // 한 번 누르면 크게 보기 없이 단추 줄만 (파일 칩처럼 두 번 눌러야 연다)
+    await tapImg();
     await page.waitForTimeout(250);
-    // 그림 한 장도 누르면 크게 보기 (묶음 사진과 같은 보기) — 닫으면 그 그림의 단추 줄
+    const once = await page.evaluate(() => ({ viewer: Boolean(document.querySelector('.mk-album-view')), row: Boolean(document.querySelector('.mk-delete-btn')) }));
+    check('그림 한 번 누르기: 크게 보기는 열리지 않고 단추 줄만', !once.viewer && once.row, JSON.stringify(once));
+    await page.waitForTimeout(500);
+    await tapImg();
+    await page.waitForTimeout(80);
+    await tapImg();
+    await page.waitForTimeout(250);
+    // 두 번 누르면 크게 보기 (묶음 사진과 같은 보기) — 닫으면 그 그림의 단추 줄
     const big = await page.evaluate(() => { const v = document.querySelector('.mk-album-view'); return v && { src: Boolean(v.querySelector('.mk-album-big')?.src), count: v.querySelector('.mk-album-count').textContent, row: Boolean(document.querySelector('.mk-delete-btn')) }; });
-    check('그림 한 장을 누르면 크게 보기 (번호 없이 · 단추 줄은 닫은 뒤에)', Boolean(big?.src) && big.count === '' && !big.row, JSON.stringify(big));
+    check('그림 두 번 누르기: 크게 보기 (번호 없이 · 단추 줄은 닫은 뒤에)', Boolean(big?.src) && big.count === '' && !big.row, JSON.stringify(big));
     await page.tap('.mk-album-view button[aria-label="닫기"]');
     await page.waitForTimeout(250);
     const shown = await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn') && await page.isVisible('.mk-save-btn');
@@ -1692,9 +1720,7 @@ try {
       await touch('touchStart', ib3.x + 40, ib3.y + 40);
       await page.waitForTimeout(80);
       await touch('touchEnd', ib3.x + 40, ib3.y + 40);
-      await page.waitForTimeout(250);
-      await page.tap('.mk-album-view button[aria-label="닫기"]'); // 크게 보기를 닫으면 단추 줄
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(400); // 한 번 누르면 단추 줄 (크게 보기는 두 번 눌러야)
     }
     await shot('18c-tap-buttons');
     // 저장 단추: 메모 폴더의 사진은 원본 파일 그대로 안드로이드 저장 창으로
@@ -1757,16 +1783,16 @@ try {
     const shared = (await devLog()).log.filter((x) => x.shareContent).at(-1);
     check('공유 버튼: 음성은 소리 파일 그대로 공유 창으로', shared?.shareContent.rel === 'attachments/voice-btn.m4a' && await page.isVisible('.mk-share-btn.done'), JSON.stringify(shared));
     await page.waitForTimeout(300);
-    // 파일 칩: 짧게 누르면 열기 그대로, 꾹 누르면 단추 (열지 않음)
+    // 파일 칩: 짧게 누르면 단추 (열지 않음 — 여는 것은 두 번 누르거나 "열기")
     const opensBefore = (await devLog()).log.filter((x) => x.openFile).length;
     const chip = await page.locator('.mk-doc a[data-file]').boundingBox();
     await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
-    await page.waitForTimeout(650);
+    await page.waitForTimeout(80);
     await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(400);
     const chipLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
     const opensAfter = (await devLog()).log.filter((x) => x.openFile).length;
-    check('파일 칩: 꾹 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 삭제' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
+    check('파일 칩: 짧게 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 삭제' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
     check('파일 칩: 옆에 "열기" 단추 없음', (await page.locator('.mk-file-open').count()) === 0);
     await page.tap('.mk-copy-btn');
     await page.waitForTimeout(500);
@@ -1774,14 +1800,25 @@ try {
     check('복사 버튼: 파일은 이름 글이 아니라 파일 그대로 (이름 붙여)', copiedFile?.copyFile.rel === 'attachments/안내서.pdf' && copiedFile.copyFile.name === '안내서.pdf', JSON.stringify(copiedFile));
     await page.waitForTimeout(1900);
     await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
-    await page.waitForTimeout(650);
+    await page.waitForTimeout(80);
     await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(400);
     await page.tap('.mk-save-btn');
     await page.waitForTimeout(500);
     const saved = (await devLog()).log.filter((x) => x.saveAs).at(-1);
     check('저장 버튼: PDF는 파일 그대로', saved?.saveAs.rel === 'attachments/안내서.pdf' && saved.saveAs.name === '안내서.pdf', JSON.stringify(saved));
     await page.waitForTimeout(1900);
+    // 글 고치기에서 콘텐츠를 꾹 누르면 옮기기 방식으로 바뀌고 그 자리에서 바로 들린다 (다이얼도 옮기기로) → 손을 떼면 제자리
+    {
+      await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
+      await page.waitForTimeout(800);
+      const held = await page.evaluate(() => ({ knob: document.querySelector('.mode-knob')?.dataset.mode, lifted: document.querySelectorAll('.mk-block-lift').length }));
+      await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
+      await page.waitForTimeout(400);
+      check('글 고치기: 콘텐츠를 꾹 누르면 옮기기 방식으로 바뀌고 바로 들림', held.knob === 'move' && held.lifted === 1, JSON.stringify(held));
+      await setMode('edit');
+      await page.waitForTimeout(1900);
+    }
     // 파일 칩을 짧게 눌러도 바로 열지 않고 단추 + 노란 "열기" (맨 왼쪽) → "열기"를 누르면 그때 연다
     const tapAt = async (sel) => {
       const b = await page.locator(sel).first().boundingBox();

@@ -1,6 +1,6 @@
 // 메모킹 안드로이드 — 시작, 화면 바꾸기, 설정·휴지통, 다른 앱에서 받은 것, 예약 알림
 import { daysAgoText } from '../../app/js/core/time.js';
-import { clampPrintScale, clampMarginMm, MARGINS } from '../../app/js/core/pdf-page.js';
+import { clampPrintScale, clampMarginMm, MARGINS, PAPERS, RATIOS, pageSize, keepRatio, clampMm } from '../../app/js/core/pdf-page.js';
 import { trashedText } from '../../app/js/core/format.js';
 import { injectIcons, icon } from '../../app/js/icons.js';
 import { normalizeReminder } from '../../app/js/core/reminders.js';
@@ -35,7 +35,7 @@ import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
 import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
-import { printHtml, pagePx } from './print-html.js';
+import { printHtml, pagePx, pageFullPx } from './print-html.js';
 import { fitPages } from '../../app/js/print-fit.js';
 import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
@@ -752,26 +752,50 @@ shareSheet.addEventListener('click', async (e) => {
   }
 });
 
-// ---------- PDF · 인쇄: 종이에 담을 내용 크기 ----------
-//   크기를 고르면 첫 쪽 미리보기가 바로 바뀐다. 고른 크기는 다음에도 (이 휴대폰에만)
+// ---------- PDF로 저장 · 인쇄 (PC 의 PDF 만들기 창과 같은 고르기 · 같은 말) ----------
+//   크기(종이 · 카드 비율 · 직접 입력, 방향) · 여백 · 글자 크기 · 메모 색 바탕 · 날짜 표시 · 그림 맞추기.
+//   고르면 첫 쪽 미리보기가 바로 바뀐다. 고른 것은 다음에도 (이 휴대폰에만)
 const printSheet = $('print-sheet');
 const SCALE_KEY = 'memoking.printScale';
 const FIT_KEY = 'memoking.printFit';
 const MARGIN_KEY = 'memoking.printMargin';
-const printJob = { id: null, mode: 'share', scale: 1, fit: true, margin: MARGINS.normal };
+const PAGE_KEY = 'memoking.printPage';
+const printJob = { id: null, mode: 'share', scale: 1, fit: true, margin: MARGINS.normal,
+  page: { kind: 'paper', paper: 'a4', orientation: 'portrait', ratio: '4:3', long: 150, width: 100, height: 150, lock: true, bg: false, date: true } };
 try {
   printJob.scale = clampPrintScale(localStorage.getItem(SCALE_KEY));
   printJob.fit = localStorage.getItem(FIT_KEY) !== 'off';
   printJob.margin = clampMarginMm(localStorage.getItem(MARGIN_KEY));
+  printJob.page = { ...printJob.page, ...JSON.parse(localStorage.getItem(PAGE_KEY) ?? '{}') };
 } catch {
   // 기본 크기
+}
+const savePrintPage = () => {
+  try {
+    localStorage.setItem(PAGE_KEY, JSON.stringify(printJob.page));
+  } catch {
+    // 이번만
+  }
+};
+const printSize = () => pageSize(printJob.page);
+// 실제로 쓸 여백: 작은 종이에 큰 여백을 고르면 글 칸이 없어지므로 짧은 변에 글 칸 20mm 는 남긴다 (PC pdf.js 와 같다)
+const printMargin = (s = printSize()) => Math.max(0, Math.min(printJob.margin, Math.floor((Math.min(s.width, s.height) - 20) / 2)));
+// 날짜 줄: PC 와 같은 말 ("만듦 · 고침")
+function printDateLine(id) {
+  const m = app.vault.get(id);
+  if (!printJob.page.date || !m?.created) return '';
+  const f = (v) => new Date(v).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+  return f(m.created) === f(m.updated ?? m.created) ? f(m.created) : `${f(m.created)} 만듦, ${f(m.updated)} 고침`;
 }
 
 function printTitle(id) {
   return titleOf(note.currentId() === id ? note.editorMarkdown() : app.vault.get(id)?.body ?? '');
 }
 function printDoc(id, preview = false) {
-  return printHtml(note.getEditor().dom(), { title: printTitle(id), color: app.vault.get(id)?.color, scale: printJob.scale, fit: printJob.fit, margin: printJob.margin, preview });
+  const s = printSize();
+  const pageBg = getComputedStyle(note.getEditor().dom()).getPropertyValue('--note-bg').trim(); // 화면의 메모 색 그대로
+  return printHtml(note.getEditor().dom(), { title: printTitle(id), color: app.vault.get(id)?.color, scale: printJob.scale, fit: printJob.fit,
+    margin: printMargin(s), page: s, bg: printJob.page.bg, pageBg, date: printDateLine(id), preview });
 }
 // 쪽 나눔 다듬기(print-fit.js)는 그려진 높이를 재야 한다 — 인쇄용 WebView 는 스크립트 없이 그대로 찍으므로
 //   여기서 보이지 않는 틀에 쪽 폭으로 그려 고친 뒤 그 HTML 을 넘긴다 (미리보기 틀은 그 자리에서 고친다)
@@ -789,7 +813,7 @@ async function fittedDoc(id) {
   if (!printJob.fit) return html;
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
-  const page = pagePx(printJob.margin);
+  const page = pagePx(printSize(), printMargin());
   frame.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${page.width}px; height: ${page.height}px; border: 0; visibility: hidden;`;
   const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
   frame.srcdoc = html;
@@ -810,19 +834,49 @@ function drawPrintSize() {
   for (const b of printSheet.querySelectorAll('[data-scale]')) b.setAttribute('aria-checked', String(Math.abs(Number(b.dataset.scale) - printJob.scale) < 0.001));
   $('print-fit').checked = printJob.fit;
   $('print-margin').value = String(printJob.margin);
-  $('print-margin-out').textContent = `${printJob.margin}mm`;
+  $('print-margin-out').textContent = `${printMargin()}mm`; // 작은 종이라 줄여 쓰면 줄인 값
+  // 크기 (종이 · 카드 비율 · 직접 입력)
+  const pg = printJob.page;
+  const radio = (box, attr, value) => box.querySelectorAll(`[data-${attr}]`).forEach((b) => b.setAttribute('aria-checked', String(b.dataset[attr] === value)));
+  radio($('print-kind'), 'kind', pg.kind);
+  for (const panel of printSheet.querySelectorAll('[data-print-panel]')) panel.hidden = panel.dataset.printPanel !== pg.kind;
+  const chips = (box, list, attr) => box.replaceChildren(...list.map((x) => {
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: x.label });
+    b.setAttribute(`data-${attr}`, x.id);
+    b.setAttribute('role', 'radio');
+    return b;
+  }));
+  if (!$('print-papers').childElementCount) chips($('print-papers'), PAPERS, 'paper');
+  if (!$('print-ratios').childElementCount) chips($('print-ratios'), RATIOS, 'ratio');
+  radio($('print-papers'), 'paper', pg.paper);
+  radio($('print-ratios'), 'ratio', pg.ratio);
+  radio($('print-orientation'), 'o', pg.orientation);
+  $('print-long').value = String(pg.long);
+  $('print-long-out').textContent = `${pg.long}mm`;
+  $('print-cw').value = String(pg.width);
+  $('print-ch').value = String(pg.height);
+  $('print-lock').checked = pg.lock !== false;
+  $('print-bg').checked = Boolean(pg.bg);
+  $('print-date').checked = pg.date !== false;
+  const s = printSize();
+  $('print-summary').textContent = `${Math.round(s.width)} × ${Math.round(s.height)}mm`;
+  fitPreview();
   for (const b of printSheet.querySelectorAll('[data-margin]')) b.setAttribute('aria-checked', String(Number(b.dataset.margin) === printJob.margin));
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
     if (!printJob.id || printSheet.hidden) return;
     const frame = $('print-frame');
-    if (printJob.fit) frame.addEventListener('load', () => fitFrame(frame, 1123 - 2 * Math.round(printJob.margin * 96 / 25.4)), { once: true }); // 미리보기 쪽: 794×1123, 안쪽 여백 = 고른 여백 (print-html.js)
+    if (printJob.fit) frame.addEventListener('load', () => fitFrame(frame, pageFullPx(printSize()).height - 2 * Math.round(printMargin() * 96 / 25.4)), { once: true }); // 미리보기 쪽: 쪽 전체 크기, 안쪽 여백 = 고른 여백 (print-html.js)
     frame.srcdoc = printDoc(printJob.id, true);
   }, 120);
 }
 function fitPreview() {
   const box = $('print-preview');
-  box.style.setProperty('--fit', String(box.clientWidth / 794));
+  const full = pageFullPx(printSize());
+  box.style.setProperty('--page-ratio', `${full.width} / ${full.height}`);
+  box.style.setProperty('--page-pw', `${full.width}px`);
+  box.style.setProperty('--page-ph', `${full.height}px`);
+  box.style.setProperty('--fit', String(box.clientWidth / full.width));
 }
 async function openPrint(id, mode) {
   if (note.currentId() !== id) await app.openMemo(id);
@@ -830,8 +884,9 @@ async function openPrint(id, mode) {
   await note.settled();
   printJob.id = id;
   printJob.mode = mode;
-  $('print-sheet-title').textContent = mode === 'print' ? '인쇄할 크기' : 'PDF에 담을 크기';
-  $('print-go').textContent = mode === 'print' ? '인쇄' : 'PDF로 공유';
+  // PC 와 같은 말: "PDF로 저장" (휴대폰은 만든 PDF 를 저장 · 공유 창으로) · "인쇄"
+  $('print-sheet-title').textContent = mode === 'print' ? '인쇄' : 'PDF로 저장';
+  $('print-go').textContent = mode === 'print' ? '인쇄' : 'PDF로 저장';
   $('print-go').disabled = false;
   $('print-busy').hidden = true;
   openSheet(printSheet);
@@ -867,6 +922,31 @@ printSheet.querySelector('#print-margin-seg').addEventListener('click', (e) => {
   if (b) setPrintMargin(Number(b.dataset.margin));
 });
 $('print-margin').addEventListener('input', (e) => setPrintMargin(Number(e.target.value)));
+// 크기 · 방향 · 바탕 · 날짜 (PC PDF 만들기 창과 같은 고르기)
+const setPrintPage = (patch) => {
+  Object.assign(printJob.page, patch);
+  savePrintPage();
+  drawPrintSize();
+};
+printSheet.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-kind], [data-paper], [data-ratio], [data-o]');
+  if (!b || !printSheet.contains(b)) return;
+  if (b.dataset.kind) setPrintPage({ kind: b.dataset.kind });
+  else if (b.dataset.paper) setPrintPage({ paper: b.dataset.paper });
+  else if (b.dataset.ratio) setPrintPage({ ratio: b.dataset.ratio });
+  else if (b.dataset.o) setPrintPage({ orientation: b.dataset.o });
+});
+$('print-long').addEventListener('input', (e) => setPrintPage({ long: Number(e.target.value) }));
+for (const [input, side] of [[$('print-cw'), 'width'], [$('print-ch'), 'height']]) {
+  input.addEventListener('change', () => {
+    const v = Number(input.value);
+    const pg = printJob.page;
+    setPrintPage($('print-lock').checked ? keepRatio(side, v, { width: pg.width, height: pg.height }) : { [side]: clampMm(v) });
+  });
+}
+$('print-lock').addEventListener('change', (e) => setPrintPage({ lock: e.target.checked }));
+$('print-bg').addEventListener('change', (e) => setPrintPage({ bg: e.target.checked }));
+$('print-date').addEventListener('change', (e) => setPrintPage({ date: e.target.checked }));
 $('print-fit').addEventListener('change', (e) => {
   printJob.fit = e.target.checked;
   try {
@@ -884,14 +964,14 @@ $('print-go').addEventListener('click', async () => {
   const html = await fittedDoc(id);
   if (printJob.mode === 'print') {
     closeSheet(printSheet);
-    call('print', { title, html, margin: printJob.margin }).catch((err) => toast(err.message, true));
+    call('print', { title, html, ...printSize() }).catch((err) => toast(err.message, true));
     return;
   }
   $('print-go').disabled = true;
   $('print-busy').hidden = false;
   try {
     // 앱이 PDF 를 바로 만들지 못하면 스스로 인쇄 화면("PDF로 저장")을 연다. 그래도 답이 없으면 계속 기다리지 않는다
-    await withTimeout(call('sharePdf', { title, name: fileName(title, 'pdf'), html, margin: printJob.margin }), PDF_WAIT_MS, 'PDF를 만들지 못했어요. 잠시 뒤 다시 해 주세요');
+    await withTimeout(call('sharePdf', { title, name: fileName(title, 'pdf'), html, ...printSize() }), PDF_WAIT_MS, 'PDF를 만들지 못했어요. 잠시 뒤 다시 해 주세요');
     closeSheet(printSheet);
   } catch (err) {
     console.error(err);

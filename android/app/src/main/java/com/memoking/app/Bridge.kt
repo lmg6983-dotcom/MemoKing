@@ -342,7 +342,7 @@ class Bridge(private val activity: MainActivity) {
             "openUrl" -> activity.runOnUiThread { activity.openUrl(id, a.getString("url")) }
             "share" -> activity.runOnUiThread { activity.shareText(id, a.optString("title"), a.getString("text")) }
             "print" -> activity.runOnUiThread {
-                activity.pdfMarginMm = a.optDouble("margin", 16.0)
+                activity.pdfPageMm = pageOf(a)
                 activity.printPage(id, a.optString("title", "메모"), a.optString("html").ifBlank { null })
             }
             "notifyPermission" -> activity.runOnUiThread { activity.requestNotifyPermission(id) }
@@ -549,7 +549,7 @@ class Bridge(private val activity: MainActivity) {
                 activity.runOnUiThread { activity.shareFile(id, file, a.optString("mime", "application/octet-stream"), a.optString("title")) }
             }
             "sharePdf" -> activity.runOnUiThread {
-                activity.pdfMarginMm = a.optDouble("margin", 16.0)
+                activity.pdfPageMm = pageOf(a)
                 activity.sharePdf(id, shareFile(a.optString("name", "메모.pdf")), a.optString("title", "메모"), a.optString("html").ifBlank { null })
             }
             // 기본: 휴대폰 구글 계정 그대로 (계정 고르기·허용). browser=true 면 브라우저 로그인(예비)
@@ -618,6 +618,13 @@ class Bridge(private val activity: MainActivity) {
     }
 
     /** 보낼 파일 자리: cache/share/<이름> (이전 것은 지운다) */
+    /** PDF 쪽 크기 (mm) { width, height } — 없으면 null (A4 · 예전 여백) */
+    private fun pageOf(a: JSONObject): Pair<Double, Double>? {
+        val w = a.optDouble("width", Double.NaN)
+        val h = a.optDouble("height", Double.NaN)
+        return if (w.isFinite() && h.isFinite() && w > 0 && h > 0) Pair(w, h) else null
+    }
+
     private fun shareFile(name: String): File {
         val dir = File(ctx.cacheDir, VaultFileProvider.SHARE_DIR).apply { mkdirs() }
         dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 60 * 60 * 1000 }?.forEach { it.delete() }
