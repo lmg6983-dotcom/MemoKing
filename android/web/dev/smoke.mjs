@@ -1766,16 +1766,16 @@ try {
     const shared = (await devLog()).log.filter((x) => x.shareContent).at(-1);
     check('공유 버튼: 음성은 소리 파일 그대로 공유 창으로', shared?.shareContent.rel === 'attachments/voice-btn.m4a' && await page.isVisible('.mk-share-btn.done'), JSON.stringify(shared));
     await page.waitForTimeout(300);
-    // 파일 칩: 짧게 누르면 열기 그대로, 꾹 누르면 단추 (열지 않음)
+    // 파일 칩: 짧게 누르면 단추 (열지 않음 — 여는 것은 두 번 누르거나 "열기")
     const opensBefore = (await devLog()).log.filter((x) => x.openFile).length;
     const chip = await page.locator('.mk-doc a[data-file]').boundingBox();
     await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
-    await page.waitForTimeout(650);
+    await page.waitForTimeout(80);
     await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(400);
     const chipLabel = await page.getAttribute('.mk-delete-btn', 'aria-label').catch(() => null);
     const opensAfter = (await devLog()).log.filter((x) => x.openFile).length;
-    check('파일 칩: 꾹 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 삭제' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
+    check('파일 칩: 짧게 누르면 공유 · 저장 · 복사 · × (파일을 열지 않음)', chipLabel === '이 파일 삭제' && await page.isVisible('.mk-share-btn') && opensAfter === opensBefore, JSON.stringify({ chipLabel, opensBefore, opensAfter }));
     check('파일 칩: 옆에 "열기" 단추 없음', (await page.locator('.mk-file-open').count()) === 0);
     await page.tap('.mk-copy-btn');
     await page.waitForTimeout(500);
@@ -1783,14 +1783,25 @@ try {
     check('복사 버튼: 파일은 이름 글이 아니라 파일 그대로 (이름 붙여)', copiedFile?.copyFile.rel === 'attachments/안내서.pdf' && copiedFile.copyFile.name === '안내서.pdf', JSON.stringify(copiedFile));
     await page.waitForTimeout(1900);
     await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
-    await page.waitForTimeout(650);
+    await page.waitForTimeout(80);
     await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(400);
     await page.tap('.mk-save-btn');
     await page.waitForTimeout(500);
     const saved = (await devLog()).log.filter((x) => x.saveAs).at(-1);
     check('저장 버튼: PDF는 파일 그대로', saved?.saveAs.rel === 'attachments/안내서.pdf' && saved.saveAs.name === '안내서.pdf', JSON.stringify(saved));
     await page.waitForTimeout(1900);
+    // 글 고치기에서 콘텐츠를 꾹 누르면 옮기기 방식으로 바뀌고 그 자리에서 바로 들린다 (다이얼도 옮기기로) → 손을 떼면 제자리
+    {
+      await touch('touchStart', chip.x + 10, chip.y + chip.height / 2);
+      await page.waitForTimeout(800);
+      const held = await page.evaluate(() => ({ knob: document.querySelector('.mode-knob')?.dataset.mode, lifted: document.querySelectorAll('.mk-block-lift').length }));
+      await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
+      await page.waitForTimeout(400);
+      check('글 고치기: 콘텐츠를 꾹 누르면 옮기기 방식으로 바뀌고 바로 들림', held.knob === 'move' && held.lifted === 1, JSON.stringify(held));
+      await setMode('edit');
+      await page.waitForTimeout(1900);
+    }
     // 파일 칩을 짧게 눌러도 바로 열지 않고 단추 + 노란 "열기" (맨 왼쪽) → "열기"를 누르면 그때 연다
     const tapAt = async (sel) => {
       const b = await page.locator(sel).first().boundingBox();

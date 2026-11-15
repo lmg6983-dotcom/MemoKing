@@ -1011,6 +1011,7 @@ el.editorRoot.addEventListener('pointerdown', (e) => {
   showGuide('글자 칸에 쓰면 글자로 바뀌어요. 톡 누르면 커서, 꾹 누르면 고르기예요. 키보드는 아래 키보드 버튼으로 꺼내요', 'S펜 손글씨', 4200);
 }, true);
 
+let wantMoveBound = false;
 function applyMode(mode, { user = false, quiet = false } = {}) {
   el.screen.dataset.touchMode = mode;
   // 글 고치기에서만 고칠 수 있다 — 옮기기·그리기에서 펜을 대도 커서 막대·손글씨 아이콘이 생기지 않게 (고칠 칸이 없으므로)
@@ -1117,6 +1118,13 @@ export function useEditMode() {
 }
 function setupKnob() {
   knob ??= setupModeKnob(el.screen, { value: storedMode(), onChange: (m, { quiet }) => applyMode(m, { user: true, quiet }) });
+  // 글 고치기에서 콘텐츠를 꾹 누르면 옮기기 방식으로 (block-move.js) — 다이얼도 함께 돌아간다
+  if (!wantMoveBound) {
+    wantMoveBound = true;
+    window.addEventListener('mk:want-move', () => {
+      if (knob?.mode === 'edit' && !el.screen.hidden) knob.set('move');
+    });
+  }
   // 다이얼은 아래쪽 막대들(도구막대 · 추천 태그 줄) 바로 위 — 키보드가 올라와 막대가 움직여도 따라간다
   //   도구막대 · 옮기기 막대 · 그리기 도구 막대는 같은 높이(52px)·같은 자리라 그만큼은 고정 — 방식을 바꿔도
   //   (막대가 올라오는 움직임 도중에 재더라도) 다이얼 · 안내가 제자리. 추천 태그 줄이 더 얹히면 그만큼 위로
