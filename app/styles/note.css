@@ -1664,7 +1664,7 @@ body.mk-block-compact .mk-doc .mk-block-compact-item { max-height: 96px; overflo
 body.mk-block-compact .mk-doc .mk-block-compact-item.mk-block-clipped { -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
 body.mk-block-compact .mk-doc :is(p, h1, h2, h3, h4, h5, h6).mk-block-compact-item { width: fit-content; max-width: 100%; }
 /* 사진 폭 제한은 % 가 아닌 px 로 (% 는 사진을 감싼 줄 기준이라 사진만 줄고 틀은 넓게 남았다) */
-body.mk-block-compact .mk-doc .mk-block-compact-item img.mk-image { width: auto; height: auto; max-height: 88px; max-width: 220px; border-radius: 8px; }
+body.mk-block-compact .mk-doc .mk-block-compact-item img.mk-image { width: auto !important; height: auto; max-height: 88px; max-width: 220px; border-radius: 8px; } /* !important: 크기를 맞춘 그림의 width % (줄 안 style) 보다 앞서게 — 아니면 높이만 줄어 찌그러진다 */
 body.mk-block-compact .mk-doc p.mk-image-line.mk-block-compact-item { -webkit-mask-image: none; mask-image: none; }
 body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height: 92px; }
 

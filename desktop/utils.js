@@ -278,8 +278,12 @@ export function copyFileToClipboard(p) {
           resolve(!err);
         });
     } else if (process.platform === 'darwin') {
-      // 여러 개도 (파인더에 붙이면 모두)
-      const script = ['on run argv', 'set fs to {}', 'repeat with a in argv', 'set end of fs to (POSIX file (a as text))', 'end repeat', 'set the clipboard to fs', 'end run'];
+      // 하나는 예전 그대로, 여러 개는 클립보드(NSPasteboard)에 파일 주소들로 — 파인더에 붙이면 모두 (AppleScript 목록은 파일로 붙지 않는다)
+      const script = all.length === 1
+        ? ['on run argv', 'set the clipboard to (POSIX file (item 1 of argv))', 'end run']
+        : ['use framework "AppKit"', 'on run argv', 'set urls to current application\'s NSMutableArray\'s array()', 'repeat with a in argv',
+          'urls\'s addObject:(current application\'s NSURL\'s fileURLWithPath:(a as text))', 'end repeat',
+          'set pb to current application\'s NSPasteboard\'s generalPasteboard()', 'pb\'s clearContents()', 'pb\'s writeObjects:urls', 'end run'];
       execFile('osascript', [...script.flatMap((l) => ['-e', l]), ...all], { timeout: 8000 }, (err) => resolve(!err));
     } else {
       // 리눅스: 파일 관리자용 형식이 없으면(일부 Electron) 경로라도 글로
