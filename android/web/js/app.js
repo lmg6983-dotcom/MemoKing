@@ -439,8 +439,11 @@ app.openMemo = async (id, options = {}) => {
   syncPane();
 };
 
+let creatingMemo = false; // 빠르게 두 번 눌러도 새 메모는 하나만
 app.newMemo = async ({ color, voice = false, ink = false } = {}) => {
-  if (!app.vault) return null;
+  if (!app.vault || creatingMemo) return null;
+  creatingMemo = true;
+  setTimeout(() => (creatingMemo = false), 500);
   let pick = color;
   if (!pick) {
     try {
