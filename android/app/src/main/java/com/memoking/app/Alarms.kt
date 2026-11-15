@@ -67,7 +67,18 @@ object Alarms {
 
     /** 휴대폰을 다시 켰을 때: 기억해 둔 예약을 다시 건다 */
     fun restore(ctx: Context) {
-        schedule(ctx, JSONArray(Vaults.prefs(ctx).getString(SCHEDULE, "[]")))
+        val saved = JSONArray(Vaults.prefs(ctx).getString(SCHEDULE, "[]"))
+        // 꺼져 있는 사이 지난 알림(하루 안): 앱을 열 때까지 기다리지 않고 바로 알린다 (예전: 다시 켠 뒤 앱을 열어야 알았다)
+        val now = System.currentTimeMillis()
+        for (i in 0 until saved.length()) {
+            val item = saved.getJSONObject(i)
+            val at = item.optLong("at")
+            val key = item.optString("key")
+            if (at > now || at < now - 24L * 60 * 60 * 1000 || key.isEmpty() || wasFired(ctx, key, at)) continue
+            markFired(ctx, key, at)
+            Notifier.show(ctx, key, item.optString("title"), "놓친 알림 · ${item.optString("text")}", item.optString("memoId"), item.optString("label"))
+        }
+        schedule(ctx, saved)
     }
 
     fun markFired(ctx: Context, key: String, at: Long) {
