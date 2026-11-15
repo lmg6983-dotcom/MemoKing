@@ -38,7 +38,7 @@ import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewT
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
 import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet } from './folder-ui.js';
-import { folderList, movedText, isFolderName, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
+import { folderList, movedText, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
@@ -208,7 +208,9 @@ const inFolder = (memos) => memosInFolder(memos, state.folder);
 const newMemo = (opts = {}) => api.memo.create({ ...opts, ...(state.folder && state.folder !== UNFILED ? { folder: state.folder } : {}) });
 
 async function loadFolders() {
-  state.folderDirs = await api.memos.folders?.().catch(() => []) ?? [];
+  const dirs = await api.memos.folders?.().catch(() => []) ?? [];
+  if (state.folderDirs && dirs.join('\n') === state.folderDirs.join('\n')) return; // 그대로면 다시 그리지 않는다
+  state.folderDirs = dirs;
   render(); // 카드도 (고른 폴더가 없어졌으면 전체로 — keepFolderValid)
 }
 
@@ -1944,7 +1946,7 @@ document.addEventListener('keydown', (e) => {
 api.on('memos:changed', (memos) => {
   state.memos = memos;
   // 폴더 목록: 아직 읽지 않았으면 지금 (앱을 켠 뒤 처음 — 빈 폴더가 목록에 빠져 있었다), 그 뒤로는 다른 기기 · 탐색기에서 생긴 폴더가 보일 때
-  if (!state.folderDirs || memos.some((m) => isFolderName(m.folder) && !state.folderDirs.includes(m.folder))) loadFolders();
+  loadFolders(); // 폴더 목록도 늘 다시 묻는다 — 다른 기기에서 만들거나 지운 빈 폴더는 메모만 봐서는 알 수 없다 (그대로면 다시 그리지 않음)
   // 이어 쓰기 막대의 메모를 다른 길(카드 두 번 누르기 등)로 열었으면 막대를 치운다
   const hb = $('handoff-bar');
   if (hb && !hb.hidden && memos.some((m) => m.id === hb.dataset.id && m.open)) hb.hidden = true;

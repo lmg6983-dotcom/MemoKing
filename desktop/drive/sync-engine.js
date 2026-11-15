@@ -24,6 +24,10 @@ export class SafetyStop extends Error {}
 
 export const skipName = (name) => name.startsWith('.') || name.startsWith('~$') || name.endsWith('.tmp') || name === 'desktop.ini' || name === 'Thumbs.db';
 export const skipPath = (rel) => LOCAL_ONLY.has(rel) || rel.split('/').some(skipName);
+// 메모 폴더 맨 위의 사용자 폴더 (메모킹의 폴더 목록) — 앱이 쓰는 폴더는 빼고. 빈 폴더도 만들기 · 지우기를 서로 맞춘다
+const APP_DIRS = new Set(['_memoking', 'attachments']);
+export const userDir = (name) => !skipName(name) && !APP_DIRS.has(name.toLowerCase());
+const JUNK = new Set(['desktop.ini', 'thumbs.db', '.ds_store']);
 
 export function md5File(file) {
   const hash = createHash('md5');
@@ -116,6 +120,15 @@ export class SyncEngine {
     };
     walk(this.root, '');
     return out;
+  }
+
+  /** 메모 폴더 맨 위의 사용자 폴더 이름들 (이 PC) */
+  localDirs() {
+    try {
+      return fs.readdirSync(this.root, { withFileTypes: true }).filter((d) => d.isDirectory() && userDir(d.name)).map((d) => d.name);
+    } catch {
+      return [];
+    }
   }
 
   async walkRemote() {
@@ -213,6 +226,49 @@ export class SyncEngine {
     return this.folderMaking.get(dir);
   }
 
+  // ---------- 맨 위 폴더 맞추기 (파일을 다 맞춘 뒤) ----------
+  //   지난번 양쪽에 다 있던 폴더(state.dirs)를 기준으로:
+  //     한쪽에만 있고 기준에 없음 → 새로 만든 것: 다른 쪽에도 만든다
+  //     한쪽에만 있고 기준에 있음 → 다른 쪽에서 지운 것: 이쪽도 비었으면 지운다 (안에 무엇이 남았으면 그대로 두고 다음에 다시 만든다)
+  //   기준이 없으면(처음) 지우지 않고 합치기만 한다
+  async syncDirs(result) {
+    const had = this.state.dirs ? new Set(this.state.dirs) : null;
+    const local = new Set(this.localDirs());
+    const remote = new Set([...this.folderIds.keys()].filter((d) => d && !d.includes('/') && userDir(d)));
+    for (const d of new Set([...local, ...remote])) {
+      if (local.has(d) && remote.has(d)) continue;
+      if (local.has(d)) {
+        if (!had?.has(d)) {
+          await this.ensureRemoteFolder(d);
+          remote.add(d);
+        } else if (this.localDirEmpty(d)) {
+          fs.rmSync(this.abs(d), { recursive: true, force: true });
+          local.delete(d);
+          result.dirsChanged = true;
+        }
+      } else if (!had?.has(d)) {
+        fs.mkdirSync(this.abs(d), { recursive: true });
+        local.add(d);
+        result.dirsChanged = true;
+      } else {
+        const id = this.folderIds.get(d);
+        if ((await this.remote.listChildren(id)).length) continue; // Drive 쪽에 무엇이 남았다 — 지우지 않는다
+        await this.remote.trash(id);
+        this.folderIds.delete(d);
+        remote.delete(d);
+      }
+    }
+    this.state.dirs = [...local].filter((d) => remote.has(d)).sort();
+  }
+
+  localDirEmpty(d) {
+    try {
+      return !fs.readdirSync(this.abs(d), { recursive: true, withFileTypes: true }).some((e) => !e.isDirectory() && !JUNK.has(e.name.toLowerCase()));
+    } catch {
+      return true;
+    }
+  }
+
   // ---------- 동기화 ----------
 
   /** @param {{ full?: boolean }} [opts] full: "바뀐 것" 목록과 상관없이 Drive 폴더를 처음부터 훑는다 ("지금 동기화") */
@@ -239,7 +295,9 @@ export class SyncEngine {
     const knownIds = new Set([...known.map((k) => files[k].id), ...Object.values(this.state.folders ?? {}), this.rootId]);
     const { changed: remoteDirty, token, items } = peeked ?? await this.remote.changesSince(this.state.pageToken || null, knownIds);
     const scanDue = full || this.now() - (this.state.lastFullScan ?? 0) >= FULL_SCAN_MS;
-    if (!localDirty && !remoteDirty && !scanDue) {
+    // 빈 폴더를 만들거나 지운 것도 바뀐 것 (파일만 보면 놓친다)
+    const dirsDirty = this.localDirs().sort().join('\n') !== (this.state.dirs ?? []).join('\n');
+    if (!localDirty && !dirsDirty && !remoteDirty && !scanDue) {
       this.state.pageToken = token;
       return { skipped: true, uploaded: 0, downloaded: 0, deletedLocal: 0, deletedRemote: 0, conflicts: [], localChanged: false };
     }
@@ -411,12 +469,13 @@ export class SyncEngine {
     };
     await Promise.all(Array.from({ length: Math.min(this.concurrency, work.length) }, lane));
     if (failed) throw failed;
+    await this.syncDirs(result);
 
     this.state.pageToken = token;
     delete this.state.keepMissing; // 다 올렸으면 다음부터는 보통대로
     if (!quick) this.state.lastFullScan = this.now();
     this.state.folders = Object.fromEntries(this.folderIds);
-    result.localChanged = result.downloaded > 0 || result.deletedLocal > 0 || result.conflicts.length > 0;
+    result.localChanged = result.downloaded > 0 || result.deletedLocal > 0 || result.conflicts.length > 0 || result.dirsChanged === true;
     return result;
   }
 }

@@ -54,9 +54,10 @@ class SyncEngine(
         val deletedRemote: Int = 0,
         val conflicts: List<String> = emptyList(),
         val skipped: Boolean = false,
+        val dirsChanged: Boolean = false, // 휴대폰 쪽 폴더를 만들거나 지웠다
     ) {
         /** 휴대폰 메모 폴더가 바뀌었는가 (화면이 다시 읽어야 하는가) */
-        val localChanged get() = downloaded > 0 || deletedLocal > 0 || conflicts.isNotEmpty()
+        val localChanged get() = downloaded > 0 || deletedLocal > 0 || conflicts.isNotEmpty() || dirsChanged
     }
 
     class SafetyStop(message: String) : Exception(message)
@@ -76,6 +77,11 @@ class SyncEngine(
 
         fun skipName(name: String) = name.startsWith(".") || name.startsWith("~$") || name.endsWith(".tmp") || name == "desktop.ini" || name == "Thumbs.db"
         fun skipPath(rel: String) = rel in LOCAL_ONLY || rel.split('/').any(::skipName)
+
+        // 메모 폴더 맨 위의 사용자 폴더 (메모킹의 폴더 목록) — 앱이 쓰는 폴더는 빼고. 빈 폴더도 만들기 · 지우기를 서로 맞춘다 (PC 와 같음)
+        private val APP_DIRS = setOf("_memoking", "attachments")
+        private val JUNK = setOf("desktop.ini", "thumbs.db", ".ds_store")
+        fun userDir(name: String) = !skipName(name) && name.lowercase() !in APP_DIRS
 
         fun md5(input: InputStream): String {
             val digest = MessageDigest.getInstance("MD5")
@@ -116,6 +122,55 @@ class SyncEngine(
         }
         walk("")
         return out
+    }
+
+    /** 메모 폴더 맨 위의 사용자 폴더 이름들 (휴대폰) */
+    private fun localDirs(): List<String> = local.list("").filter { it.dir && userDir(it.name) }.map { it.name }
+
+    private fun localDirEmpty(dir: String): Boolean {
+        fun empty(rel: String): Boolean = local.list(rel).all { e ->
+            if (e.dir) empty("$rel/${e.name}") else e.name.lowercase() in JUNK
+        }
+        return empty(dir)
+    }
+
+    private fun baseDirs(): Set<String>? = state.optJSONArray("dirs")?.let { a -> (0 until a.length()).map { a.optString(it) }.toSet() }
+
+    /**
+     * 맨 위 폴더 맞추기 (파일을 다 맞춘 뒤, PC sync-engine.js syncDirs 와 같음) — 지난번 양쪽에 다 있던 폴더(dirs)를 기준으로:
+     *   한쪽에만 있고 기준에 없음 → 새로 만든 것: 다른 쪽에도 만든다
+     *   한쪽에만 있고 기준에 있음 → 다른 쪽에서 지운 것: 이쪽도 비었으면 지운다
+     *   기준이 없으면(처음) 지우지 않고 합치기만 한다
+     * @return 휴대폰 쪽 폴더가 바뀌었는가
+     */
+    private fun syncDirs(): Boolean {
+        val had = baseDirs()
+        val here = localDirs().toMutableSet()
+        val there = folderIds.keys.filter { it.isNotEmpty() && '/' !in it && userDir(it) }.toMutableSet()
+        var changed = false
+        for (d in here + there) {
+            if (d in here && d in there) continue
+            if (d in here) {
+                if (had?.contains(d) != true) {
+                    ensureRemoteFolder(d)
+                    there += d
+                } else if (localDirEmpty(d)) {
+                    if (local.delete(d)) { here -= d; changed = true }
+                }
+            } else if (had?.contains(d) != true) {
+                local.mkdirs(d)
+                here += d
+                changed = true
+            } else {
+                val id = folderIds[d] ?: continue
+                if (remote.listChildren(id).isNotEmpty()) continue // Drive 쪽에 무엇이 남았다 — 지우지 않는다
+                remote.trash(id)
+                folderIds.remove(d)
+                there -= d
+            }
+        }
+        state.put("dirs", org.json.JSONArray(here.filter { it in there }.sorted()))
+        return changed
     }
 
     private fun walkRemote(): Map<String, Remote.Item> {
@@ -220,7 +275,9 @@ class SyncEngine(
             (state.optJSONObject("folders")?.let { f -> f.keys().asSequence().map { f.optString(it) }.toSet() } ?: emptySet()) + rootId
         val (remoteDirty, token, items) = remote.changesSince(state.optString("pageToken").ifEmpty { null }, knownIds)
         val scanDue = full || now() - state.optLong("lastFullScan", 0L) >= FULL_SCAN_MS
-        if (!localDirty && !remoteDirty && !scanDue) {
+        // 빈 폴더를 만들거나 지운 것도 바뀐 것 (파일만 보면 놓친다)
+        val dirsDirty = localDirs().sorted() != (baseDirs()?.sorted() ?: emptyList<String>())
+        if (!localDirty && !dirsDirty && !remoteDirty && !scanDue) {
             state.put("pageToken", token)
             return Result(skipped = true)
         }
@@ -388,10 +445,12 @@ class SyncEngine(
             }
         }
 
+        val dirsChanged = syncDirs()
+
         state.put("pageToken", token)
         state.remove("keepMissing") // 다 올렸으면 다음부터는 보통대로
         if (quick == null) state.put("lastFullScan", now())
         state.put("folders", JSONObject(folderIds.toMap()))
-        return Result(uploaded, downloaded, deletedLocal, deletedRemote, conflicts)
+        return Result(uploaded, downloaded, deletedLocal, deletedRemote, conflicts, dirsChanged = dirsChanged)
     }
 }

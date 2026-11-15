@@ -1403,6 +1403,7 @@ export function refresh() {
   if (!app.vault) return;
   app.vault.defaultMode = state.mode; // 폴더를 다시 열어 새 저장소가 됐어도 지금 모드로
   state.memos = app.vault.list();
+  state.folderDirs = null; // 폴더 목록도 다시 묻는다 — 다른 기기에서 만들거나 지운 빈 폴더는 메모만 봐서는 알 수 없다
   // Work / Life 나누기를 정한 적이 없으면: 이미 Work 메모가 있을 때만 켠다 (PC 에서 옮겨 둔 것 등)
   if (state.workLife === null && state.memos.length) {
     state.workLife = state.memos.some((m) => m.mode === 'work');
