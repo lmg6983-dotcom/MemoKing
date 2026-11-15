@@ -158,6 +158,8 @@ export class Vault extends EventEmitter {
       try {
         text = fs.readFileSync(this.abs(file), 'utf8');
       } catch {
+        // 백신 · OneDrive 가 잠깐 붙잡아 못 읽었다 — 아는 내용 그대로 둔다 (예전: 사라진 메모로 보고 창에 "사라졌어요" 가 떴다)
+        if (prev && !next.has(prev.id)) next.set(prev.id, prev);
         continue;
       }
       const { meta, body } = parseMemoFile(text);

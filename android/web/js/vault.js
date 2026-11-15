@@ -134,9 +134,13 @@ export class Vault extends EventTarget {
       try {
         text = fs.readText(file);
       } catch {
+        text = null;
+      }
+      if (text == null) {
+        // 잠깐 못 읽었다 (목록에는 있는 파일) — 아는 내용 그대로 둔다 (사라진 메모로 보지 않게)
+        if (prev && !next.has(prev.id)) next.set(prev.id, prev);
         continue;
       }
-      if (text == null) continue;
       const { meta, body } = parseMemoFile(text);
       // id 가 없는 파일(직접 만든 파일)이나 복사본처럼 id 가 겹치는 파일은 임시 id 를 준다.
       let id = meta.id;
