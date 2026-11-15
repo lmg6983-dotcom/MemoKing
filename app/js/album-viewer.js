@@ -359,7 +359,15 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       return;
     }
     gesture = null;
-    if (!g || e.type === 'pointercancel') return;
+    if (!g) return;
+    if (e.type === 'pointercancel') {
+      // 휴대폰이 누름을 거둬 가면(뒤로 가기 몸짓 등) 밀던 장을 제자리로 (예전: 옆으로 밀린 채 남았다)
+      if (g.follow && !moving) {
+        img.style.transition = '';
+        img.style.transform = '';
+      }
+      return;
+    }
     const dx = e.clientX - g.x;
     const dy = e.clientY - g.y;
     if (g.kind === 'swipe' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && images[i + (dx < 0 ? 1 : -1)]) {
