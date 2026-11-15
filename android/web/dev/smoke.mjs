@@ -133,16 +133,42 @@ try {
   check('알림: 지난 알림이 울림 (알림 막대)', (await devLog()).log.some((l) => l.notify?.title === '약 먹기'));
   check('알림: 울린 기록을 메모 파일에', /last:/.test(read('약 먹기.md')) && /enabled: false/.test(read('약 먹기.md')));
 
-  // 태그로 거르기: 검색창에 #태그 (태그 줄은 없앰 — 그 자리에 폴더 단추)
-  check('목록: 태그 줄 대신 폴더 칩 줄 (전체가 골라짐 · 새 폴더 칩)', (await page.locator('#tag-strip').count()) === 0
-    && (await page.getAttribute('#folder-chips .fchip[data-folder=""]', 'aria-pressed')) === 'true' && (await page.locator('#folder-chips .fchip-add').count()) === 1);
-  // 폴더 칩 꾹 누르기: 안드로이드는 타이머로 메뉴가 뜬 직후 contextmenu 를 한 번 더 보낸다 — 그래도 메뉴가 그대로 떠 있어야 한다
-  await page.tap('#folder-chips .fchip-add');
-  await page.fill('#folder-chips .fchip-input', '점검폴더');
+  // 폴더 (v0.84): 칩 줄 대신 PC 처럼 왼쪽 폴더 목록 — 폴더가 없으면 접혀 있고 검색창 왼쪽 폴더 단추로 편다
+  check('목록: 태그 줄 · 칩 줄 없이 폴더 단추 (폴더가 없으면 목록은 접힘)', (await page.locator('#tag-strip, #folder-chips').count()) === 0
+    && await page.isVisible('#folder-btn') && await page.isHidden('#folder-side'));
+  await page.tap('#folder-btn');
+  await page.waitForTimeout(300);
+  check('폴더 단추: 왼쪽 폴더 목록이 펴짐 (전체가 골라짐 · 새 폴더)', await page.isVisible('#folder-side')
+    && (await page.getAttribute('#folder-side [data-folder=""]', 'aria-current')) === 'true' && await page.isVisible('#folder-side .mf-new'));
+  await page.tap('#folder-side .mf-new');
+  await page.fill('.mf-name-input', '점검폴더');
   await page.keyboard.press('Enter');
-  await page.waitForSelector('#folder-chips .fchip[data-folder="점검폴더"]');
+  await page.waitForSelector('#folder-side [data-folder="점검폴더"][aria-current="true"]');
+  check('새 폴더: 만들면 그 폴더로 (비어 있음)', (await page.locator('.card').count()) === 0);
+  await page.tap('#folder-side [data-folder=""]');
+  await page.waitForTimeout(300);
   {
-    const box = await page.locator('#folder-chips .fchip[data-folder="점검폴더"]').boundingBox();
+    const fcdp = await ctx.newCDPSession(page);
+    const ft = (type, x, y) => fcdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+    await page.evaluate(() => document.querySelectorAll('.hint-bubble').forEach((h) => h.remove()));
+    // 메모를 꾹 눌러 들어 올린 뒤 끌어 폴더에 놓기
+    const card = page.locator('.card').first();
+    const id = await card.getAttribute('data-id');
+    const cb = await card.boundingBox();
+    const fb = await page.locator('#folder-side [data-folder="점검폴더"]').boundingBox();
+    const [sx, sy] = [cb.x + cb.width / 2, cb.y + 24];
+    await ft('touchStart', sx, sy);
+    await page.waitForTimeout(600);
+    const lifted = await card.evaluate((c) => c.classList.contains('lifted'));
+    for (let i = 1; i <= 8; i++) await ft('touchMove', sx + ((fb.x + fb.width / 2 - sx) * i) / 8, sy + ((fb.y + fb.height / 2 - sy) * i) / 8);
+    const over = await page.evaluate(() => ({ on: document.querySelector('#folder-side .drop-on')?.dataset.folder ?? null, clone: !!document.querySelector('.m-drag-clone.over-folder') }));
+    await ft('touchEnd', 0, 0);
+    await page.waitForTimeout(500);
+    const moved = fs.readdirSync(path.join(vault, '점검폴더')).filter((f) => f.endsWith('.md') && read(`점검폴더/${f}`).includes(`id: ${id}`)).length;
+    check('꾹 눌러 끌기: 카드가 들리고 · 폴더 위에서 그 폴더가 표시되고 · 놓으면 파일이 그 폴더로', lifted && over.on === '점검폴더' && over.clone && moved === 1, JSON.stringify({ lifted, over, moved }));
+    check('꾹 눌러 끌기: 메뉴는 뜨지 않고, 카드에 폴더 이름', await page.isHidden('#memo-sheet') && (await page.locator(`.card[data-id="${id}"] .card-folder`).textContent()).includes('점검폴더'));
+    // 폴더 꾹 누르기: 안드로이드는 타이머로 메뉴가 뜬 직후 contextmenu 를 한 번 더 보낸다 — 그래도 메뉴가 그대로 떠 있어야 한다
+    const box = await page.locator('#folder-side [data-folder="점검폴더"]').boundingBox();
     const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
     await page.mouse.move(x, y);
     await page.mouse.down();
@@ -150,12 +176,15 @@ try {
     await page.evaluate(([px, py]) => document.elementFromPoint(px, py).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: px, clientY: py })), [x, y]);
     await page.mouse.up();
     await page.waitForTimeout(250);
-    check('폴더 칩: 꾹 눌러 뜬 메뉴가 손을 뗀 뒤에도 그대로 (이름 바꾸기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 2);
+    check('폴더 꾹 누르기: 뜬 메뉴가 손을 뗀 뒤에도 그대로 (이름 바꾸기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 2);
     await page.locator('.mk-ctx-item[data-id="delete"]').click();
     await page.waitForTimeout(300);
-    check('폴더 칩: 메뉴에서 지우면 칩이 사라짐', (await page.locator('#folder-chips .fchip[data-folder="점검폴더"]').count()) === 0);
-    await page.tap('#folder-chips .fchip[data-folder=""]').catch(() => {});
-    await page.waitForTimeout(200);
+    check('폴더 지우기: 목록에서 사라지고 메모는 폴더 밖으로', (await page.locator('#folder-side [data-folder="점검폴더"]').count()) === 0
+      && !fs.existsSync(path.join(vault, '점검폴더')));
+    await fcdp.detach();
+    // 뒤의 점검은 예전처럼 목록을 접은 화면으로
+    if (await page.isVisible('#folder-side')) await page.tap('#folder-btn');
+    await page.waitForTimeout(300);
   }
   await page.fill('#search', '#업무');
   await page.waitForTimeout(250);
@@ -557,6 +586,10 @@ try {
     rows: [...document.querySelectorAll('#reminder-groups .ev-ext .row-title')].map((e) => e.textContent),
   }));
   check('다른 캘린더: 삼성 캘린더 일정이 달력(점선) · 다가오는 일정에 함께', ext.bars.some((t) => /삼성 캘린더/.test(t)) && ext.rows.includes('가족 저녁'), JSON.stringify(ext));
+  // 같은 일정이 두 캘린더에 (결혼식: 삼성 캘린더 · Google 캘린더 (개인)) — 하나로, 캘린더 이름은 둘 다
+  const weddings = ext.bars.filter((t) => /^결혼식/.test(t));
+  check('다른 캘린더: 같은 일정이 여러 캘린더에 있으면 하나로 (캘린더 이름은 모두)', weddings.length === 1 && ext.rows.filter((t) => t === '결혼식').length === 1
+    && /삼성 캘린더, Google 캘린더 \(개인\)/.test(weddings[0]), JSON.stringify({ weddings, rows: ext.rows }));
   await shot('02j-calendar-device');
   // 일정을 누르면 다른 캘린더 앱으로 나가지 않고 메모킹 안에서 자세히 보기 (예전: 캘린더 앱 → "일정을 찾을 수 없습니다")
   await page.tap('.ev-ext .row-main >> nth=0');
@@ -848,18 +881,30 @@ try {
     await touch('touchEnd', 0, 0);
     await page.waitForTimeout(300);
     check('목록 카드: 비스듬히 밀어도(처음에 위아래로 조금 흔들려도) 밀림', /translate3d\(\d/.test(diag), diag);
-    // 꾹 눌렀다가(메뉴가 뜰 때쯤) 그대로 옆으로 밀면 메뉴 대신 밀기
+    // 꾹 눌렀다가(메뉴가 뜰 때쯤) 그대로 움직이면 지우기가 아니라 들어 올려 끌기 — 놓을 곳이 아니면 제자리로
     await touch('touchStart', cx, cy);
     await page.waitForTimeout(30);
     await page.dispatchEvent(cardSel, 'contextmenu');
     for (const mx of [-12, -30, -60]) await touch('touchMove', cx + mx, cy);
     await page.waitForTimeout(40);
-    const held = await cardX();
-    await touch('touchMove', cx - 2, cy);
-    await page.waitForTimeout(40);
+    const dragging = await page.evaluate((sel) => ({ clone: !!document.querySelector('.m-drag-clone'), source: document.querySelector(sel)?.classList.contains('drag-source') }), cardSel);
     await touch('touchEnd', 0, 0);
-    await page.waitForTimeout(350);
-    check('목록 카드: 꾹 눌렀다가 밀면 메뉴 대신 밀기', /translate3d\(-\d/.test(held) && await page.isHidden('#memo-sheet'), held);
+    await page.waitForTimeout(400);
+    check('목록 카드: 꾹 눌렀다가 움직이면 지우지 않고 들어 올려 끌기 · 놓을 곳이 아니면 제자리', dragging.clone && dragging.source && await page.isVisible(cardSel)
+      && await page.isHidden('#memo-sheet') && !(await page.$eval(cardSel, (c) => c.classList.contains('drag-source'))) && (await page.locator('.m-drag-clone').count()) === 0, JSON.stringify(dragging));
+    // 위로 훑다가(비스듬히) 손을 떼도 지우지 않는다 · 오른쪽으로 밀어도 지우지 않는다
+    await touch('touchStart', cx, cy);
+    for (const [mx, my] of [[-4, -10], [-10, -25], [-18, -50], [-26, -90]]) await touch('touchMove', cx + mx, cy + my);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(300);
+    const scrolledBy = await page.evaluate(() => document.getElementById('view-memos').scrollTop);
+    await page.evaluate(() => (document.getElementById('view-memos').scrollTop = 0)); // 훑어서 내려간 목록을 처음으로 (아래 점검이 같은 자리를 누르게)
+    await page.waitForTimeout(400);
+    await touch('touchStart', cx, cy);
+    for (const mx of [15, 60, 120, 200]) await touch('touchMove', cx + mx, cy);
+    await touch('touchEnd', 0, 0);
+    await page.waitForTimeout(400);
+    check('목록 카드: 위아래로 훑거나 오른쪽으로 밀면 지우지 않음 (훑기는 스크롤)', await page.isVisible(cardSel) && !(await cardX()), `scrolled ${scrolledBy}`);
     // 꾹 누르고 밀지 않고 떼면 메뉴 (실제 길게 누르기처럼 오래 누른 뒤 떼야 "눌림" 이 따라오지 않는다)
     await touch('touchStart', cx, cy);
     await page.waitForTimeout(30);
@@ -888,7 +933,7 @@ try {
       const midFlight = await page.evaluate((sel) => ({ inDom: Boolean(document.querySelector(sel)), flying: document.querySelector(sel)?.classList.contains('flying') }), cardSel);
       await page.waitForTimeout(800);
       const rebuilt = await page.evaluate(() => window.__colsBuilt);
-      check('밀어 삭제: 날아가는 동안은 그대로 · 다 날아간 뒤 삭제하고 목록은 한 번만 다시 그림', midFlight.inDom && midFlight.flying && rebuilt === 1
+      check('밀어 삭제: 날아가는 동안은 그대로 · 다 날아간 뒤 삭제하고 목록은 다시 쌓지 않고 그 카드만 들어냄', midFlight.inDom && midFlight.flying && rebuilt === 0
         && !fs.existsSync(path.join(vault, fileName)) && await page.isHidden(cardSel), JSON.stringify({ midFlight, rebuilt }));
       await page.tap('.toast-action');
       await page.waitForTimeout(500);

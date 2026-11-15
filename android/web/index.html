@@ -57,6 +57,7 @@
         <button type="button" role="radio" data-mode="life" aria-checked="true">Life</button>
         <button type="button" role="radio" data-mode="work" aria-checked="false" tabindex="-1">Work</button>
       </div>
+      <button id="folder-btn" class="icon-btn folder-btn" aria-label="폴더 목록" aria-pressed="true" aria-controls="folder-side"><svg><use href="#i-folder"/></svg></button>
       <label class="search">
         <svg class="search-icon"><use href="#i-search"/></svg>
         <input id="search" type="search" placeholder="메모나 #태그 검색" aria-label="메모 검색" autocomplete="off" enterkeyhint="search">
@@ -75,8 +76,8 @@
         <div class="filter-group"><span class="filter-label">담긴 것</span><div id="kind-filter" class="chip-row" role="group" aria-label="담긴 것으로 거르기"></div></div>
         <div class="filter-group" id="tag-filter-group" hidden><span class="filter-label">태그</span><div id="tag-filter" class="chip-row tag-filter" role="group" aria-label="태그로 거르기"></div></div>
       </div>
-      <!-- 메모킹 폴더: 전체 · 폴더마다 · ＋ 칩 줄 — 한 번 누르면 그 폴더로, 꾹 누르면 이름 바꾸기 · 지우기 (folder-ui.js) -->
-      <div id="folder-chips" class="folder-chips" role="group" aria-label="폴더"></div>
+      <!-- 메모킹 폴더: 왼쪽 목록 (PC 처럼 탐색기 모양) — 누르면 그 폴더로, 꾹 누르면 이름 바꾸기 · 지우기, 메모를 꾹 눌러 끌어 놓으면 그 폴더로 (folder-ui.js) -->
+      <nav id="folder-side" class="folder-side" aria-label="폴더"></nav>
       <div id="filter-summary" class="filter-summary" hidden>
         <span id="filter-summary-text"></span>
         <button id="filter-clear" class="link-btn">필터 풀기</button>

@@ -174,7 +174,7 @@ export function radioGroups(root = document) {
 // 가장 짧은 줄에 차례로 쌓기. 카드를 하나 넣을 때마다 줄 높이를 재면 카드 수만큼 화면 배치를 다시 계산해
 //   메모가 많으면 검색 한 번에 몇 초씩 걸렸다 (1,500개에 1초 넘게) — 첫 줄에 모두 넣어 높이를 한 번에 재고 나눈다 (줄 폭은 모두 같다)
 /** 카드 목록(PC · 휴대폰)의 엇갈려 쌓기 */
-export function stackCards(columns, items, { late } = {}) {
+export function stackCards(columns, items, { late, chunk = true } = {}) {
   const run = ++stackRun;
   const single = columns.length < 2;
   const width = columns[0].clientWidth;
@@ -211,7 +211,8 @@ export function stackCards(columns, items, { late } = {}) {
   // 처음 보는 카드가 많을 때(앱을 켠 직후 · 폭이 바뀐 뒤)만 나눠 쌓는다: 화면에 보이는 것 먼저, 나머지는 다음 화면 그리기마다 조금씩
   //   (한꺼번에 쌓으면 메모 수백 개에서 화면이 몇 초 멈췄다). 높이를 아는 카드뿐이면 한 번에 — 보던 자리(스크롤)가 그대로 있게
   const unknown = single ? items.reduce((n, it) => n + (it.mkEpoch === undefined ? 1 : 0), 0) : items.reduce((n, it) => n + (known(it) ? 0 : 1), 0);
-  if (unknown <= STACK_SYNC_MAX || !width) return void place(items);
+  // 나눠 쌓기는 목록이 비어 있던 처음에만 (chunk) — 카드가 있던 목록을 나눠 쌓으면 잠깐 짧아진 목록 때문에 보던 자리가 맨 위로 튀었다
+  if (!chunk || unknown <= STACK_SYNC_MAX || !width) return void place(items);
   place(items.slice(0, STACK_FIRST));
   let i = STACK_FIRST;
   const step = () => {

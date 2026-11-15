@@ -9,7 +9,7 @@ import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
 import { describeReminder, describeTask, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocalIso } from './core/time.js';
-import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, importedEventBody, googleEventUrl } from './core/calendar-feeds.js';
+import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, importedEventBody, googleEventUrl, mergeDuplicateEvents, eventKey } from './core/calendar-feeds.js';
 import { findDates, guessTitle } from './core/date-detect.js';
 import { parseScheduleText } from './core/schedule-parse.js';
 import { remembered } from './event-editor.js';
@@ -149,7 +149,13 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
         out.push({ ...e, ext: true, source: e.calendar || '휴대폰 캘린더', device: true, ...(pref?.color ? { color: pref.color } : {}) });
       }
     }
-    return query.trim() ? out.filter((e) => `${e.title} ${e.location ?? ''} ${e.source}`.toLowerCase().includes(query.trim().toLowerCase())) : out;
+    // 같은 일정이 여러 캘린더에 있으면 하나로 (캘린더 이름은 모두 적는다), 메모킹 일정의 사본은 빼고
+    const mine = occurrences(from, to).map(({ item, start }) => {
+      const r = item.reminder;
+      return eventKey({ title: r.title || item.title, start, end: occurrenceEnd(start, r.allDay, r.end), allDay: Boolean(r.allDay) });
+    });
+    const merged = mergeDuplicateEvents(out, mine);
+    return query.trim() ? merged.filter((e) => `${e.title} ${e.location ?? ''} ${e.source}`.toLowerCase().includes(query.trim().toLowerCase())) : merged;
   }
 
   /** 찾는 말과 맞는 다른 캘린더 일정이 하나라도 있는가 (기간 없이 — 범위를 펼치면 바쁜 캘린더는 잘린다) */
