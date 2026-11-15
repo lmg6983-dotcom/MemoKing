@@ -1862,6 +1862,9 @@ try {
   const ds = drive.status();
   if (ds.reconnect && !ds.connected && app.vault) {
     toast('Google Drive 동기화를 다시 켜 주세요 (메모는 그대로예요)', false, { label: '연결', run: () => startConnect(() => openVault()) });
+  } else if (ds.restored) {
+    // 새 휴대폰으로 옮겨 왔다: Drive 로그인은 백업하지 않으므로 다시 연결해야 PC 와 메모를 맞춘다
+    toast('새 휴대폰이에요. Google Drive를 다시 연결하면 PC와 메모를 맞춰요', false, { label: '연결', run: () => startConnect(() => openVault()) });
   }
 } catch {
   // 미리보기 등

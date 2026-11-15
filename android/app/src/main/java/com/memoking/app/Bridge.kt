@@ -240,6 +240,8 @@ class Bridge(private val activity: MainActivity) {
         .put("folderId", DriveSync.folderId(ctx) ?: "")
         .put("folderName", DriveSync.folderName(ctx))
         .put("status", DriveSync.status.json())
+        // 백업에서 되살린 휴대폰: Drive 폴더의 휴대폰 쪽 사본은 따라왔는데 연결(로그인)은 백업하지 않아 풀려 있다 → 다시 연결 안내
+        .put("restored", !DriveSync.active(ctx) && (java.io.File(ctx.filesDir, "drive").listFiles()?.any { it.isDirectory } == true))
 
     @JavascriptInterface
     fun driveStatus(): String = reply { driveInfo() }
