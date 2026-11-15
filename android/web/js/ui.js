@@ -12,6 +12,7 @@ const sheets = []; // [{ el, close }]
 function syncScrim() {
   const scrim = $('scrim');
   scrim.hidden = sheets.length === 0;
+  document.body.classList.toggle('sheet-open', sheets.length > 0); // 메모 위에 떠 있는 것(날짜 "일정 추가" 알약 등)이 시트 위로 올라오지 않게 (mobile.css)
   // 위에 있는 시트 바로 아래에 막을 둔다
   if (sheets.length) {
     scrim.style.zIndex = String(40 + sheets.length * 2 - 1);

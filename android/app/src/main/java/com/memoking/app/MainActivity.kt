@@ -771,15 +771,20 @@ class MainActivity : Activity() {
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
     private var pdfJob = 0
 
-    /** PDF · 인쇄 쪽 여백 (mm) — 화면의 PDF 시트에서 고른 값 (print-html.js 가 같은 여백으로 쪽 안 크기를 맞춘다) */
-    var pdfMarginMm = 16.0
+    /** PDF · 인쇄 쪽 크기 (mm, 가로 to 세로) — 화면의 PDF 시트에서 고른 종이 · 카드 · 직접 입력 (없으면 A4)
+     *  여백은 화면이 만든 문서(print-html.js)가 쪽마다 되풀이되는 빈 칸으로 넣으므로 여기서는 0 — 메모 색 바탕이 쪽 끝까지 칠해진다 (PC 와 같다) */
+    var pdfPageMm: Pair<Double, Double>? = null
 
     private fun pdfAttributes(): PrintAttributes {
-        val mils = (pdfMarginMm.coerceIn(0.0, 40.0) / 25.4 * 1000).roundToInt() // 1/1000 인치 단위
+        val page = pdfPageMm
+        val mils = { mm: Double -> (mm.coerceIn(50.0, 1200.0) / 25.4 * 1000).roundToInt() } // 1/1000 인치 단위
+        val size = if (page == null) PrintAttributes.MediaSize.ISO_A4
+            else PrintAttributes.MediaSize("memoking_${mils(page.first)}x${mils(page.second)}", "메모킹 ${page.first.roundToInt()}×${page.second.roundToInt()}mm", mils(page.first), mils(page.second))
+        val margin = if (page == null) 720 else 0 // 예전 문서(크기 정보 없음)는 예전 여백 0.72인치
         return PrintAttributes.Builder()
-            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+            .setMediaSize(size)
             .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
-            .setMinMargins(PrintAttributes.Margins(mils, mils, mils, mils))
+            .setMinMargins(PrintAttributes.Margins(margin, margin, margin, margin))
             .build()
     }
 

@@ -1419,13 +1419,30 @@ try {
   await page.tap('[data-memo-action="share"]');
   await page.tap('[data-share="pdf"]');
   await page.waitForSelector('#print-sheet:not([hidden])');
-  check('PDF: 먼저 내용 크기 고르기 (작게·보통·크게·아주 크게 + 직접)', (await page.locator('#print-size-seg [data-scale]').count()) === 4 && await page.isVisible('#print-scale'));
+  check('PDF: 글자 크기 고르기 (작게·보통·크게·아주 크게 + 직접)', (await page.locator('#print-size-seg [data-scale]').count()) === 4 && await page.isVisible('#print-scale'));
+  // PC PDF 만들기 창과 같은 고르기 · 같은 말: 크기(종이 · 카드 비율 · 직접 입력) · 방향 · 여백 · 메모 색 바탕 · 날짜 표시
+  {
+    const words = await page.evaluate(() => ({ title: document.getElementById('print-sheet-title').textContent, go: document.getElementById('print-go').textContent,
+      kinds: [...document.querySelectorAll('#print-kind [data-kind]')].map((b) => b.textContent).join('|'), papers: [...document.querySelectorAll('#print-papers [data-paper]')].map((b) => b.textContent).join('|') }));
+    await page.tap('#print-papers [data-paper="a5"]');
+    await page.tap('#print-orientation [data-o="landscape"]');
+    await page.tap('#print-bg');
+    await page.waitForTimeout(500);
+    const pv = await page.$eval('#print-frame', (f) => ({ size: /@page \{ size: 210mm 148mm;/.test(f.srcdoc), bg: /class="[^"]*with-bg/.test(f.srcdoc), date: f.srcdoc.includes('print-date') }));
+    check('PDF: PC 와 같은 고르기 · 같은 말 (PDF로 저장 · 종이/카드 비율/직접 입력 · A4/A5/B5/레터 · A5 가로 · 메모 색 바탕 · 날짜)', words.title === 'PDF로 저장' && words.go === 'PDF로 저장'
+      && words.kinds === '종이|카드 비율|직접 입력' && words.papers === 'A4|A5|B5|레터' && pv.size && pv.bg && pv.date, JSON.stringify({ words, pv }));
+    // 다음 점검을 위해 A4 세로 · 바탕 없음으로 되돌린다
+    await page.tap('#print-papers [data-paper="a4"]');
+    await page.tap('#print-orientation [data-o="portrait"]');
+    await page.tap('#print-bg');
+    await page.waitForTimeout(300);
+  }
   await page.tap('#print-size-seg [data-scale="1.2"]');
   await page.waitForTimeout(400);
   check('PDF: 크기를 고르면 미리보기도 그 크기로', /zoom: 1\.2/.test(await page.$eval('#print-frame', (f) => f.srcdoc)) && (await page.textContent('#print-scale-out')) === '120%');
   await shot('09b-print-size');
   {
-    const on = await page.$eval('#print-frame', (f) => f.srcdoc.includes('class="print-page fit-images"'));
+    const on = await page.$eval('#print-frame', (f) => /class="print-page fit-images/.test(f.srcdoc));
     await page.tap('#print-fit');
     await page.waitForTimeout(400);
     const off = await page.$eval('#print-frame', (f) => !f.srcdoc.includes('fit-images'));
