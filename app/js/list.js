@@ -2337,6 +2337,18 @@ $('trash-btn').addEventListener('click', async () => {
 });
 $('trash-close').addEventListener('click', () => trashEl.dialog.close());
 trashEl.list.addEventListener('click', async (e) => {
+  // 줄(제목 · 미리보기)을 누르면 글을 더 펼쳐 본다 — 되살리기 전에 무엇인지 알게
+  const text = e.target.closest('.trash-text');
+  if (text) {
+    const row = text.closest('.trash-row');
+    const open = row.querySelector('.trash-body');
+    if (open) return open.remove();
+    const body = document.createElement('div');
+    body.className = 'trash-body';
+    body.textContent = (await api.trash.preview(row.dataset.name).catch(() => null)) || '(내용이 없어요)';
+    text.append(body);
+    return;
+  }
   const restore = e.target.closest('[data-restore]');
   if (restore) {
     restore.disabled = true;

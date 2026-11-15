@@ -148,6 +148,7 @@ contextBridge.exposeInMainWorld('memoking', {
   trash: {
     list: invoke('trash:list'),
     restore: invoke('trash:restore'),
+    preview: invoke('trash:preview'), // 휴지통 메모의 글 미리보기 (잠긴 메모는 안내만)
     remove: invoke('trash:delete'),
     empty: invoke('trash:empty'),
   },

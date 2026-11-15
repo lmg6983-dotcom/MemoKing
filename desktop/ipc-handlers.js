@@ -685,6 +685,7 @@ export function registerIpc(ctx) {
 
   // ---------- 휴지통 ----------
   ipcMain.handle('trash:list', () => getVault()?.trashList() ?? []);
+  ipcMain.handle('trash:preview', (_e, name) => getVault()?.trashPreview(String(name ?? '')) ?? null);
   ipcMain.handle('trash:restore', (_e, name) => {
     const id = getVault()?.restoreTrash(String(name ?? '')) ?? null;
     wm.pushList();

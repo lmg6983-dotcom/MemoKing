@@ -871,6 +871,14 @@ export class Vault extends EventEmitter {
       }));
   }
 
+  /** 휴지통 메모의 글 미리보기 (되살리기 전에 무엇인지 보게 — 잠긴 메모는 내용을 보이지 않는다) */
+  trashPreview(name) {
+    const file = this.trashFile(name);
+    if (!file) return null;
+    const { body } = parseMemoFile(fs.readFileSync(file, 'utf8'));
+    return isLockedBody(body) ? '(잠긴 메모라 내용을 볼 수 없어요)' : plainLines(body).slice(1).join('\n').slice(0, 1500); // 제목 줄은 빼고, 줄은 그대로
+  }
+
   /** 메모 폴더로 되돌린다 (이름이 겹치면 "(2)"). 함께 휴지통에 간 첨부도 돌려놓는다. 되살린 메모 id */
   restoreTrash(name) {
     const file = this.trashFile(name);

@@ -1121,3 +1121,6 @@ body > :is(.mem-album, .mem-preview)::before { content: ''; position: absolute; 
 
 /* 스크롤 막대: 목록 창 어디서나 가늘고 옅게 (Windows 기본 굵은 막대와 화살표 대신), 메모 창 편집기와 같은 결 */
 * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text) 24%, transparent) transparent; }
+/* 휴지통 줄을 누르면 펼쳐 보는 글 (되살리기 전에) */
+.trash-text { cursor: pointer; }
+.trash-body { margin-top: 6px; max-height: 180px; overflow-y: auto; font-size: 12.5px; line-height: 1.55; color: var(--text); white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
