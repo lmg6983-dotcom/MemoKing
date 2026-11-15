@@ -172,7 +172,14 @@ export function createAiService(opts) {
         log.push(...chunk.split('\n').filter(Boolean));
         log.splice(0, Math.max(0, log.length - 20));
       });
-      const exited = new Promise((resolve) => s.proc.once('exit', resolve));
+      const exited = new Promise((resolve) => {
+        s.proc.once('exit', resolve);
+        // 엔진 파일을 띄우지 못하면(보안 프로그램이 격리함 등) 'error' 만 온다 — 듣지 않으면 앱이 오류로 꺼졌다
+        s.proc.once('error', (err) => {
+          log.push(err.message);
+          resolve(-1);
+        });
+      });
       exited.then((code) => {
         if (servers.get(role) === s) servers.delete(role);
         clearTimeout(s.timer);

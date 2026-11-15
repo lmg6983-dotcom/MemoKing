@@ -39,10 +39,16 @@ export class CaptureHelper {
       this.waiting.shift()?.resolve(msg);
     });
     proc.stderr.on('data', (d) => console.warn('[매직 카피 도우미]', String(d).trim()));
-    proc.on('exit', () => {
+    const end = () => {
       if (this.proc === proc) this.proc = null;
       markReady(false);
       for (const w of this.waiting.splice(0)) w.reject(new Error('도우미가 꺼졌어요'));
+    };
+    proc.on('exit', end);
+    // PowerShell 을 띄우지 못하면(보안 프로그램이 막음 등) 'error' 만 온다 — 듣지 않으면 앱이 오류로 꺼졌다
+    proc.on('error', (err) => {
+      console.warn('[매직 카피 도우미]', err.message);
+      end();
     });
     return this.ready;
   }
