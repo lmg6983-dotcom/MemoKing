@@ -677,7 +677,7 @@ function hintCards() {
   if (state.tab !== 'memos') return; // 그사이 일정 · 보관함 탭으로 갔으면 다음에 (달력 위에 메모 카드 안내가 뜨지 않게)
   const card = document.querySelector('.item .card');
   if (!card?.getClientRects().length) return; // 목록이 안 보이면 다음에
-  hintOnce('card-gestures', '카드를 오른쪽으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 메뉴가 뜨고, 꾹 누른 채 끌면 폴더로 옮길 수 있어요', { anchor: card });
+  hintOnce('card-gestures', '카드를 오른쪽으로 밀면 휴지통으로 가요(되돌릴 수 있어요). 꾹 누르면 메뉴가 뜨고, 꾹 누르거나 왼쪽으로 당긴 채 멈추면 들려서 폴더로 옮길 수 있어요', { anchor: card });
 }
 
 // ---------- 필터 ----------
@@ -1008,6 +1008,15 @@ function startDrag(x, y, { pop = false } = {}) {
 function moveDrag(x, y) {
   const d = swipe.drag;
   const row = document.elementFromPoint(x, y)?.closest('#folder-side [data-folder]') ?? null;
+  // 폴더가 많아 목록이 넘치면: 목록의 위 · 아래 끝 가까이로 끌면 그쪽으로 넘겨 준다
+  const side = el.folderSide;
+  if (side.scrollHeight > side.clientHeight) {
+    const r = side.getBoundingClientRect();
+    if (x >= r.left && x <= r.right) {
+      if (y < r.top + 44) side.scrollTop -= 14;
+      else if (y > r.bottom - 44) side.scrollTop += 14;
+    }
+  }
   if (row !== d.overRow) {
     d.overRow?.classList.remove('drop-on');
     row?.classList.add('drop-on');
