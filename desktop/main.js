@@ -47,7 +47,7 @@ import {
 import {
   SMOKE, APP_ID, STT_WORKER, STT_VENDOR, LLAMA_SERVER, POPUP_HELPER,
   settings, loadSettings, saveSettings, suggestedVaultPath,
-  purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings,
+  purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings, settingsReset,
   TRASH_DAYS, openWebPage, openVaultFile, toast, clickLastToast, smokeToasts, smokeOpened,
   smokeConfirmAnswers, writeClipboard, fetchRemoteImage, registerVaultProtocol,
   mcpStatus, mcpConnect, mcpSnippet, shorten,
@@ -267,7 +267,7 @@ function retryMissingVault() {
 
 function vaultInfo() {
   const root = realVault()?.root ?? null;
-  return { vaultPath: root, vaultError, missingPath: vaultMissing, suggestedPath: suggestedVaultPath(), version: app.getVersion(), sandbox: Boolean(sandbox) };
+  return { vaultPath: root, vaultError, missingPath: vaultMissing, suggestedPath: suggestedVaultPath(), version: app.getVersion(), sandbox: Boolean(sandbox), settingsReset };
 }
 
 function showHandoff(memos) {

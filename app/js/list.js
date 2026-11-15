@@ -2419,9 +2419,13 @@ api.on('mode:changed', ({ mode, enabled } = {}) => {
 });
 await refresh();
 showMode();
+// 설정 파일이 깨져 새로 시작했으면: 메모 폴더가 기본 폴더로 바뀌어 메모가 사라진 것처럼 보인다 → 쓰던 폴더를 고르게
+if (state.info?.settingsReset) {
+  showUndoBar('설정을 읽지 못해 새로 시작했어요. 쓰던 메모 폴더가 따로 있으면 골라 주세요', async () => applyInfo(await api.vault.choose()), { label: '폴더 고르기', ms: 30_000 });
+}
 // 창을 닫으며 저장하지 못해 따로 남긴 글이 있으면: 한 번에 메모로 되살리기 (예전: 앱 폴더의 파일을 찾아 직접 붙여 넣어야 했다)
 api.recovered?.count().then((n) => {
-  if (!n) return;
+  if (!n || state.info?.settingsReset) return; // 설정 안내를 덮지 않게 (다음에 켤 때 다시 알린다)
   showUndoBar(`저장하지 못한 글 ${n}개를 따로 남겨 뒀어요`, async () => {
     const back = await api.recovered.restore().catch(() => 0);
     flashStatus(back ? `메모 ${back}개로 되살렸어요` : '되살리지 못했어요. 메모 폴더를 확인하고 다시 해 주세요');

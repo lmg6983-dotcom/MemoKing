@@ -59,6 +59,8 @@ export const settings = {
 };
 
 let settingsTimer = null;
+/** 이번에 켤 때 설정 파일이 깨져 새로 시작했다 (목록 창이 알린다 — 메모 폴더가 기본 폴더로 바뀌어 메모가 사라진 것처럼 보이므로) */
+export let settingsReset = false;
 
 // 튜토리얼은 처음 설치(설정 파일이 없는 PC)에만 — 업데이트 · 다시 설치로는 다시 띄우지 않는다 (설정 › 사용법 둘러보기로만)
 export function loadSettings() {
@@ -69,6 +71,8 @@ export function loadSettings() {
   } catch (err) {
     // 첫 실행 — 다만 파일이 있는데 못 읽었으면(깨짐) 곧 새 설정으로 덮어쓰기 전에 따로 남긴다 (메모 폴더 위치 · Drive 연결을 되살릴 수 있게)
     if (err.code !== 'ENOENT') {
+      settingsReset = true;
+      settings.tutorialDone = true; // 처음 설치가 아니다 — 연습(사용법)을 띄우지 않는다
       try {
         fs.copyFileSync(settingsFile(), `${settingsFile()}.broken-${Date.now()}`);
         console.error('설정 파일을 읽지 못해 따로 남겼어요', err.message);
