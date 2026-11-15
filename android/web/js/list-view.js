@@ -584,15 +584,18 @@ el.folderBtn.addEventListener('click', async () => {
   if (reduceMotion() || typeof side.animate !== 'function') return render();
   sideSliding = true;
   // 카드는 slideSide 가 자리만 미끄러뜨린다 (크기까지 늘이고 줄이면 글자가 찌그러져 보였다)
-  await slideSide(side, sideWanted, () => {
-    glideOff = true;
-    try {
-      render();
-    } finally {
-      glideOff = false;
-    }
-  }, el.cards);
-  sideSliding = false;
+  try {
+    await slideSide(side, sideWanted, () => {
+      glideOff = true;
+      try {
+        render();
+      } finally {
+        glideOff = false;
+      }
+    }, el.cards);
+  } finally {
+    sideSliding = false; // 움직임이 중간에 실패해도 단추가 계속 안 눌리지 않게
+  }
   applyFolderSide();
 });
 

@@ -526,10 +526,11 @@ async function pickAndInsert(accept) {
     return;
   }
   if (!files?.length || !editor) return;
+  const ed = editor; // 고른 메모 (묻는 사이에 다른 메모로 바꾸면 그 메모에 들어가지 않게)
   try {
     setStatus(`파일 ${files.length}개 추가 중`);
-    const items = await editor.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
-    if (!editor) return; // 묻는 사이에 메모를 닫았다
+    const items = await ed.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
+    if (editor !== ed) return; // 묻는 사이에 메모를 닫거나 바꿨다
     // 쓰던 자리가 있으면 그 자리에, 아니면(키보드를 내리고 버튼만 누름) 메모 끝에
     //   (+ 를 펼치면 키보드를 닫으므로, 펼칠 때 쓰던 중이었는지를 본다)
     const typing = addFromCursor || el.editorRoot.contains(document.activeElement);
