@@ -24,7 +24,7 @@ import { injectMobileIcons } from './m-icons.js';
 import { app } from './state.js';
 import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, copiedToast, confirmDialog, closeConfirm, cancelTopDialog, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
-import { renderMemoImage } from '../../app/js/share-image.js';
+import { renderMemoImages } from '../../app/js/share-image.js';
 import * as widgets from './widgets.js';
 import { lockDialog } from '../../app/js/lock-ui.js';
 import { newLockSession } from '../../app/js/core/memo-lock.js';
@@ -750,8 +750,10 @@ shareSheet.addEventListener('click', async (e) => {
     }
     note.flush();
     await note.settled();
-    const base64 = await renderMemoImage(note.getEditor(), { color: app.vault.get(id)?.color });
-    await call('shareFile', { base64, name: fileName(title, 'png'), mime: 'image/png', title });
+    // 길면 문단 사이에서 나눠 여러 장으로 (메신저에 차례로 붙는다)
+    const images = await renderMemoImages(note.getEditor(), { color: app.vault.get(id)?.color });
+    if (images.length === 1) await call('shareFile', { base64: images[0], name: fileName(title, 'png'), mime: 'image/png', title });
+    else await call('shareFiles', { files: images.map((base64, k) => ({ base64, name: fileName(`${title} ${k + 1}`, 'png') })), mime: 'image/png', title });
     closeSheet(shareSheet);
   } catch (err) {
     console.error(err);

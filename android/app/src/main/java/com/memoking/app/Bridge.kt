@@ -548,6 +548,20 @@ class Bridge(private val activity: MainActivity) {
                 }
                 activity.runOnUiThread { activity.shareFile(id, file, a.optString("mime", "application/octet-stream"), a.optString("title")) }
             }
+            // 여러 파일 한꺼번에 (긴 메모를 나눈 그림들) — 받는 앱에 차례로 붙는다
+            "shareFiles" -> pool.execute {
+                val list = a.getJSONArray("files")
+                val files = try {
+                    (0 until list.length()).map { k ->
+                        val f = list.getJSONObject(k)
+                        shareFile(f.optString("name", "메모 ${k + 1}")).also { it.writeBytes(Base64.decode(f.getString("base64"), Base64.DEFAULT)) }
+                    }
+                } catch (e: Exception) {
+                    resolve(id) { throw e }
+                    return@execute
+                }
+                activity.runOnUiThread { activity.shareFiles(id, files, a.optString("mime", "application/octet-stream"), a.optString("title")) }
+            }
             "sharePdf" -> activity.runOnUiThread {
                 activity.pdfPageMm = pageOf(a)
                 activity.sharePdf(id, shareFile(a.optString("name", "메모.pdf")), a.optString("title", "메모"), a.optString("html").ifBlank { null })
