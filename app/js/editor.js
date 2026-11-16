@@ -27,9 +27,9 @@ import { videoPoster } from './video-poster.js';
 import { openAlbumViewer } from './album-viewer.js';
 import { touchMode } from './keyboard-guard.js';
 import { promptChoice } from './rename-content.js';
-import { isDocumentFile, documentPages, documentPdf, decodeTxtBytes } from './doc-pages.js';
+import { isDocumentFile, documentPages, documentPdf, decodeTxtBytes, preloadDocument } from './doc-pages.js';
 import { openPdfViewer } from './pdf-viewer.js';
-import { pdfThumbnail } from './pdf-engine.js';
+import { warmPdf } from './pdf-engine.js';
 import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from './core/link-preview.js';
 import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
@@ -232,6 +232,7 @@ function mediaView(node, view, getPos) {
   dom.src = vaultUrl(src);
   dom.alt = plainAlt(alt);
   if (title && !album && !pdfThumb) dom.title = title;
+  if (pdfThumb) warmPdf();
   // 크기 (설명 끝의 "|50%" — media-resize.js 로 끌어서 바꾼다). 묶음 사진은 묶음 모양 그대로
   const w = album ? null : mediaWidthOf(alt);
   if (w) {
@@ -1495,6 +1496,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const docs = items.filter((it) => it.kind === 'file' && isDocumentFile({ name: it.name }));
     // "PDF로": 문서를 PDF 로 바꿔 넣고 메모에는 첫 쪽 썸네일 — 누르면 앱 안에서 모든 쪽을 미리 본다 (예전의 "그림으로" 자리)
     //   장마다 그림으로 펼치려면 파일 칩 오른쪽 클릭 › 그림으로 펼치기
+    for (const d of docs) preloadDocument(d.name); // 묻는 동안 그릴 도구를 미리 올린다
     const docsAsPages = docs.length > 0 && await promptChoice({
       title: docs.length > 1 ? `문서 ${docs.length}개를 어떻게 넣을까요?` : `${docs[0].name}을 어떻게 넣을까요?`,
       message: 'PDF로 넣으면 첫 쪽이 보이고, 누르면 앱 안에서 모든 쪽을 넘겨 봐요',
@@ -1545,10 +1547,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       onNotice?.(`${name}을 PDF로 바꾸고 있어요`);
       const srcFile = await documentSource(it);
       const isPdf = extOf(srcFile.name) === 'pdf';
-      const { pdf, total, pages } = await documentPdf(srcFile, (n, all) => onNotice?.(`${name}을 PDF로 바꾸고 있어요 (${n}/${all})`));
+      const { pdf, total, pages, thumb } = await documentPdf(srcFile, (n, all) => onNotice?.(`${name}을 PDF로 바꾸고 있어요 (${n}/${all})`));
       // 원래 PDF 면 넣은 파일 그대로, 바꾼 것이면 PDF 를 새로 남긴다
       const pdfSrc = isPdf && extOf(name) === 'pdf' ? it.src : await saveFile(new File([pdf], `${baseName(name)}.pdf`, { type: 'application/pdf' }));
-      const thumb = await pdfThumbnail(pdf, 600);
       const thumbSrc = await saveFile(new File([thumb], `${baseName(name)} 미리보기.png`, { type: 'image/png' }));
       onNotice?.(total > pages ? `${name}의 앞 ${pages}장을 PDF로 넣었어요 (모두 ${total}장)` : `${name}을 PDF로 넣었어요 (${pages}쪽). 누르면 넘겨 봐요`);
       return { kind: 'image', src: thumbSrc, alt: baseName(name), title: pdfThumbTitle(pdfSrc) };

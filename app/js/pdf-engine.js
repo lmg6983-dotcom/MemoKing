@@ -45,6 +45,30 @@ function pdfium() {
   return ready;
 }
 
+/** 쉬는 틈에 PDFium 을 미리 올려 둔다 (메모에 PDF 썸네일이 보일 때) — 눌렀을 때 wasm 풀기 · 컴파일을 기다리지 않게 */
+let warmed = false;
+export function warmPdf() {
+  if (warmed) return;
+  warmed = true;
+  (globalThis.requestIdleCallback ?? ((f) => setTimeout(f, 1500)))(() => pdfium().catch(() => (warmed = false)), { timeout: 4000 });
+}
+/** 지금 바로 올리기 시작 (못 올려도 조용히 — 실제로 쓸 때 다시 해 보고 알린다) */
+export const preloadPdf = () => void pdfium().catch(() => {});
+
+/** 캔버스 → 폭 width 이하로 줄인 PNG Blob (썸네일) */
+export async function thumbBlob(canvas, width) {
+  let c = canvas;
+  if (canvas.width > width) {
+    c = document.createElement('canvas');
+    c.width = width;
+    c.height = Math.max(1, Math.round((canvas.height * width) / canvas.width));
+    const g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(canvas, 0, 0, c.width, c.height);
+  }
+  return new Promise((done, fail) => c.toBlob((b) => (b ? done(b) : fail(new Error('썸네일을 만들지 못했어요'))), 'image/png'));
+}
+
 /**
  * PDF 열기 → { pageCount, size(i) → { width, height } (pt), render(i, width) → canvas, close() }
  *   render: 쪽을 폭 width(px)로 그린 캔버스 (흰 바탕)
@@ -111,17 +135,6 @@ export async function openPdf(bytes) {
     m.pdfium.wasmExports.free(ptr);
   };
   return { pageCount, size, render, close };
-}
-
-/** 첫 쪽 썸네일 (PNG Blob, 폭 width px) */
-export async function pdfThumbnail(bytes, width = 480) {
-  const pdf = await openPdf(bytes);
-  try {
-    const canvas = pdf.render(0, width);
-    return await new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('썸네일을 만들지 못했어요'))), 'image/png'));
-  } finally {
-    pdf.close();
-  }
 }
 
 /** 쪽 캔버스 → PDF 에 담을 JPEG { bytes, w, h } */

@@ -4,7 +4,7 @@
 //   PDF: PDFium (pdf-engine.js) · 한글 HWP · HWPX: rhwp (Rust · wasm, 못 읽으면 hwp.js · HWPX 글 뽑기)
 //   DOCX: docx-preview · PPTX: JSZip — 화면 밖에 그린 장을 html-to-image 로 찍는다 (app/vendor/docpages.js — 넣을 때만 불러온다)
 import { toCanvas } from '../vendor/html-to-image.js';
-import { openPdf, makeImagePdf, pageJpeg, assetBytes } from './pdf-engine.js';
+import { openPdf, makeImagePdf, pageJpeg, assetBytes, thumbBlob, preloadPdf } from './pdf-engine.js';
 
 export const DOC_EXTS = ['pdf', 'docx', 'pptx', 'hwp', 'hwpx', 'txt'];
 const extOf = (name) => String(name ?? '').split('.').pop().toLowerCase();
@@ -28,21 +28,38 @@ export async function documentPages(file, onProgress) {
   return { pages, total };
 }
 
+/** 이 문서를 그릴 도구를 미리 올린다 ("어떻게 넣을까요?" 를 묻는 동안) — 고른 뒤 기다리는 시간을 줄인다 */
+export function preloadDocument(name) {
+  const ext = extOf(name);
+  if (ext === 'pdf') preloadPdf();
+  else if (ext === 'hwp' || ext === 'hwpx') void rhwp().catch(() => {});
+  else if (ext === 'docx' || ext === 'pptx') void import('../vendor/docpages.js').catch(() => {});
+}
+
 /**
  * 문서 → PDF (메모에 PDF 로 넣는다). PDF 는 그대로, 그 밖은 장마다 그린 그림을 담은 PDF
- * @returns {Promise<{ pdf: Uint8Array, total: number, pages: number }>} total: 문서 전체 장 수 · pages: PDF 에 담은 장 수
+ * @returns {Promise<{ pdf: Uint8Array, total: number, pages: number, thumb: Blob }>} total: 문서 전체 장 수 · pages: PDF 에 담은 장 수 · thumb: 첫 쪽 PNG
  */
-export async function documentPdf(file, onProgress) {
+export async function documentPdf(file, onProgress, thumbWidth = 600) {
   const ext = extOf(file.name);
   const data = new Uint8Array(await file.arrayBuffer());
   if (ext === 'pdf') {
-    const pdf = await openPdf(data); // 열리는지 (깨진 · 암호 PDF 는 여기서 알린다)
-    const n = pdf.pageCount;
-    pdf.close();
-    return { pdf: data, total: n, pages: n };
+    const pdf = await openPdf(data); // 열리는지 (깨진 · 암호 PDF 는 여기서 알린다) — 연 김에 썸네일도
+    try {
+      const n = pdf.pageCount;
+      return { pdf: data, total: n, pages: n, thumb: await thumbBlob(pdf.render(0, thumbWidth), thumbWidth) };
+    } finally {
+      pdf.close();
+    }
   }
-  const { items, total } = await documentCanvases(ext, data, onProgress, pageJpeg);
-  return { pdf: makeImagePdf(items), total, pages: items.length };
+  // 썸네일은 첫 쪽을 그린 캔버스로 바로 (PDF 를 다시 열지 않는다 — 한글 · Word 는 PDFium 을 올릴 필요도 없다)
+  let thumb = null;
+  const take = async (canvas) => {
+    thumb ??= await thumbBlob(canvas, thumbWidth);
+    return pageJpeg(canvas);
+  };
+  const { items, total } = await documentCanvases(ext, data, onProgress, take);
+  return { pdf: makeImagePdf(items), total, pages: items.length, thumb };
 }
 
 // 문서(PDF 가 아닌 것) → 장마다 그린 캔버스를 바로 take 로 넘겨(PNG · JPEG 로 바꾸고) 캔버스는 버린다 — 60장을 한꺼번에 들고 있지 않게 (휴대폰 메모리)

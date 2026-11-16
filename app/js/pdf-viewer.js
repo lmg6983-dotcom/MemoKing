@@ -54,10 +54,41 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
   let shutDown = false;
   const pages = []; // { box, canvas, drawnAt (그린 폭) }
   const io = new IntersectionObserver((entries) => {
-    for (const e of entries) (e.isIntersecting ? draw : drop)(Number(e.target.dataset.i));
+    for (const e of entries) {
+      const i = Number(e.target.dataset.i);
+      if (e.isIntersecting) near.add(i);
+      else {
+        near.delete(i);
+        drop(i);
+      }
+    }
+    pump();
     showCount();
   }, { root: scroller, rootMargin: '600px 0px' });
 
+  // 그릴 쪽은 한 프레임에 하나씩, 화면 가운데에 가까운 쪽부터 — 한꺼번에 그리느라 스크롤 · 확대가 멈칫하지 않게
+  const near = new Set();
+  let pumping = 0;
+  function pump() {
+    if (pumping || shutDown || !pdf) return;
+    pumping = requestAnimationFrame(() => {
+      pumping = 0;
+      const mid = scroller.scrollTop + scroller.clientHeight / 2;
+      let best = -1;
+      let gap = Infinity;
+      for (const i of near) {
+        const p = pages[i];
+        if (!stale(p)) continue;
+        const d = Math.abs(p.box.offsetTop + p.box.offsetHeight / 2 - mid);
+        if (d < gap) [best, gap] = [i, d];
+      }
+      if (best < 0) return;
+      draw(best);
+      pump();
+    });
+  }
+  const want = (p) => Math.min(4096, Math.round(p.box.clientWidth * Math.min(2.5, window.devicePixelRatio || 1))); // 크게 확대해도 캔버스는 4096px 까지 (메모리)
+  const stale = (p) => !p.failed && !(p.drawnAt && Math.abs(p.drawnAt - want(p)) < 8);
   const baseWidth = () => Math.min(scroller.clientWidth - 24, 900); // 쪽 폭 (확대 1) — 화면 폭에 맞추되 PC 는 900px 까지
   const layout = () => {
     const w = Math.round(baseWidth() * zoom);
@@ -69,15 +100,17 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
   };
   function draw(i) {
     const p = pages[i];
-    if (!p || shutDown) return;
-    const want = Math.min(4096, Math.round(p.box.clientWidth * Math.min(2.5, window.devicePixelRatio || 1))); // 크게 확대해도 캔버스는 4096px 까지 (메모리)
-    if (p.drawnAt && Math.abs(p.drawnAt - want) < 8) return; // 이미 그 크기로
+    if (!p || shutDown || !stale(p)) return;
+    const w = want(p);
     try {
-      const canvas = pdf.render(i, want);
+      const canvas = pdf.render(i, w);
       canvas.className = 'mk-pdf-canvas';
+      const old = p.box.firstChild;
+      if (old instanceof HTMLCanvasElement) old.width = old.height = 0;
       p.box.replaceChildren(canvas);
-      p.drawnAt = want;
+      p.drawnAt = w;
     } catch (err) {
+      p.failed = true;
       p.box.textContent = '이 쪽을 그리지 못했어요';
       console.warn('[PDF 미리보기]', err);
     }
@@ -107,11 +140,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
     scroller.scrollTop = ratio * scroller.scrollHeight;
     // 보이는 쪽은 새 크기로 다시 그린다 (흐려지지 않게)
     clearTimeout(setZoom.t);
-    setZoom.t = setTimeout(() => {
-      const top = scroller.scrollTop - 600;
-      const bottom = scroller.scrollTop + scroller.clientHeight + 600;
-      pages.forEach((p, i) => p.box.offsetTop + p.box.offsetHeight > top && p.box.offsetTop < bottom && draw(i));
-    }, 150);
+    setZoom.t = setTimeout(pump, 150); // 확대하는 동안은 있던 그림을 늘려 보여 주고, 멈추면 또렷하게
   }
 
   // 확대: Ctrl+휠 (터치패드 벌리기) · 두 손가락
@@ -176,6 +205,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
   const onResize = () => {
     layout();
     showCount();
+    pump();
   };
   window.addEventListener('resize', onResize);
 
@@ -183,6 +213,8 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
     if (shutDown) return;
     shutDown = true;
     current = null;
+    cancelAnimationFrame(pumping);
+    clearTimeout(setZoom.t);
     io.disconnect();
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onResize);
@@ -216,5 +248,6 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
   }
   layout();
   showCount();
+  pump();
   return shut;
 }
