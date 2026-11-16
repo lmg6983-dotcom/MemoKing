@@ -865,7 +865,9 @@ el.cards.addEventListener('click', (e) => {
   if (card && state.picking) return togglePick(card.dataset.id);
   const tag = e.target.closest('[data-card-tag]');
   if (tag) return toggleTag(tag.dataset.cardTag, { only: true });
-  if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect() }); // 그 카드가 커지며 메모 화면이 된다
+  // 찾는 중이면 그 말을 넘겨, 메모가 열리면 찾은 자리로 가고 칠한다
+  const find = state.query ? parseQuery(state.query).text : '';
+  if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect(), ...(find ? { find } : {}) }); // 그 카드가 커지며 메모 화면이 된다
 });
 // 카드 손짓 (휴대폰)
 //   - 오른쪽으로 밀기: 휴지통으로 (묻지 않고, 되돌리기 가능)

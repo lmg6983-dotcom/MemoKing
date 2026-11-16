@@ -1730,7 +1730,9 @@ el.cards.addEventListener('click', async (e) => {
     const pair = await api.conflict.get(card.dataset.id).catch(() => null);
     if (pair) return compareConflict(pair);
   }
-  api.memo.open(card.dataset.id);
+  // 찾는 중이면 그 말을 넘겨, 메모가 열리면 찾은 자리로 가고 칠한다
+  const findText = state.query ? parseQuery(state.query).text : '';
+  api.memo.open(card.dataset.id, findText ? { find: findText } : undefined);
 });
 
 /** 충돌 사본 ↔ 원본 나란히: 사본 내용으로 바꾸기 · 사본 지우기 · 둘 다 두기 · 따로 열어 보기 */

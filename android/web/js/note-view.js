@@ -1214,6 +1214,7 @@ export async function openNote(memoId, options = {}) {
   if (id === memoId && editor) {
     if (options.alarm) showAlarm(options.alarm);
     if (options.highlight) highlight();
+    if (options.find) findBar.open({ text: options.find });
     return;
   }
   if (id) closeNote({ quiet: true });
@@ -1352,6 +1353,7 @@ export async function openNote(memoId, options = {}) {
     recorder.attach(memoId);
     if (options.alarm) showAlarm(options.alarm);
     if (options.highlight) highlight();
+    if (options.find) findBar.open({ text: options.find }); // 목록에서 찾던 말로 열었다: 그 말을 찾아 첫 자리로 가고 칠한다
     if (options.capture) await options.capture(editor);
     annotation ??= setupAnnotation({
       scroller: el.editorRoot,

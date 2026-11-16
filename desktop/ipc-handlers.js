@@ -705,7 +705,14 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 개별 메모 조작 ----------
-  ipcMain.handle('memo:open', (e, id) => {
+  ipcMain.handle('memo:open', (e, id, opts) => {
+    // 목록에서 찾던 말 (그 말로 찾아 첫 자리로 — note.js runCommand)
+    const find = typeof opts?.find === 'string' ? opts.find.trim().slice(0, 200) : '';
+    if (find) {
+      const open = wm.noteWins.get(id);
+      if (open && !open.isDestroyed() && !open.webContents.isLoading()) open.webContents.send('memo:command', { find });
+      else wm.pendingCommands.set(id, { find });
+    }
     // 목록에서 고른 테이프 메모: 테이프를 떼고 앞으로
     const untaped = e.sender === wm.listWin?.webContents && wm.untapeFromList(String(id));
     const win = wm.openNote(id);

@@ -944,6 +944,8 @@ $('alarm-ok').addEventListener('click', () => {
 api.on('memo:alarm', showAlarm);
 // 밖(목록 카드 오른쪽 클릭)에서 부탁한 일: 메뉴의 그 단추를 누른 것과 같게
 function runCommand(command) {
+  // 목록에서 찾던 말로 열었다: 그 말을 찾아 첫 자리로 가고 모두 칠한다 (찾기 막대가 열린 채 — 다음 · 이전으로 넘긴다)
+  if (command?.find) return findBar.open({ text: command.find });
   if ((command === 'lock' && !memo?.locked) || (command === 'unlock' && memo?.locked)) $('lock-btn').click();
   else if (command === 'versions') $('versions-btn').click();
 }
