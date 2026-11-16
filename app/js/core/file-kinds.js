@@ -25,6 +25,10 @@ export function extOf(name) {
   return dot > 0 ? base.slice(dot + 1).toLowerCase() : '';
 }
 
+// 메모에 넣으면 PDF 첫 쪽 썸네일과 짝이 되는 문서 (doc-pages.js 가 그린다)
+export const DOC_EXTS = ['pdf', 'docx', 'pptx', 'hwp', 'hwpx', 'txt'];
+export const isDocumentFile = (file) => DOC_EXTS.includes(extOf(file?.name));
+
 export function isProgramFile(name) {
   return PROGRAM_EXT.has(extOf(name));
 }

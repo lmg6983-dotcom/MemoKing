@@ -2132,6 +2132,10 @@ if (!memo) {
   editor.focus();
   markPainted();
   if (memo.capture) await applyCapture(memo.capture);
+  if (memo.insert) { // 목록에 놓은 문서: 메모 창에서 넣을 때처럼 원본 칩 + PDF 첫 쪽 썸네일
+    editor.insertItems(await editor.arrangeItems(memo.insert));
+    await flush();
+  }
   if (memo.command) runCommand(memo.command); // 목록 카드 오른쪽 클릭 › 잠그기 · 잠금 풀기 · 이전 버전
   if (params.get('record') === '1') recorder.start(); // 목록 + › 음성 메모
   if (params.get('ink') === '1') editor.insertInk(); // 목록 + › 손 메모

@@ -730,7 +730,12 @@ export function registerIpc(ctx) {
     if (!vault) throw new Error(UI.noVault);
     const id = vault.import({ body: String(body ?? '').slice(0, 5_000_000) });
     if (!id) throw new Error('이 파일로는 메모를 만들 수 없어요. 글 파일(.txt, .md 등)을 골라 주세요');
-    if (opts?.open) wm.openNote(id);
+    // 문서 첨부: 메모 창을 열어 편집기가 넣는다 (PDF 첫 쪽 썸네일과 한 덩어리 — 메모 창에서 넣을 때와 같게). 메모 폴더의 첨부만
+    const items = (Array.isArray(opts?.items) ? opts.items : [])
+      .filter((it) => typeof it?.src === 'string' && /^attachments\/[^/\\]+$/.test(it.src) && typeof it.name === 'string')
+      .map((it) => ({ kind: 'file', src: it.src, name: it.name.slice(0, 255) }));
+    if (items.length) wm.pendingInserts.set(id, items);
+    if (opts?.open || items.length) wm.openNote(id);
     return id;
   });
   // ---------- 충돌 사본 비교: "제목 (PC 충돌 2026-11-15 1530).md" ↔ 원본 "제목.md" ----------
@@ -773,10 +778,12 @@ export function registerIpc(ctx) {
     const alarm = wm.pendingAlarms.get(id) ?? null;
     const capture = wm.pendingCaptures.get(id) ?? null;
     const command = wm.pendingCommands.get(id) ?? null;
+    const insert = wm.pendingInserts.get(id) ?? null;
     wm.pendingAlarms.delete(id);
     wm.pendingCaptures.delete(id);
     wm.pendingCommands.delete(id);
-    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, command, stack: wm.stackState(id), linkPreviews: settings.linkPreviews !== false, workLife: settings.workLife === true };
+    wm.pendingInserts.delete(id);
+    return { ...memo, ...wm.layerState(id), onTop: settings.onTop[id] === true, alarm, capture, command, insert, stack: wm.stackState(id), linkPreviews: settings.linkPreviews !== false, workLife: settings.workLife === true };
   });
 
   // ---------- 잠금 메모 ----------
