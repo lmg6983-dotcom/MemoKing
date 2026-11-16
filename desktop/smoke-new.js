@@ -1337,8 +1337,8 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       // 4) 여러 파일을 한꺼번에 끌어다 놓기 · 메모 밖으로 끌어내기 · 다른 창에 가 있으면 고른 테두리 해제
       {
         const { win } = await openMemo('# 파일 놓기\n\n끝\n', '파일 놓기');
-        // 안내는 곧 다른 안내(글 파일의 PDF 짝)로 바뀌므로 지나간 안내도 모아 둔다
-        await js(win, `new MutationObserver(() => (window.__statusLog ??= []).push(document.getElementById('status').textContent)).observe(document.getElementById('status'), { childList: true, characterData: true, subtree: true })`);
+        // 안내는 곧 다른 안내(문서의 PDF 짝)로 바뀌므로 지나간 안내도 모아 둔다 — 같은 순간 바로 덮여도 놓치지 않게, 새로 들어온 글자 노드마다
+        await js(win, `new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) (window.__statusLog ??= []).push(n.textContent); }).observe(document.getElementById('status'), { childList: true, characterData: true, subtree: true })`);
         const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
         await js(win, `(async () => {
           const bin = Uint8Array.from(atob(${JSON.stringify(png)}), (c) => c.charCodeAt(0));
