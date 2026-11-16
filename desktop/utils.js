@@ -59,6 +59,8 @@ export const settings = {
 };
 
 let settingsTimer = null;
+/** 이번에 켤 때 설정 파일이 깨져 새로 시작했다 (목록 창이 알린다 — 메모 폴더가 기본 폴더로 바뀌어 메모가 사라진 것처럼 보이므로) */
+export let settingsReset = false;
 
 // 튜토리얼은 처음 설치(설정 파일이 없는 PC)에만 — 업데이트 · 다시 설치로는 다시 띄우지 않는다 (설정 › 사용법 둘러보기로만)
 export function loadSettings() {
@@ -66,8 +68,18 @@ export function loadSettings() {
     const loaded = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
     Object.assign(settings, loaded);
     if (!('tutorialDone' in loaded)) settings.tutorialDone = true;
-  } catch {
-    // 첫 실행
+  } catch (err) {
+    // 첫 실행 — 다만 파일이 있는데 못 읽었으면(깨짐) 곧 새 설정으로 덮어쓰기 전에 따로 남긴다 (메모 폴더 위치 · Drive 연결을 되살릴 수 있게)
+    if (err.code !== 'ENOENT') {
+      settingsReset = true;
+      settings.tutorialDone = true; // 처음 설치가 아니다 — 연습(사용법)을 띄우지 않는다
+      try {
+        fs.copyFileSync(settingsFile(), `${settingsFile()}.broken-${Date.now()}`);
+        console.error('설정 파일을 읽지 못해 따로 남겼어요', err.message);
+      } catch {
+        // 남기지 못해도 시작은 한다
+      }
+    }
   }
 }
 
@@ -423,7 +435,9 @@ export function mcpConnect(on) {
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     if (fs.existsSync(file) && !fs.existsSync(`${file}.memoking-backup`)) fs.copyFileSync(file, `${file}.memoking-backup`);
-    fs.writeFileSync(file, `${JSON.stringify({ ...config, mcpServers: servers }, null, 2)}\n`);
+    // 임시 파일에 쓰고 바꿔치기 — 쓰는 도중 꺼져도 Claude 설정 파일이 깨지지 않게
+    fs.writeFileSync(`${file}.memoking-tmp`, `${JSON.stringify({ ...config, mcpServers: servers }, null, 2)}\n`);
+    fs.renameSync(`${file}.memoking-tmp`, file);
   } catch (err) {
     return { ...mcpStatus(), error: `설정 파일에 쓰지 못했어요 (${err.message})` };
   }

@@ -134,9 +134,13 @@ export class Vault extends EventTarget {
       try {
         text = fs.readText(file);
       } catch {
+        text = null;
+      }
+      if (text == null) {
+        // 잠깐 못 읽었다 (목록에는 있는 파일) — 아는 내용 그대로 둔다 (사라진 메모로 보지 않게)
+        if (prev && !next.has(prev.id)) next.set(prev.id, prev);
         continue;
       }
-      if (text == null) continue;
       const { meta, body } = parseMemoFile(text);
       // id 가 없는 파일(직접 만든 파일)이나 복사본처럼 id 가 겹치는 파일은 임시 id 를 준다.
       let id = meta.id;
@@ -638,7 +642,7 @@ export class Vault extends EventTarget {
       const dropText = fs.readText(drop);
       if (dropText == null) return;
       if (source !== target) fs.writeText(target, fs.readText(source) ?? '');
-      fs.writeText(`${TRASH_DIR}/${stripMd(baseName(drop))} (${stamp()}).md`, withoutId(dropText));
+      fs.writeText(this.trashPath(stripMd(baseName(drop))), withoutId(dropText));
       fs.remove(drop);
     } catch (err) {
       this.emit('error', err);
@@ -657,13 +661,22 @@ export class Vault extends EventTarget {
     }
   }
 
+  // 휴지통에 둘 파일 자리 — 같은 제목을 같은 초에 지우면 이름이 겹쳐 옮기기가 실패하거나 앞의 것을 덮어썼다
+  //   → 겹치면 "제목 (2) (지운 시각).md" (지운 시각은 늘 이름 끝에)
+  trashPath(base) {
+    for (let n = 1; ; n++) {
+      const dest = `${TRASH_DIR}/${base}${n > 1 ? ` (${n})` : ''} (${stamp()}).md`;
+      if (!fs.stat(dest)) return dest;
+    }
+  }
+
   trash(id) {
     const entry = this.entries.get(id);
     if (!entry) return false;
     this.entries.delete(id);
     let trashed = null;
     if (entry.file && fs.stat(entry.file)) {
-      const dest = `${TRASH_DIR}/${stripMd(baseName(entry.file))} (${stamp()}).md`;
+      const dest = this.trashPath(stripMd(baseName(entry.file)));
       trashed = baseName(dest);
       if (!fs.move(entry.file, dest)) {
         this.entries.set(id, entry);
@@ -770,6 +783,14 @@ export class Vault extends EventTarget {
   }
 
   /** 메모 폴더로 되돌린다 (이름이 겹치면 "(2)"). 함께 휴지통에 간 첨부도 돌려놓는다. 되살린 메모 id */
+  /** 휴지통 메모의 글 (되살리기 전에 무엇인지 보게 — 잠긴 메모는 안내만, 제목 줄은 빼고 줄 그대로) */
+  trashPreview(name) {
+    const file = this.trashFile(name);
+    if (!file) return null;
+    const { body } = parseMemoFile(fs.readText(file) ?? '');
+    return isLockedBody(body) ? '(잠긴 메모라 내용을 볼 수 없어요)' : plainLines(body).slice(1).join('\n').slice(0, 1500);
+  }
+
   restoreTrash(name) {
     const file = this.trashFile(name);
     if (!file) return null;

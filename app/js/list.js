@@ -812,13 +812,18 @@ function badge(name, text, extra = '') {
   return span;
 }
 
+let refreshSeq = 0; // 바뀜이 잇따르면 늦게 끝난 앞 읽기가 새 목록을 덮지 않게 (지운 메모가 잠깐 되살아 보였다)
 async function refresh() {
-  state.memos = await api.memos.list();
+  const seq = ++refreshSeq;
+  const memos = await api.memos.list();
+  if (seq !== refreshSeq) return;
+  state.memos = memos;
   loadFolders();
   await runSearch();
 }
 
 // 검색창은 지금 보고 있는 탭을 검색한다
+let searchSeq = 0; // 늦게 온 앞 검색어의 결과가 마지막 검색어 결과를 덮어쓰지 않게
 async function runSearch() {
   if (activeTab === 'reminders') return remindersTab.setQuery(el.search.value);
   if (activeTab === 'history') return historyTab.setQuery(el.search.value);
@@ -826,7 +831,10 @@ async function runSearch() {
   // 검색어의 #태그 는 태그 필터로, 나머지는 글자 검색으로
   const { text, tags } = parseQuery(state.query);
   state.queryTags = tags;
-  state.results = text ? await api.memos.search(text) : null;
+  const seq = ++searchSeq;
+  const results = text ? await api.memos.search(text) : null;
+  if (seq !== searchSeq) return;
+  state.results = results;
   render();
   aiAsk?.update(text);
 }
@@ -862,7 +870,12 @@ async function deleteMemo(id) {
     ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
     setTimeout(() => ghost.remove(), 600);
   }
-  await api.memo.remove(id);
+  try {
+    await api.memo.remove(id);
+  } catch (err) {
+    if (card) card.style.visibility = ''; // 지우지 못했으면 카드를 다시 보인다 (예전: 빈자리로 남았다)
+    flashStatus(err?.message || '메모를 삭제하지 못했어요');
+  }
 }
 
 // ---------- 파일을 끌어다 놓으면 메모로 (.md · .txt · 그림 · 그 밖의 파일) ----------
@@ -900,7 +913,9 @@ window.addEventListener('drop', async (e) => {
   if (el.main.hidden) return;
   // 폴더는 빼고 (폴더는 webkitGetAsEntry 로만 알 수 있다)
   const entries = [...e.dataTransfer.items].map((it) => it.webkitGetAsEntry?.());
-  const files = [...e.dataTransfer.files].filter((_f, i) => !entries[i]?.isDirectory).slice(0, MAX_DROP_FILES);
+  const all = [...e.dataTransfer.files].filter((_f, i) => !entries[i]?.isDirectory);
+  const files = all.slice(0, MAX_DROP_FILES);
+  const over = all.length - files.length; // 한 번에 넣는 수를 넘은 파일 (예전: 말없이 빠졌다)
   if (!files.length) return;
   const made = [];
   let failed = 0;
@@ -922,7 +937,7 @@ window.addEventListener('drop', async (e) => {
   }
   if (activeTab !== 'memos') showTab('memos');
   flashStatus(made.length
-    ? `파일 ${made.length}개로 메모를 만들었어요${failed ? ` (${failed}개는 못 만들었어요)` : ''}`
+    ? `파일 ${made.length}개로 메모를 만들었어요${failed ? ` (${failed}개는 못 만들었어요)` : ''}${over ? `. 한 번에 ${MAX_DROP_FILES}개까지라 ${over}개는 넣지 않았어요` : ''}`
     : '이 파일로는 메모를 만들지 못했어요');
 });
 
@@ -950,7 +965,7 @@ function showUndo({ name, title }) {
 }
 
 /** 아래 "…했어요 · 되돌리기" 막대 (지우기 · 폴더로 옮기기) — run: 되돌리기 */
-function showUndoBar(message, run) {
+function showUndoBar(message, run, { label = '되돌리기', ms = 6000 } = {}) {
   let bar = $('undo-bar');
   if (!bar) {
     bar = document.createElement('div');
@@ -979,7 +994,7 @@ function showUndoBar(message, run) {
   text.textContent = message;
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.textContent = '되돌리기';
+  btn.textContent = label;
   btn.addEventListener('click', async () => {
     bar.hidden = true;
     await run();
@@ -987,7 +1002,7 @@ function showUndoBar(message, run) {
   bar.replaceChildren(text, btn);
   bar.hidden = false;
   clearTimeout(undoTimer);
-  undoTimer = setTimeout(() => (bar.hidden = true), 6000);
+  undoTimer = setTimeout(() => (bar.hidden = true), ms);
 }
 api.on('memo:trashed', showUndo);
 
@@ -1352,8 +1367,13 @@ if (api.ai) {
   }
   $('ai-default').addEventListener('click', async () => {
     $('ai-default').hidden = true;
-    const st = await api.ai.downloadDefault();
-    renderAi(st, st?.error ? { chat: st.error } : {});
+    try {
+      const st = await api.ai.downloadDefault();
+      renderAi(st, st?.error ? { chat: st.error } : {});
+    } catch (err) {
+      $('ai-default').hidden = false; // 실패해도 단추가 숨은 채로 남지 않게
+      $('ai-try-out').textContent = err?.message || '모델을 받지 못했어요';
+    }
   });
   $('ai-default-stop').addEventListener('click', () => api.ai.cancelDownload());
   $('ai-reinstall').addEventListener('click', () => api.links.open(WINDOWS_SETUP));
@@ -1373,9 +1393,9 @@ if (api.ai) {
     const btn = $('ai-try');
     btn.disabled = true;
     $('ai-try-out').textContent = '모델을 올리고 묻는 중이에요…';
-    const r = await api.ai.try();
+    const r = await api.ai.try().catch((err) => ({ error: err?.message || '모델에 묻지 못했어요' })); // 실패해도 단추가 잠긴 채 · "묻는 중" 으로 남지 않게
     btn.disabled = false;
-    $('ai-try-out').textContent = r.error ? r.error : `답: ${r.text} (${r.seconds.toFixed(1)}초)`;
+    $('ai-try-out').textContent = r?.error ? r.error : `답: ${r.text} (${r.seconds.toFixed(1)}초)`;
   });
 } else {
   $('local-ai-sec').hidden = true;
@@ -1677,7 +1697,7 @@ el.cards.addEventListener('keydown', (e) => {
   e.preventDefault();
   deleteMemo(card.dataset.id);
 });
-el.cards.addEventListener('click', (e) => {
+el.cards.addEventListener('click', async (e) => {
   if (suppressClick) {
     suppressClick = false; // 끌기가 끝난 직후의 클릭은 무시
     return;
@@ -1704,8 +1724,79 @@ el.cards.addEventListener('click', (e) => {
   const cardTag = e.target.closest('[data-card-tag]');
   if (cardTag) return toggleTagFilter(cardTag.dataset.cardTag, { only: true });
   const card = e.target.closest('.card');
-  if (card) api.memo.open(card.dataset.id);
+  if (!card) return;
+  // 충돌 사본만 보는 중: 사본을 누르면 원본과 나란히 견주는 창 (사본이 아니면 평소대로 연다)
+  if (state.onlyFiles && api.conflict) {
+    const pair = await api.conflict.get(card.dataset.id).catch(() => null);
+    if (pair) return compareConflict(pair);
+  }
+  // 찾는 중이면 그 말을 넘겨, 메모가 열리면 찾은 자리로 가고 칠한다
+  const findText = state.query ? parseQuery(state.query).text : '';
+  api.memo.open(card.dataset.id, findText ? { find: findText } : undefined);
 });
+
+/** 충돌 사본 ↔ 원본 나란히: 사본 내용으로 바꾸기 · 사본 지우기 · 둘 다 두기 · 따로 열어 보기 */
+function compareConflict({ copy, original }) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'compare-dialog';
+  const h = document.createElement('h2');
+  h.textContent = '충돌 사본 견주기';
+  const note = document.createElement('p');
+  note.className = 'compare-note';
+  note.textContent = '두 기기에서 같은 메모를 동시에 고쳐 따로 남긴 사본이에요. 남길 쪽을 골라 주세요.';
+  const col = (label, m) => {
+    const box = document.createElement('section');
+    box.className = 'compare-col';
+    const t = document.createElement('h3');
+    t.textContent = label;
+    const sub = document.createElement('div');
+    sub.className = 'compare-sub';
+    sub.textContent = m ? `${m.file}${m.updated ? `, ${new Date(m.updated).toLocaleString('ko-KR')}` : ''}` : '원본을 찾지 못했어요 (이름을 바꿨거나 지웠어요)';
+    const pre = document.createElement('pre');
+    pre.className = 'compare-body';
+    pre.textContent = !m ? '' : m.locked ? '(잠긴 메모라 내용을 볼 수 없어요)' : m.body;
+    box.append(t, sub, pre);
+    if (m) {
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'link-btn';
+      open.textContent = '따로 열기';
+      open.addEventListener('click', () => api.memo.open(m.id));
+      box.append(open);
+    }
+    return box;
+  };
+  const cols = document.createElement('div');
+  cols.className = 'compare-cols';
+  cols.append(col('지금 메모', original), col('충돌 사본', copy));
+  const actions = document.createElement('div');
+  actions.className = 'dialog-actions';
+  const btn = (label, cls, run) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `btn${cls ? ` ${cls}` : ''}`;
+    b.textContent = label;
+    b.addEventListener('click', run);
+    return b;
+  };
+  const resolve = (keep) => async () => {
+    const r = await api.conflict.resolve(copy.id, keep).catch((err) => ({ ok: false, message: err.message }));
+    flashStatus(r.message);
+    if (r.ok) dialog.close();
+  };
+  const locked = copy.locked || original?.locked;
+  actions.append(
+    btn('둘 다 두기', '', () => dialog.close()),
+    btn('사본 지우기', '', resolve('original')),
+    btn('사본 내용으로 바꾸기', 'primary', resolve('copy')),
+  );
+  if (locked || !original) actions.lastChild.disabled = true;
+  if (locked) actions.children[1].disabled = true;
+  dialog.append(h, note, cols, actions);
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+}
 
 // ---------- 카드를 끌어 화면에 놓기 ----------
 // 목록 안: 카드 복제본이 커서를 따라온다. 목록 밖: 메인 프로세스가 실제 크기의 미리보기 창을 띄운다.
@@ -2317,10 +2408,26 @@ $('trash-btn').addEventListener('click', async () => {
 });
 $('trash-close').addEventListener('click', () => trashEl.dialog.close());
 trashEl.list.addEventListener('click', async (e) => {
+  // 줄(제목 · 미리보기)을 누르면 글을 더 펼쳐 본다 — 되살리기 전에 무엇인지 알게
+  const text = e.target.closest('.trash-text');
+  if (text) {
+    const row = text.closest('.trash-row');
+    const open = row.querySelector('.trash-body');
+    if (open) return open.remove();
+    const body = document.createElement('div');
+    body.className = 'trash-body';
+    body.textContent = (await api.trash.preview(row.dataset.name).catch(() => null)) || '(내용이 없어요)';
+    text.append(body);
+    return;
+  }
   const restore = e.target.closest('[data-restore]');
   if (restore) {
     restore.disabled = true;
-    await api.trash.restore(restore.dataset.restore);
+    try {
+      await api.trash.restore(restore.dataset.restore);
+    } catch (err) {
+      await confirmDialog(`메모를 되살리지 못했어요.\n${err?.message ?? ''}`.trim(), '확인'); // 예전: 단추만 잠기고 아무 말이 없었다
+    }
     return renderTrash();
   }
   const remove = e.target.closest('[data-remove]');
@@ -2395,6 +2502,18 @@ api.on('mode:changed', ({ mode, enabled } = {}) => {
 });
 await refresh();
 showMode();
+// 설정 파일이 깨져 새로 시작했으면: 메모 폴더가 기본 폴더로 바뀌어 메모가 사라진 것처럼 보인다 → 쓰던 폴더를 고르게
+if (state.info?.settingsReset) {
+  showUndoBar('설정을 읽지 못해 새로 시작했어요. 쓰던 메모 폴더가 따로 있으면 골라 주세요', async () => applyInfo(await api.vault.choose()), { label: '폴더 고르기', ms: 30_000 });
+}
+// 창을 닫으며 저장하지 못해 따로 남긴 글이 있으면: 한 번에 메모로 되살리기 (예전: 앱 폴더의 파일을 찾아 직접 붙여 넣어야 했다)
+api.recovered?.count().then((n) => {
+  if (!n || state.info?.settingsReset) return; // 설정 안내를 덮지 않게 (다음에 켤 때 다시 알린다)
+  showUndoBar(`저장하지 못한 글 ${n}개를 따로 남겨 뒀어요`, async () => {
+    const back = await api.recovered.restore().catch(() => 0);
+    flashStatus(back ? `메모 ${back}개로 되살렸어요` : '되살리지 못했어요. 메모 폴더를 확인하고 다시 해 주세요');
+  }, { label: '되살리기', ms: 20_000 });
+}, () => {});
 await remindersTab.refresh();
 showTab(new URLSearchParams(location.search).get('tab') ?? 'memos');
 document.documentElement.dataset.ready = 'true';

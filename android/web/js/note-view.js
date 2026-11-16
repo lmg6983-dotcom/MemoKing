@@ -139,6 +139,7 @@ function onChange(md) {
 // 빈 메모 안내 문구 (한글 조합 중에도 바로 끈다)
 const showPlaceholder = trackPlaceholder(el.editorRoot);
 
+let saveFails = 0; // 잇따라 저장하지 못한 수 (다시 해 보기 간격)
 /** 쓰던 내용을 바로 저장 (화면을 떠나거나 앱이 뒤로 갈 때) */
 export function flush() {
   clearTimeout(saveTimer);
@@ -172,11 +173,16 @@ export function flush() {
     }
     refusedSave = false;
     saved = body;
+    saveFails = 0;
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
     refusedSave = true; // 이대로 닫으면 사본 메모로라도 남긴다 (closeNote)
-    setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
+    // 잠깐의 실패(저장소가 바쁨 등)면 더 치지 않아도 다시 저장해 본다 — 몇 번까지만, 점점 길게
+    if (++saveFails <= 4) {
+      setStatus('저장하지 못해 곧 다시 저장해요…', true); // 다시 해 보는 중임을 보인다 (급히 글을 복사해 두지 않아도 되게)
+      saveTimer = setTimeout(flush, 2000 * saveFails);
+    } else setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
   }
 }
 
@@ -496,7 +502,10 @@ async function pasteClipboardFiles(text) {
   if (!editor) return;
   if (files.length) {
     try {
-      editor.insertItems(await editor.arrangeItems(tempsToItems(files)), { atCursor: true }); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
+      const ed = editor;
+      const items = await ed.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
+      if (editor !== ed) return setStatus(UI.fileNotAdded); // 묻는 사이에 메모를 닫거나 바꿨다
+      ed.insertItems(items, { atCursor: true });
       flush();
       setStatus(files.length > 1 ? `파일 ${files.length}개를 붙여 넣었어요` : '붙여 넣었어요');
     } catch (err) {
@@ -526,10 +535,11 @@ async function pickAndInsert(accept) {
     return;
   }
   if (!files?.length || !editor) return;
+  const ed = editor; // 고른 메모 (묻는 사이에 다른 메모로 바꾸면 그 메모에 들어가지 않게)
   try {
     setStatus(`파일 ${files.length}개 추가 중`);
-    const items = await editor.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
-    if (!editor) return; // 묻는 사이에 메모를 닫았다
+    const items = await ed.arrangeItems(tempsToItems(files)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
+    if (editor !== ed) return setStatus(UI.fileNotAdded); // 묻는 사이에 메모를 닫거나 바꿨다
     // 쓰던 자리가 있으면 그 자리에, 아니면(키보드를 내리고 버튼만 누름) 메모 끝에
     //   (+ 를 펼치면 키보드를 닫으므로, 펼칠 때 쓰던 중이었는지를 본다)
     const typing = addFromCursor || el.editorRoot.contains(document.activeElement);
@@ -1192,6 +1202,7 @@ function setupPanels() {
  */
 export async function openNote(memoId, options = {}) {
   findBar.close(); // 다른 메모를 열면 찾기는 새로
+  saveFails = 0; // 저장 다시 해 보기는 메모마다 새로 (앞 메모에서 다 써 버려 이 메모는 다시 해 보지 않았다)
   setupPanels();
   if (opening) {
     // 잠긴 메모의 비밀번호 화면이 떠 있는 채로 다른 메모를 고르면: 그 화면을 닫고 고른 메모로 (뒤로 가기를 기다리지 않게)
@@ -1203,6 +1214,7 @@ export async function openNote(memoId, options = {}) {
   if (id === memoId && editor) {
     if (options.alarm) showAlarm(options.alarm);
     if (options.highlight) highlight();
+    if (options.find) findBar.open({ text: options.find });
     return;
   }
   if (id) closeNote({ quiet: true });
@@ -1239,8 +1251,21 @@ export async function openNote(memoId, options = {}) {
     if (memo.needsPassword) {
       // 잠긴 메모: 비밀번호를 넣어야 편집기를 만든다 (열쇠는 메모를 닫을 때까지만)
       el.screen.classList.add('memo-locked');
+      let bio = { available: false, saved: false };
+      try {
+        bio = native.bioStatus(memoId);
+      } catch {
+        // 예전 앱
+      }
+      let typed = null; // 비밀번호로 열었으면 그 비밀번호 (다음부터 지문으로 — 아래에서 묻는다)
+      let viaBio = false;
       const opened = await lockScreen(el.editorRoot, {
         title: memo.title,
+        bio: bio.available && bio.saved ? { label: '지문 · 얼굴로 열기', get: async () => {
+          const pw = await call('bioOpen', { memoId });
+          viaBio = Boolean(pw);
+          return pw;
+        } } : null,
         onTry: async (password) => {
           try {
             // 비밀번호 화면이 떠 있는 사이 다른 기기가 다시 잠갔을 수 있어 지금 파일의 암호문으로
@@ -1255,8 +1280,19 @@ export async function openNote(memoId, options = {}) {
             const r = app.vault.openLock(memoId, session);
             if (!r) return UI.memoOpenFail;
             memo = r;
+            typed = viaBio ? null : password;
             return null;
           } catch (err) {
+            // 감싸 둔 비밀번호가 맞지 않다 (다른 기기에서 비밀번호를 바꿈) — 잊고 비밀번호로
+            if (viaBio) {
+              viaBio = false;
+              try {
+                native.bioForget(memoId);
+              } catch {
+                // 예전 앱
+              }
+              return '비밀번호가 바뀌었어요. 새 비밀번호를 넣어 주세요';
+            }
             return err.message;
           }
         },
@@ -1273,6 +1309,11 @@ export async function openNote(memoId, options = {}) {
         return;
       }
       current = saved = memo.body;
+      // 비밀번호로 열었고 지문을 쓸 수 있으면: 다음부터 지문으로 열지 한 번 묻는다 (휴대폰 보안 칩의 열쇠로 감싸 둔다)
+      if (typed && bio.available && !bio.saved) {
+        const pw = typed;
+        toast('다음부터 이 메모를 지문 · 얼굴로 열까요?', false, { label: '켜기', run: () => call('bioSave', { memoId, password: pw }).then((ok) => ok && toast('다음부터 지문 · 얼굴로 열어요')).catch(() => {}) });
+      }
     }
     editor = await createNoteEditor(el.editorRoot, {
       markdown: memo.body,
@@ -1312,6 +1353,7 @@ export async function openNote(memoId, options = {}) {
     recorder.attach(memoId);
     if (options.alarm) showAlarm(options.alarm);
     if (options.highlight) highlight();
+    if (options.find) findBar.open({ text: options.find }); // 목록에서 찾던 말로 열었다: 그 말을 찾아 첫 자리로 가고 칠한다
     if (options.capture) await options.capture(editor);
     annotation ??= setupAnnotation({
       scroller: el.editorRoot,

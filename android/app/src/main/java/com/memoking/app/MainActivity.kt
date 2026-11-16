@@ -768,6 +768,23 @@ class MainActivity : Activity() {
         }
     }
 
+    /** 앱 캐시의 파일 여러 개를 한꺼번에 다른 앱으로 (긴 메모를 나눈 그림들) */
+    fun shareFiles(id: Int, files: List<java.io.File>, mime: String, title: String) {
+        bridge.resolve(id) {
+            val uris = ArrayList(files.map { VaultFileProvider.shareUriFor(it.name) })
+            val intent = Intent(Intent.ACTION_SEND_MULTIPLE).setType(mime)
+                .putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                .putExtra(Intent.EXTRA_SUBJECT, title)
+                .putExtra(Intent.EXTRA_TITLE, title)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val clip = android.content.ClipData.newRawUri(title, uris.first())
+            for (u in uris.drop(1)) clip.addItem(android.content.ClipData.Item(u))
+            intent.clipData = clip
+            startActivity(Intent.createChooser(intent, title.ifEmpty { null }).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+            true
+        }
+    }
+
     /** 지금 인쇄용 WebView (끝날 때까지 붙잡아 둔다 — 버려지면 PDF 가 중간에 끊긴다) */
     private var printWeb: WebView? = null
     private val main = android.os.Handler(android.os.Looper.getMainLooper())

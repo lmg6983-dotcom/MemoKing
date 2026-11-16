@@ -67,7 +67,24 @@ object Alarms {
 
     /** 휴대폰을 다시 켰을 때: 기억해 둔 예약을 다시 건다 */
     fun restore(ctx: Context) {
-        schedule(ctx, JSONArray(Vaults.prefs(ctx).getString(SCHEDULE, "[]")))
+        val saved = JSONArray(Vaults.prefs(ctx).getString(SCHEDULE, "[]"))
+        // 꺼져 있는 사이 지난 알림(하루 안): 앱을 열 때까지 기다리지 않고 바로 알린다 (예전: 다시 켠 뒤 앱을 열어야 알았다)
+        val now = System.currentTimeMillis()
+        val missed = (0 until saved.length()).map { saved.getJSONObject(it) }.filter {
+            val at = it.optLong("at")
+            val key = it.optString("key")
+            at <= now && at >= now - 24L * 60 * 60 * 1000 && key.isNotEmpty() && !wasFired(ctx, key, at)
+        }
+        for (item in missed) markFired(ctx, item.optString("key"), item.optLong("at"))
+        // 하나면 그 알림 그대로, 여럿이면 한 알림으로 묶는다 (다시 켜자마자 알림이 쏟아지지 않게 — 누르면 메모킹)
+        if (missed.size == 1) {
+            val item = missed[0]
+            Notifier.show(ctx, item.optString("key"), item.optString("title"), "놓친 알림 · ${item.optString("text")}", item.optString("memoId"), item.optString("label"))
+        } else if (missed.size > 1) {
+            val list = missed.joinToString("\n") { "· ${it.optString("title").ifEmpty { "메모" }} ${it.optString("text")}".trim() }
+            Notifier.show(ctx, "missed@$now", "놓친 알림 ${missed.size}개", list, "", "휴대폰이 꺼져 있는 사이 지난 알림이에요")
+        }
+        schedule(ctx, saved)
     }
 
     fun markFired(ctx: Context, key: String, at: Long) {

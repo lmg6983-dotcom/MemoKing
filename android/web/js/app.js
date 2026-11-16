@@ -24,7 +24,7 @@ import { injectMobileIcons } from './m-icons.js';
 import { app } from './state.js';
 import { openSheet, closeSheet, closeTopSheet, closeAllSheets, sheetOpen, toast, copiedToast, confirmDialog, closeConfirm, cancelTopDialog, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
-import { renderMemoImage } from '../../app/js/share-image.js';
+import { renderMemoImages } from '../../app/js/share-image.js';
 import * as widgets from './widgets.js';
 import { lockDialog } from '../../app/js/lock-ui.js';
 import { newLockSession } from '../../app/js/core/memo-lock.js';
@@ -36,7 +36,8 @@ import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWai
 import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml, pagePx, pageFullPx } from './print-html.js';
-import { fitPages } from '../../app/js/print-fit.js';
+import { originalFileOf } from '../../app/js/core/conflicts.js';
+import { fitPages, spaceBreaks } from '../../app/js/print-fit.js';
 import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
 import { openMemoryDay, dayText } from '../../app/js/memory-day.js';
@@ -439,8 +440,11 @@ app.openMemo = async (id, options = {}) => {
   syncPane();
 };
 
+let creatingMemo = false; // 빠르게 두 번 눌러도 새 메모는 하나만
 app.newMemo = async ({ color, voice = false, ink = false } = {}) => {
-  if (!app.vault) return null;
+  if (!app.vault || creatingMemo) return null;
+  creatingMemo = true;
+  setTimeout(() => (creatingMemo = false), 500);
   let pick = color;
   if (!pick) {
     try {
@@ -488,6 +492,7 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="mode"]').hidden = !list.workLifeOn(); // Work / Life 를 나눠 쓸 때만
   memoSheet.querySelector('[data-memo-action="folder"] small').textContent = folderOf(memo.file) || '폴더 없음';
   memoSheet.querySelector('[data-memo-action="pick"]').hidden = inNote; // 여러 장 고르기는 목록에서만
+  memoSheet.querySelector('[data-memo-action="compare"]').hidden = !conflictOriginal(memo); // 충돌 사본이고 원본이 있을 때만
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -513,6 +518,12 @@ memoSheet.addEventListener('click', async (e) => {
   if (!b || !menuFor) return;
   const id = menuFor;
   const memo = app.vault.get(id);
+  if (!memo) {
+    // 메뉴를 연 사이 다른 기기에서 지워졌다 (예전: 고정 등을 누르면 오류로 멈췄다)
+    closeSheet(memoSheet);
+    toast('이 메모는 이미 삭제됐어요', true);
+    return;
+  }
   const body = note.currentId() === id ? note.editorMarkdown() : memo?.body ?? '';
   switch (b.dataset.memoAction) {
     case 'find':
@@ -579,6 +590,10 @@ memoSheet.addEventListener('click', async (e) => {
       closeSheet(memoSheet);
       openVersions(id);
       break;
+    case 'compare':
+      closeSheet(memoSheet);
+      openCompare(id);
+      break;
     case 'lock':
       closeSheet(memoSheet);
       note.flush();
@@ -619,6 +634,62 @@ memoSheet.addEventListener('click', async (e) => {
     default:
   }
 });
+
+// ---------- 충돌 사본 ↔ 원본 견주기 (PC 목록 창과 같은 일, core/conflicts.js) ----------
+
+function conflictOriginal(memo) {
+  const file = originalFileOf(memo?.file);
+  return file ? app.vault.list().find((m) => m.file === file) ?? null : null;
+}
+const compareSheet = $('compare-sheet');
+let compareFor = null;
+function openCompare(copyId) {
+  const copy = app.vault.get(copyId);
+  const orig = conflictOriginal(copy);
+  if (!copy || !orig) return toast('원본 메모를 찾지 못했어요. 이름을 바꿨거나 지웠을 수 있어요', true);
+  note.flush();
+  const original = app.vault.get(orig.id);
+  compareFor = { copyId, origId: orig.id };
+  const col = (label, m) => {
+    const box = document.createElement('section');
+    box.className = 'compare-col';
+    const t = document.createElement('b');
+    t.textContent = `${label}${m.updated ? `, ${new Date(m.updated).toLocaleString('ko-KR')}` : ''}`;
+    const pre = document.createElement('pre');
+    pre.className = 'compare-text';
+    pre.textContent = m.locked ? '(잠긴 메모라 내용을 볼 수 없어요)' : m.body;
+    box.append(t, pre);
+    return box;
+  };
+  $('compare-body').replaceChildren(col('지금 메모', original), col('충돌 사본', copy));
+  const locked = copy.locked || original.locked;
+  $('compare-take').disabled = locked;
+  $('compare-drop').disabled = locked;
+  openSheet(compareSheet);
+}
+$('compare-close').addEventListener('click', () => closeSheet(compareSheet));
+async function resolveCompare(take) {
+  const job = compareFor;
+  if (!job) return;
+  const copy = app.vault.get(job.copyId);
+  if (!copy) return closeSheet(compareSheet);
+  if (take && app.vault.save(job.origId, copy.body)?.refused) return toast('원본을 바꾸지 못했어요. 잠시 뒤 다시 해 주세요', true);
+  closeSheet(compareSheet);
+  if (note.currentId() === job.copyId) {
+    note.discardAndClose(); // 사본을 보던 중이면 닫고 목록으로 (지울 메모)
+    app.showList();
+  }
+  if (take && note.currentId() === job.origId) note.showRestored(app.vault.get(job.origId)); // 원본을 보던 중이면 바꾼 글로
+  try {
+    app.vault.trash(job.copyId);
+  } catch (err) {
+    return toast(err.message, true);
+  }
+  list.refresh();
+  toast(take ? '사본 내용으로 바꾸고 사본은 휴지통으로 옮겼어요' : '사본을 휴지통으로 옮겼어요');
+}
+$('compare-take').addEventListener('click', () => resolveCompare(true));
+$('compare-drop').addEventListener('click', () => resolveCompare(false));
 
 // ---------- 이전 버전 ----------
 
@@ -670,7 +741,8 @@ async function deleteMemo(id, { flown = false } = {}) {
     name = app.vault.trash(id);
   } catch (err) {
     toast(err.message, true);
-    list.refresh();
+    if (inNote) app.showList(); // 메모 화면은 이미 닫았다 — 목록으로 (예전: 빈 화면에 남았다)
+    else list.refresh();
     return;
   }
   if (inNote) app.showList();
@@ -740,12 +812,17 @@ shareSheet.addEventListener('click', async (e) => {
     }
     note.flush();
     await note.settled();
-    const base64 = await renderMemoImage(note.getEditor(), { color: app.vault.get(id)?.color });
-    await call('shareFile', { base64, name: fileName(title, 'png'), mime: 'image/png', title });
+    // 길면 문단 사이에서 나눠 여러 장으로 (메신저에 차례로 붙는다)
+    const images = await renderMemoImages(note.getEditor(), { color: app.vault.get(id)?.color });
+    if (images.length === 1) await call('shareFile', { base64: images[0], name: fileName(title, 'png'), mime: 'image/png', title });
+    else await call('shareFiles', { files: images.map((base64, k) => ({ base64, name: fileName(`${title} ${k + 1}`, 'png') })), mime: 'image/png', title });
     closeSheet(shareSheet);
   } catch (err) {
     console.error(err);
-    toast(err.message || UI.shareFail, true);
+    // 너무 길어 그림 한 장이 안 되면 알림에서 바로 PDF 로 (예전: 말만 하고 다시 메뉴를 찾아가야 했다)
+    const toPdf = /PDF로 저장/.test(err?.message ?? '') ? { label: 'PDF로 저장', run: () => openPrint(id, 'share') } : undefined;
+    if (toPdf) closeSheet(shareSheet);
+    toast(err.message || UI.shareFail, true, toPdf);
   } finally {
     $('share-busy').hidden = true;
     for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = false;
@@ -760,11 +837,13 @@ const SCALE_KEY = 'memoking.printScale';
 const FIT_KEY = 'memoking.printFit';
 const MARGIN_KEY = 'memoking.printMargin';
 const PAGE_KEY = 'memoking.printPage';
+const BREAKS_KEY = 'memoking.printBreaks';
 const printJob = { id: null, mode: 'share', scale: 1, fit: true, margin: MARGINS.normal,
   page: { kind: 'paper', paper: 'a4', orientation: 'portrait', ratio: '4:3', long: 150, width: 100, height: 150, lock: true, bg: false, date: true } };
 try {
   printJob.scale = clampPrintScale(localStorage.getItem(SCALE_KEY));
   printJob.fit = localStorage.getItem(FIT_KEY) !== 'off';
+  printJob.breaks = localStorage.getItem(BREAKS_KEY) === 'on';
   printJob.margin = clampMarginMm(localStorage.getItem(MARGIN_KEY));
   printJob.page = { ...printJob.page, ...JSON.parse(localStorage.getItem(PAGE_KEY) ?? '{}') };
 } catch {
@@ -806,15 +885,16 @@ async function fitFrame(frame, pageH) {
   if (!doc) return;
   await imagesLoaded(d);
   await d.fonts?.ready;
-  fitPages(doc, { pageH, zoom: printJob.scale });
+  if (printJob.breaks) spaceBreaks(doc, { pageH, zoom: printJob.scale }); // 구분선에서 다음 쪽으로 (그림 맞추기가 그 자리를 알게 먼저)
+  if (printJob.fit) fitPages(doc, { pageH, zoom: printJob.scale });
 }
 async function fittedDoc(id) {
   const html = printDoc(id);
-  if (!printJob.fit) return html;
+  if (!printJob.fit && !printJob.breaks) return html;
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   const page = pagePx(printSize(), printMargin());
-  frame.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${page.width}px; height: ${page.height}px; border: 0; visibility: hidden;`;
+  frame.style.cssText = `position: fixed; left: -10000px; top: 0; width: ${pageFullPx(printSize()).width}px; height: ${page.height}px; border: 0; visibility: hidden;`;
   const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
   frame.srcdoc = html;
   document.body.append(frame);
@@ -833,6 +913,7 @@ function drawPrintSize() {
   $('print-scale-out').textContent = `${pct}%`;
   for (const b of printSheet.querySelectorAll('[data-scale]')) b.setAttribute('aria-checked', String(Math.abs(Number(b.dataset.scale) - printJob.scale) < 0.001));
   $('print-fit').checked = printJob.fit;
+  $('print-breaks').checked = printJob.breaks === true;
   $('print-margin').value = String(printJob.margin);
   $('print-margin-out').textContent = `${printMargin()}mm`; // 작은 종이라 줄여 쓰면 줄인 값
   // 크기 (종이 · 카드 비율 · 직접 입력)
@@ -866,9 +947,55 @@ function drawPrintSize() {
   previewTimer = setTimeout(() => {
     if (!printJob.id || printSheet.hidden) return;
     const frame = $('print-frame');
-    if (printJob.fit) frame.addEventListener('load', () => fitFrame(frame, pageFullPx(printSize()).height - 2 * Math.round(printMargin() * 96 / 25.4)), { once: true }); // 미리보기 쪽: 쪽 전체 크기, 안쪽 여백 = 고른 여백 (print-html.js)
+    const contentH = pageFullPx(printSize()).height - 2 * Math.round(printMargin() * 96 / 25.4); // 미리보기 쪽: 쪽 전체 크기, 안쪽 여백 = 고른 여백 (print-html.js)
+    frame.addEventListener('load', async () => {
+      if (printJob.fit || printJob.breaks) await fitFrame(frame, contentH);
+      // 미리보기는 첫 쪽만 — 모두 몇 쪽인지 크기 옆에 (PC PDF 창처럼)
+      const main = frame.contentDocument?.querySelector('main');
+      const pages = main ? Math.max(1, Math.ceil((main.getBoundingClientRect().height - 1) / contentH)) : 0;
+      const s = printSize();
+      $('print-summary').textContent = `${Math.round(s.width)} × ${Math.round(s.height)}mm${pages > 1 ? ` · ${pages}쪽` : ''}`;
+      if (pages > 1) paginatePreview(frame, Math.min(pages, PREVIEW_PAGES), contentH);
+    }, { once: true });
+    frame.style.height = ''; // 한 쪽 모양으로 (여러 쪽이면 load 뒤 paginatePreview 가 다시)
+    $('print-preview').classList.remove('multi');
+    $('print-preview').scrollTop = 0;
     frame.srcdoc = printDoc(printJob.id, true);
   }, 120);
+}
+// 여러 쪽 미리보기 (PC print.js paginate 와 같다): 본문을 쪽마다 복사해 쪽의 글 칸 높이만큼씩 올려 보이고, 미리보기 칸은 위아래로 넘긴다
+const PREVIEW_PAGES = 30; // 이보다 긴 메모는 앞 30쪽만 (복사본이 많으면 시트가 무거워진다)
+const PREVIEW_GAP = 28; // 쪽 사이 (print.css .pv-pages)
+function paginatePreview(frame, n, contentH) {
+  const d = frame.contentDocument;
+  const main = d?.querySelector('main');
+  if (!main) return;
+  const date = d.querySelector('.print-date');
+  const list = d.createElement('div');
+  list.className = 'pv-pages';
+  for (let i = 0; i < n; i++) {
+    const page = d.createElement('section');
+    page.className = 'pv-page';
+    const view = d.createElement('div');
+    view.className = 'pv-view';
+    const flow = d.createElement('div');
+    flow.style.transform = `translateY(${-i * contentH}px)`;
+    flow.append(main.cloneNode(true));
+    if (date) flow.append(date.cloneNode(true));
+    view.append(flow);
+    page.append(view);
+    list.append(page);
+  }
+  main.remove();
+  date?.remove();
+  d.body.append(list);
+  d.documentElement.classList.add('multi');
+  const full = pageFullPx(printSize()).height;
+  const total = n * full + (n - 1) * PREVIEW_GAP;
+  frame.style.height = `${total}px`;
+  const box = $('print-preview');
+  box.classList.add('multi');
+  box.querySelector('.pv-spacer')?.style.setProperty('height', `${total * Number(box.style.getPropertyValue('--fit') || 0.35)}px`);
 }
 function fitPreview() {
   const box = $('print-preview');
@@ -947,6 +1074,15 @@ for (const [input, side] of [[$('print-cw'), 'width'], [$('print-ch'), 'height']
 $('print-lock').addEventListener('change', (e) => setPrintPage({ lock: e.target.checked }));
 $('print-bg').addEventListener('change', (e) => setPrintPage({ bg: e.target.checked }));
 $('print-date').addEventListener('change', (e) => setPrintPage({ date: e.target.checked }));
+$('print-breaks').addEventListener('change', (e) => {
+  printJob.breaks = e.target.checked;
+  try {
+    localStorage.setItem(BREAKS_KEY, printJob.breaks ? 'on' : 'off');
+  } catch {
+    // 이번만
+  }
+  drawPrintSize();
+});
 $('print-fit').addEventListener('change', (e) => {
   printJob.fit = e.target.checked;
   try {
@@ -1279,6 +1415,15 @@ function renderTrash() {
     sub.className = 'trash-sub';
     sub.textContent = [`${daysAgoText(t.deletedAt)} 지움`, t.attachments ? `첨부 ${t.attachments}개` : ''].filter(Boolean).join(', ');
     text.append(title, sub);
+    // 누르면 글을 펼쳐 본다 — 되살리기 전에 무엇인지 알게 (다시 누르면 접힌다)
+    text.addEventListener('click', () => {
+      const open = text.querySelector('.trash-body');
+      if (open) return open.remove();
+      const body = document.createElement('span');
+      body.className = 'trash-body';
+      body.textContent = app.vault.trashPreview(t.name) || '(내용이 없어요)';
+      text.append(body);
+    });
     const restore = document.createElement('button');
     restore.className = 'btn';
     restore.textContent = '되살리기';
@@ -1626,7 +1771,8 @@ function openVault() {
   if (pendingIntent) {
     const p = pendingIntent;
     pendingIntent = null;
-    if (p.type === 'open') app.openMemo(p.memoId, { alarm: p.label ? { label: p.label } : undefined, highlight: true });
+    if (p.type === 'open' && !p.memoId) app.showList(); // 묶은 놓친 알림 (휴대폰을 다시 켠 뒤) — 메모 하나가 아니라 목록으로
+    else if (p.type === 'open') app.openMemo(p.memoId, { alarm: p.label ? { label: p.label } : undefined, highlight: true });
     else if (p.type === 'new') app.newMemo({ voice: p.voice === true });
     else if (p.type === 'widget-pick') widgets.startPick(p.widgetId, { toast });
     else if (p.type === 'share') memoFromShare(p);
@@ -1800,6 +1946,10 @@ try {
   const ds = drive.status();
   if (ds.reconnect && !ds.connected && app.vault) {
     toast('Google Drive 동기화를 다시 켜 주세요 (메모는 그대로예요)', false, { label: '연결', run: () => startConnect(() => openVault()) });
+  } else if (ds.restored && !localStorage.getItem('memoking.restoredHint')) {
+    // 새 휴대폰으로 옮겨 왔다(Drive 로그인은 백업하지 않는다) · 연결을 끊었다 — 한 번만 알린다
+    localStorage.setItem('memoking.restoredHint', '1');
+    toast('Google Drive와 연결되어 있지 않아요. 다시 연결하면 PC와 메모를 맞춰요', false, { label: '연결', run: () => startConnect(() => openVault()) });
   }
 } catch {
   // 미리보기 등

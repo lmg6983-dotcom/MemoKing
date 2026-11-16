@@ -303,6 +303,7 @@
     <button class="menu-item" data-memo-action="lock"><svg><use href="#i-lock"/></svg><span>잠그기</span></button>
     <button class="menu-item" data-memo-action="find"><svg><use href="#i-search"/></svg><span>찾기, 바꾸기</span></button>
     <button class="menu-item" data-memo-action="versions"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
+    <button class="menu-item" data-memo-action="compare" hidden><svg><use href="#i-copy"/></svg><span>원본과 견주기</span></button>
     <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>공유</span></button>
     <button class="menu-item" data-memo-action="widget"><svg><use href="#i-widget"/></svg><span>홈 화면에 놓기</span></button>
     <button class="menu-item" data-memo-action="copy"><svg><use href="#i-copy"/></svg><span>글 복사</span></button>
@@ -333,6 +334,21 @@
     <ul id="versions-list" class="link-list versions-list"></ul>
   </section>
 
+  <!-- 충돌 사본 ↔ 원본 견주기 (두 기기에서 동시에 고쳐 따로 남긴 사본) -->
+  <section id="compare-sheet" class="sheet links-panel versions-panel" role="dialog" aria-labelledby="compare-sheet-title" hidden>
+    <div class="sheet-grip"></div>
+    <header class="links-head">
+      <b id="compare-sheet-title">충돌 사본 견주기</b>
+      <button id="compare-close" class="icon-btn" aria-label="견주기 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <p class="versions-hint">두 기기에서 같은 메모를 동시에 고쳐 따로 남긴 사본이에요. 남길 쪽을 골라 주세요.</p>
+    <div id="compare-body" class="compare-cols"></div>
+    <div class="dialog-actions compare-actions">
+      <button id="compare-drop" class="btn">사본 지우기</button>
+      <button id="compare-take" class="btn primary">사본 내용으로 바꾸기</button>
+    </div>
+  </section>
+
   <!-- 다른 앱으로 보내기: 글 · 그림 · PDF -->
   <section id="share-sheet" class="sheet share-sheet" role="dialog" aria-labelledby="share-sheet-title" hidden>
     <div class="sheet-grip"></div>
@@ -349,7 +365,7 @@
   <section id="print-sheet" class="sheet print-sheet" role="dialog" aria-labelledby="print-sheet-title" hidden>
     <div class="sheet-grip"></div>
     <h3 id="print-sheet-title" class="sheet-title">PDF로 저장</h3>
-    <div class="print-preview" id="print-preview" aria-hidden="true"><iframe id="print-frame" title="첫 쪽 미리보기" tabindex="-1" sandbox="allow-same-origin"></iframe></div>
+    <div class="print-preview" id="print-preview" aria-hidden="true"><iframe id="print-frame" title="미리보기" tabindex="-1" sandbox="allow-same-origin"></iframe><div class="pv-spacer"></div></div>
     <p id="print-summary" class="print-summary" aria-live="polite"></p>
     <p class="print-label">크기</p>
     <div class="seg" id="print-kind" role="radiogroup" aria-label="크기 고르는 방법">
@@ -399,6 +415,7 @@
     <label class="setting-row"><input type="checkbox" id="print-bg" class="switch" role="switch"><span>메모 색 바탕</span></label>
     <label class="setting-row"><input type="checkbox" id="print-date" class="switch" role="switch" checked><span>날짜 표시</span></label>
     <label class="setting-row print-fit-row"><input type="checkbox" id="print-fit" class="switch" role="switch" checked><span>그림을 쪽 안에 맞추기</span></label>
+    <label class="setting-row print-fit-row"><input type="checkbox" id="print-breaks" class="switch" role="switch"><span>구분선(───)에서 다음 쪽으로</span></label>
     <p id="print-busy" class="wait" hidden><span class="spinner"></span><span>PDF를 만드는 중</span></p>
     <button type="button" class="btn primary print-go" id="print-go">PDF로 저장</button>
   </section>

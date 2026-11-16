@@ -46,6 +46,7 @@ export const UI = Object.freeze({
   linkSaveFail: '연결을 저장하지 못했어요. 잠시 뒤 다시 해 주세요',
   imageType: '지원하지 않는 그림 형식이에요. PNG, JPG, GIF, WebP 그림을 써 주세요',
   fileAddFail: '파일을 추가하지 못했어요. 다시 해 주세요',
+  fileNotAdded: '메모를 바꿔서 파일을 넣지 않았어요. 넣을 메모에서 다시 해 주세요',
   rowDelete: '이 행 삭제',
   colDelete: '이 열 삭제',
   mergePick: '합칠 칸들을 끌어서 골라 주세요',

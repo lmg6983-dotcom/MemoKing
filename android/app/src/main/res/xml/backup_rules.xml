@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 안드로이드 11 이하 자동 백업: Google 로그인 정보가 든 설정(memoking.xml)은 빼고, 메모 · 녹음은 그대로 -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="memoking.xml" />
+        <exclude domain="sharedpref" path="memoking_bio.xml" />
+</full-backup-content>

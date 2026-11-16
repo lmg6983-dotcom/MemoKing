@@ -76,3 +76,18 @@ export function fitPages(doc, { pageH, zoom = 1 }) {
     }
   }
 }
+
+/**
+ * 구분선(───)에서 다음 쪽으로 (PDF 창 스위치): 구분선 뒤에 그 쪽의 남은 높이만큼 빈 자리를 두어 다음 내용이 새 쪽 맨 위에서 시작하게.
+ *   CSS 쪽 나눔(break-after) 대신 빈 자리로 — 미리보기(높이로 자른 쪽)와 실제 PDF 가 똑같이 나뉘고, 그림 맞추기(fitPages)도 그 자리를 안다.
+ *   구분선은 종이에는 보이지 않는다. pageH: 쪽의 글 칸 높이 (확대와 상관없이) · zoom: 본문 확대 배율 (잰 높이는 확대된 값)
+ */
+export function spaceBreaks(doc, { pageH, zoom = 1 }) {
+  for (const hr of doc.querySelectorAll('hr')) {
+    hr.style.visibility = 'hidden';
+    const top0 = doc.getBoundingClientRect().top;
+    const bottom = hr.getBoundingClientRect().bottom - top0;
+    const rest = pageH - (bottom % pageH);
+    if (rest > 2 && rest < pageH - 2) hr.style.marginBottom = `${(rest - 1) / zoom}px`; // 1px 덜 — 반올림으로 빈 쪽이 생기지 않게
+  }
+}

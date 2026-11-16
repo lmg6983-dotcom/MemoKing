@@ -584,15 +584,18 @@ el.folderBtn.addEventListener('click', async () => {
   if (reduceMotion() || typeof side.animate !== 'function') return render();
   sideSliding = true;
   // 카드는 slideSide 가 자리만 미끄러뜨린다 (크기까지 늘이고 줄이면 글자가 찌그러져 보였다)
-  await slideSide(side, sideWanted, () => {
-    glideOff = true;
-    try {
-      render();
-    } finally {
-      glideOff = false;
-    }
-  }, el.cards);
-  sideSliding = false;
+  try {
+    await slideSide(side, sideWanted, () => {
+      glideOff = true;
+      try {
+        render();
+      } finally {
+        glideOff = false;
+      }
+    }, el.cards);
+  } finally {
+    sideSliding = false; // 움직임이 중간에 실패해도 단추가 계속 안 눌리지 않게
+  }
   applyFolderSide();
 });
 
@@ -862,7 +865,9 @@ el.cards.addEventListener('click', (e) => {
   if (card && state.picking) return togglePick(card.dataset.id);
   const tag = e.target.closest('[data-card-tag]');
   if (tag) return toggleTag(tag.dataset.cardTag, { only: true });
-  if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect() }); // 그 카드가 커지며 메모 화면이 된다
+  // 찾는 중이면 그 말을 넘겨, 메모가 열리면 찾은 자리로 가고 칠한다
+  const find = state.query ? parseQuery(state.query).text : '';
+  if (card) app.openMemo(card.dataset.id, { fromList: true, from: card.getBoundingClientRect(), ...(find ? { find } : {}) }); // 그 카드가 커지며 메모 화면이 된다
 });
 // 카드 손짓 (휴대폰)
 //   - 오른쪽으로 밀기: 휴지통으로 (묻지 않고, 되돌리기 가능)

@@ -158,6 +158,8 @@ export class Vault extends EventEmitter {
       try {
         text = fs.readFileSync(this.abs(file), 'utf8');
       } catch {
+        // 백신 · OneDrive 가 잠깐 붙잡아 못 읽었다 — 아는 내용 그대로 둔다 (예전: 사라진 메모로 보고 창에 "사라졌어요" 가 떴다)
+        if (prev && !next.has(prev.id)) next.set(prev.id, prev);
         continue;
       }
       const { meta, body } = parseMemoFile(text);
@@ -722,7 +724,7 @@ export class Vault extends EventEmitter {
     try {
       const dropText = fs.readFileSync(this.abs(drop), 'utf8');
       if (source !== target) writeAtomic(this.abs(target), fs.readFileSync(this.abs(source), 'utf8'));
-      writeAtomic(path.join(this.trashDir, `${path.posix.basename(drop, '.md')} (${stamp()}).md`), withoutId(dropText));
+      writeAtomic(this.trashPath(path.posix.basename(drop, '.md')), withoutId(dropText));
       fs.rmSync(this.abs(drop), { force: true });
     } catch (err) {
       this.emit('error', err);
@@ -741,6 +743,15 @@ export class Vault extends EventEmitter {
     }
   }
 
+  // 휴지통에 둘 파일 자리 "제목 (지운 시각).md" — 같은 제목을 같은 초에 지우면(다른 폴더의 "회의" 둘을 함께 등)
+  //   이름이 겹쳐 앞의 것을 덮어썼다 → 겹치면 "제목 (2) (지운 시각).md" (지운 시각은 늘 이름 끝에 — trashedAt 이 읽는다)
+  trashPath(base) {
+    for (let n = 1; ; n++) {
+      const dest = path.join(this.trashDir, `${base}${n > 1 ? ` (${n})` : ''} (${stamp()}).md`);
+      if (!fs.existsSync(dest)) return dest;
+    }
+  }
+
   trash(id) {
     const entry = this.entries.get(id);
     if (!entry) return false;
@@ -748,7 +759,7 @@ export class Vault extends EventEmitter {
     let trashed = null;
     if (entry.file) {
       const base = path.posix.basename(entry.file, '.md');
-      const dest = path.join(this.trashDir, `${base} (${stamp()}).md`);
+      const dest = this.trashPath(base);
       try {
         fs.renameSync(this.abs(entry.file), dest);
         trashed = path.basename(dest);
@@ -858,6 +869,14 @@ export class Vault extends EventEmitter {
         deletedAt: new Date(t.at).toISOString(),
         attachments: lockedFiles(t.body, t.meta, () => this.trashAttachmentFiles()).length, // 잠긴 메모는 머리말의 표로
       }));
+  }
+
+  /** 휴지통 메모의 글 미리보기 (되살리기 전에 무엇인지 보게 — 잠긴 메모는 내용을 보이지 않는다) */
+  trashPreview(name) {
+    const file = this.trashFile(name);
+    if (!file) return null;
+    const { body } = parseMemoFile(fs.readFileSync(file, 'utf8'));
+    return isLockedBody(body) ? '(잠긴 메모라 내용을 볼 수 없어요)' : plainLines(body).slice(1).join('\n').slice(0, 1500); // 제목 줄은 빼고, 줄은 그대로
   }
 
   /** 메모 폴더로 되돌린다 (이름이 겹치면 "(2)"). 함께 휴지통에 간 첨부도 돌려놓는다. 되살린 메모 id */

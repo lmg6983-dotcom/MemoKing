@@ -107,7 +107,9 @@ class WebServer(private val context: Context) {
         }) ?: return none
         val w = minOf(480, frame.width)
         val small = Bitmap.createScaledBitmap(frame, w, maxOf(1, frame.height * w / frame.width), true)
+        if (small !== frame) frame.recycle() // 4K 동영상의 한 장면은 30MB 쯤 — 줄인 뒤 바로 놓는다 (동영상이 많은 목록에서 메모리가 모자랐다)
         val jpg = ByteArrayOutputStream().also { small.compress(Bitmap.CompressFormat.JPEG, 80, it) }.toByteArray()
+        small.recycle()
         return WebResourceResponse("image/jpeg", null, 200, "OK", headers("image/jpeg"), ByteArrayInputStream(jpg))
     }
 

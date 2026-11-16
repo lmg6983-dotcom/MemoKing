@@ -7,6 +7,7 @@ import { contextMenuTemplate } from './context-menu.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { createErrorLog, problemMail } from './error-log.js';
+import { SUPPORT_MAIL } from './support-mail.js';
 import { MODE_LABEL } from '../app/js/core/modes.js';
 import path from 'node:path';
 import { Vault } from './vault.js';
@@ -46,7 +47,7 @@ import {
 import {
   SMOKE, APP_ID, STT_WORKER, STT_VENDOR, LLAMA_SERVER, POPUP_HELPER,
   settings, loadSettings, saveSettings, suggestedVaultPath,
-  purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings,
+  purgeTrash, autoStartAvailable, getAutoStart, setAutoStart, appSettings, settingsReset,
   TRASH_DAYS, openWebPage, openVaultFile, toast, clickLastToast, smokeToasts, smokeOpened,
   smokeConfirmAnswers, writeClipboard, fetchRemoteImage, registerVaultProtocol,
   mcpStatus, mcpConnect, mcpSnippet, shorten,
@@ -266,7 +267,7 @@ function retryMissingVault() {
 
 function vaultInfo() {
   const root = realVault()?.root ?? null;
-  return { vaultPath: root, vaultError, missingPath: vaultMissing, suggestedPath: suggestedVaultPath(), version: app.getVersion(), sandbox: Boolean(sandbox) };
+  return { vaultPath: root, vaultError, missingPath: vaultMissing, suggestedPath: suggestedVaultPath(), version: app.getVersion(), sandbox: Boolean(sandbox), settingsReset };
 }
 
 function showHandoff(memos) {
@@ -344,6 +345,10 @@ function fireReminder(memoId, reminder, info) {
       win.moveTop();
       win.flashFrame(true);
       win.once('focus', () => win.flashFrame(false));
+    } else {
+      // 창을 열 수 없으면(사용법 연습 중 — 화면은 연습 폴더) Windows 알림으로라도 (예전: 아무것도 뜨지 않았다)
+      windowManager.pendingAlarms.delete(memoId);
+      showToast(memoId, memo, { ...alarm, title, label });
     }
   } else {
     showToast(memoId, memo, { ...alarm, title, label });
@@ -656,6 +661,9 @@ async function switchDriveFolder(folderId, folderName) {
   const moving = root !== vault?.root;
   if (moving) {
     const wins = [...windowManager.noteWins.values()].filter((w) => !w.isDestroyed());
+    // 옮기기 전에 쓰던 글부터 저장 — 3초 안에 안 닫히는 창이 있어도 마지막 글이 옛 폴더에만 남지 않게 (업데이트 설치 전과 같게)
+    const flushed = Promise.all(wins.map((w) => w.webContents.executeJavaScript('window.mkFlushSync?.()', true).catch(() => {})));
+    await Promise.race([flushed, new Promise((r) => setTimeout(r, 2000))]); // 멈춘 창이 있어도 옮기기가 멈추지 않게
     await Promise.all(wins.map((w) => new Promise((resolve) => {
       w.once('closed', resolve);
       setTimeout(resolve, 3000);
@@ -860,12 +868,25 @@ async function enterSandbox() {
   await closeNoteWindows({ keep: true });
   const dir = fs.mkdtempSync(path.join(app.getPath('temp'), 'memoking-tutorial-'));
   const next = new Vault(dir);
-  next.defaultMode = viewMode();
-  next.on('changed', () => windowManager.pushList());
-  next.on('error', (err) => console.error('[연습 공간]', err));
-  next.open();
-  // 예시 사진: 앱에 든 사진을 연습 폴더 첨부로 복사
-  await seedTutorialSandbox(next, toLocalIso, { photo: (name) => next.saveAttachment(fs.readFileSync(path.join(import.meta.dirname, '..', 'app', 'assets', 'tutorial', 'sample', `${name}.jpg`)), 'jpg') }); // 설치본(asar) 안의 사진도 readFileSync 로 읽힌다
+  try {
+    next.defaultMode = viewMode();
+    next.on('changed', () => windowManager.pushList());
+    next.on('error', (err) => console.error('[연습 공간]', err));
+    next.open();
+    // 예시 사진: 앱에 든 사진을 연습 폴더 첨부로 복사
+    await seedTutorialSandbox(next, toLocalIso, { photo: (name) => next.saveAttachment(fs.readFileSync(path.join(import.meta.dirname, '..', 'app', 'assets', 'tutorial', 'sample', `${name}.jpg`)), 'jpg') }); // 설치본(asar) 안의 사진도 readFileSync 로 읽힌다
+  } catch (err) {
+    // 만들다 실패하면 임시 폴더를 치우고 닫아 둔 실제 메모 창을 다시 연다 (예전: 창이 닫힌 채 남았다)
+    console.error('연습 공간을 만들지 못했어요', err);
+    next.close();
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      // 임시 폴더라 Windows 가 나중에 치운다
+    }
+    for (const id of openNotes) windowManager.openNote(id, { inactive: true });
+    return;
+  }
   sandbox = { real, dir, openNotes, workLife: settings.workLife };
   vault = next;
   windowManager.loadStacks();
@@ -931,6 +952,7 @@ function whatsNew() {
 async function startTutorial() {
   if (!vault) return false;
   await enterSandbox();
+  if (!sandbox) return false; // 연습 공간을 만들지 못했다 (실제 메모로 사용법을 돌리지 않는다)
   tutorial = { active: true, index: 0, memoId: null, praise: false, again: settings.tutorialDone === true };
   windowManager.createListWindow('memos');
   sendTutorial();
@@ -1018,7 +1040,7 @@ function setShortcut(name, acc) {
   const prev = shortcutKey(name);
   const enabled = shortcutStatus(name).enabled;
   if (enabled && next !== prev) {
-    if (!globalShortcut.register(next, () => {})) return { ok: false, reason: 'taken', label: displayAccelerator(next), status: shortcutStatus(name) };
+    if (!tryRegister(next, () => {})) return { ok: false, reason: 'taken', label: displayAccelerator(next), status: shortcutStatus(name) };
     globalShortcut.unregister(next);
   }
   settings.shortcuts = { ...normalizeShortcuts(settings.shortcuts), [name]: next };
@@ -1039,12 +1061,22 @@ function pauseShortcuts(on) {
   memoHotkeys.pause(on);
 }
 
+// 단축키 잡기: 잘못된 키 이름(손상된 설정 등)은 Electron 이 예외를 던진다 — 앱이 멈추지 않고 "잡지 못함" 으로
+function tryRegister(key, run) {
+  try {
+    return globalShortcut.register(key, run);
+  } catch (err) {
+    console.warn('단축키를 등록하지 못했어요', key, err?.message);
+    return false;
+  }
+}
+
 function registerQuickMemoKey() {
   if (heldKeys.quickMemo) globalShortcut.unregister(heldKeys.quickMemo);
   heldKeys.quickMemo = null;
   if (!settings.quickMemo || process.platform !== 'win32' || shortcutsPaused) return false;
   const key = shortcutKey('quickMemo');
-  const ok = globalShortcut.register(key, () => onQuickMemoKey());
+  const ok = tryRegister(key, () => onQuickMemoKey());
   if (!ok) console.warn(`${displayAccelerator(key)}를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else {
     heldKeys.quickMemo = key;
@@ -1058,7 +1090,7 @@ function registerListKey() {
   heldKeys.list = null;
   if (shortcutsPaused) return false;
   const key = shortcutKey('list');
-  const ok = globalShortcut.register(key, () => windowManager.toggleListWindow());
+  const ok = tryRegister(key, () => windowManager.toggleListWindow());
   if (!ok) console.warn(`${displayAccelerator(key)}를 다른 프로그램이 쓰고 있어 등록하지 못했어요`);
   else heldKeys.list = key;
   return ok;
@@ -1237,7 +1269,28 @@ console.error = (...args) => {
   consoleError(...args);
   errors().write(args.map(logText).join(' '));
 };
-app.on('render-process-gone', (_e, wc, details) => errors().write(`[창 꺼짐] ${wc.getURL().split('/').pop()} ${details.reason} (${details.exitCode})`));
+// 메모 · 목록 창의 화면이 꺼지면 다시 불러온다 — 창 틀이 없어(닫기 단추도 화면이 그린다) 흰 창으로 남으면 닫을 수도 없었다.
+//   메모 창은 마지막으로 저장된 글로 다시 열린다. 1분 안에 세 번 꺼지면 되풀이하지 않고 창을 닫는다
+//   (메모 창은 새로 연다 — 예비 창으로 열린 창은 주소에 메모가 없어 다시 불러오면 빈 창이 된다)
+const crashTimes = new Map(); // 메모 id · 'list' → 꺼진 때들
+app.on('render-process-gone', (_e, wc, details) => {
+  errors().write(`[창 꺼짐] ${wc.getURL().split('/').pop()} ${details.reason} (${details.exitCode})`);
+  if (details.reason === 'clean-exit' || quitting || wc.isDestroyed()) return;
+  const win = BrowserWindow.fromWebContents(wc);
+  if (!win) return;
+  const noteId = [...windowManager.noteWins].find(([, w]) => w === win)?.[0];
+  const key = noteId ?? (win === windowManager.listWin ? 'list' : null);
+  if (!key) return;
+  const now = Date.now();
+  const recent = (crashTimes.get(key) ?? []).filter((t) => now - t < 60_000);
+  recent.push(now);
+  crashTimes.set(key, recent);
+  if (recent.length >= 3) return win.destroy();
+  if (key === 'list') return wc.reload();
+  win.mkKeep = true; // 닫았다가 바로 다시 여는 것 — 열린 메모 기억은 그대로
+  win.once('closed', () => windowManager.openNote(noteId)); // 창 관리자의 정리(closed)가 먼저 돈 뒤에 (새 창을 지우지 않게)
+  win.destroy();
+});
 
 /** 설정 › 문제 보내기: 최근 기록은 클립보드에, 들어가는 만큼은 새 메일 본문에 (보낼지는 사용자가) */
 async function reportProblem() {
@@ -1245,7 +1298,7 @@ async function reportProblem() {
   const version = app.getVersion();
   const osName = `${os.type()} ${os.release()}`;
   clipboard.writeText([`메모킹 v${version} · ${osName}`, ...lines].join('\n'));
-  const url = problemMail({ to: 'lmg6983@gmail.com', version, os: osName, lines });
+  const url = problemMail({ to: SUPPORT_MAIL, version, os: osName, lines });
   if (SMOKE) return smokeOpened.push({ kind: 'mail', target: url }), { ok: true, lines: lines.length };
   await shell.openExternal(url).catch(() => {});
   return { ok: true, lines: lines.length };
@@ -1270,7 +1323,13 @@ app.on('web-contents-created', (_e, wc) => {
       copyImage: () => wc.copyImageAt(params.x, params.y),
       saveImage: src && fs.existsSync(src) ? async () => {
         const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), path.basename(src)) });
-        if (!r.canceled && r.filePath) fs.copyFileSync(src, r.filePath);
+        if (r.canceled || !r.filePath) return;
+        try {
+          await fs.promises.copyFile(src, r.filePath);
+        } catch (err) {
+          console.error('그림 저장 실패', err);
+          windowManager.showHud({ title: '그림을 저장하지 못했어요', body: '다른 위치에 저장해 보세요', kind: 'warn' }); // 예전: 말없이 실패했다
+        }
       } : null,
       // 메모 창의 편집기는 서식 없이 붙여넣기 · 서식 지우기를 직접 한다 (note.js 가 'edit:*' 를 받는다). 그 밖의 칸은 창의 기본 동작
       pastePlain: isNote ? async () => wc.send('edit:paste-plain', await clipboard.readText()) : null, // readText 는 약속(Promise)을 돌려준다
@@ -1508,7 +1567,8 @@ app.whenReady().then(async () => {
     // 메모 하나를 열거나(점프 목록) MagicKey 가 새 메모를 만들 때는 목록 창을 띄우지 않는다
     if (!(launched?.kind === 'memo' && vault?.get(launched.id)) && !(launched?.kind === 'newFile' && vault)) windowManager.createListWindow();
   }
-  for (const id of [...settings.openNotes]) {
+  // 메모 폴더를 찾지 못했으면(외장 드라이브를 안 꽂음 등) 열 수 없을 뿐 — 다음에 다시 열 수 있게 목록은 그대로 둔다
+  if (vault) for (const id of [...settings.openNotes]) {
     // 테이프 메모는 바탕화면 층에 조용히 (로그인 때 쓰던 앱의 포커스를 빼앗지 않게)
     const inactive = windowManager.layerOf(id) === 'bottom';
     if (!windowManager.openNote(id, { inactive })) settings.openNotes = settings.openNotes.filter((x) => x !== id);
@@ -1563,8 +1623,9 @@ updater = new Updater({
       quitting = false;
       syncPopupWatch();
     }, 20_000).unref?.();
-    await Promise.all([...windowManager.noteWins.values()].filter((w) => !w.isDestroyed())
+    const flushed = Promise.all([...windowManager.noteWins.values()].filter((w) => !w.isDestroyed())
       .map((w) => w.webContents.executeJavaScript('window.mkFlushSync?.()', true).catch(() => {})));
+    await Promise.race([flushed, new Promise((r) => setTimeout(r, 3000))]); // 멈춘 창이 있어도 설치가 멈추지 않게
     saveSettings(true);
     // 설치 파일이 이전 설치 폴더를 지우려면 메모킹이 띄운 PowerShell 도우미(알림 · 창 층 · 클립보드)가 다 꺼져 있어야 한다 —
     //   남아 있으면 "이전 설치 파일을 지우지 못했어요(Failed to uninstall old application files)" 로 업데이트가 멈춘다

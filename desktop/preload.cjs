@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld('memoking', {
     save: invoke('memo:save'),
     keepCopy: invoke('memo:keep-copy'),
     // 창이 닫히는 순간에는 비동기 저장이 끝나기 전에 창이 사라질 수 있어 동기 저장을 쓴다.
-    saveSync: (id, body) => ipcRenderer.sendSync('memo:save-sync', id, body),
+    saveSync: (id, body, opts) => ipcRenderer.sendSync('memo:save-sync', id, body, opts), // opts.locked: 잠긴 메모 (못 저장해도 풀린 글을 파일로 남기지 않게)
     set: invoke('memo:set'),
     remove: invoke('memo:remove'),
     links: invoke('memo:links'),
@@ -143,9 +143,14 @@ contextBridge.exposeInMainWorld('memoking', {
     setWrite: invoke('mcp:set-write'),
   },
   // 휴지통 (지운 메모)
+  // 창을 닫으며 저장하지 못해 따로 남긴 글 (ipc-handlers memo:save-sync) — 몇 개인지 · 메모로 되살리기 → 되살린 수
+  recovered: { count: invoke('recovered:count'), restore: invoke('recovered:restore') },
+  // 충돌 사본 비교: get(사본 id) → { copy, original } | null · resolve(사본 id, 'copy' | 'original') → { ok, message }
+  conflict: { get: invoke('conflict:get'), resolve: invoke('conflict:resolve') },
   trash: {
     list: invoke('trash:list'),
     restore: invoke('trash:restore'),
+    preview: invoke('trash:preview'), // 휴지통 메모의 글 미리보기 (잠긴 메모는 안내만)
     remove: invoke('trash:delete'),
     empty: invoke('trash:empty'),
   },

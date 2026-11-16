@@ -77,6 +77,19 @@ test('휴지통: 폴더에 있던 메모는 그 폴더로 되살린다 (폴더�
   assert.equal(parseMemoFile(fs.readFileSync(path.join(dir, '업무', '보고서.md'), 'utf8')).meta.extra.trashedFrom, undefined);
 }));
 
+test('휴지통: 다른 폴더의 같은 제목 메모를 함께 지워도 둘 다 휴지통에 (덮어쓰지 않는다)', () => withVault(({ vault }) => {
+  const a = vault.create({ folder: '업무' });
+  vault.save(a, '# 회의\n\n업무 쪽');
+  const b = vault.create({ folder: '개인' });
+  vault.save(b, '# 회의\n\n개인 쪽');
+  const na = vault.trash(a);
+  const nb = vault.trash(b); // 같은 초 — 예전에는 이름이 같아 a 를 덮어썼다
+  assert.notEqual(na, nb);
+  assert.equal(vault.trashList().length, 2);
+  assert.equal(memo(vault, vault.restoreTrash(na)).file, '업무/회의.md');
+  assert.equal(memo(vault, vault.restoreTrash(nb)).file, '개인/회의.md');
+}));
+
 test('잠긴 메모를 옮겨도 파일은 잠긴 그대로 (풀린 글이 새 자리에 쓰이지 않는다)', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-folders-'));
   const vault = new Vault(dir);

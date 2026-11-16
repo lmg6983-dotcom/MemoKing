@@ -11,6 +11,7 @@
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- 녹음 · 받아쓰기: 화면을 꺼도 계속 녹음 (포그라운드 서비스 · 마이크) -->
     <!-- 일정 탭에 휴대폰 캘린더(삼성 캘린더 · Google 캘린더) 일정도 함께 — 사용자가 켤 때만 묻는다 -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
@@ -33,6 +34,8 @@
     <application
         android:name=".MemoKingApp"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"

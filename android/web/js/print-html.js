@@ -56,10 +56,8 @@ export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = f
   ];
   const links = [...new Set(sheets)].map((h) => `<link rel="stylesheet" href="${esc(h)}">`).join('\n');
   const body = `<main class="editor print-doc">${doc.outerHTML}</main>${date ? `<footer class="print-date">${esc(date)}</footer>` : ''}`;
-  // PDF: 위아래 여백은 쪽마다 되풀이되는 표 머리 · 꼬리(빈 칸)로, 좌우 여백은 칸 안쪽 여백으로 (PC print.js 와 같다)
-  const paged = !preview && m > 0
-    ? `<table class="page-table"><thead><tr><td class="page-gap"></td></tr></thead><tfoot><tr><td class="page-gap"></td></tr></tfoot><tbody><tr><td class="page-cell">${body}</td></tr></tbody></table>`
-    : body;
+  // PDF: 위아래 여백은 @page 여백으로, 좌우 여백은 안쪽 여백으로 — 여백을 표 한 칸에 담으면 안드로이드 WebView 가
+  //   긴 칸을 쪽으로 나누지 못하고 한 쪽에서 잘라 버린다. 메모 색 바탕은 @page 바탕으로 여백까지 칠한다
   const cls = ['print-page', fit ? 'fit-images' : '', bg ? 'with-bg' : '', preview ? 'preview' : ''].filter(Boolean).join(' ');
   return `<!doctype html>
 <html lang="ko" class="${cls}">
@@ -68,7 +66,8 @@ export function printHtml(dom, { title, color = 'yellow', scale = 1, preview = f
 <title>${esc(title)}</title>
 ${links}
 <style>
-@page { size: ${W}mm ${H}mm; margin: 0; }
+@page { size: ${W}mm ${H}mm; margin: ${preview ? 0 : m}mm 0; ${bg && pageBg ? `background: ${esc(pageBg)};` : ''} }
+${preview ? '' : `html.print-page body { padding: 0 ${m}mm; box-sizing: border-box; }`}
 :root { --page-w: ${W}mm; --page-h: ${H}mm; --page-m: ${m}mm; --fit-h: ${(Math.max(20, H - 2 * m - 12) / zoom).toFixed(1)}mm; --page-bg: ${bg ? esc(pageBg) || `var(--${esc(color)}-bg, #ffffff)` : '#ffffff'}; }
 .print-doc .mk-voice { box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.12); break-inside: auto; }
 .print-doc .mk-voice-body > p:first-child { line-height: normal; font-size: 11pt; }
@@ -78,7 +77,7 @@ ${zoom !== 1 ? `.print-doc { zoom: ${zoom}; }` : ''}
 </style>
 </head>
 <body data-color="${esc(color)}">
-${paged}
+${body}
 </body>
 </html>`;
 }

@@ -240,6 +240,8 @@ class Bridge(private val activity: MainActivity) {
         .put("folderId", DriveSync.folderId(ctx) ?: "")
         .put("folderName", DriveSync.folderName(ctx))
         .put("status", DriveSync.status.json())
+        // 백업에서 되살린 휴대폰: Drive 폴더의 휴대폰 쪽 사본은 따라왔는데 연결(로그인)은 백업하지 않아 풀려 있다 → 다시 연결 안내
+        .put("restored", !DriveSync.active(ctx) && (java.io.File(ctx.filesDir, "drive").listFiles()?.any { it.isDirectory } == true))
 
     @JavascriptInterface
     fun driveStatus(): String = reply { driveInfo() }
@@ -329,6 +331,16 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun sttStatus(): String = reply { Stt.status(ctx) }
 
+    // 잠긴 메모를 지문 · 얼굴로 (Bio.kt): 쓸 수 있나 · 이 메모를 감싸 두었나 · 잊기
+    @JavascriptInterface
+    fun bioStatus(memoId: String): String = reply { JSONObject().put("available", Bio.available(ctx)).put("saved", Bio.has(ctx, memoId)) }
+
+    @JavascriptInterface
+    fun bioForget(memoId: String): String = reply {
+        Bio.forget(ctx, memoId)
+        true
+    }
+
     // ---------- 오래 걸리는 일 ----------
 
     @JavascriptInterface
@@ -404,6 +416,9 @@ class Bridge(private val activity: MainActivity) {
                 }
             }
             "micPermission" -> activity.runOnUiThread { activity.requestMicPermission(id) }
+            // 지문 · 얼굴 확인 창을 띄우고 끝나면 답한다 (Bio.kt)
+            "bioSave" -> activity.runOnUiThread { Bio.save(activity, a.getString("memoId"), a.getString("password")) { ok -> resolve(id) { ok } } }
+            "bioOpen" -> activity.runOnUiThread { Bio.open(activity, a.getString("memoId")) { pw -> resolve(id) { pw ?: JSONObject.NULL } } }
             "recordStart" -> activity.runOnUiThread {
                 resolve(id) { RecorderService.start(activity, a.getString("memoId"), a.optBoolean("stt", true), terms(a)) }
             }
@@ -547,6 +562,20 @@ class Bridge(private val activity: MainActivity) {
                     return@execute
                 }
                 activity.runOnUiThread { activity.shareFile(id, file, a.optString("mime", "application/octet-stream"), a.optString("title")) }
+            }
+            // 여러 파일 한꺼번에 (긴 메모를 나눈 그림들) — 받는 앱에 차례로 붙는다
+            "shareFiles" -> pool.execute {
+                val list = a.getJSONArray("files")
+                val files = try {
+                    (0 until list.length()).map { k ->
+                        val f = list.getJSONObject(k)
+                        shareFile(f.optString("name", "메모 ${k + 1}")).also { it.writeBytes(Base64.decode(f.getString("base64"), Base64.DEFAULT)) }
+                    }
+                } catch (e: Exception) {
+                    resolve(id) { throw e }
+                    return@execute
+                }
+                activity.runOnUiThread { activity.shareFiles(id, files, a.optString("mime", "application/octet-stream"), a.optString("title")) }
             }
             "sharePdf" -> activity.runOnUiThread {
                 activity.pdfPageMm = pageOf(a)

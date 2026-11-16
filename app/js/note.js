@@ -275,6 +275,7 @@ function onChange(md) {
 // 빈 메모 안내 문구
 const showPlaceholder = trackPlaceholder(el.editorRoot);
 
+let saveFails = 0; // 잇따라 저장하지 못한 수 (다시 해 보기 간격)
 async function flush() {
   clearTimeout(saveTimer);
   saveTimer = null;
@@ -297,10 +298,15 @@ async function flush() {
       return;
     }
     saved = body;
+    saveFails = 0;
     setStatus('저장했어요');
   } catch (err) {
     console.error(err);
-    setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
+    // 잠깐의 실패(파일을 다른 프로그램이 잡고 있음 등)면 더 치지 않아도 다시 저장해 본다 — 몇 번까지만, 점점 길게
+    if (++saveFails <= 4) {
+      setStatus('저장하지 못해 곧 다시 저장해요…', true); // 다시 해 보는 중임을 보인다 (급히 글을 복사해 두지 않아도 되게)
+      saveTimer = setTimeout(flush, 2000 * saveFails);
+    } else setStatus('저장하지 못했어요. 메모 폴더를 확인해 주세요', true);
   }
 }
 
@@ -308,7 +314,7 @@ async function flush() {
 function flushSync() {
   clearTimeout(saveTimer);
   if (isDirty()) {
-    api.memo.saveSync(id, current);
+    api.memo.saveSync(id, current, { locked: Boolean(memo?.locked) });
     saved = current;
   }
   flushTables();
@@ -605,7 +611,8 @@ async function memoImage(kind) {
     setStatus(kind === 'copy' ? '그림을 복사했어요. 붙여 넣으면 돼요' : `그림으로 저장했어요: ${r?.name ?? ''}`);
   } catch (err) {
     console.error(err);
-    setStatus('그림을 만들지 못했어요. 다시 해 주세요', true);
+    // 너무 길어 그림 한 장이 안 되는 것은 다시 해도 같다 — 그 까닭(PDF로 저장)을 그대로
+    setStatus(/PDF로 저장/.test(err?.message ?? '') ? err.message : '그림을 만들지 못했어요. 다시 해 주세요', true);
   }
 }
 // 메뉴 맨 위 아이콘: 목록 카드 메뉴와 같은 그림 · 같은 순서 · 같은 일 (같은 아이콘은 같은 뜻)
@@ -719,11 +726,18 @@ $('show-list').addEventListener('click', () => {
 $('delete-btn').addEventListener('click', async () => {
   closeMenu();
   // 묻지 않고 바로 휴지통으로 (목록 창에 되돌리기) — 창이 휴지통으로 빨려 들어가듯 사라진다
+  const keep = saved;
   saved = current; // 삭제하는 메모는 저장하지 않는다
-  if (!reduceMotion()) {
-    await document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: EASE_OUT, fill: 'forwards' }).finished.catch(() => {});
+  const fade = reduceMotion() ? null : document.body.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(24px) scale(0.92)' }], { duration: 180, easing: EASE_OUT, fill: 'forwards' });
+  await fade?.finished.catch(() => {});
+  try {
+    await api.memo.remove(id);
+  } catch (err) {
+    // 지우지 못했으면 창을 되돌린다 (예전: 사라진 채 투명한 창이 남았다) — 고친 글도 다시 저장되게
+    fade?.cancel();
+    saved = keep;
+    setStatus(err?.message || '메모를 삭제하지 못했어요', true);
   }
-  await api.memo.remove(id);
 });
 
 api.on('memo:meta', applyMeta);
@@ -930,6 +944,8 @@ $('alarm-ok').addEventListener('click', () => {
 api.on('memo:alarm', showAlarm);
 // 밖(목록 카드 오른쪽 클릭)에서 부탁한 일: 메뉴의 그 단추를 누른 것과 같게
 function runCommand(command) {
+  // 목록에서 찾던 말로 열었다: 그 말을 찾아 첫 자리로 가고 모두 칠한다 (찾기 막대가 열린 채 — 다음 · 이전으로 넘긴다)
+  if (command?.find) return findBar.open({ text: command.find });
   if ((command === 'lock' && !memo?.locked) || (command === 'unlock' && memo?.locked)) $('lock-btn').click();
   else if (command === 'versions') $('versions-btn').click();
 }
@@ -1763,10 +1779,19 @@ async function closeTabOrWindow() {
 }
 
 // 윗막대 + : 새 메모를 이 창의 새 탭으로 (스택이 아니면 스택이 된다). 따로 새 창은 Ctrl+N
-$('new-btn').addEventListener('click', async () => {
-  await flush();
-  api.stack.newTab(id);
-});
+// 빠르게 두 번 눌러도 새 메모는 하나만 (예전: 빈 메모 탭이 두 개 생겼다)
+let addingTab = false;
+async function newTab() {
+  if (addingTab) return;
+  addingTab = true;
+  try {
+    await flush();
+    await api.stack.newTab(id);
+  } finally {
+    setTimeout(() => (addingTab = false), 400);
+  }
+}
+$('new-btn').addEventListener('click', newTab);
 $('close-btn').addEventListener('click', closeWindow);
 el.editorRoot.addEventListener('mousedown', (e) => {
   // 글 아래 빈 곳을 눌러도 편집을 시작할 수 있게
@@ -1838,10 +1863,7 @@ tabsEl.addEventListener('click', async (e) => {
     if (close.dataset.closeTab === id) await flush();
     return api.stack.remove(close.dataset.closeTab);
   }
-  if (e.target.closest('.stack-add')) {
-    await flush();
-    return api.stack.newTab(id);
-  }
+  if (e.target.closest('.stack-add')) return newTab();
   const tab = e.target.closest('[data-tab-id]');
   if (tab && tab.dataset.tabId !== id) {
     // 저장을 기다리지 않고 바로 바꾼다 (저장은 함께 진행 — 다른 탭은 이 메모의 글이 필요 없다)

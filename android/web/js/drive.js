@@ -1,7 +1,7 @@
 // Google Drive 연결 화면 (① OAuth 클라이언트 ② 로그인 ③ 폴더 고르기) 과 동기화 상태 표시
 import { drive, call } from './native.js';
 import { app } from './state.js';
-import { openSheet, closeSheet, toast } from './ui.js';
+import { openSheet, closeSheet, toast, promptName } from './ui.js';
 import { icon } from '../../app/js/icons.js';
 import { installShareText } from '../../app/js/core/install-links.js';
 import { UI } from '../../app/js/core/ui-text.js';
@@ -181,7 +181,7 @@ function renderCrumbs() {
 
 $('folder-new').addEventListener('click', async () => {
   const here = path.at(-1);
-  const name = window.prompt('새 폴더 이름', here.id === 'root' ? SUGGEST : '')?.trim();
+  const name = (await promptName({ title: '새 폴더 이름', value: here.id === 'root' ? SUGGEST : '', okLabel: '만들기' }))?.trim(); // 앱의 이름 창 (WebView 기본 창은 모양이 달랐다)
   if (!name) return;
   try {
     const f = await call('driveCreateFolder', { parent: here.id, name });
@@ -221,7 +221,9 @@ function ago(ms) {
 
 /** 설정 화면의 Drive 상자와 목록 위 동기화 버튼 */
 export function renderStatus(s = drive.status()) {
-  const st = s.status ?? {};
+  // 인터넷이 끊겼으면 동기화 오류가 아니라 "오프라인" — 메모는 이 휴대폰에 저장되고 연결되면 맞춘다
+  const offline = navigator.onLine === false && s.active && s.connected;
+  const st = offline ? { ...(s.status ?? {}), state: 'offline' } : s.status ?? {};
   const btn = $('sync-btn');
   btn.hidden = !s.active;
   btn.classList.toggle('syncing', st.state === 'syncing');
@@ -236,7 +238,8 @@ export function renderStatus(s = drive.status()) {
     btn.append(line);
   }
   document.body.dataset.sync = s.active ? st.state ?? '' : ''; // 목록이 비어 있을 때 "받는 중" 안내 (list-view)
-  btn.setAttribute('aria-label', st.state === 'error' ? `동기화 오류: ${st.error}` : 'Google Drive와 지금 동기화');
+  btn.classList.toggle('offline', st.state === 'offline');
+  btn.setAttribute('aria-label', st.state === 'error' ? `동기화 오류: ${st.error}` : st.state === 'offline' ? '오프라인: 인터넷이 연결되면 맞춰요' : 'Google Drive와 지금 동기화');
 
   const box = $('drive-box');
   box.classList.toggle('on', s.active && s.connected);
@@ -247,6 +250,7 @@ export function renderStatus(s = drive.status()) {
       ? '로그인이 끊겼어요. 연결하기를 눌러 다시 로그인해 주세요'
       : st.state === 'syncing' ? [s.email, '동기화하는 중'].filter(Boolean).join(', ')
       : st.state === 'error' ? st.error
+      : st.state === 'offline' ? '오프라인, 인터넷이 연결되면 맞춰요'
       : [s.email, st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'].filter(Boolean).join(', ');
   } else {
     $('drive-title').textContent = s.connected ? '폴더를 골라 주세요' : UI.notConnected;
@@ -262,7 +266,10 @@ export function renderStatus(s = drive.status()) {
   $('drive-connect').classList.toggle('primary', !(s.active && s.connected)); // 연결 전에는 PC처럼 주 단추
 }
 
+let syncing = false; // 여러 번 눌러도 동기화는 한 번만
 export async function syncNow() {
+  if (syncing) return;
+  syncing = true;
   renderStatus({ ...drive.status(), status: { ...drive.status().status, state: 'syncing' } });
   try {
     const st = await call('driveSync');
@@ -270,6 +277,8 @@ export async function syncNow() {
     else toast('동기화했어요');
   } catch (err) {
     toast(err.message, true);
+  } finally {
+    syncing = false;
   }
   renderStatus();
 }
@@ -278,3 +287,7 @@ export async function syncNow() {
 $('share-install')?.addEventListener('click', () => {
   call('share', { title: '메모킹 설치 링크', text: installShareText() }).catch((err) => toast(err.message, true));
 });
+
+// 인터넷이 끊기거나 다시 붙으면 구름 단추 · 설정의 Drive 상자를 바로 (다시 붙으면 앱이 곧 동기화한다)
+window.addEventListener('offline', () => renderStatus());
+window.addEventListener('online', () => renderStatus());

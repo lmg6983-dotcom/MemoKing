@@ -30,7 +30,7 @@ const el = (tag, cls, attrs = {}) => Object.assign(document.createElement(tag), 
 const ROTATE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
 const SPLIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M14 7h4v4M10 17H6v-4"/></svg>';
 
-export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShare, onDelete, onUndo, onRotate, onSplit }) {
+export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShare, onDelete, onUndo, onRotate, onSplit, onMove }) {
   let i = Math.max(0, Math.min(images.length - 1, start));
   const view = el('div', 'mk-album-view', { role: 'dialog', ariaModal: 'true', ariaLabel: images.length > 1 ? '묶음 사진' : '사진 크게 보기' });
   const head = el('div', 'mk-album-head');
@@ -49,19 +49,34 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // 오른쪽으로 90도 돌리기 (돌린 그림을 새 파일로 저장 — 메모의 되돌리기로 원래대로)
   let turning = false;
   const rotate = onRotate ? svgBtn('오른쪽으로 90도 돌리기', ROTATE_ICON, async () => {
-    if (inking || turning) return;
+    if (inking || turning || moving) return;
     turning = true;
     rotate.disabled = true;
+    // 누르자마자 화면에서 먼저 돌려 보이고(화면에 맞게 줄여), 새 파일은 그 뒤에서 만든다
+    resetZoom();
+    const fit = Math.min(stage.clientWidth / (img.offsetHeight || 1), stage.clientHeight / (img.offsetWidth || 1), 1 / Math.min(1, img.offsetWidth / (img.naturalWidth || img.offsetWidth || 1)));
+    img.style.transformOrigin = '50% 50%';
+    img.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1)';
+    img.style.transform = `rotate(90deg) scale(${fit})`;
+    const at = i;
     try {
-      const src = await onRotate(i);
+      const src = await onRotate(at);
       if (src) {
-        images[i].src = src;
+        images[at].src = src;
+        const pre = new Image();
+        pre.src = url(src);
+        await pre.decode().catch(() => {}); // 새 그림이 준비된 뒤 바꿔야 깜빡이지 않는다
         paintStrip();
-        show();
+        if (i === at) show();
       }
     } catch (err) {
       say(err?.message || '돌리지 못했어요');
     } finally {
+      img.style.transformOrigin = '';
+      if (img.style.transform.startsWith('rotate')) {
+        img.style.transition = '';
+        img.style.transform = '';
+      }
       turning = false;
       rotate.disabled = false;
     }
@@ -107,6 +122,16 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       view.classList.remove('ui-active');
     }, 2000);
   }
+  // 숨어 있던 머리 줄 · 장 목록 · 화살표가 누르는 순간 떠오르면, 같은 누르기의 click 이 그 자리의 단추(다른 장 등)에 떨어졌다 →
+  //   떠오른 직후 잠깐은 사진 밖 click 을 버린다 (사진 보기를 연 누르기도 같다)
+  let guardUntil = Date.now() + 400;
+  view.addEventListener('click', (e) => {
+    if (e.pointerType === 'mouse') return; // 마우스는 누른 자리 그대로 (연 직후 바로 닫기를 눌러도 닫히게)
+    if (Date.now() < guardUntil && !stage.contains(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
   for (const bar of [head, strip, prev, next]) {
     bar.addEventListener('pointerdown', () => wakeUI());
     bar.addEventListener('click', () => wakeUI());
@@ -115,6 +140,67 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     if (e.pointerType === 'mouse' && !pts.size && !inking) wakeUI();
   });
 
+  // ---------- 장 순서 바꾸기: 아래 장 목록의 장을 꾹 누르면(마우스는 끌면) 들리고, 놓은 자리로 ----------
+  const reorder = { justDropped: false };
+  if (onMove) {
+    let d = null; // { thumb, from, to, x, y, armed, timer, id }
+    const thumbs = () => [...strip.querySelectorAll('.mk-album-thumb')];
+    const arm = () => {
+      if (!d || inking || turning || moving) return;
+      d.armed = true;
+      d.thumb.classList.add('lifting');
+      strip.setPointerCapture?.(d.id);
+      if (navigator.vibrate) navigator.vibrate(10);
+    };
+    strip.addEventListener('pointerdown', (e) => {
+      const thumb = e.target.closest('.mk-album-thumb');
+      if (!thumb || images.length < 2) return;
+      d = { thumb, from: thumbs().indexOf(thumb), x: e.clientX, y: e.clientY, armed: false, id: e.pointerId, mouse: e.pointerType === 'mouse' };
+      d.to = d.from;
+      if (!d.mouse) d.timer = setTimeout(arm, 300);
+    });
+    strip.addEventListener('pointermove', (e) => {
+      if (!d) return;
+      const far = Math.hypot(e.clientX - d.x, e.clientY - d.y);
+      if (!d.armed) {
+        if (d.mouse && far > 6) arm();
+        else if (!d.mouse && far > 10) { clearTimeout(d.timer); d = null; } // 밀면 장 목록 넘기기
+        if (!d?.armed) return;
+      }
+      // 손가락 · 마우스 아래 장 앞(또는 뒤)으로 바로 옮겨 보인다
+      const over = thumbs().find((t) => t !== d.thumb && (() => { const r = t.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right; })());
+      if (!over) return;
+      const list = thumbs();
+      const before = list.indexOf(over) < list.indexOf(d.thumb);
+      if (before) over.before(d.thumb);
+      else over.after(d.thumb);
+      d.to = thumbs().indexOf(d.thumb);
+    });
+    // 들린 동안은 장 목록이 스크롤되지 않게 (터치)
+    strip.addEventListener('touchmove', (e) => d?.armed && e.cancelable && e.preventDefault(), { passive: false });
+    const drop = () => {
+      if (!d) return;
+      clearTimeout(d.timer);
+      const { armed, from, to, thumb } = d;
+      d = null;
+      if (!armed) return;
+      thumb.classList.remove('lifting');
+      reorder.justDropped = true; // 놓을 때 따라오는 click 으로 그 장이 열리지 않게
+      setTimeout(() => (reorder.justDropped = false), 0);
+      const next = from !== to ? onMove(from, to) : null;
+      if (next?.length) {
+        const showing = images[i];
+        images.splice(0, images.length, ...next);
+        i = Math.max(0, images.findIndex((it) => it.src === showing?.src));
+        say('장 순서를 바꿨어요');
+      }
+      paintStrip();
+      show();
+    };
+    strip.addEventListener('pointerup', drop);
+    strip.addEventListener('pointercancel', drop);
+  }
+
   function paintStrip() {
     strip.hidden = images.length < 2;
     strip.replaceChildren(...images.map((it, k) => {
@@ -122,12 +208,13 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       b.setAttribute('aria-selected', String(k === i));
       const t = el('img', '', { src: url(it.src), alt: '', loading: 'lazy', draggable: false });
       b.append(t);
-      b.addEventListener('click', () => goTo(k));
+      b.addEventListener('click', () => !reorder.justDropped && goTo(k));
       return b;
     }));
   }
   function show() {
     const it = images[i];
+    img.style.transition = '';
     resetZoom();
     img.src = url(it.src);
     img.alt = it.alt ?? '';
@@ -142,10 +229,45 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     });
     strip.children[i]?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
+  // 장 넘기기: 지금 장은 미끄러져 나가고, 새 장은 반대쪽에서 들어온다
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let sliding = 0;
+  let moving = false; // 지금 장이 미끄러져 나가는 중 (i 는 이미 새 장, 화면은 아직 앞 장) — 이 동안 장 단추는 받지 않는다
+  const glide = (t, ms = 180) => {
+    img.style.transition = `transform ${ms}ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity ${ms}ms ease-out`;
+    img.style.transform = `translateX(${t}px)`;
+  };
   const goTo = (k) => {
-    if (inking || k < 0 || k >= images.length) return;
+    if (inking || turning || k < 0 || k >= images.length || k === i) return; // 돌리는 중에는 넘기지 않는다 (돌린 모양이 다른 장에 남았다)
+    const dir = k > i ? 1 : -1;
+    const w = stage.clientWidth;
+    const job = ++sliding;
+    moving = false; // 앞 미끄럼은 그만 (아래 timeout 이 job 이 달라 돌지 않으므로 여기서 푼다)
     i = k;
-    show();
+    count.textContent = `${i + 1} / ${images.length}`; // 장 번호는 누르자마자 (그림은 미끄러진 뒤에 바뀐다)
+    if (still || z.s > 1) {
+      show();
+      return;
+    }
+    glide(-dir * w * 0.6);
+    img.style.opacity = '0';
+    moving = true;
+    setTimeout(() => {
+      if (job !== sliding) return;
+      moving = false;
+      show();
+      img.style.transition = 'none';
+      img.style.transform = `translateX(${dir * w * 0.35}px)`;
+      img.style.opacity = '0';
+      void img.offsetWidth;
+      glide(0, 220);
+      img.style.opacity = '';
+      setTimeout(() => {
+        if (job !== sliding) return;
+        img.style.transition = '';
+        img.style.transform = '';
+      }, 240);
+    }, 150);
   };
   const go = (d) => goTo(i + d);
 
@@ -167,6 +289,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   }
   note.hidden = true;
   async function act(fn) {
+    if (moving) return; // 넘어가는 중 — 보이는 장과 고르는 장이 다르다
     try {
       const msg = await fn(i);
       if (msg) say(msg);
@@ -176,7 +299,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   }
   // 이 장 빼기 → 남은 장으로 (다 빼면 닫힘) · 알림의 "되돌리기" 로 되살림
   function removePage() {
-    if (inking) return;
+    if (inking || moving) return;
     const left = onDelete(i);
     if (!left) return;
     if (!left.length) {
@@ -274,6 +397,25 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       zoomTo(z.s * (d / gesture.d), m.x, m.y);
       gesture.d = d;
       gesture.m = m;
+    } else if (gesture.kind === 'swipe' && !still && !turning && !moving) {
+      const tx = e.clientX - gesture.x;
+      const ty = e.clientY - gesture.y;
+      // 처음 10px 로 방향을 정한다: 옆 = 넘기기, 아래 = 닫기 (휴대폰 사진 앱처럼)
+      if (!gesture.axis && Math.hypot(tx, ty) > 10) gesture.axis = ty > 0 && Math.abs(ty) > Math.abs(tx) ? 'y' : 'x';
+      if (gesture.axis) {
+        if (!gesture.follow) sliding++; // 들어오는 움직임의 마무리(transform 비우기)가 끄는 그림을 제자리로 튕기지 않게
+        gesture.follow = true;
+        img.style.transition = 'none';
+        if (gesture.axis === 'y') {
+          const down = Math.max(0, ty);
+          img.style.transform = `translate(${tx / 3}px, ${down}px) scale(${1 - Math.min(0.2, down / 1500)})`;
+          view.style.backgroundColor = `rgba(0, 0, 0, ${1 - Math.min(0.7, down / 400)})`;
+        } else {
+          let t = tx;
+          if ((t > 0 && i === 0) || (t < 0 && i === images.length - 1)) t /= 3; // 끝 장은 덜 따라온다
+          img.style.transform = `translateX(${t}px)`;
+        }
+      }
     } else if (gesture.kind === 'pan') {
       z.x += dx;
       z.y += dy;
@@ -292,12 +434,41 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
       return;
     }
     gesture = null;
-    if (!g || e.type === 'pointercancel') return;
+    if (!g) return;
+    if (e.type === 'pointercancel') {
+      // 휴대폰이 누름을 거둬 가면(뒤로 가기 몸짓 등) 밀던 장을 제자리로 (예전: 옆으로 밀린 채 남았다)
+      if (g.follow && !moving) {
+        img.style.transition = '';
+        img.style.transform = '';
+        view.style.backgroundColor = '';
+      }
+      return;
+    }
     const dx = e.clientX - g.x;
     const dy = e.clientY - g.y;
-    if (g.kind === 'swipe' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+    // 아래로 충분히 밀었으면 닫는다 (그림이 내려가며 사라진다)
+    if (g.kind === 'swipe' && g.axis === 'y' && dy > 110 && !moving) {
+      img.style.transition = 'transform 0.18s ease-in, opacity 0.18s ease-in';
+      img.style.transform = `translate(${dx / 3}px, ${dy + 160}px) scale(0.85)`;
+      img.style.opacity = '0';
+      view.style.transition = 'background-color 0.18s ease-in';
+      view.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+      setTimeout(() => shut(), 170);
+      return;
+    }
+    if (g.kind === 'swipe' && g.axis === 'y') view.style.backgroundColor = ''; // 모자라면 제자리로 (아래에서 그림도)
+    if (g.kind === 'swipe' && g.axis !== 'y' && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && images[i + (dx < 0 ? 1 : -1)]) {
       go(dx < 0 ? 1 : -1);
       return;
+    }
+    if (g.kind === 'swipe' && img.style.transform && !moving) { // 넘어가는 중이면 그 움직임에 맡긴다 (여기서 끊으면 새 장이 뜨지 않았다)
+      glide(0); // 넘기지 않으면 제자리로
+      const job = ++sliding;
+      setTimeout(() => {
+        if (job !== sliding) return;
+        img.style.transition = '';
+        img.style.transform = '';
+      }, 200);
     }
     if (g.moved) return;
     const now = Date.now();
@@ -308,7 +479,10 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     } else {
       lastTap = { at: now, x: e.clientX, y: e.clientY };
       if (view.classList.contains('ui-active')) hideUI();
-      else wakeUI();
+      else {
+        guardUntil = Date.now() + 400;
+        wakeUI();
+      }
     }
   };
   stage.addEventListener('pointerup', lift);
@@ -317,7 +491,10 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   // ---------- 그리기 ----------
   let inking = null; // { svg, surface, toolbar, hist }
   function startInk() {
-    if (inking || !img.naturalWidth) return;
+    if (inking || turning || moving || !img.naturalWidth) return;
+    sliding++; // 넘기는 움직임이 남아 있으면 멈춘다 (그리기판이 움직이는 그림 자리에 맞춰지지 않게)
+    img.style.transition = '';
+    img.style.opacity = '';
     resetZoom(); // 그리기판은 원래 크기의 장 위에
     view.classList.add('inking'); // 도구 막대 자리를 비운 뒤에 그림 크기를 잰다 (그리기판이 그림에 꼭 맞게)
     const r = img.getBoundingClientRect();
@@ -374,13 +551,14 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     k.toolbar.el.remove();
     k.svg.remove();
     if (!strokes.length || !onDraw) return;
+    const at = i; // 저장하는 동안 다른 장으로 넘겨도 그린 장에 (예전: 넘긴 장에 저장됐다)
     try {
       const png = await flatten(strokes, k.w, k.h);
-      const src = await onDraw(i, png);
+      const src = await onDraw(at, png);
       if (src) {
-        images[i] = { ...images[i], src, inked: true };
+        images[at] = { ...images[at], src, inked: true };
         paintStrip();
-        show();
+        if (i === at) show();
         say('그린 것을 이 장에 저장했어요');
       }
     } catch (err) {
@@ -389,6 +567,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   }
 
   async function flatten(strokes, w, h) {
+    const photo = /\.(jpe?g|heic|heif)$/i.test(images[i].src); // 사진 위에 그린 것은 JPEG, 그 밖(투명할 수 있는 그림)은 WebP — PNG 보다 몇 배 빨리 만들고 작다
     const base = new Image();
     base.crossOrigin = 'anonymous'; // 메모 폴더 그림(다른 오리진)도 캔버스로 읽을 수 있게
     base.src = img.currentSrc || img.src;
@@ -412,7 +591,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     layer.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
     await layer.decode();
     ctx.drawImage(layer, 0, 0, W, H);
-    return new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('그림을 만들지 못했어요'))), 'image/png'));
+    return new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('그림을 만들지 못했어요'))), photo ? 'image/jpeg' : 'image/webp', 0.92));
   }
 
   // ---------- 닫기 · 키 ----------
@@ -479,7 +658,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     if (!localStorage.getItem(HINT_KEY) && images.length > 1) {
       localStorage.setItem(HINT_KEY, '1');
       const coarse = matchMedia('(pointer: coarse)').matches;
-      say(coarse ? '옆으로 밀거나 아래 장을 눌러 넘겨요. 두 손가락으로 벌리면 크게 보여요' : '← → 나 아래 장을 눌러 넘겨요. 휠을 굴리면 크게 보여요');
+      say(coarse ? '옆으로 밀어 넘기고, 아래로 밀면 닫혀요. 아래 장을 꾹 눌러 끌면 순서가 바뀌어요' : '← → 나 아래 장을 눌러 넘겨요. 아래 장을 끌면 순서가 바뀌어요');
     }
   } catch {
     // 저장소를 못 써도 보기는 그대로

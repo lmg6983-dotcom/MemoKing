@@ -43,10 +43,19 @@ export class PopupWatcher extends EventEmitter {
       else this.emit('popup', { ...msg, lines: [].concat(msg.lines ?? []) });
     });
     proc.stderr.on('data', (d) => this.emit('error', new Error(String(d).trim())));
-    proc.on('exit', () => {
+    let ended = false;
+    const end = () => {
+      if (ended) return;
+      ended = true;
       if (this.proc === proc) this.proc = null;
       // 도우미가 멈추면 잠시 뒤 다시 (끄는 중이 아니면)
       if (!this.stopping) this.restartTimer = setTimeout(() => this.start(), 5000);
+    };
+    proc.on('exit', end);
+    // PowerShell 을 띄우지 못하면(보안 프로그램이 막음 등) 'error' 만 온다 — 듣지 않으면 앱이 오류로 꺼졌다
+    proc.on('error', (err) => {
+      this.emit('error', err);
+      end();
     });
   }
 

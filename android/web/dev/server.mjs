@@ -452,6 +452,10 @@ const calls = {
     if (a.mime === 'image/png' && process.env.MK_SHARE_OUT) fs.writeFileSync(process.env.MK_SHARE_OUT, Buffer.from(a.base64, 'base64'));
     return true;
   },
+  shareFiles: async (a) => {
+    log.push({ shareFiles: { names: (a.files ?? []).map((f) => f.name), mime: a.mime } });
+    return true;
+  },
   sharePdf: async (a) => {
     log.push({ sharePdf: a });
     return true;

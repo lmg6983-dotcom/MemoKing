@@ -99,7 +99,8 @@ export function lockDialog({ onLock, title = '' }) {
  * @param {{ title: string, onTry: (password: string) => Promise<string|null>, onCancel?: () => void }} o
  * @returns {Promise<boolean>}
  */
-export function lockScreen(container, { title, onTry, onCancel }) {
+// bio: { label, get: () => Promise<비밀번호|null> } — 지문 · 얼굴로 열기 단추 (휴대폰, 감싸 둔 비밀번호가 있을 때). 화면이 뜨면 바로 한 번 묻는다
+export function lockScreen(container, { title, onTry, onCancel, bio = null }) {
   return new Promise((resolve) => {
     const screen = el('form', { class: 'lock-screen', role: 'dialog', 'aria-labelledby': 'lock-screen-title' });
     const field = passwordField('비밀번호', 'lock-open-pass');
@@ -125,6 +126,18 @@ export function lockScreen(container, { title, onTry, onCancel }) {
       actions.append(cancel);
     }
     actions.append(open);
+    let bioBtn = null;
+    const useBio = async () => {
+      if (busy) return;
+      const pw = await bio.get().catch(() => null);
+      if (!pw || !screen.isConnected) return field.input.focus(); // 취소 — 비밀번호로
+      field.input.value = pw;
+      screen.requestSubmit();
+    };
+    if (bio) {
+      bioBtn = el('button', { type: 'button', class: 'btn lock-bio' }, bio.label || '지문으로 열기');
+      bioBtn.addEventListener('click', useBio);
+    }
     const mark = el('div', { class: 'lock-icon' });
     mark.append(icon('lock'));
     screen.append(
@@ -133,6 +146,7 @@ export function lockScreen(container, { title, onTry, onCancel }) {
       el('p', { class: 'lock-note' }, '비밀번호를 넣으면 열려요'),
       field.wrap, error, actions,
     );
+    if (bioBtn) screen.append(bioBtn);
     screen.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!field.input.value) return field.input.focus();
@@ -158,6 +172,7 @@ export function lockScreen(container, { title, onTry, onCancel }) {
       resolve(true);
     });
     container.append(screen);
-    field.input.focus();
+    if (bio) setTimeout(useBio, 250); // 열자마자 지문 창 (닫으면 비밀번호 칸)
+    else field.input.focus();
   });
 }

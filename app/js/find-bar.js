@@ -436,15 +436,15 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
   }
   return {
     /** 연다: replace 면 바꾸기까지. 고른 글이 있으면 그 글을 찾을 말로 */
-    open({ replace = false } = {}) {
+    open({ replace = false, text = '' } = {}) {
       const f = find();
-      const picked = f?.selectedText() ?? '';
+      const picked = text || (f?.selectedText() ?? ''); // text: 목록에서 찾던 말 (그 말로 바로 찾아 첫 자리로)
       if (picked) query.value = picked;
       const wasHidden = bar.hidden;
       bar.hidden = false;
       if (wasHidden) onToggle(true);
       setReplace(replace || (bar.dataset.mode === 'replace' && !wasHidden));
-      if (!replace || !query.value) {
+      if ((!replace || !query.value) && !text) { // 찾던 말로 연 것은 커서를 옮기지 않는다 (휴대폰 자판이 올라오지 않게)
         query.focus();
         query.select();
       }

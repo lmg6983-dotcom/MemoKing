@@ -1566,7 +1566,7 @@ export class WindowManager {
       await win.loadFile(path.join(APP_DIR, 'print.html'), {
         query: {
           id, w: String(width), h: String(height), m: String(margin),
-          bg: o.bg ? '1' : '0', date: o.date ? '1' : '0', fit: o.fit === false ? '0' : '1',
+          bg: o.bg ? '1' : '0', date: o.date ? '1' : '0', fit: o.fit === false ? '0' : '1', br: o.breaks === true ? '1' : '0',
           z: String(clampPrintScale(o.zoom)),
         },
       });
@@ -1575,7 +1575,7 @@ export class WindowManager {
         await new Promise((r) => setTimeout(r, 100));
       }
       const pdf = await win.webContents.printToPDF({ preferCSSPageSize: true, printBackground: true, margins: { marginType: 'none' } });
-      fs.writeFileSync(file, pdf);
+      await fs.promises.writeFile(file, pdf); // 큰 PDF 를 쓰는 동안 모든 창이 멈추지 않게
       const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) ?? []).length;
       if (o.open && !SMOKE) shell.openPath(file);
       return { file, pages };

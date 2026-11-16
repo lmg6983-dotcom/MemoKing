@@ -1341,7 +1341,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       url: vaultUrl,
       onDraw: !editable ? null : async (i, png) => {
         const it = images[i];
-        const src = await saveFile(new File([png], `${baseName(it.alt || '그림')} 그림.png`, { type: 'image/png' }));
+        const ext = { 'image/jpeg': 'jpg', 'image/webp': 'webp' }[png.type] ?? 'png';
+        const src = await saveFile(new File([png], `${baseName(it.alt || '그림')} 그림.${ext}`, { type: png.type || 'image/png' }));
         const cur = nodeOf(it);
         if (!cur) return null;
         it.src = src; // 같은 장을 또 그리면 이번 그림에서 이어서
@@ -1370,6 +1371,21 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         v.dispatch(tr);
         return collect();
       },
+      // 장 순서 바꾸기 (사진 보기의 장 목록에서 끌어서): 묶음 줄 안에서 그 장만 옮긴다 → 새 장 목록 (메모의 되돌리기로 원래대로)
+      onMove: !editable || !album ? null : (from, to) => {
+        const node = v.state.doc.nodeAt(para);
+        if (node?.type.name !== 'paragraph') return null;
+        const kids = [];
+        node.forEach((c) => kids.push(c));
+        const at = kids.map((c, k) => (c.type.name === 'image' && isAlbumTitle(c.attrs.title) ? k : -1)).filter((k) => k >= 0);
+        if (from === to || at[from] === undefined || at[to] === undefined) return null;
+        const pics = at.map((k) => kids[k]);
+        pics.splice(to, 0, pics.splice(from, 1)[0]);
+        const next = kids.slice();
+        at.forEach((k, j) => (next[k] = pics[j]));
+        v.dispatch(v.state.tr.replaceWith(para + 1, para + 1 + node.content.size, next));
+        return collect();
+      },
       onUndo: !editable ? null : () => {
         v.focus();
         v.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true })); // 편집기의 Ctrl+Z 와 같은 기록
@@ -1380,7 +1396,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         const it = images[i];
         if (/\.gif$/i.test(it.src)) throw new Error('움직이는 그림(GIF)은 돌리면 멈춘 그림이 돼서 돌리지 않았어요');
         const blob = await rotatedBlob(vaultUrl(it.src), it.src);
-        const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+        const ext = { 'image/png': 'png', 'image/webp': 'webp' }[blob.type] ?? 'jpg';
         const src = await saveFile(new File([blob], `${baseName(it.alt || '사진')}.${ext}`, { type: blob.type }));
         const cur = nodeOf(it);
         if (!cur) return null;
@@ -1412,15 +1428,15 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     im.src = url;
     await im.decode();
     const canvas = document.createElement('canvas');
-    const k = Math.min(1, 8000 / Math.max(im.naturalWidth, im.naturalHeight)); // 너무 큰 그림은 줄여서 (메모리 한도)
+    const k = Math.min(1, 4096 / Math.max(im.naturalWidth, im.naturalHeight)); // 너무 큰 그림은 줄여서 (메모리 · 시간 — 4096 이면 화면 · 인쇄에 충분)
     canvas.width = Math.round(im.naturalHeight * k);
     canvas.height = Math.round(im.naturalWidth * k);
     const g = canvas.getContext('2d');
     g.translate(canvas.width, 0);
     g.rotate(Math.PI / 2);
     g.drawImage(im, 0, 0, canvas.height, canvas.width);
-    const jpeg = /\.(jpe?g|heic|heif)$/i.test(src); // WebP · PNG 는 투명한 곳이 있을 수 있어 PNG 로 (JPEG 는 투명한 곳이 검게 된다)
-    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진을 돌리지 못했어요'))), jpeg ? 'image/jpeg' : 'image/png', 0.92));
+    const jpeg = /\.(jpe?g|heic|heif)$/i.test(src); // 투명한 곳이 있을 수 있는 그림은 WebP 로 (PNG 보다 몇 배 빨리 만들고 작다 · 못 만들면 브라우저가 PNG 로)
+    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진을 돌리지 못했어요'))), jpeg ? 'image/jpeg' : 'image/webp', 0.92));
   }
 
   // 파일들을 메모 폴더에 저장 → 넣을 줄들. 하나가 안 읽혀도(폴더 · 잠긴 파일 · 너무 큰 파일) 나머지는 그대로 넣고 알린다

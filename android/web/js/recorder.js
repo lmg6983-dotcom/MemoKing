@@ -50,6 +50,7 @@ let attached = null; // 지금 열린 메모 id
 let tickBase = { at: 0, elapsed: 0 };
 let ticker = 0;
 let stopping = false;
+let starting = false; // 시작을 기다리는 중 (두 번 눌러 녹음이 두 번 시작되지 않게)
 let liveHintShown = false;
 
 export { recordingClock as formatDuration } from '../../app/js/core/voice-card.js';
@@ -118,7 +119,6 @@ function renderPill() {
 }
 
 function setStatus(next) {
-  const was = status.active;
   status = { ...status, ...next };
   tickBase = { at: Date.now(), elapsed: status.elapsedMs ?? 0 };
   clearInterval(ticker);
@@ -139,11 +139,12 @@ export function detach() {
 }
 
 export async function start(memoId) {
-  if (!memoId) return;
+  if (!memoId || starting) return;
   if (status.active) {
     if (status.memoId !== memoId) toast('다른 메모에서 녹음 중이에요. 먼저 끝내 주세요', true);
     return;
   }
+  starting = true;
   try {
     if (!(await call('micPermission'))) {
       toast('녹음하려면 마이크 권한을 허용해 주세요', true);
@@ -161,6 +162,8 @@ export async function start(memoId) {
     document.activeElement?.blur();
   } catch (err) {
     toast(err.message || UI.recordFail, true);
+  } finally {
+    starting = false;
   }
 }
 

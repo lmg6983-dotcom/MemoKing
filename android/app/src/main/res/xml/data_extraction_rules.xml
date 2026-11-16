@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 안드로이드 12 이상: 클라우드 백업 · 새 기기로 옮기기 모두 Google 로그인 정보가 든 설정(memoking.xml)은 빼고, 메모 · 녹음은 그대로 -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="memoking.xml" />
+        <exclude domain="sharedpref" path="memoking_bio.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="memoking.xml" />
+        <exclude domain="sharedpref" path="memoking_bio.xml" />
+    </device-transfer>
+</data-extraction-rules>

@@ -22,6 +22,7 @@ import { driveShareLink } from './share-drive.js';
 import { officeToPdf } from './office-pdf.js';
 import { UI } from '../app/js/core/ui-text.js';
 import { summaryBody } from '../app/js/core/agent.js';
+import { originalFileOf } from '../app/js/core/conflicts.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 // 메뉴를 띄울 자리 (화면이 준 창 안 좌표 — 키보드로 연 메뉴는 마우스 자리가 아니라 그 카드 · 내용 자리에). 없으면 마우스 자리
@@ -685,6 +686,7 @@ export function registerIpc(ctx) {
 
   // ---------- 휴지통 ----------
   ipcMain.handle('trash:list', () => getVault()?.trashList() ?? []);
+  ipcMain.handle('trash:preview', (_e, name) => getVault()?.trashPreview(String(name ?? '')) ?? null);
   ipcMain.handle('trash:restore', (_e, name) => {
     const id = getVault()?.restoreTrash(String(name ?? '')) ?? null;
     wm.pushList();
@@ -703,7 +705,14 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 개별 메모 조작 ----------
-  ipcMain.handle('memo:open', (e, id) => {
+  ipcMain.handle('memo:open', (e, id, opts) => {
+    // 목록에서 찾던 말 (그 말로 찾아 첫 자리로 — note.js runCommand)
+    const find = typeof opts?.find === 'string' ? opts.find.trim().slice(0, 200) : '';
+    if (find) {
+      const open = wm.noteWins.get(id);
+      if (open && !open.isDestroyed() && !open.webContents.isLoading()) open.webContents.send('memo:command', { find });
+      else wm.pendingCommands.set(id, { find });
+    }
     // 목록에서 고른 테이프 메모: 테이프를 떼고 앞으로
     const untaped = e.sender === wm.listWin?.webContents && wm.untapeFromList(String(id));
     const win = wm.openNote(id);
@@ -723,6 +732,40 @@ export function registerIpc(ctx) {
     if (!id) throw new Error('이 파일로는 메모를 만들 수 없어요. 글 파일(.txt, .md 등)을 골라 주세요');
     if (opts?.open) wm.openNote(id);
     return id;
+  });
+  // ---------- 충돌 사본 비교: "제목 (PC 충돌 2026-11-15 1530).md" ↔ 원본 "제목.md" ----------
+  const conflictPair = (copyId) => {
+    const vault = getVault();
+    const copy = vault?.get(String(copyId));
+    const origFile = originalFileOf(copy?.file);
+    if (!origFile) return null;
+    const original = vault.list().find((m) => m.file === origFile);
+    return { vault, copy, original: original ? vault.get(original.id) : null };
+  };
+  const side = (m) => (m ? { id: m.id, title: m.title, file: m.file, updated: m.updated, locked: Boolean(m.locked), body: m.locked ? '' : m.body } : null);
+  ipcMain.handle('conflict:get', (_e, copyId) => {
+    const p = conflictPair(copyId);
+    return p ? { copy: side(p.copy), original: side(p.original) } : null;
+  });
+  // keep: 'copy' 사본 내용으로 원본을 바꾸고 사본은 휴지통 · 'original' 원본 그대로, 사본만 휴지통
+  ipcMain.handle('conflict:resolve', async (_e, copyId, keep) => {
+    // 사본 창을 열어 둔 채 막 고쳤으면 그 글부터 저장 (아직 저장 전인 0.6초 안의 글이 빠지지 않게) — 멈춘 창이면 2초까지만
+    const copyWin = wm.noteWins.get(String(copyId));
+    if (copyWin && !copyWin.isDestroyed()) {
+      await Promise.race([copyWin.webContents.executeJavaScript('window.mkFlushSync?.()', true).catch(() => {}), new Promise((r) => setTimeout(r, 2000))]);
+    }
+    const p = conflictPair(copyId);
+    if (!p) return { ok: false, message: '사본을 찾지 못했어요. 이미 지웠을 수 있어요' };
+    if (p.copy.locked || p.original?.locked) return { ok: false, message: '잠긴 메모는 직접 열어 고쳐 주세요' };
+    if (keep === 'copy') {
+      if (!p.original) return { ok: false, message: '원본 메모를 찾지 못했어요. 사본을 그대로 쓰면 돼요' };
+      const r = p.vault.save(p.original.id, p.copy.body);
+      if (r?.refused) return { ok: false, message: '원본을 바꾸지 못했어요. 잠시 뒤 다시 해 주세요' };
+      wm.sendToNote(p.original.id, 'memo:external', p.vault.get(p.original.id)); // 원본 창이 열려 있으면 바꾼 글로
+    }
+    wm.noteWins.get(p.copy.id)?.destroy();
+    p.vault.trash(p.copy.id);
+    return { ok: true, message: keep === 'copy' ? '사본 내용으로 바꾸고 사본은 휴지통으로 옮겼어요' : '사본을 휴지통으로 옮겼어요' };
   });
   ipcMain.handle('memo:get', (_e, id) => {
     const memo = getVault()?.get(id);
@@ -786,9 +829,36 @@ export function registerIpc(ctx) {
     if (unlocked && !vault.locks.has(sourceId)) return vault.import({ body, color: vault.get(sourceId)?.color });
     return vault.importCopyOf(sourceId, body, { color: vault.get(sourceId)?.color });
   });
-  ipcMain.on('memo:save-sync', (event, id, body) => {
+  // 따로 남긴 글: 몇 개인지 · 메모로 되살리기 (되살린 파일은 지운다)
+  const recoveredDir = () => path.join(app.getPath('userData'), 'recovered');
+  const recoveredFiles = () => {
+    try {
+      return fs.readdirSync(recoveredDir()).filter((n) => n.endsWith('.md')).map((n) => path.join(recoveredDir(), n));
+    } catch {
+      return [];
+    }
+  };
+  ipcMain.handle('recovered:count', () => (getVault() ? recoveredFiles().length : 0));
+  ipcMain.handle('recovered:restore', () => {
+    const vault = getVault();
+    if (!vault) return 0;
+    let n = 0;
+    for (const file of recoveredFiles()) {
+      try {
+        const id = vault.import({ body: fs.readFileSync(file, 'utf8') });
+        if (!id) continue;
+        fs.rmSync(file, { force: true });
+        n++;
+      } catch (err) {
+        console.error('따로 남긴 글 되살리기', err);
+      }
+    }
+    return n;
+  });
+  ipcMain.on('memo:save-sync', (event, id, body, opts) => {
     try {
       const vault = getVault();
+      if (typeof body === 'string' && !vault) throw new Error(UI.noVault); // 메모 폴더가 없다 — 아래에서 따로 남긴다 (예전: 저장한 척했다)
       let r = typeof body === 'string' && vault ? vault.save(id, body) : null;
       if (r?.retry) {
         vault.scan();
@@ -801,6 +871,30 @@ export function registerIpc(ctx) {
       event.returnValue = true;
     } catch (err) {
       console.error('저장 실패', err);
+      // 창을 닫는 마지막 저장이라 다시 할 수 없다 — 쓴 글을 앱 폴더에 따로 남기고 알린다 (예전: 말없이 사라졌다. 디스크 가득 참 · 드라이브 빠짐 등)
+      const vault = getVault();
+      if (typeof body === 'string' && !isBlankBody(body) && (opts?.locked || vault?.locks.has(id))) {
+        // 잠긴 메모: 풀린 글을 파일로 남기면 잠금이 풀린다 — 잠긴 사본으로만 (그것도 안 되면 알리기만)
+        let kept = null;
+        try {
+          kept = vault?.locks.has(id) ? vault.importCopyOf(id, body, { color: vault.get(id)?.color }) : null;
+        } catch (err2) {
+          console.error('잠긴 사본 남기기 실패', err2);
+        }
+        toast(kept
+          ? { title: '메모를 저장하지 못해 잠긴 사본으로 남겼어요', body: '같은 비밀번호로 열 수 있어요' }
+          : { title: '잠긴 메모를 저장하지 못했어요', body: '잠긴 메모라 따로 남기지 않았어요. 메모 폴더를 확인해 주세요' });
+      } else if (typeof body === 'string' && !isBlankBody(body)) {
+        try {
+          const dir = path.join(app.getPath('userData'), 'recovered');
+          fs.mkdirSync(dir, { recursive: true });
+          const file = path.join(dir, `${new Date().toISOString().replace(/[:.]/g, '-')}.md`);
+          fs.writeFileSync(file, body);
+          toast({ title: '메모를 저장하지 못해 따로 남겼어요', body: '메모킹을 다시 켜면 목록에서 한 번에 되살릴 수 있어요. 눌러서 남긴 글 보기', onClick: () => shell.showItemInFolder(file) });
+        } catch (err2) {
+          console.error('따로 남기기도 실패', err2);
+        }
+      }
       event.returnValue = false;
     }
   });
@@ -850,7 +944,7 @@ export function registerIpc(ctx) {
       if (r.canceled || !r.filePath) return { cancelled: true };
       file = r.filePath;
     }
-    fs.writeFileSync(file, Buffer.from(String(base64), 'base64'));
+    await fs.promises.writeFile(file, Buffer.from(String(base64), 'base64'));
     return { file, name: path.basename(file) };
   });
   ipcMain.handle('pdf:open', (_e, id) => wm.openPdfWindow(String(id)));
@@ -876,11 +970,11 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 첨부 파일 ----------
-  ipcMain.handle('attachment:read', (_e, rel) => {
+  ipcMain.handle('attachment:read', async (_e, rel) => {
     const file = getVault()?.resolve(String(rel ?? ''));
     if (!file || !fs.existsSync(file)) throw new Error('파일을 찾지 못했어요. 메모 폴더에서 삭제됐거나 옮겨졌는지 확인해 주세요');
     if (fs.statSync(file).size > 500 * 1024 * 1024) throw new Error('파일이 너무 커요 (500MB 넘음). 더 작은 파일로 해 주세요');
-    return new Uint8Array(fs.readFileSync(file));
+    return new Uint8Array(await fs.promises.readFile(file)); // 큰 파일을 읽는 동안 모든 창이 멈추지 않게
   });
   ipcMain.handle('attachment:save', (_e, bytes, ext) => {
     const vault = getVault();

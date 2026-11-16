@@ -49,10 +49,14 @@ export class NotificationHistory extends EventEmitter {
   save(now = false) {
     clearTimeout(this.saveTimer);
     const write = () => {
-      fs.mkdirSync(this.dir, { recursive: true });
-      const tmp = `${this.file}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(this.state));
-      fs.renameSync(tmp, this.file);
+      try {
+        fs.mkdirSync(this.dir, { recursive: true });
+        const tmp = `${this.file}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify(this.state));
+        fs.renameSync(tmp, this.file);
+      } catch (err) {
+        this.emit('error', err); // 디스크가 가득 참 등 — 예전: 뒤에서 도는 저장이라 앱 오류 창이 떴다. 다음 알림 때 다시 쓴다
+      }
     };
     if (now) write();
     else this.saveTimer = setTimeout(write, 500);
@@ -213,12 +217,20 @@ export class NotificationHistory extends EventEmitter {
     try {
       const db = path.join(this.sourceDir, 'wpndatabase.db');
       if (!fs.existsSync(db)) return 0;
+      // 알림 DB(와 쓰기 기록 -wal)가 지난번 그대로면 복사하지 않는다 — 알림이 많은 PC 는 수십 MB 라 15초마다 앱이 잠깐 멈췄다
+      const sig = ['wpndatabase.db', 'wpndatabase.db-wal'].map((n) => {
+        const st = fs.statSync(path.join(this.sourceDir, n), { throwIfNoEntry: false });
+        return st ? `${st.mtimeMs}:${st.size}` : '-';
+      }).join('|');
+      if (sig === this.lastSig) return 0;
       tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-wpn-'));
       for (const name of ['wpndatabase.db', 'wpndatabase.db-wal', 'wpndatabase.db-shm']) {
         const src = path.join(this.sourceDir, name);
         if (fs.existsSync(src)) fs.copyFileSync(src, path.join(tmp, name));
       }
-      return this.readCopy(path.join(tmp, 'wpndatabase.db'));
+      const added = this.readCopy(path.join(tmp, 'wpndatabase.db'));
+      this.lastSig = sig; // 다 읽은 뒤에만 (읽다 실패하면 다음에 다시)
+      return added;
     } catch (err) {
       this.emit('error', err);
       return 0;

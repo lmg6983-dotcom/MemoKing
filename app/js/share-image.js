@@ -6,7 +6,19 @@ const MAX_PIXELS = 7900; // 캔버스 한 변의 한계(약 8192)를 넘지 않�
 
 let fontCss = null;
 
-export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
+/** 메모 → 그림 한 장 (base64 PNG). 너무 길면 PDF 로 저장하라는 오류 */
+export async function renderMemoImage(editor, opts = {}) {
+  return (await renderMemoImages(editor, { ...opts, split: false }))[0];
+}
+
+const SLICE = 3600; // 나눠 찍을 때 한 장의 본문 높이 (CSS px — 2배로 찍어 7200px, 캔버스 한계 안)
+const MAX_SLICES = 20;
+
+/**
+ * 메모 → 그림들 (base64 PNG 배열). split: 너무 길면 문단 사이에서 끊어 여러 장으로 (메신저로 보내기 — 휴대폰 공유)
+ *   한 장에 들어가면 늘 한 장
+ */
+export async function renderMemoImages(editor, { color = 'yellow', split = true } = {}) {
   if (!editor) throw new Error('메모가 열려 있지 않아요');
   const { toCanvas, getFontEmbedCSS } = await import('../vendor/html-to-image.js');
   const source = editor.dom();
@@ -35,7 +47,9 @@ export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
   foot.className = 'share-foot';
   const d = new Date();
   foot.textContent = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}  메모킹`;
-  paper.append(doc, foot);
+  const inner = document.createElement('div'); // 나눠 찍을 때 이것을 위로 올려 그 장의 부분만 보이게
+  inner.append(doc, foot);
+  paper.append(inner);
   document.body.append(paper);
   try {
     // 그림이 다 불러와지기를 잠깐 기다린다
@@ -47,21 +61,51 @@ export async function renderMemoImage(editor, { color = 'yellow' } = {}) {
     const height = paper.offsetHeight;
     // 길면 배율을 낮춰 캔버스 한계 안에 (1 아래로도) — 너무 길어 글자를 읽을 수 없을 만큼이면 안내
     const ratio = Math.min(2, MAX_PIXELS / Math.max(WIDTH, height));
-    if (ratio < 0.4) throw new Error('메모가 너무 길어 그림 한 장으로 만들 수 없어요. PDF로 저장해 주세요');
     fontCss ??= await getFontEmbedCSS(paper).catch(() => '');
-    const canvas = await toCanvas(paper, {
-      pixelRatio: ratio,
-      backgroundColor: getComputedStyle(paper).backgroundColor,
-      fontEmbedCSS: fontCss,
-      cacheBust: false,
-      skipAutoScale: true,
-      // 그림 하나를 못 그려도 메모 전체를 실패로 하지 않는다 (그 그림만 빈칸)
-      onImageErrorHandler: () => {},
-      style: { position: 'static', left: '0', top: '0' },
-    });
-    const base64 = canvas.toDataURL('image/png').split(',')[1];
-    if (!base64) throw new Error(UI.imageMakeFail);
-    return base64;
+    const shoot = async (pixelRatio, clip = null) => {
+      const canvas = await toCanvas(paper, {
+        pixelRatio,
+        backgroundColor: getComputedStyle(paper).backgroundColor,
+        fontEmbedCSS: fontCss,
+        cacheBust: false,
+        skipAutoScale: true,
+        ...(clip ? { height: clip } : {}),
+        // 그림 하나를 못 그려도 메모 전체를 실패로 하지 않는다 (그 그림만 빈칸)
+        onImageErrorHandler: () => {},
+        style: { position: 'static', left: '0', top: '0', ...(clip ? { height: `${clip}px`, overflow: 'hidden' } : {}) },
+      });
+      const base64 = canvas.toDataURL('image/png').split(',')[1];
+      if (!base64) throw new Error(UI.imageMakeFail);
+      return base64;
+    };
+    if (ratio >= 0.4) return [await shoot(ratio)];
+    const tooLong = new Error('메모가 너무 길어 그림 한 장으로 만들 수 없어요. PDF로 저장해 주세요');
+    if (!split) throw tooLong;
+    // 문단(맨 위 덩어리) 사이에서 끊는다 — 한 덩어리가 한 장보다 길면 그 안에서
+    const top0 = inner.getBoundingClientRect().top;
+    const total = inner.offsetHeight;
+    const bottoms = [...doc.children].map((c) => c.getBoundingClientRect().bottom - top0).filter((y) => y > 0).sort((a, b) => a - b);
+    const cuts = [];
+    let a = 0;
+    let last = 0;
+    for (const y of [...bottoms, total]) {
+      while (y - a > SLICE) {
+        const cut = last > a ? last : a + SLICE;
+        cuts.push([a, cut]);
+        a = cut;
+      }
+      last = y;
+    }
+    if (total > a) cuts.push([a, total]);
+    if (cuts.length > MAX_SLICES) throw tooLong;
+    const cs = getComputedStyle(paper);
+    const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const out = [];
+    for (const [from, to] of cuts) {
+      inner.style.marginTop = `${-from}px`;
+      out.push(await shoot(2, Math.ceil(to - from + pad)));
+    }
+    return out;
   } catch (err) {
     // 그림 그리기 도구는 Error 가 아닌 것(불러오기 실패 Event 등)으로 거절하기도 한다 → 알아들을 수 있는 말로
     if (err instanceof Error) throw err;
