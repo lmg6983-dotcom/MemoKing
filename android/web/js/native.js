@@ -45,6 +45,14 @@ export const fs = {
   dropTemp: sync('dropTemp'),
 };
 
+// 켤 때 다시 읽지 않을 메모 파일 글 (Bridge.kt scanCache — 메모 폴더마다). 예전 앱에는 없음 → null · 무시
+const has = (name) => typeof raw?.[name] === 'function';
+export const scanCache = {
+  key: () => (has('scanCacheKey') ? unwrap(raw.scanCacheKey()) : null),
+  read: (key) => (has('readScanCache') ? unwrap(raw.readScanCache(key)) : null),
+  write: (key, text) => (has('writeScanCache') ? unwrap(raw.writeScanCache(key, text)) : false),
+};
+
 export const native = {
   info: sync('info'),
   useInternalVault: sync('useInternalVault'),
