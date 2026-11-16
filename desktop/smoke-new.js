@@ -1494,6 +1494,9 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
           // PDF → 장마다 그림 (pdf.js 로 실제로 바꿔 본다)
           const pdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R 5 0 R 6 0 R 7 0 R 8 0 R]/Count 5>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n4 0 obj<</Length 33>>stream\n0 0 1 rg 20 20 160 240 re f\nendstream endobj\n5 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n6 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n7 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n8 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
           await js(aw, `(() => {
+            // 바꾸는 동안 칩 문단 안(칩 아래)에 임시 칸이 보였는가 — 파일에는 남지 않는 꾸밈
+            window.__pendingSeen = null;
+            new MutationObserver(() => { const b = document.querySelector('.mk-doc .mk-doc-pending'); if (b && !window.__pendingSeen) window.__pendingSeen = { chip: b.closest('p')?.querySelector('a[data-file]')?.textContent ?? null, label: b.querySelector('.mk-doc-pending-label')?.textContent ?? '' }; }).observe(document.querySelector('.mk-doc'), { childList: true, subtree: true });
             const dt = new DataTransfer();
             dt.items.add(new File([${JSON.stringify(pdf)}], '설명서.pdf', { type: 'application/pdf' }));
             const ps = document.querySelectorAll('.mk-doc p');
@@ -1503,6 +1506,8 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
           // 묻지 않고 원본 칩과 한 문단(칩 · 줄바꿈 · 썸네일)에 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목 — 누르면 앱 안 미리보기)
           const thumb = await until(() => js(aw, `(() => { const t = document.querySelector('.mk-doc img.mk-pdf-thumb'); return t && t.complete && t.naturalWidth > 0 && { chip: t.closest('p')?.querySelector('a[data-file]')?.textContent ?? null, br: Boolean(t.closest('p')?.querySelector('br')) }; })()`), 'PDF 첫 쪽', 20000).catch(() => null);
           check('PDF 는 묻지 않고 언제나 원본 칩과 한 문단(칩 아래 줄)에 첫 쪽 썸네일', thumb?.chip === '설명서.pdf' && thumb.br, JSON.stringify({ thumb }));
+          const pending = await js(aw, `({ seen: window.__pendingSeen, left: document.querySelectorAll('.mk-doc .mk-doc-pending').length })`);
+          check('PDF 를 넣으면 칩은 바로, 첫 쪽을 그리는 동안 칩 아래에 진행 임시 칸 → 다 되면 썸네일로 바뀌고 임시 칸은 사라짐', pending.seen?.chip === '설명서.pdf' && /첫 쪽을 그리는 중/.test(pending.seen.label) && pending.left === 0, JSON.stringify(pending));
           // 파일 칩 › 그림으로 펼치기: 장마다 그림 묶음 (PDFium 으로 실제로 바꿔 본다)
           await js(aw, `(() => { const a = [...document.querySelectorAll('.mk-doc a[data-file]')].find((x) => x.textContent === '설명서.pdf'); window.dispatchEvent(new CustomEvent('mk:expand-document-images', { detail: { href: a.getAttribute('href'), name: '설명서.pdf' } })); })()`);
           const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 5 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);

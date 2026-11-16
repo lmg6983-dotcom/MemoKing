@@ -2570,6 +2570,27 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 @media print { .mk-pdf-view { display: none !important; } }
 /* 메모 속 PDF 썸네일: 누르면 미리보기 — 오른쪽 아래 "PDF" 표시 */
 .mk-doc img.mk-pdf-thumb { box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12); background: #fff; cursor: zoom-in; }
+/* 문서를 PDF 로 바꾸는 동안 칩 아래 임시 칸 (editor.js pendingDocs — 파일에 저장되지 않음): 썸네일 자리에 종이 + 지나가는 빛 + 진행 막대 */
+.mk-doc .mk-doc-pending { display: block; width: min(100%, 360px); margin: 6px 0; user-select: none; cursor: progress; animation: mk-fade-in 0.2s ease-out; }
+.mk-doc-pending-page {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1.414;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    repeating-linear-gradient(#0000 0 14px, rgba(0, 0, 0, 0.06) 14px 22px) left 24px top 64px / calc(100% - 48px) 50% no-repeat,
+    linear-gradient(rgba(0, 0, 0, 0.09) 0 0) left 24px top 30px / 42% 12px no-repeat,
+    #fff;
+  box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.mk-doc-pending-page::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, #fff0 30%, rgba(255, 255, 255, 0.85) 50%, #fff0 70%); transform: translateX(-100%); animation: mk-doc-shine 1.4s ease-in-out infinite; }
+.mk-doc-pending-bar { display: block; height: 4px; margin-top: 10px; overflow: hidden; border-radius: 2px; background: color-mix(in srgb, var(--note-text) 12%, transparent); }
+.mk-doc-pending-bar > span { display: block; height: 100%; border-radius: inherit; background: color-mix(in srgb, var(--note-text) 60%, transparent); transition: width 0.3s ease-out; }
+.mk-doc-pending-bar.indeterminate > span { width: 35%; animation: mk-doc-indeterminate 1.2s ease-in-out infinite; }
+.mk-doc-pending-label { display: block; margin-top: 6px; font-size: 12px; color: var(--note-muted); font-variant-numeric: tabular-nums; }
+@keyframes mk-doc-shine { to { transform: translateX(100%); } }
+@keyframes mk-doc-indeterminate { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 .mk-doc p:has(> img.mk-pdf-thumb) { position: relative; width: fit-content; max-width: 100%; }
 /* 문서 칩 + 썸네일 한 문단: 그림이 블록이라 줄바꿈 · 편집기 보조 그림이 빈 줄만 더한다 (묶음 사진과 같게) */
 .mk-doc p:has(> img.mk-pdf-thumb) > :is(img.ProseMirror-separator, br) { display: none !important; }

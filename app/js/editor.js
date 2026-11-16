@@ -601,6 +601,52 @@ const tagHighlight = $prose(() => new Plugin({
   },
 }));
 
+// ---------- 문서를 PDF 로 바꾸는 동안의 임시 칸 ----------
+// 칩 아래, 첫 쪽 썸네일이 들어갈 자리에 종이 모양 + 진행 막대 (화면에만 — 파일에 저장되지 않는 꾸밈).
+//   상태: id → { pos(칩 문단 끝), name, pdf, done, total } — 글이 바뀌면 자리도 따라간다. meta: { id, set } · { id, remove }
+const pendingDocKey = new PluginKey('memoking-doc-pending');
+function pendingDocDom(p) {
+  const box = document.createElement('span');
+  box.className = 'mk-doc-pending';
+  box.contentEditable = 'false';
+  const page = document.createElement('span');
+  page.className = 'mk-doc-pending-page';
+  const bar = document.createElement('span');
+  bar.className = `mk-doc-pending-bar${p.total ? '' : ' indeterminate'}`;
+  const fill = document.createElement('span');
+  if (p.total) fill.style.width = `${Math.round((p.done / p.total) * 100)}%`;
+  bar.append(fill);
+  const label = document.createElement('span');
+  label.className = 'mk-doc-pending-label';
+  label.textContent = `${p.pdf ? '첫 쪽을 그리는 중' : 'PDF로 바꾸는 중'}${p.total ? ` · ${p.done} / ${p.total}쪽` : ''}`;
+  box.append(page, bar, label);
+  box.setAttribute('role', 'status');
+  box.setAttribute('aria-label', `${p.name} ${label.textContent}`);
+  return box;
+}
+const pendingDocs = $prose(() => new Plugin({
+  key: pendingDocKey,
+  state: {
+    init: () => new Map(),
+    apply(tr, map) {
+      const meta = tr.getMeta(pendingDocKey);
+      if (!tr.docChanged && !meta) return map;
+      const next = new Map();
+      for (const [id, p] of map) next.set(id, { ...p, pos: tr.mapping.map(p.pos, -1) });
+      if (meta?.set) next.set(meta.id, { ...next.get(meta.id), ...meta.set });
+      if (meta?.remove) next.delete(meta.id);
+      return next;
+    },
+  },
+  props: {
+    decorations(state) {
+      const map = pendingDocKey.getState(state);
+      if (!map?.size) return null;
+      return DecorationSet.create(state.doc, [...map].map(([id, p]) => Decoration.widget(p.pos, () => pendingDocDom(p), { key: `doc-pending-${id}-${p.done}-${p.total}`, side: 1, ignoreSelection: true })));
+    },
+  },
+}));
+
 function buildTagDecorations(doc) {
   return DecorationSet.create(doc, tagRanges(doc).map((r) => Decoration.inline(r.from, r.to, { class: 'mk-tag', 'data-tag': r.name })));
 }
@@ -1240,8 +1286,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         return schema.nodes.paragraph.create(null, item.images.map((im) => schema.nodes.image.create({ src: im.src, alt: im.alt, title: im.page ? ALBUM_PAGE_TITLE : ALBUM_TITLE })));
       }
       if (item.kind === 'file') {
-        const chip = schema.text(item.name, [schema.marks.link.create({ href: item.src })]);
-        return schema.nodes.paragraph.create(null, item.thumb ? [chip, ...pdfPairNodes(schema, item.thumb)] : chip);
+        return schema.nodes.paragraph.create(null, schema.text(item.name, [schema.marks.link.create({ href: item.src })]));
       }
       return schema.nodes.paragraph.create(null, schema.nodes.image.create({ src: item.src, alt: item.alt, title: item.title ?? '' })); // title: PDF 썸네일이면 "pdf <경로>"
     });
@@ -1270,6 +1315,27 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     tr = tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(end + 1, tr.doc.content.size))));
     v.dispatch(tr.scrollIntoView());
     v.focus();
+    // 문서 칩: 넣은 칩 문단 끝에 PDF 첫 쪽 썸네일을 이어 붙인다 (바꾸는 동안 그 자리에 임시 칸)
+    for (const item of items) {
+      const at = item.pairPdf ? chipParagraphEnd(v.state.doc, item.src) : -1;
+      if (at >= 0) void pairDocument(item, at);
+    }
+  }
+  /** 그 첨부를 가리키는 파일 칩이 든 문단(아직 PDF 썸네일 짝이 없는 것)의 끝 자리 — 없으면 -1 */
+  function chipParagraphEnd(doc, src) {
+    let at = -1;
+    doc.descendants((node, pos) => {
+      if (node.type.name !== 'paragraph') return true;
+      let chip = false;
+      let paired = false;
+      node.forEach((c) => {
+        if (c.marks?.some((m) => m.type.name === 'link' && m.attrs.href === src)) chip = true;
+        if (c.type.name === 'image' && pdfOfTitle(c.attrs.title)) paired = true;
+      });
+      if (chip && !paired) at = pos + node.nodeSize - 1;
+      return false;
+    });
+    return at;
   }
 
   // ---------- 손 메모 (콘텐츠): 그린 만큼의 SVG 한 칸 ----------
@@ -1532,9 +1598,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     let album = null; // 모으는 중인 묶음 (처음 사진 자리에 한 묶음)
     for (const it of items) {
       if (paired.has(it)) {
-        // 원본 문서 파일(칩)과 같은 문단, 그 아래 줄에 PDF 썸네일 — 원본을 열거나 보낼 수도 있게 (바꾸지 못하면 칩만)
-        const thumb = await documentPdfItem(it);
-        out.push(thumb ? { ...it, thumb } : it);
+        // 칩은 바로 넣고, PDF 첫 쪽 썸네일은 넣은 뒤 바꾸며 같은 문단에 (바꾸는 동안 그 자리에 임시 칸 — insertBlocks · pairDocument)
+        out.push({ ...it, pairPdf: true });
         continue;
       }
       if (asAlbum && it.kind === 'image') {
@@ -1558,13 +1623,13 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }
 
   // 메모 폴더에 넣은 문서 → PDF (PDF 는 그대로) → 첫 쪽 썸네일 그림 (누르면 그 PDF 미리보기). 바꾸지 못하면 null (칩만)
-  async function documentPdfItem(it) {
+  //   onProgress(done, total): 장을 그릴 때마다 (진행 정도는 그 자리의 임시 칸이 보인다)
+  async function documentPdfItem(it, onProgress = null) {
     const name = it.name;
     try {
-      onNotice?.(`${name}을 PDF로 바꾸고 있어요`);
       const srcFile = await documentSource(it);
       const isPdf = extOf(srcFile.name) === 'pdf';
-      const { pdf, total, pages, thumb } = await documentPdf(srcFile, (n, all) => onNotice?.(`${name}을 PDF로 바꾸고 있어요 (${n}/${all})`));
+      const { pdf, total, pages, thumb } = await documentPdf(srcFile, (n, all) => onProgress?.(n, all));
       // 원래 PDF 면 넣은 파일 그대로, 바꾼 것이면 PDF 를 새로 남긴다
       const pdfSrc = isPdf && extOf(name) === 'pdf' ? it.src : await saveFile(new File([pdf], `${baseName(name)}.pdf`, { type: 'application/pdf' }));
       const thumbSrc = await saveFile(new File([thumb], `${baseName(name)} 미리보기.png`, { type: 'image/png' }));
@@ -1575,6 +1640,33 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       onNotice?.(`${name}은 PDF로 바꾸지 못해 파일로 넣었어요`, true);
       return null;
     }
+  }
+
+  // 넣은 문서 칩의 문단(끝 자리 pos)에 PDF 첫 쪽 썸네일을 붙인다 — 바꾸는 동안은 그 자리에 임시 칸 (진행 정도)
+  //   그사이 칩을 지웠거나 옮겨 문단이 달라졌으면 붙이지 않는다
+  let pendingSeq = 0;
+  async function pairDocument(it, pos) {
+    const id = String(++pendingSeq);
+    const send = (meta) => {
+      const v = view();
+      if (!v.isDestroyed) v.dispatch(v.state.tr.setMeta(pendingDocKey, { id, ...meta }).setMeta('addToHistory', false));
+    };
+    send({ set: { pos, name: it.name, pdf: extOf(it.name) === 'pdf', done: 0, total: 0 } });
+    const thumb = await documentPdfItem(it, (done, total) => send({ set: { done, total } }));
+    const v = view();
+    if (v.isDestroyed) return;
+    const p = pendingDocKey.getState(v.state)?.get(id);
+    // 썸네일 붙이기는 보통 편집으로 (addToHistory: false 면 Milkdown 이 바뀐 것으로 알리지 않아 저장되지 않는다)
+    const tr = v.state.tr.setMeta(pendingDocKey, { id, remove: true });
+    if (thumb && p) {
+      const $p = tr.doc.resolve(p.pos);
+      let chip = false;
+      $p.parent.forEach((c) => {
+        if (c.marks?.some((m) => m.type.name === 'link' && m.attrs.href === it.src)) chip = true;
+      });
+      if ($p.parent.type.name === 'paragraph' && chip) tr.insert($p.end(), pdfPairNodes(v.state.schema, thumb));
+    }
+    v.dispatch(tr);
   }
 
   // 메모 폴더에 넣은 문서 → 장마다 그림 → 묶음 사진 (바꾸지 못하면 받은 것(파일 칩) 그대로 돌려준다) — 파일 칩 › 그림으로 펼치기
@@ -1617,15 +1709,12 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     if (readOnly) return;
     const { pos, node, href, name } = e.detail ?? {};
     if (!href) return;
-    const thumb = await documentPdfItem({ kind: 'file', src: href, name: name || href.split('/').pop() });
-    if (!thumb) return;
+    const item = { kind: 'file', src: href, name: name || href.split('/').pop() };
+    const at = chipParagraphEnd(view().state.doc, href);
+    if (at >= 0) return void pairDocument(item, at); // 칩 문단 끝에 (바꾸는 동안 그 자리에 임시 칸)
+    const thumb = await documentPdfItem(item); // 칩이 문단에 섞여 있지 않은 경우 (표 칸 등) — 칩 아래 새 줄에
     const v = view();
-    // 바꾸는 사이 그 문단이 그대로면 그 안에, 달라졌으면 칩 아래 새 줄에
-    if (pos != null && node?.type.name === 'paragraph' && v.state.doc.nodeAt(pos) === node) {
-      v.dispatch(v.state.tr.insert(pos + node.nodeSize - 1, pdfPairNodes(v.state.schema, thumb)));
-      return;
-    }
-    insertBlocks(pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head, [thumb]);
+    if (thumb) insertBlocks(pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head, [thumb]);
   });
 
   // 파일 칩 우클릭 메뉴 › 텍스트로 본문에 풀기
@@ -2322,6 +2411,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     .use(pastePlugin) // 클립보드·업로드 플러그인보다 먼저 판단
     .use(keepIndentPlugin)
     .use(fileChips) // 파일 칩 이름은 고칠 수 없게
+    .use(pendingDocs) // 문서를 PDF 로 바꾸는 동안 칩 아래 임시 칸
     .use(listContent) // 목록 안에는 글만 (그림 · 파일 · 표 등은 목록 뒤로)
     .use(inlineHtmlMarks)
     .use(linkCards)
