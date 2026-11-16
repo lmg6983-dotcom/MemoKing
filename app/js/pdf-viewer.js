@@ -1,0 +1,197 @@
+// 앱 안 PDF 미리보기 (PC · 휴대폰 함께) — PDFium(pdf-engine.js)으로 쪽을 그린다.
+//   쪽은 화면에 보일 때만 그리고(긴 PDF 도 바로 열림), 위아래로 넘겨 본다. 확대: − + 단추 · Ctrl+휠 · 두 손가락 벌리기
+//   위 막대: 쪽 번호 · 확대 · 다른 앱으로 열기 · 닫기 (Esc · 휴대폰 뒤로 가기)
+import { openPdf } from './pdf-engine.js';
+import { icon } from './icons.js';
+
+const el = (tag, cls, props = {}) => Object.assign(document.createElement(tag), cls ? { className: cls } : {}, props);
+let current = null; // 열린 보기의 닫기
+
+/** 떠 있는 미리보기를 닫는다 → 닫았는가 (휴대폰 뒤로 가기) */
+export const closePdfViewer = () => {
+  if (!current) return false;
+  current();
+  return true;
+};
+export const pdfViewerOpen = () => Boolean(current);
+
+/**
+ * @param {{ bytes: Uint8Array | ArrayBuffer, name?: string, onExternal?: () => void }} o
+ *   onExternal: "다른 앱으로 열기" (없으면 단추 없음)
+ */
+export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) {
+  closePdfViewer();
+  const view = el('div', 'mk-pdf-view', { role: 'dialog', ariaModal: 'true', ariaLabel: `${name} 미리보기` });
+  const head = el('div', 'mk-pdf-head');
+  const title = el('span', 'mk-pdf-title', { textContent: name });
+  const count = el('span', 'mk-pdf-count');
+  const btn = (label, iconName, text, run) => {
+    const b = el('button', 'mk-pdf-btn', { type: 'button', title: label, ariaLabel: label });
+    if (iconName) b.append(icon(iconName));
+    if (text) b.append(el('span', '', { textContent: text }));
+    b.addEventListener('click', run);
+    return b;
+  };
+  const out = btn('작게', null, '−', () => setZoom(zoom / 1.25));
+  const zoomLabel = el('span', 'mk-pdf-zoom');
+  const inn = btn('크게', null, '+', () => setZoom(zoom * 1.25));
+  const ext = onExternal ? btn('다른 앱으로 열기', null, '다른 앱으로', () => onExternal()) : null;
+  const close = btn('닫기 (Esc)', 'close', '', () => shut());
+  head.append(title, count, el('span', 'mk-pdf-gap'), out, zoomLabel, inn, ...(ext ? [ext] : []), close);
+  const scroller = el('div', 'mk-pdf-scroll');
+  const list = el('div', 'mk-pdf-pages');
+  const note = el('div', 'mk-pdf-note', { role: 'status', textContent: 'PDF 를 여는 중이에요' });
+  scroller.append(list, note);
+  view.append(head, scroller);
+  document.body.append(view);
+  const restore = document.activeElement;
+  close.focus();
+
+  let pdf = null;
+  let zoom = 1;
+  let shutDown = false;
+  const pages = []; // { box, canvas, drawnAt (그린 폭) }
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) draw(Number(e.target.dataset.i));
+    showCount();
+  }, { root: scroller, rootMargin: '600px 0px' });
+
+  const baseWidth = () => Math.min(scroller.clientWidth - 24, 900); // 쪽 폭 (확대 1) — 화면 폭에 맞추되 PC 는 900px 까지
+  const layout = () => {
+    const w = Math.round(baseWidth() * zoom);
+    for (const p of pages) {
+      p.box.style.width = `${w}px`;
+      p.box.style.height = `${Math.round((w * p.h) / p.w)}px`;
+    }
+    zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+  };
+  function draw(i) {
+    const p = pages[i];
+    if (!p || shutDown) return;
+    const want = Math.min(4096, Math.round(p.box.clientWidth * Math.min(2.5, window.devicePixelRatio || 1))); // 크게 확대해도 캔버스는 4096px 까지 (메모리)
+    if (p.drawnAt && Math.abs(p.drawnAt - want) < 8) return; // 이미 그 크기로
+    try {
+      const canvas = pdf.render(i, want);
+      canvas.className = 'mk-pdf-canvas';
+      p.box.replaceChildren(canvas);
+      p.drawnAt = want;
+    } catch (err) {
+      p.box.textContent = '이 쪽을 그리지 못했어요';
+      console.warn('[PDF 미리보기]', err);
+    }
+  }
+  function showCount() {
+    if (!pages.length) return;
+    const mid = scroller.scrollTop + scroller.clientHeight / 3;
+    let at = 0;
+    for (let i = 0; i < pages.length; i++) if (pages[i].box.offsetTop <= mid) at = i;
+    count.textContent = `${at + 1} / ${pages.length}`;
+  }
+  function setZoom(z) {
+    const next = Math.max(0.5, Math.min(4, z));
+    if (Math.abs(next - zoom) < 0.01) return;
+    const ratio = scroller.scrollTop / Math.max(1, scroller.scrollHeight); // 보던 자리를 지킨다
+    zoom = next;
+    layout();
+    scroller.scrollTop = ratio * scroller.scrollHeight;
+    // 보이는 쪽은 새 크기로 다시 그린다 (흐려지지 않게)
+    clearTimeout(setZoom.t);
+    setZoom.t = setTimeout(() => {
+      const top = scroller.scrollTop - 600;
+      const bottom = scroller.scrollTop + scroller.clientHeight + 600;
+      pages.forEach((p, i) => p.box.offsetTop + p.box.offsetHeight > top && p.box.offsetTop < bottom && draw(i));
+    }, 150);
+  }
+
+  // 확대: Ctrl+휠 (터치패드 벌리기) · 두 손가락
+  scroller.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    setZoom(zoom * Math.exp(-e.deltaY * 0.01));
+  }, { passive: false });
+  const touches = new Map();
+  let pinch = null;
+  scroller.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) {
+      const [a, b] = [...touches.values()];
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: zoom };
+    }
+  });
+  scroller.addEventListener('pointermove', (e) => {
+    if (!touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && touches.size === 2) {
+      const [a, b] = [...touches.values()];
+      setZoom(pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d));
+    }
+  });
+  const lift = (e) => {
+    touches.delete(e.pointerId);
+    if (touches.size < 2) pinch = null;
+  };
+  scroller.addEventListener('pointerup', lift);
+  scroller.addEventListener('pointercancel', lift);
+  scroller.addEventListener('scroll', showCount, { passive: true });
+
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      shut();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+      e.preventDefault();
+      setZoom(zoom * 1.25);
+    } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+      e.preventDefault();
+      setZoom(zoom / 1.25);
+    } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+      e.preventDefault();
+      setZoom(1);
+    }
+  };
+  document.addEventListener('keydown', onKey, true);
+  const onResize = () => {
+    layout();
+    showCount();
+  };
+  window.addEventListener('resize', onResize);
+
+  function shut() {
+    if (shutDown) return;
+    shutDown = true;
+    current = null;
+    io.disconnect();
+    document.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('resize', onResize);
+    pdf?.close();
+    view.remove();
+    window.dispatchEvent(new Event('mk:pdf-closed'));
+    if (restore instanceof HTMLElement && restore.isConnected) restore.focus({ preventScroll: true });
+  }
+  current = shut;
+
+  try {
+    pdf = await openPdf(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+  } catch (err) {
+    note.textContent = err?.message || 'PDF 를 열지 못했어요';
+    return shut;
+  }
+  if (shutDown) {
+    pdf.close();
+    return shut;
+  }
+  note.remove();
+  for (let i = 0; i < pdf.pageCount; i++) {
+    const { width, height } = pdf.size(i);
+    const box = el('div', 'mk-pdf-page', { ariaLabel: `${i + 1}쪽` });
+    box.dataset.i = String(i);
+    list.append(box);
+    pages.push({ box, w: width || 595, h: height || 842, drawnAt: 0 });
+    io.observe(box);
+  }
+  layout();
+  showCount();
+  return shut;
+}

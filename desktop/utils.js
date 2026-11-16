@@ -364,7 +364,15 @@ export function registerVaultProtocol(getVault, getHistory) {
     if (url.host === 'ocr') {
       const safe = path.normalize(rel).replace(/^(\.\.(\/|\\|$))+/, '');
       const file = path.join(APP_DIR, safe);
-      if (file.startsWith(APP_DIR) && fs.existsSync(file)) return net.fetch(pathToFileURL(file).href, { headers: request.headers });
+      if (file.startsWith(APP_DIR) && fs.existsSync(file)) {
+        // 앱에 든 파일 (OCR 창 · 메모 창의 wasm · 글꼴) — 메모 창(file://, origin null)에서도 읽을 수 있게
+        return net.fetch(pathToFileURL(file).href, { headers: request.headers }).then((res) => {
+          const headers = new Headers(res.headers);
+          headers.set('Access-Control-Allow-Origin', '*');
+          if (file.endsWith('.wasm')) headers.set('Content-Type', 'application/wasm');
+          return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+        });
+      }
       return new Response('not found', { status: 404 });
     }
     const vault = getVault?.();

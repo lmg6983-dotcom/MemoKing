@@ -2465,3 +2465,24 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-album-thumb.lifting { transform: scale(1.15); z-index: 1; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5); transition: transform 0.12s ease-out; }
 /* 잠긴 메모: 지문 · 얼굴로 열기 (휴대폰, lock-ui.js) */
 .lock-screen .lock-bio { margin-top: 10px; width: 100%; }
+/* ---------- 앱 안 PDF 미리보기 (pdf-viewer.js) ---------- */
+.mk-pdf-view { position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: #2b2b2a; color: #fff; animation: mk-fade-in 0.15s ease-out; -webkit-app-region: no-drag; }
+.mk-pdf-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top)); background: #1e1e1d; }
+.mk-pdf-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; font-size: 14px; }
+.mk-pdf-count, .mk-pdf-zoom { flex: none; font-size: 12.5px; color: rgba(255, 255, 255, 0.75); font-variant-numeric: tabular-nums; }
+.mk-pdf-zoom { min-width: 3.2em; text-align: center; }
+.mk-pdf-gap { flex: 1; }
+.mk-pdf-btn { flex: none; display: inline-flex; align-items: center; gap: 4px; min-width: 36px; height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+.mk-pdf-btn:hover { background: rgba(255, 255, 255, 0.2); }
+.mk-pdf-btn svg { width: 18px; height: 18px; }
+.mk-pdf-scroll { flex: 1; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; }
+.mk-pdf-pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; min-width: min-content; }
+.mk-pdf-page { flex: none; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4); color: #555; display: grid; place-items: center; font-size: 13px; }
+.mk-pdf-canvas { display: block; width: 100%; height: 100%; }
+.mk-pdf-note { padding: 40px 16px; text-align: center; color: rgba(255, 255, 255, 0.8); }
+@media (max-width: 480px) { .mk-pdf-btn > span:not(:only-child) { display: none; } .mk-pdf-btn { padding: 0 8px; } }
+@media print { .mk-pdf-view { display: none !important; } }
+/* 메모 속 PDF 썸네일: 누르면 미리보기 — 오른쪽 아래 "PDF" 표시 */
+.mk-doc img.mk-pdf-thumb { box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12); background: #fff; cursor: zoom-in; }
+.mk-doc p:has(> img.mk-pdf-thumb) { position: relative; width: fit-content; max-width: 100%; }
+.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF"; position: absolute; right: 8px; bottom: 10px; padding: 2px 7px; border-radius: 6px; background: #c4282e; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; }
