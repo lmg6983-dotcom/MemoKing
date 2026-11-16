@@ -1250,8 +1250,21 @@ export async function openNote(memoId, options = {}) {
     if (memo.needsPassword) {
       // 잠긴 메모: 비밀번호를 넣어야 편집기를 만든다 (열쇠는 메모를 닫을 때까지만)
       el.screen.classList.add('memo-locked');
+      let bio = { available: false, saved: false };
+      try {
+        bio = native.bioStatus(memoId);
+      } catch {
+        // 예전 앱
+      }
+      let typed = null; // 비밀번호로 열었으면 그 비밀번호 (다음부터 지문으로 — 아래에서 묻는다)
+      let viaBio = false;
       const opened = await lockScreen(el.editorRoot, {
         title: memo.title,
+        bio: bio.available && bio.saved ? { label: '지문 · 얼굴로 열기', get: async () => {
+          const pw = await call('bioOpen', { memoId });
+          viaBio = Boolean(pw);
+          return pw;
+        } } : null,
         onTry: async (password) => {
           try {
             // 비밀번호 화면이 떠 있는 사이 다른 기기가 다시 잠갔을 수 있어 지금 파일의 암호문으로
@@ -1266,8 +1279,19 @@ export async function openNote(memoId, options = {}) {
             const r = app.vault.openLock(memoId, session);
             if (!r) return UI.memoOpenFail;
             memo = r;
+            typed = viaBio ? null : password;
             return null;
           } catch (err) {
+            // 감싸 둔 비밀번호가 맞지 않다 (다른 기기에서 비밀번호를 바꿈) — 잊고 비밀번호로
+            if (viaBio) {
+              viaBio = false;
+              try {
+                native.bioForget(memoId);
+              } catch {
+                // 예전 앱
+              }
+              return '비밀번호가 바뀌었어요. 새 비밀번호를 넣어 주세요';
+            }
             return err.message;
           }
         },
@@ -1284,6 +1308,11 @@ export async function openNote(memoId, options = {}) {
         return;
       }
       current = saved = memo.body;
+      // 비밀번호로 열었고 지문을 쓸 수 있으면: 다음부터 지문으로 열지 한 번 묻는다 (휴대폰 보안 칩의 열쇠로 감싸 둔다)
+      if (typed && bio.available && !bio.saved) {
+        const pw = typed;
+        toast('다음부터 이 메모를 지문 · 얼굴로 열까요?', false, { label: '켜기', run: () => call('bioSave', { memoId, password: pw }).then((ok) => ok && toast('다음부터 지문 · 얼굴로 열어요')).catch(() => {}) });
+      }
     }
     editor = await createNoteEditor(el.editorRoot, {
       markdown: memo.body,

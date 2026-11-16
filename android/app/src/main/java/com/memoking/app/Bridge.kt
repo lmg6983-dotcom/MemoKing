@@ -331,6 +331,16 @@ class Bridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun sttStatus(): String = reply { Stt.status(ctx) }
 
+    // 잠긴 메모를 지문 · 얼굴로 (Bio.kt): 쓸 수 있나 · 이 메모를 감싸 두었나 · 잊기
+    @JavascriptInterface
+    fun bioStatus(memoId: String): String = reply { JSONObject().put("available", Bio.available(ctx)).put("saved", Bio.has(ctx, memoId)) }
+
+    @JavascriptInterface
+    fun bioForget(memoId: String): String = reply {
+        Bio.forget(ctx, memoId)
+        true
+    }
+
     // ---------- 오래 걸리는 일 ----------
 
     @JavascriptInterface
@@ -406,6 +416,9 @@ class Bridge(private val activity: MainActivity) {
                 }
             }
             "micPermission" -> activity.runOnUiThread { activity.requestMicPermission(id) }
+            // 지문 · 얼굴 확인 창을 띄우고 끝나면 답한다 (Bio.kt)
+            "bioSave" -> activity.runOnUiThread { Bio.save(activity, a.getString("memoId"), a.getString("password")) { ok -> resolve(id) { ok } } }
+            "bioOpen" -> activity.runOnUiThread { Bio.open(activity, a.getString("memoId")) { pw -> resolve(id) { pw ?: JSONObject.NULL } } }
             "recordStart" -> activity.runOnUiThread {
                 resolve(id) { RecorderService.start(activity, a.getString("memoId"), a.optBoolean("stt", true), terms(a)) }
             }

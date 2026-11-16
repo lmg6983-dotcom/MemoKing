@@ -61,6 +61,9 @@ export const native = {
   openLiveUpdateSettings: sync('openLiveUpdateSettings'), // 녹음 중 상태 막대 캡슐(안드로이드 16 실시간 업데이트) 켜는 설정
   // 지난번 오류 기록 (앱이 멈췄거나 위젯에서 오류) — 꺼내면 지워짐. 예전 앱에는 없음
   lastError: () => (typeof raw.lastError === 'function' ? unwrap(raw.lastError()) : null),
+  // 잠긴 메모를 지문 · 얼굴로 (Bio.kt) — { available, saved } · 잊기. 예전 앱에는 없음
+  bioStatus: (memoId) => (typeof raw.bioStatus === 'function' ? unwrap(raw.bioStatus(String(memoId))) : { available: false, saved: false }),
+  bioForget: (memoId) => (typeof raw.bioForget === 'function' ? unwrap(raw.bioForget(String(memoId))) : false),
 };
 
 // 홈 화면 위젯 (Widgets.kt)
