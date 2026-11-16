@@ -1356,10 +1356,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
         check('문서를 넣으면 묻지 않음 (PDF 도 언제나 첫 쪽 썸네일과 한 쌍)', askDoc === false, JSON.stringify(askDoc));
         const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
         const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length })`);
-        const dropNote = await js(win, `(window.__statusLog ?? []).find((t) => /4개를 넣었어요/.test(t)) ?? document.getElementById('status').textContent`);
-        // 문서 셋(글 둘 · 깨진 PDF)을 PDF 로 바꾸는 일이 끝날 때까지 — 뒤 점검(다른 창의 휠 · 클릭)과 CPU 를 다투지 않게
-        await until(() => js(win, `document.querySelectorAll('.mk-doc img.mk-pdf-thumb').length >= 2 && (window.__statusLog ?? []).some((t) => /다\\.pdf.*바꾸지 못해/.test(t))`), '문서 PDF 바꾸기', 30000).catch(() => null);
-        check('여러 파일 놓기: 4개 (글 파일 2 · PDF · 사진)가 한 번에 모두 들어감, 읽지 못한 하나(폴더)는 알리고 나머지는 그대로', fallback.chips.length === 3 && fallback.imgs === 1 && ['가.txt', '다.pdf', '라.txt'].every((n) => fallback.chips.includes(n)) && /4개를 넣었어요.*1개.*읽지 못해/.test(dropNote.replace('파일 ', '')), JSON.stringify({ fallback, dropNote }));
+        const dropNote = await js(win, `(window.__statusLog ?? []).find((t) => /4개를 넣었어요/.test(t)) ?? document.getElementById('status').textContent`);        check('여러 파일 놓기: 4개 (글 파일 2 · PDF · 사진)가 한 번에 모두 들어감, 읽지 못한 하나(폴더)는 알리고 나머지는 그대로', fallback.chips.length === 3 && fallback.imgs === 1 && ['가.txt', '다.pdf', '라.txt'].every((n) => fallback.chips.includes(n)) && /4개를 넣었어요.*1개.*읽지 못해/.test(dropNote.replace('파일 ', '')), JSON.stringify({ fallback, dropNote }));
         // 사진 여러 장: 묶음 사진으로 넣을지 묻고, 고르면 한 줄에 모아 격자로 · 누르면 크게 넘겨 보기
         {
           const { win: aw } = await openMemo('# 묶음 사진\n\n끝\n', '묶음 사진');
@@ -1397,6 +1394,8 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
           await wait(150);
           const after = await js(aw, `document.querySelector('.mk-album-view .mk-album-count')?.textContent`);
           // 확대 · 축소: 휠 → 크게 (배율 단추) · 끌어서 둘러보기 · 0 → 원래대로 · 두 번 누르기 → 250%
+          //   장 넘김(나가기 150ms · 들어오기 220ms)이 끝나고 새 장 그림이 풀린 뒤에 — 그 전에는 확대를 받지 않는다 (album-viewer.js zoomTo)
+          await until(() => js(aw, `(() => { const b = document.querySelector('.mk-album-big'); return b && b.style.transform === '' && b.complete && b.naturalWidth > 0; })()`), '장 넘김 끝', 3000).catch(() => null);
           const mid = await js(aw, `(() => { const r = document.querySelector('.mk-album-big').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
           const zoomState = `({ t: document.querySelector('.mk-album-big').style.transform, btn: document.querySelector('.mk-album-zoom').hidden ? '' : document.querySelector('.mk-album-zoom').textContent, count: document.querySelector('.mk-album-count').textContent })`;
           for (let k = 0; k < 3; k++) aw.webContents.sendInputEvent({ type: 'mouseWheel', x: mid.x, y: mid.y, deltaX: 0, deltaY: 120, canScroll: true });
