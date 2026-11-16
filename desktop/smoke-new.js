@@ -1356,8 +1356,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
         check('문서를 넣으면 묻지 않음 (PDF 도 언제나 첫 쪽 썸네일과 한 쌍)', askDoc === false, JSON.stringify(askDoc));
         const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
         const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length })`);
-        const dropNote = await js(win, `(window.__statusLog ?? []).find((t) => /4개를 넣었어요/.test(t)) ?? document.getElementById('status').textContent`);
-        check('여러 파일 놓기: 4개 (글 파일 2 · PDF · 사진)가 한 번에 모두 들어감, 읽지 못한 하나(폴더)는 알리고 나머지는 그대로', fallback.chips.length === 3 && fallback.imgs === 1 && ['가.txt', '다.pdf', '라.txt'].every((n) => fallback.chips.includes(n)) && /4개를 넣었어요.*1개.*읽지 못해/.test(dropNote.replace('파일 ', '')), JSON.stringify({ fallback, dropNote }));
+        const dropNote = await js(win, `(window.__statusLog ?? []).find((t) => /4개를 넣었어요/.test(t)) ?? document.getElementById('status').textContent`);        check('여러 파일 놓기: 4개 (글 파일 2 · PDF · 사진)가 한 번에 모두 들어감, 읽지 못한 하나(폴더)는 알리고 나머지는 그대로', fallback.chips.length === 3 && fallback.imgs === 1 && ['가.txt', '다.pdf', '라.txt'].every((n) => fallback.chips.includes(n)) && /4개를 넣었어요.*1개.*읽지 못해/.test(dropNote.replace('파일 ', '')), JSON.stringify({ fallback, dropNote }));
         // 사진 여러 장: 묶음 사진으로 넣을지 묻고, 고르면 한 줄에 모아 격자로 · 누르면 크게 넘겨 보기
         {
           const { win: aw } = await openMemo('# 묶음 사진\n\n끝\n', '묶음 사진');
@@ -1395,6 +1394,8 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
           await wait(150);
           const after = await js(aw, `document.querySelector('.mk-album-view .mk-album-count')?.textContent`);
           // 확대 · 축소: 휠 → 크게 (배율 단추) · 끌어서 둘러보기 · 0 → 원래대로 · 두 번 누르기 → 250%
+          //   장 넘김(나가기 150ms · 들어오기 220ms)이 끝나고 새 장 그림이 풀린 뒤에 — 그 전에는 확대를 받지 않는다 (album-viewer.js zoomTo)
+          await until(() => js(aw, `(() => { const b = document.querySelector('.mk-album-big'); return b && b.style.transform === '' && b.complete && b.naturalWidth > 0; })()`), '장 넘김 끝', 3000).catch(() => null);
           const mid = await js(aw, `(() => { const r = document.querySelector('.mk-album-big').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
           const zoomState = `({ t: document.querySelector('.mk-album-big').style.transform, btn: document.querySelector('.mk-album-zoom').hidden ? '' : document.querySelector('.mk-album-zoom').textContent, count: document.querySelector('.mk-album-count').textContent })`;
           for (let k = 0; k < 3; k++) aw.webContents.sendInputEvent({ type: 'mouseWheel', x: mid.x, y: mid.y, deltaX: 0, deltaY: 120, canScroll: true });
@@ -1499,9 +1500,9 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
             const r = ps[ps.length - 1].getBoundingClientRect();
             document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
           })()`);
-          // 묻지 않고 원본 칩 바로 아래 줄에 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목 — 누르면 앱 안 미리보기)
-          const thumb = await until(() => js(aw, `(() => { const t = document.querySelector('.mk-doc img.mk-pdf-thumb'); return t && t.complete && t.naturalWidth > 0 && { chip: t.closest('p')?.previousElementSibling?.querySelector('a[data-file]')?.textContent ?? null }; })()`), 'PDF 첫 쪽', 20000).catch(() => null);
-          check('PDF 는 묻지 않고 언제나 원본 칩 바로 아래 줄에 첫 쪽 썸네일', thumb?.chip === '설명서.pdf', JSON.stringify({ thumb }));
+          // 묻지 않고 원본 칩과 한 문단(칩 · 줄바꿈 · 썸네일)에 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목 — 누르면 앱 안 미리보기)
+          const thumb = await until(() => js(aw, `(() => { const t = document.querySelector('.mk-doc img.mk-pdf-thumb'); return t && t.complete && t.naturalWidth > 0 && { chip: t.closest('p')?.querySelector('a[data-file]')?.textContent ?? null, br: Boolean(t.closest('p')?.querySelector('br')) }; })()`), 'PDF 첫 쪽', 20000).catch(() => null);
+          check('PDF 는 묻지 않고 언제나 원본 칩과 한 문단(칩 아래 줄)에 첫 쪽 썸네일', thumb?.chip === '설명서.pdf' && thumb.br, JSON.stringify({ thumb }));
           // 파일 칩 › 그림으로 펼치기: 장마다 그림 묶음 (PDFium 으로 실제로 바꿔 본다)
           await js(aw, `(() => { const a = [...document.querySelectorAll('.mk-doc a[data-file]')].find((x) => x.textContent === '설명서.pdf'); window.dispatchEvent(new CustomEvent('mk:expand-document-images', { detail: { href: a.getAttribute('href'), name: '설명서.pdf' } })); })()`);
           const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 5 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);
@@ -1557,7 +1558,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
         const outOk = out && /가\.txt$/.test(out.target) && fs.readFileSync(out.target, 'utf8') === '첫째 파일' && /memoking-drag/.test(out.target);
         check('파일 칩을 메모 밖으로 끌어내면 (탐색기 · 카카오톡) 보이는 이름의 복사본 파일이 감 — 메모의 첨부는 그대로', prevented && Boolean(outOk) && fs.readdirSync(path.join(vault.root, 'attachments')).length >= 4, JSON.stringify({ prevented, out }));
         const dragBefore2 = smokeOpened.filter((o) => o.kind === 'drag-out').length;
-        await js(win, `(() => { const a = document.querySelector('.mk-doc img.mk-image'); a.dispatchEvent(new DragEvent('dragstart', { dataTransfer: new DataTransfer(), bubbles: true, cancelable: true })); })()`);
+        await js(win, `(() => { const a = document.querySelector('.mk-doc img.mk-image:not(.mk-pdf-thumb)'); a.dispatchEvent(new DragEvent('dragstart', { dataTransfer: new DataTransfer(), bubbles: true, cancelable: true })); })()`);
         const outImg = await until(() => smokeOpened.filter((o) => o.kind === 'drag-out').length > dragBefore2 && smokeOpened.filter((o) => o.kind === 'drag-out').at(-1), '사진 끌어내기', 3000).catch(() => null);
         check('사진도 끌어내면 그림 파일 (확장자 유지)', Boolean(outImg) && /\.png$/i.test(outImg.target) && fs.statSync(outImg.target).size > 50, JSON.stringify(outImg));
         // 끌어낸 파일이 도로 이 메모에 떨어지면 무시 (메모킹이 끌어낸 임시 파일 경로면)

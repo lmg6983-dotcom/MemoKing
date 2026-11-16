@@ -1228,6 +1228,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     v.dispatch(tr.setSelection(TextSelection.create(tr.doc, after + 1)));
   }
 
+  // 문서 칩과 PDF 첫 쪽 썸네일은 한 문단 (칩 · 줄바꿈 · 썸네일) — 옮기기 · 지우기를 함께
+  const pdfPairNodes = (schema, thumb) => [schema.nodes.hardbreak.create(), schema.nodes.image.create({ src: thumb.src, alt: thumb.alt, title: thumb.title })];
+
   function insertBlocks(pos, items) {
     const v = view();
     const { schema } = v.state;
@@ -1237,7 +1240,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         return schema.nodes.paragraph.create(null, item.images.map((im) => schema.nodes.image.create({ src: im.src, alt: im.alt, title: im.page ? ALBUM_PAGE_TITLE : ALBUM_TITLE })));
       }
       if (item.kind === 'file') {
-        return schema.nodes.paragraph.create(null, schema.text(item.name, [schema.marks.link.create({ href: item.src })]));
+        const chip = schema.text(item.name, [schema.marks.link.create({ href: item.src })]);
+        return schema.nodes.paragraph.create(null, item.thumb ? [chip, ...pdfPairNodes(schema, item.thumb)] : chip);
       }
       return schema.nodes.paragraph.create(null, schema.nodes.image.create({ src: item.src, alt: item.alt, title: item.title ?? '' })); // title: PDF 썸네일이면 "pdf <경로>"
     });
@@ -1528,10 +1532,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     let album = null; // 모으는 중인 묶음 (처음 사진 자리에 한 묶음)
     for (const it of items) {
       if (paired.has(it)) {
-        // 원본 문서 파일(칩) 바로 아래 줄에 PDF 썸네일 — 원본을 열거나 보낼 수도 있게 (바꾸지 못하면 칩만)
+        // 원본 문서 파일(칩)과 같은 문단, 그 아래 줄에 PDF 썸네일 — 원본을 열거나 보낼 수도 있게 (바꾸지 못하면 칩만)
         const thumb = await documentPdfItem(it);
-        out.push(it);
-        if (thumb) out.push(thumb);
+        out.push(thumb ? { ...it, thumb } : it);
         continue;
       }
       if (asAlbum && it.kind === 'image') {
@@ -1609,7 +1612,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     }
   });
 
-  // 파일 칩 우클릭 메뉴 › PDF 짝 만들기 (예전에 파일로만 넣은 문서) — 칩 바로 아래에 PDF 첫 쪽 썸네일
+  // 파일 칩 우클릭 메뉴 › PDF 짝 만들기 (예전에 파일로만 넣은 문서) — 칩 문단 끝에 줄바꿈 + PDF 첫 쪽 썸네일
   window.addEventListener('mk:expand-document-pdf', async (e) => {
     if (readOnly) return;
     const { pos, node, href, name } = e.detail ?? {};
@@ -1617,6 +1620,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const thumb = await documentPdfItem({ kind: 'file', src: href, name: name || href.split('/').pop() });
     if (!thumb) return;
     const v = view();
+    // 바꾸는 사이 그 문단이 그대로면 그 안에, 달라졌으면 칩 아래 새 줄에
+    if (pos != null && node?.type.name === 'paragraph' && v.state.doc.nodeAt(pos) === node) {
+      v.dispatch(v.state.tr.insert(pos + node.nodeSize - 1, pdfPairNodes(v.state.schema, thumb)));
+      return;
+    }
     insertBlocks(pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head, [thumb]);
   });
 

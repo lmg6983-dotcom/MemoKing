@@ -5,7 +5,7 @@
 //   링크 카드: 주소 하나 (글자는 주소, 서식은 <a href="주소">제목</a> — 메모킹에 다시 붙이면 카드, 메신저 · 주소창에는 주소)
 //   그 밖의 내용(줄 · 목록 · 표 · 수식): 서식(HTML)과 일반 글자를 함께
 import { plainTextOf, spacedHtml } from './clipboard-text.js';
-import { mediaKindOf, isAlbumTitle, plainAlt } from './core/memo-file.js';
+import { mediaKindOf, isAlbumTitle, plainAlt, pdfOfTitle } from './core/memo-file.js';
 import { textBase64 } from './core/base64.js';
 import { voiceAudioOf } from './voice-card-view.js';
 
@@ -111,7 +111,7 @@ function imageOfLine(node, target, view, pos) {
 
 const isAttachment = (href) => typeof href === 'string' && /^attachments\//.test(href);
 
-/** 파일로 복사할 첨부: 소리 · 동영상 줄, 음성 카드의 소리, 파일 칩(링크 하나만 든 줄) — 없으면 null */
+/** 파일로 복사할 첨부: 소리 · 동영상 줄, 음성 카드의 소리, 파일 칩(링크 하나만 든 줄 — 문서 칩과 같은 줄의 PDF 썸네일은 칩의 일부) — 없으면 null */
 export function attachmentOf(node) {
   const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : voiceAudioOf(node);
   if (media) {
@@ -124,6 +124,7 @@ export function attachmentOf(node) {
   node.forEach((child) => {
     const link = child.marks?.find((m) => m.type.name === 'link');
     if (link) hrefs.add(link.attrs.href);
+    else if (child.type.name === 'hardbreak' || (isImageNode(child) && pdfOfTitle(child.attrs.title))) return;
     else if (!(child.isText && !child.text.trim())) other = true;
   });
   const [href] = hrefs;
