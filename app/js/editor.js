@@ -1513,15 +1513,18 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   async function arrangeItems(items) {
     if (readOnly) return items;
     const docs = items.filter((it) => it.kind === 'file' && isDocumentFile({ name: it.name }));
-    // "PDF로": 문서를 PDF 로 바꿔 넣고 메모에는 첫 쪽 썸네일 — 누르면 앱 안에서 모든 쪽을 미리 본다 (예전의 "그림으로" 자리)
-    //   장마다 그림으로 펼치려면 파일 칩 오른쪽 클릭 › 그림으로 펼치기
-    for (const d of docs) preloadDocument(d.name); // 묻는 동안 그릴 도구를 미리 올린다
-    const docsAsPages = docs.length > 0 && await promptChoice({
-      title: docs.length > 1 ? `문서 ${docs.length}개를 어떻게 넣을까요?` : `${docs[0].name}을 어떻게 넣을까요?`,
-      message: 'PDF로 넣으면 첫 쪽이 보이고, 누르면 앱 안에서 모든 쪽을 넘겨 봐요',
-      choices: [{ id: 'file', label: '파일로' }, { id: 'pages', label: 'PDF로', primary: true }],
+    // 문서는 원본 + PDF 한 쌍: 원본 파일(칩) 아래에 PDF 첫 쪽 썸네일 — 누르면 앱 안에서 모든 쪽을 미리 본다
+    //   PDF 가 아닌 문서(한글 · Word · 파워포인트 · 글)는 언제나 한 쌍으로 (묻지 않는다)
+    //   PDF 는 이미 PDF 라 첫 쪽을 보일지만 묻는다. 장마다 그림으로 펼치려면 파일 칩 오른쪽 클릭 › 그림으로 펼치기
+    for (const d of docs) preloadDocument(d.name); // 묻는 동안(· 바로) 그릴 도구를 미리 올린다
+    const pdfs = docs.filter((d) => extOf(d.name) === 'pdf');
+    const showPdfs = pdfs.length > 0 && await promptChoice({
+      title: pdfs.length > 1 ? `PDF ${pdfs.length}개를 어떻게 넣을까요?` : `${pdfs[0].name}을 어떻게 넣을까요?`,
+      message: '첫 쪽이 보이게 넣으면, 누르면 앱 안에서 모든 쪽을 넘겨 보고 주석도 달 수 있어요',
+      choices: [{ id: 'file', label: '파일만' }, { id: 'pages', label: '첫 쪽 보이게', primary: true }],
       remember: 'doc-insert',
     }) === 'pages';
+    const paired = new Set(docs.filter((d) => extOf(d.name) !== 'pdf' || showPdfs));
     const photos = items.filter((it) => it.kind === 'image');
     const asAlbum = photos.length > 1 && await promptChoice({
       title: `사진 ${photos.length}장을 어떻게 넣을까요?`,
@@ -1532,7 +1535,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const out = [];
     let album = null; // 모으는 중인 묶음 (처음 사진 자리에 한 묶음)
     for (const it of items) {
-      if (docsAsPages && docs.includes(it)) {
+      if (paired.has(it)) {
         // 원본 문서 파일(칩) 바로 아래 줄에 PDF 썸네일 — 원본을 열거나 보낼 수도 있게 (바꾸지 못하면 칩만)
         const thumb = await documentPdfItem(it);
         out.push(it);
@@ -1612,6 +1615,17 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const insertAt = pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head;
       insertBlocks(insertAt, [album]);
     }
+  });
+
+  // 파일 칩 우클릭 메뉴 › PDF 짝 만들기 (예전에 파일로만 넣은 문서) — 칩 바로 아래에 PDF 첫 쪽 썸네일
+  window.addEventListener('mk:expand-document-pdf', async (e) => {
+    if (readOnly) return;
+    const { pos, node, href, name } = e.detail ?? {};
+    if (!href) return;
+    const thumb = await documentPdfItem({ kind: 'file', src: href, name: name || href.split('/').pop() });
+    if (!thumb) return;
+    const v = view();
+    insertBlocks(pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head, [thumb]);
   });
 
   // 파일 칩 우클릭 메뉴 › 텍스트로 본문에 풀기

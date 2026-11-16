@@ -837,7 +837,7 @@ try {
   await page.waitForTimeout(800);
   check('도구막대: 고르면 위성 버튼이 접힘', await page.isHidden('#add-menu'));
   // 문서는 어떻게 넣을지 묻는다 (PC 와 같음) → 이번엔 "파일로"
-  await page.locator('.mk-prompt button', { hasText: '파일로' }).tap({ timeout: 3000 }).catch(() => {});
+  await page.locator('.mk-prompt button', { hasText: /^파일(로|만)$/ }).tap({ timeout: 3000 }).catch(() => {});
   await page.waitForTimeout(500);
   const withFile = read(shared);
   check('파일 넣기: 파일 칩 링크', /\n\[보고서\.pdf\]\(attachments\/[^)]+\.pdf\)\n?$/.test(withFile), withFile);

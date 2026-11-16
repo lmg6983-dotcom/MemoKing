@@ -458,7 +458,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       const fileDone = fileMenu0 ? await pressCopy() : '';
       const fileCopy = smokeOpened.filter((o) => o.kind === 'copy-file').at(-1);
       check('PDF 파일: 오른쪽 클릭 → 메뉴 맨 위에 복사 · 저장 · 공유 · 삭제 아이콘 + "이 파일 열기", 복사 아이콘은 파일 그대로 클립보드에',
-        fileMenu0?.icons.join('|') === 'cut:이 파일 잘라내기|copy:이 파일 복사|save:이 파일 저장|share:이 파일 공유|delete:이 파일 삭제' && (fileMenu0.items.join('|') === '이 파일 열기|이름 변경' || fileMenu0.items.join('|') === '이 파일 열기|이름 변경|그림으로 펼치기') && /파일을 복사했어요/.test(fileDone)
+        fileMenu0?.icons.join('|') === 'cut:이 파일 잘라내기|copy:이 파일 복사|save:이 파일 저장|share:이 파일 공유|delete:이 파일 삭제' && ['이 파일 열기|이름 변경', '이 파일 열기|이름 변경|그림으로 펼치기', '이 파일 열기|이름 변경|PDF 짝 만들기|그림으로 펼치기'].includes(fileMenu0.items.join('|')) && /파일을 복사했어요/.test(fileDone)
           && smokeOpened.filter((o) => o.kind === 'copy-file').length === copiesBefore + 1 && /안내 자료\.pdf$/.test(fileCopy?.target ?? ''),
         JSON.stringify({ fileMenu0, fileDone, fileCopy }));
       // 파일 이름 변경: 메뉴 › 이름 변경… → 입력 창 → 칩 글자가 바뀜 (확장자는 지키고 · 쓸 수 없는 글자는 뺌) → 되돌려 둔다
@@ -1349,12 +1349,12 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
           const r = document.querySelector('.mk-doc p').getBoundingClientRect();
           document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
         })()`);
-        // 문서(PDF · TXT)가 섞여 있으면 어떻게 넣을지 묻는다 → 이번엔 "파일로"
+        // PDF 는 어떻게 넣을지 묻는다 → 이번엔 "파일만" (TXT 는 묻지 않고 PDF 짝과 함께)
         const askDoc = await until(() => js(win, `(() => { const p = document.querySelector('.mk-prompt'); return p && { title: p.querySelector('b').textContent, buttons: [...p.querySelectorAll('button')].map((b) => b.textContent) }; })()`), '문서 넣기 질문', 4000).catch(() => null);
-        check('문서를 넣으면 파일로 · 그림으로 중 고르게 물음', (askDoc?.title.includes('다.pdf') || askDoc?.title.includes('문서 3개')) && askDoc.buttons.join() === '파일로,그림으로', JSON.stringify(askDoc));
-        await js(win, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '파일로')?.click()`);
-        const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
-        const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image').length })`);
+        check('PDF 를 넣으면 파일만 · 첫 쪽 보이게 중 고르게 물음 (다른 문서는 묻지 않고 PDF 와 한 쌍)', /\.pdf|PDF \d+개/.test(askDoc?.title ?? '') && askDoc.buttons.join() === '파일만,첫 쪽 보이게', JSON.stringify(askDoc));
+        await js(win, `[...document.querySelectorAll('.mk-prompt button')].find((b) => /^파일(로|만)$/.test(b.textContent))?.click()`);
+        const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
+        const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length })`);
         const dropNote = await js(win, `document.getElementById('status').textContent`);
         check('여러 파일 놓기: 4개 (글 파일 2 · PDF · 사진)가 한 번에 모두 들어감, 읽지 못한 하나(폴더)는 알리고 나머지는 그대로', fallback.chips.length === 3 && fallback.imgs === 1 && ['가.txt', '다.pdf', '라.txt'].every((n) => fallback.chips.includes(n)) && /4개를 넣었어요.*1개.*읽지 못해/.test(dropNote.replace('파일 ', '')), JSON.stringify({ fallback, dropNote }));
         // 사진 여러 장: 묶음 사진으로 넣을지 묻고, 고르면 한 줄에 모아 격자로 · 누르면 크게 넘겨 보기
