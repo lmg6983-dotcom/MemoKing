@@ -1842,7 +1842,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       if (setAi) {
         setAi({
           status: () => ({ engine: true, chat: { state: 'ready', name: '점검', size: 1 } }),
-          chat: async () => '| 항목 | 설명 |\n| --- | --- |\n| 첫째 | 목록 항목 |\n| 둘째 | 목록 항목 |',
+          chat: async () => (await wait(1500), '| 항목 | 설명 |\n| --- | --- |\n| 첫째 | 목록 항목 |\n| 둘째 | 목록 항목 |'), // 답이 늦게 와서 임시 칸을 본다
         });
         await js(fw, `(() => { const b = document.getElementById('ai-btn'); b.hidden = false; b.click(); })()`);
         await until(() => js(fw, `!document.getElementById('ai-pop').hidden`), 'AI 패널 열림', 3000);
@@ -1851,6 +1851,9 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
           inp.value = '표로 정리해줘';
           document.querySelector('#ai-pop .ai-ask-row').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
         })()`);
+        // 묻는 동안 답이 나올 자리(결과 칸)에 임시 칸 — 글줄 모양 · 진행 막대 · 하는 일
+        const aiPending = await until(() => js(fw, `(() => { const p = document.querySelector('#ai-pop .ai-result .ai-pending'); return p && { label: p.querySelector('.mk-doc-pending-label')?.textContent, h: Math.round(p.querySelector('.ai-pending-lines').getBoundingClientRect().height), state: document.querySelector('#ai-pop .ai-state').textContent }; })()`), 'AI 임시 칸', 2000).catch(() => null);
+        await capture(fw, 'smoke-feedback-ai-pending.png');
         const aiBtns = await until(() => js(fw, `(() => {
           const bs = [...document.querySelectorAll('#ai-pop .ai-result button')].map((b) => b.textContent);
           return bs.length ? bs : null;
@@ -1858,6 +1861,9 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
         await capture(fw, 'smoke-feedback-ai-edit.png');
         check('AI 메모 편집: 지시사항 입력 시 "메모 덮어쓰기" 버튼이 제공됨',
           Array.isArray(aiBtns) && (aiBtns.includes('메모 덮어쓰기') || aiBtns.includes('선택 영역 바꾸기')) && aiBtns.includes('메모 끝에 넣기'), JSON.stringify(aiBtns));
+        const aiLeft = await js(fw, `document.querySelectorAll('#ai-pop .ai-pending').length`);
+        check('AI 글쓰기: 묻는 동안 답이 나올 자리에 임시 칸(글줄 · 진행 막대 · "다듬는 중"), 답이 오면 그 자리에 답',
+          aiPending?.label === '지시대로 메모를 다듬는 중' && aiPending.h > 40 && aiPending.state === '' && aiLeft === 0, JSON.stringify({ aiPending, aiLeft }));
       }
       fw.close();
     }

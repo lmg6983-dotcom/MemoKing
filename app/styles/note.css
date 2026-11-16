@@ -556,6 +556,22 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .ai-state:empty { display: none; }
 .ai-out { margin: 6px 0; white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
 .ai-out:empty { display: none; }
+/* 답이 나올 자리의 임시 칸 (ai-write-panel.js pending): 답 글 크기의 글줄 넷(끝 줄은 짧게) + 지나가는 빛 + 진행 막대 */
+.ai-pending { margin: 6px 0; cursor: progress; animation: mk-fade-in 0.2s ease-out; }
+.ai-pending-lines {
+  position: relative;
+  display: block;
+  height: 84px;
+  overflow: hidden;
+  background:
+    linear-gradient(color-mix(in srgb, currentColor 10%, transparent) 0 0) left 0 top 63px / 58% 11px no-repeat,
+    repeating-linear-gradient(#0000 0 5px, color-mix(in srgb, currentColor 10%, transparent) 5px 16px, #0000 16px 21px) left 0 top 0 / 100% 63px no-repeat;
+}
+.ai-pending-lines::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, #0000 30%, color-mix(in srgb, var(--surface-2, #fff) 75%, transparent) 50%, #0000 70%); transform: translateX(-100%); animation: mk-doc-shine 1.4s ease-in-out infinite; }
+.ai-pending .mk-doc-pending-bar { margin-top: 8px; }
+.ai-pending .mk-doc-pending-bar > span { background: color-mix(in srgb, currentColor 55%, transparent); }
+.ai-pending .mk-doc-pending-bar { background: color-mix(in srgb, currentColor 12%, transparent); }
+.ai-pending .mk-doc-pending-label { color: var(--muted); }
 .ai-all { margin-bottom: 6px; }
 .ai-card { padding: 8px 0; border-bottom: 1px solid var(--border); }
 .ai-diff { margin: 0 0 6px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
