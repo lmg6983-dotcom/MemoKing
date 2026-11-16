@@ -5,8 +5,9 @@
 //   - 확대: 두 손가락 · Ctrl+휠 · 두 번 누르기(100% ↔ 200%) · PC 는 오른쪽 아래 확대 막대
 //   - 주석(onSave 가 있을 때): 쪽 위에 펜 · 형광펜 · 지우개 (메모 주석과 같은 도구 막대) — 완료하면 PDF 안에 잉크 주석으로 저장
 //     (원본은 그대로, 주석을 넣은 새 PDF 를 onSave 로 넘긴다). 손가락 하나는 그리기, 두 손가락은 넘기기
-//   - 글자 고르기: PC 는 끌기 · 두 번 눌러 낱말, 휴대폰은 꾹 눌러 낱말 → 그대로 끌어 늘리기. 고르면 위에 [복사 · 형광펜 색들]
-//     형광펜은 고른 줄마다 형광펜 획으로 넣는다 (주석과 같이 PDF 에 저장 · 주석 모드의 지우개 · 되돌리기로 고친다)
+//   - 글자 고르기: PC 는 끌기 · 두 번 눌러 낱말, 휴대폰은 꾹 눌러 낱말 → 그대로 끌어 늘리기
+//   - 네모 고르기: 글자가 없는 곳에서 끌면(휴대폰은 꾹 눌러 끌면) 네모 — 스캔 · 그림 · 표도
+//     고르면 위에 [복사 · 형광펜 색들 · 네모 테두리]. 형광펜 · 테두리는 획으로 넣는다 (주석과 같이 PDF 에 저장 · 주석 모드의 지우개 · 되돌리기로 고친다)
 //   Esc · 휴대폰 뒤로 가기: 주석 중이면 주석 끝내기(저장), 아니면 닫기
 import { openPdf } from './pdf-engine.js';
 import { icon } from './icons.js';
@@ -406,8 +407,8 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   }, { passive: true });
 
   // ---------- 글자 고르기 · 복사 · 형광펜 ----------
-  let sel = null; // { i, a, b } 글자 번호 (a: 시작, b: 끝)
-  let selecting = null; // 끌고 있는 { id, i, anchor: [a, b] }
+  let sel = null; // 글자: { i, a, b } 글자 번호 (a: 시작, b: 끝) · 네모: { i, box: { x, y, w, h } } (pt)
+  let selecting = null; // 끌고 있는 { id, i, anchor: [a, b] } | { id, i, area: true, x0, y0 }
   let justSelected = false; // 막 고른 뒤의 pointerup 은 두 번 누르기로 세지 않는다
   let pressTimer = 0;
   const menu = el('div', 'mk-pdf-selmenu', { role: 'toolbar', ariaLabel: '고른 글자' });
@@ -422,6 +423,9 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
       b.addEventListener('click', () => highlightSel(color));
       menu.append(b);
     }
+    const frame = el('button', 'mk-pdf-selframe', { type: 'button', title: '네모 테두리', ariaLabel: '네모 테두리' });
+    frame.addEventListener('click', () => frameSel());
+    menu.append(frame);
   }
   menu.hidden = true;
   view.append(menu);
@@ -458,14 +462,13 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
     }
     return l;
   }
+  const rectsOf = (s) => (s.box ? [s.box] : textOf(s.i)?.rects(s.a, s.b) ?? []);
   function paintSel() {
     for (const l of view.querySelectorAll('.mk-pdf-sel')) l.replaceChildren();
     if (!sel) return;
     const p = pages[sel.i];
-    const t = textOf(sel.i);
-    if (!t) return;
-    layerOf(sel.i).append(...t.rects(sel.a, sel.b).map((r) => {
-      const d = el('div');
+    layerOf(sel.i).append(...rectsOf(sel).map((r) => {
+      const d = el('div', sel.box ? 'area' : '');
       Object.assign(d.style, { left: `${(r.x / p.w) * 100}%`, top: `${(r.y / p.h) * 100}%`, width: `${(r.w / p.w) * 100}%`, height: `${(r.h / p.h) * 100}%` });
       return d;
     }));
@@ -492,7 +495,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
     menu.hidden = top < vr.top + 56 || top > vr.bottom - 40; // 고른 데가 화면 밖이면 숨긴다
   }
   function setSel(next) {
-    sel = next && next.a >= 0 && next.b >= 0 ? next : null;
+    sel = next && (next.box || (next.a >= 0 && next.b >= 0)) ? next : null;
     paintSel();
     placeMenu();
   }
@@ -508,15 +511,24 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
       // 합성 이벤트
     }
   }
+  function startArea(e, h) {
+    selecting = { id: e.pointerId, i: h.i, area: true, x0: h.x, y0: h.y, moved: false };
+    setSel({ i: h.i, box: { x: h.x, y: h.y, w: 0, h: 0 } });
+    try {
+      scroller.setPointerCapture(e.pointerId);
+    } catch {
+      // 합성 이벤트
+    }
+  }
   scroller.addEventListener('pointerdown', (e) => {
     if (inking || !pdf || e.button || (e.target instanceof Element && e.target.closest('.mk-pdf-selmenu'))) return;
     clearTimeout(pressTimer);
     if (e.pointerType === 'mouse') {
       const h = hit(e);
-      if (h && h.c >= 0) {
-        e.preventDefault();
-        startSel(e, h, false);
-      } else clearSel();
+      if (!h) return clearSel();
+      e.preventDefault();
+      if (h.c >= 0) startSel(e, h, false);
+      else startArea(e, h); // 글자가 없는 곳: 네모
       return;
     }
     // 손가락 · 펜: 꾹 누르면 낱말을 고르고, 떼지 않고 끌면 늘린다 (움직이면 넘기기)
@@ -536,14 +548,24 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
       scroller.removeEventListener('pointermove', cancel);
       if (touches.size > 1) return;
       const h = hit({ target, clientX: start.x, clientY: start.y }, 8);
-      if (!h || h.c < 0) return;
+      if (!h) return;
       navigator.vibrate?.(10);
-      startSel({ pointerId: start.id }, h, true);
+      if (h.c >= 0) startSel({ pointerId: start.id }, h, true);
+      else startArea({ pointerId: start.id }, h);
     }, 450);
   });
   scroller.addEventListener('pointermove', (e) => {
     if (!selecting || e.pointerId !== selecting.id) return;
     const h = hit(e, 12);
+    if (selecting.area) {
+      if (!h) return;
+      const p = pages[selecting.i];
+      const x = Math.max(0, Math.min(p.w, h.x));
+      const y = Math.max(0, Math.min(p.h, h.y));
+      selecting.moved = true;
+      const { x0, y0 } = selecting;
+      return setSel({ i: selecting.i, box: { x: Math.min(x0, x), y: Math.min(y0, y), w: Math.abs(x - x0), h: Math.abs(y - y0) } });
+    }
     if (!h || h.i !== selecting.i || h.c < 0) return;
     selecting.moved = true;
     const [a, b] = selecting.anchor;
@@ -551,11 +573,13 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   });
   const endSel = (e) => {
     if (!selecting || e.pointerId !== selecting.id) return;
-    const { moved } = selecting;
+    const { moved, area } = selecting;
     selecting = null;
-    justSelected = true;
+    justSelected = moved; // 끌어서 고른 뒤의 떼기는 두 번 누르기로 세지 않는다
     setTimeout(() => (justSelected = false), 0);
-    if (e.pointerType === 'mouse' && !moved) return setSel(null); // 글자 위를 한 번 누르기만: 고르지 않음
+    if (e.pointerType === 'mouse' && !moved) return setSel(null); // 한 번 누르기만: 고르지 않음
+    if (area && (sel?.box.w < 4 || sel?.box.h < 4)) return setSel(null); // 너무 작은 네모
+    if (area) navigator.vibrate?.(5);
     placeMenu();
   };
   scroller.addEventListener('pointerup', endSel);
@@ -571,7 +595,8 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
 
   async function copySel() {
     if (!sel) return;
-    const txt = textOf(sel.i)?.text(sel.a, sel.b) ?? '';
+    const t = textOf(sel.i);
+    const txt = (sel.box ? t?.textIn(sel.box) : t?.text(sel.a, sel.b)) ?? '';
     if (!txt.trim()) return showToast('고른 곳에 글자가 없어요');
     try {
       await navigator.clipboard.writeText(txt);
@@ -589,10 +614,32 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   let hlTimer = 0;
   function highlightSel(color) {
     if (!sel || !onSave) return;
-    const rects = textOf(sel.i)?.rects(sel.a, sel.b) ?? [];
-    const strokes = rects.map((r) => ({ tool: 'highlighter', color, size: Math.max(4, r.h * 1.1), pen: false, pts: [point(r.x, r.y + r.h / 2), point(r.x + r.w, r.y + r.h / 2)] }));
+    const strokes = rectsOf(sel).map((r) => ({ tool: 'highlighter', color, size: Math.max(4, r.h * 1.1), pen: false, pts: [point(r.x, r.y + r.h / 2), point(r.x + r.w, r.y + r.h / 2)] }));
+    addStrokes(sel.i, strokes);
+  }
+  /** 고른 곳(글자 줄들을 감싼 네모 · 고른 네모)에 빨간 테두리 */
+  function frameSel() {
+    if (!sel || !onSave) return;
+    const rs = rectsOf(sel);
+    if (!rs.length) return;
+    const pad = sel.box ? 0 : 2;
+    const x0 = Math.min(...rs.map((r) => r.x)) - pad;
+    const y0 = Math.min(...rs.map((r) => r.y)) - pad;
+    const x1 = Math.max(...rs.map((r) => r.x + r.w)) + pad;
+    const y1 = Math.max(...rs.map((r) => r.y + r.h)) + pad;
+    // 모서리가 둥글게 뭉개지지 않게 변마다 점을 촘촘히
+    const pts = [];
+    const corners = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]];
+    for (let k = 0; k < 4; k++) {
+      const [[ax, ay], [bx, by]] = [corners[k], corners[k + 1]];
+      const steps = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 4));
+      for (let j = 0; j < steps; j++) pts.push(point(ax + ((bx - ax) * j) / steps, ay + ((by - ay) * j) / steps));
+    }
+    pts.push(point(x0, y0 + 0.1));
+    addStrokes(sel.i, [{ tool: 'pen', color: '#e5484d', size: 2.5, pen: false, pts }]);
+  }
+  function addStrokes(i, strokes) {
     if (!strokes.length) return;
-    const i = sel.i;
     hist.set({ ...hist.get(), [i]: [...inkOf(i), ...strokes] });
     setSel(null);
     paintInk(i);

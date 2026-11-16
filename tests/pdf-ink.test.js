@@ -59,5 +59,7 @@ test('PDF 글자: 누른 자리의 글자 · 낱말 · 꺼내기 · 칠할 네�
   assert.equal(t.charAt(500, 500), -1);
   const [r] = t.rects(0, 4);
   assert.ok(r.x > 70 && r.x < 75 && r.y > 70 && r.y < 92 && r.w > 40, JSON.stringify(r));
+  assert.equal(t.textIn({ x: 60, y: 60, w: 400, h: 50 }).trim(), 'Hello MemoKing'); // 네모 안의 글
+  assert.equal(t.textIn({ x: 60, y: 300, w: 100, h: 50 }), '');
   pdf.close();
 });

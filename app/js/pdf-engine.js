@@ -85,7 +85,7 @@ const hexRgb = (hex) => {
  * PDF 열기 → { pageCount, size(i) → { width, height } (pt), render(i, width) → canvas, takeInk(i), save(inkByPage), close() }
  *   render: 쪽을 폭 width(px)로 그린 캔버스 (흰 바탕)
  *   takeInk(i): 그 쪽의 메모킹 주석 획들 (쪽 왼쪽 위 기준 pt, 아래로 +) — 꺼낸 주석은 이 문서에서 빼서 render 에 그려지지 않는다 (화면 층이 그린다)
- *   text(i): 그 쪽의 글자 — { count, charAt(x, y) → 글자 번호 | -1, rects(a, b) → [{ x, y, w, h }], text(a, b), word(k) → [a, b] } (pt, 왼쪽 위 기준)
+ *   text(i): 그 쪽의 글자 — { count, charAt(x, y) → 글자 번호 | -1, rects(a, b) → [{ x, y, w, h }], text(a, b), word(k) → [a, b], textIn({ x, y, w, h }) } (pt, 왼쪽 위 기준)
  *   save(Map 쪽 → 획들): 꺼낸 쪽마다 획들을 잉크 주석으로 다시 넣은 PDF 바이트. 저장한 뒤 이 문서는 닫고 그 바이트로 다시 연다
  * @param {{ keepInk?: boolean }} [opts] keepInk: 주석을 꺼내지 않고 그대로 그린다 (썸네일)
  */
@@ -226,6 +226,21 @@ export async function openPdf(bytes, { keepInk = false } = {}) {
         try {
           const got = m.FPDFText_GetText(tp, lo, cnt, buf);
           return new TextDecoder('utf-16le').decode(H.HEAPU8.slice(buf, buf + Math.max(0, got - 1) * 2)).replace(/\r\n/g, '\n');
+        } finally {
+          H.wasmExports.free(buf);
+        }
+      },
+      /** 네모 안의 글 */
+      textIn({ x, y, w, h }) {
+        if (!n) return '';
+        const args = [x, ph - y, x + w, ph - y - h];
+        const need = m.FPDFText_GetBoundedText(tp, ...args, 0, 0);
+        if (need <= 0) return '';
+        const H = heap();
+        const buf = H.wasmExports.malloc((need + 1) * 2);
+        try {
+          const got = m.FPDFText_GetBoundedText(tp, ...args, buf, need);
+          return new TextDecoder('utf-16le').decode(H.HEAPU8.slice(buf, buf + got * 2)).replace(/\0+$/, '').replace(/\r\n/g, '\n');
         } finally {
           H.wasmExports.free(buf);
         }
