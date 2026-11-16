@@ -11,6 +11,7 @@ import { friendlyTime, shortUrls } from './core/format.js';
 import { vaultUrl, mediaKind, fileExtension } from './media.js';
 import { videoThumb } from './video-poster.js';
 import { memoBodyFromFile } from './core/file-memo.js';
+import { isDocumentFile } from './core/file-kinds.js';
 import { isTextDocument } from './core/markdown-import.js';
 import { setupRemindersTab } from './list-reminders.js';
 import { setupHistoryTab } from './list-history.js';
@@ -927,6 +928,11 @@ window.addEventListener('drop', async (e) => {
         body = memoBodyFromFile({ name: file.name, kind: 'text', text: await file.text() });
       } else {
         const rel = await api.attachments.save(new Uint8Array(await file.arrayBuffer()), fileExtension(file));
+        // 문서(PDF · 한글 · Word …)는 제목만 두고 메모 창이 칩 + PDF 첫 쪽 썸네일로 넣는다 (그래서 창이 열린다)
+        if (isDocumentFile(file)) {
+          made.push(await api.memo.import(memoBodyFromFile({ name: file.name, kind: 'text' }), { items: [{ src: rel, name: file.name }] }));
+          continue;
+        }
         body = memoBodyFromFile({ name: file.name, kind: mediaKind(file) === 'image' ? 'image' : 'file', rel });
       }
       made.push(await api.memo.import(body, { open: files.length === 1 }));

@@ -6,9 +6,8 @@
 import { toCanvas } from '../vendor/html-to-image.js';
 import { openPdf, makeImagePdf, pageJpeg, assetBytes, thumbBlob, preloadPdf } from './pdf-engine.js';
 
-export const DOC_EXTS = ['pdf', 'docx', 'pptx', 'hwp', 'hwpx', 'txt'];
-const extOf = (name) => String(name ?? '').split('.').pop().toLowerCase();
-export const isDocumentFile = (file) => DOC_EXTS.includes(extOf(file?.name));
+import { extOf, isDocumentFile } from './core/file-kinds.js';
+export { isDocumentFile };
 
 const MAX_PAGES = 60; // shortcut: 아주 긴 문서는 앞 60장만, 더 필요하면 나눠 넣기 (메모 폴더 · 동기화 부담)
 const PAGE_WIDTH = 1240; // A4 를 150dpi 쯤으로 — 글자가 또렷하면서 파일이 너무 크지 않게

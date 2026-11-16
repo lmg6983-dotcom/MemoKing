@@ -761,6 +761,22 @@ export async function runSmoke({
         bodies.some((b) => /# 끌어온 회의록\n\n- 안건 하나\n- 안건 둘/.test(b)) && bodies.some((b) => /# 끌어온 그림\n\n!\[끌어온 그림\.png\]\(attachments\/[^)]+\.png\)/.test(b)),
         JSON.stringify(bodies.map((b) => b.slice(-160))));
       for (const m of made) getVault().trash(m.id); // 뒤 점검의 메모 수에 섞이지 않게
+      // PDF 를 놓으면 메모 창이 열려 원본 칩 + PDF 첫 쪽 썸네일 한 덩어리로 (메모 창에서 넣을 때와 같게)
+      const beforePdf = new Set(getVault().list().map((m) => m.id));
+      const pdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 280]/Contents 4 0 R>>endobj\n4 0 obj<</Length 33>>stream\n0 0 1 rg 20 20 160 240 re f\nendstream endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
+      await js(getList(), `(() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File([${JSON.stringify(pdf)}], '끌어온 설명서.pdf', { type: 'application/pdf' }));
+        window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      })()`);
+      const pdfMemo = await until(() => getVault().list().find((m) => !beforePdf.has(m.id) && m.file && /"pdf attachments\//.test(readMemo(m.id))), '끌어다 놓은 PDF → 칩 + 썸네일', 20000).catch(() => null);
+      const pdfBody = pdfMemo ? readMemo(pdfMemo.id) : '';
+      check('목록 창에 PDF 를 끌어다 놓으면 원본 칩 + PDF 첫 쪽 썸네일 한 덩어리 (칩 · 줄바꿈 · 썸네일)',
+        /# 끌어온 설명서\n\n\[끌어온 설명서\.pdf\]\(attachments\/[^)]+\.pdf\)\\\n!\[끌어온 설명서\]\(attachments\/[^ )]+ "pdf attachments\/[^"]+\.pdf"\)/.test(pdfBody), pdfBody.slice(-260));
+      if (pdfMemo) {
+        await closeNote(pdfMemo.id);
+        getVault().trash(pdfMemo.id);
+      }
     }
 
     // 13-1) 링크 미리보기 카드 · 한 번 눌러 열기 (v0.10.0) — 실제 브라우저·프로그램은 띄우지 않고 기록만
