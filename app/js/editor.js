@@ -29,7 +29,7 @@ import { touchMode } from './keyboard-guard.js';
 import { promptChoice } from './rename-content.js';
 import { isDocumentFile, documentPages, documentPdf, decodeTxtBytes, preloadDocument } from './doc-pages.js';
 import { openPdfViewer } from './pdf-viewer.js';
-import { warmPdf } from './pdf-engine.js';
+import { warmPdf, pdfThumbnail } from './pdf-engine.js';
 import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from './core/link-preview.js';
 import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
@@ -105,13 +105,14 @@ let albumHandler = null;
 let fileOpener = null; // 첨부를 다른 앱으로 열기 (PC · 휴대폰 화면이 준다 — PDF 미리보기의 "다른 앱으로")
 
 /** 메모 폴더의 PDF 를 앱 안에서 미리 본다 (PDF 썸네일 · PDF 파일 칩) — 열지 못하면 오류 */
-export async function previewPdf(src, name = 'PDF') {
+/** @param {{ onSave?: (pdf: Uint8Array) => Promise<void> }} [o] onSave: 주석을 넣은 PDF (없으면 주석 단추 없음) */
+export async function previewPdf(src, name = 'PDF', { onSave = null } = {}) {
   // 읽는 동안에도 보기를 먼저 띄운다 ("여는 중") — 큰 PDF 도 누르자마자 반응하게
   const bytes = fetch(vaultUrl(src)).then((res) => {
     if (!res.ok) throw new Error('PDF 파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 삭제됐는지 확인해 주세요');
     return res.arrayBuffer();
   });
-  return openPdfViewer({ bytes, name, onExternal: fileOpener ? () => fileOpener(src) : null });
+  return openPdfViewer({ bytes, name, onExternal: fileOpener ? () => fileOpener(src) : null, onSave });
 }
 
 let inkReader = null; // 손 메모 SVG 글 읽기 (createNoteEditor 의 readAttachment)
@@ -1330,7 +1331,24 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     // PDF 썸네일: 그 PDF 를 앱 안에서 미리 본다
     const pdf = pdfOfTitle(v.state.doc.nodeAt(pos)?.attrs.title);
     if (pdf) {
-      previewPdf(pdf, plainAlt(v.state.doc.nodeAt(pos).attrs.alt) || 'PDF').catch((err) => onNotice?.(err.message, true));
+      const name = plainAlt(v.state.doc.nodeAt(pos).attrs.alt) || 'PDF';
+      // 주석: 원본은 그대로 두고 주석을 넣은 새 PDF · 새 썸네일로 바꾼다 (되돌리기로 원래대로)
+      let shown = pdf;
+      const onSave = readOnly ? null : async (bytes) => {
+        const pdfSrc = await saveFile(new File([bytes], `${baseName(name)}.pdf`, { type: 'application/pdf' }));
+        const thumbSrc = await saveFile(new File([await pdfThumbnail(bytes, 600)], `${baseName(name)} 미리보기.png`, { type: 'image/png' }));
+        // 그사이 글이 바뀌었을 수 있다 — 그 썸네일을 다시 찾는다
+        let at = -1;
+        v.state.doc.descendants((n, p) => {
+          if (at < 0 && n.type.name === 'image' && pdfOfTitle(n.attrs.title) === shown) at = p;
+          return at < 0;
+        });
+        if (at < 0) throw new Error('메모에서 이 PDF 를 찾지 못해 주석을 넣지 못했어요');
+        const node = v.state.doc.nodeAt(at);
+        v.dispatch(v.state.tr.setNodeMarkup(at, null, { ...node.attrs, src: thumbSrc, title: pdfThumbTitle(pdfSrc) }));
+        shown = pdfSrc;
+      };
+      previewPdf(pdf, name, { onSave }).catch((err) => onNotice?.(err.message, true));
       return;
     }
     // 묶음 줄의 장들 (줄 자리 para 는 지우기 · 되돌리기 뒤에도 따라간다)

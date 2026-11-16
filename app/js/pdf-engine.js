@@ -2,7 +2,12 @@
 //   읽기: Google PDFium 의 WebAssembly 판 (app/vendor/pdfium.js · pdfium.wasm.gz)
 //   만들기: 쪽 그림(JPEG)들을 담은 PDF (makeImagePdf) — 한글 · Word · 파워포인트 문서를 PDF 로 바꿀 때
 //   처음 쓸 때만 불러온다 — wasm 은 gzip 으로 넣어 두고(앱 용량) 열 때 브라우저 기본 기능(DecompressionStream)으로 푼다
+//   주석(손으로 그린 펜 · 형광펜): PDF 안에 표준 잉크 주석(/Ink)으로 저장한다 — 다른 PDF 앱에서도 보인다.
+//     메모킹 획 자료(MKStroke)도 함께 넣어, 다시 열면 주석을 꺼내 화면 층에서 이어 고친다 (takeInk · save)
 //   한글 대체 글꼴: PC 는 Windows 의 맑은 고딕을 빌려 쓰고(앱에 넣지 않음), 휴대폰은 앱에 든 Noto Sans KR
+
+import { getStroke } from '../vendor/perfect-freehand.js';
+import { strokeOptions } from './core/ink.js';
 
 /** 앱에 든 파일 주소: PC 메모 창(file://)은 앱 파일을 내주는 memoking://ocr/ 로 (file:// 는 fetch 가 막힌다), 휴대폰은 그대로 */
 export function appAsset(rel) {
@@ -69,11 +74,21 @@ export async function thumbBlob(canvas, width) {
   return new Promise((done, fail) => c.toBlob((b) => (b ? done(b) : fail(new Error('썸네일을 만들지 못했어요'))), 'image/png'));
 }
 
+const INK_KEY = 'MKStroke'; // 잉크 주석에 남기는 메모킹 획 자료 (JSON)
+const ANNOT_INK = 15;
+const hexRgb = (hex) => {
+  const n = Number.parseInt(String(hex).replace('#', '').slice(0, 6), 16) || 0;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
 /**
- * PDF 열기 → { pageCount, size(i) → { width, height } (pt), render(i, width) → canvas, close() }
+ * PDF 열기 → { pageCount, size(i) → { width, height } (pt), render(i, width) → canvas, takeInk(i), save(inkByPage), close() }
  *   render: 쪽을 폭 width(px)로 그린 캔버스 (흰 바탕)
+ *   takeInk(i): 그 쪽의 메모킹 주석 획들 (쪽 왼쪽 위 기준 pt, 아래로 +) — 꺼낸 주석은 이 문서에서 빼서 render 에 그려지지 않는다 (화면 층이 그린다)
+ *   save(Map 쪽 → 획들): 꺼낸 쪽마다 획들을 잉크 주석으로 다시 넣은 PDF 바이트. 저장한 뒤 이 문서는 닫고 그 바이트로 다시 연다
+ * @param {{ keepInk?: boolean }} [opts] keepInk: 주석을 꺼내지 않고 그대로 그린다 (썸네일)
  */
-export async function openPdf(bytes) {
+export async function openPdf(bytes, { keepInk = false } = {}) {
   const m = await pdfium();
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const ptr = m.pdfium.wasmExports.malloc(data.length);
@@ -86,6 +101,116 @@ export async function openPdf(bytes) {
   }
   const pageCount = m.FPDF_GetPageCount(doc);
   let closed = false;
+  const taken = new Map(); // 쪽 → 꺼낸 획들
+  const heap = () => m.pdfium;
+  const takeInk = (i) => {
+    if (keepInk) return [];
+    if (taken.has(i)) return taken.get(i);
+    const page = m.FPDF_LoadPage(doc, i);
+    const strokes = [];
+    try {
+      for (let k = m.FPDFPage_GetAnnotCount(page) - 1; k >= 0; k--) {
+        const annot = m.FPDFPage_GetAnnot(page, k);
+        if (!annot) continue;
+        let stroke = null;
+        try {
+          if (m.FPDFAnnot_GetSubtype(annot) === ANNOT_INK) {
+            const len = m.FPDFAnnot_GetStringValue(annot, INK_KEY, 0, 0);
+            if (len > 2) {
+              const buf = heap().wasmExports.malloc(len);
+              try {
+                m.FPDFAnnot_GetStringValue(annot, INK_KEY, buf, len);
+                const text = new TextDecoder('utf-16le').decode(heap().HEAPU8.slice(buf, buf + len - 2));
+                const s = JSON.parse(text);
+                if (s?.v === 1 && Array.isArray(s.pts) && s.pts.length) stroke = { tool: s.tool === 'highlighter' ? 'highlighter' : 'pen', color: String(s.color), size: Number(s.size) || 4, pen: Boolean(s.pen), pts: s.pts };
+              } catch {
+                stroke = null; // 깨진 자료 — 그 주석은 PDF 에 그대로 둔다
+              } finally {
+                heap().wasmExports.free(buf);
+              }
+            }
+          }
+        } finally {
+          m.FPDFPage_CloseAnnot(annot);
+        }
+        if (stroke) {
+          strokes.unshift(stroke);
+          m.FPDFPage_RemoveAnnot(page, k);
+        }
+      }
+    } finally {
+      m.FPDF_ClosePage(page);
+    }
+    taken.set(i, strokes);
+    return strokes;
+  };
+  // 획 하나 → 잉크 주석 (모양: perfect-freehand 테두리를 칠한 경로 · 뜻: 가운데 선 InkList · 메모킹 자료)
+  const addInk = (page, ph, s) => {
+    const outline = getStroke(s.pts.length === 1 ? [s.pts[0], [s.pts[0][0] + 0.1, s.pts[0][1] + 0.1, s.pts[0][2]]] : s.pts, strokeOptions(s));
+    if (outline.length < 3) return;
+    const H = heap();
+    const [r, g, b] = hexRgb(s.color);
+    const alpha = s.tool === 'highlighter' ? 102 : 255;
+    const annot = m.FPDFPage_CreateAnnot(page, ANNOT_INK);
+    if (!annot) return;
+    const tmp = H.wasmExports.malloc(Math.max(16, s.pts.length * 8, (JSON.stringify(s).length + 64) * 2));
+    try {
+      let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const [x, y] of outline) {
+        x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+      }
+      H.HEAPF32.set([x0 - 1, ph - y0 + 1, x1 + 1, ph - y1 - 1], tmp >> 2); // FS_RECTF { left, top, right, bottom }
+      m.FPDFAnnot_SetRect(annot, tmp);
+      m.FPDFAnnot_SetColor(annot, 0, r, g, b, alpha);
+      m.FPDFAnnot_SetBorder(annot, 0, 0, s.size);
+      m.FPDFAnnot_SetFlags(annot, 4); // 인쇄에도
+      const path = m.FPDFPageObj_CreateNewPath(outline[0][0], ph - outline[0][1]);
+      for (let k = 1; k < outline.length; k++) m.FPDFPath_LineTo(path, outline[k][0], ph - outline[k][1]);
+      m.FPDFPath_Close(path);
+      m.FPDFPath_SetDrawMode(path, 2, false); // 칠하기 (winding)
+      m.FPDFPageObj_SetFillColor(path, r, g, b, alpha);
+      m.FPDFAnnot_AppendObject(annot, path);
+      H.HEAPF32.set(s.pts.flatMap(([x, y]) => [x, ph - y]), tmp >> 2);
+      m.FPDFAnnot_AddInkStroke(annot, tmp, s.pts.length);
+      const json = JSON.stringify({ v: 1, tool: s.tool, color: s.color, size: s.size, pen: Boolean(s.pen), pts: s.pts });
+      const u16 = new Uint16Array(json.length + 1);
+      for (let k = 0; k < json.length; k++) u16[k] = json.charCodeAt(k);
+      H.HEAPU8.set(new Uint8Array(u16.buffer), tmp);
+      m.FPDFAnnot_SetStringValue(annot, INK_KEY, tmp);
+    } finally {
+      H.wasmExports.free(tmp);
+      m.FPDFPage_CloseAnnot(annot);
+    }
+  };
+  const save = (inkByPage) => {
+    if (closed) throw new Error('닫힌 PDF 예요');
+    for (const [i, strokes] of inkByPage) {
+      takeInk(i); // 아직 꺼내지 않은 쪽이면 먼저 꺼낸다 (두 번 들어가지 않게)
+      if (!strokes.length) continue;
+      const page = m.FPDF_LoadPage(doc, i);
+      try {
+        const ph = m.FPDF_GetPageHeightF(page);
+        for (const s of strokes) addInk(page, ph, s);
+      } finally {
+        m.FPDF_ClosePage(page);
+      }
+    }
+    const H = heap();
+    const writer = m.PDFiumExt_OpenFileWriter();
+    try {
+      if (!m.PDFiumExt_SaveAsCopy(doc, writer)) throw new Error('주석을 넣은 PDF 를 만들지 못했어요');
+      const n = m.PDFiumExt_GetFileWriterSize(writer);
+      const buf = H.wasmExports.malloc(n);
+      try {
+        m.PDFiumExt_GetFileWriterData(writer, buf, n);
+        return H.HEAPU8.slice(buf, buf + n);
+      } finally {
+        H.wasmExports.free(buf);
+      }
+    } finally {
+      m.PDFiumExt_CloseFileWriter(writer);
+    }
+  };
   const size = (i) => {
     const page = m.FPDF_LoadPage(doc, i);
     try {
@@ -96,6 +221,7 @@ export async function openPdf(bytes) {
   };
   const render = (i, width) => {
     if (closed) throw new Error('닫힌 PDF 예요');
+    takeInk(i);
     const page = m.FPDF_LoadPage(doc, i);
     const pw = m.FPDF_GetPageWidthF(page);
     const ph = m.FPDF_GetPageHeightF(page);
@@ -104,20 +230,13 @@ export async function openPdf(bytes) {
     const bmp = m.FPDFBitmap_Create(W, H, 1);
     try {
       m.FPDFBitmap_FillRect(bmp, 0, 0, W, H, 0xffffffff);
-      m.FPDF_RenderPageBitmap(bmp, page, 0, 0, W, H, 0, 0x01 | 0x10); // 주석도 · 글자를 또렷하게 (FPDF_ANNOT | FPDF_LCD_TEXT)
+      m.FPDF_RenderPageBitmap(bmp, page, 0, 0, W, H, 0, 0x01 | 0x10); // 주석도 · RGBA 순서로 (FPDF_ANNOT | FPDF_REVERSE_BYTE_ORDER — 캔버스와 같아 그대로 옮긴다)
       const buf = m.FPDFBitmap_GetBuffer(bmp);
       const stride = m.FPDFBitmap_GetStride(bmp);
+      const src = m.pdfium.HEAPU8;
       const img = new ImageData(W, H);
-      // PDFium 은 BGRA — 캔버스는 RGBA: 4바이트씩 한 번에 R · B 를 바꾼다 (little-endian, 버퍼는 4바이트 정렬)
-      const src = new Uint32Array(m.pdfium.HEAPU8.buffer, buf, (stride * H) >> 2);
-      const out = new Uint32Array(img.data.buffer);
-      const row = stride >> 2;
-      for (let y = 0; y < H; y++) {
-        for (let x = 0, s = y * row, d = y * W; x < W; x++) {
-          const v = src[s + x];
-          out[d + x] = 0xff000000 | ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
-        }
-      }
+      if (stride === W * 4) img.data.set(src.subarray(buf, buf + W * H * 4));
+      else for (let y = 0; y < H; y++) img.data.set(src.subarray(buf + y * stride, buf + y * stride + W * 4), y * W * 4);
       const canvas = document.createElement('canvas');
       canvas.width = W;
       canvas.height = H;
@@ -134,7 +253,17 @@ export async function openPdf(bytes) {
     m.FPDF_CloseDocument(doc);
     m.pdfium.wasmExports.free(ptr);
   };
-  return { pageCount, size, render, close };
+  return { pageCount, size, render, takeInk, save, close };
+}
+
+/** 첫 쪽 썸네일 (PNG Blob, 폭 width px) — 주석까지 그린다 */
+export async function pdfThumbnail(bytes, width = 600) {
+  const pdf = await openPdf(bytes, { keepInk: true });
+  try {
+    return await thumbBlob(pdf.render(0, width), width);
+  } finally {
+    pdf.close();
+  }
 }
 
 /** 쪽 캔버스 → PDF 에 담을 JPEG { bytes, w, h } */
