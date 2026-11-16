@@ -174,6 +174,7 @@ export function contentKindName(node, dom) {
   if (dom.querySelector('.mk-video')) return '동영상';
   if (dom.querySelector('.mk-media')) return '소리';
   if (dom.querySelector('img.mk-album-img')) return '묶음 사진';
+  if (dom.querySelector('img.mk-pdf-thumb')) return '문서'; // 문서 칩 + PDF 첫 쪽 썸네일 한 덩어리
   if (dom.querySelector('img.mk-image')) return '그림';
   if (dom.querySelector('a[data-file]')) return '파일';
   if (dom.querySelector('.mk-link-card, [data-link-card]')) return '링크';
@@ -1039,13 +1040,15 @@ class Mover {
         const name = chip.textContent.trim();
         const ext = extOf(name) || extOf(href);
         if (isDocumentFile({ name }) || isDocumentFile({ name: href })) {
-          // PDF 가 아닌 문서: 아직 PDF 짝(바로 아래 PDF 썸네일)이 없으면 만들기
+          // PDF 가 아닌 문서: 아직 PDF 짝(같은 문단, 예전 메모는 바로 아랫줄의 PDF 썸네일)이 없으면 만들기
           const after = view.state.doc.nodeAt(block.pos + block.node.nodeSize);
           let hasPair = false;
-          after?.descendants((n) => {
-            if (n.type.name === 'image' && /^pdf \S+$/.test(n.attrs.title ?? '')) hasPair = true;
-            return !hasPair;
-          });
+          for (const n of [block.node, after]) {
+            n?.descendants((c) => {
+              if (c.type.name === 'image' && /^pdf \S+$/.test(c.attrs.title ?? '')) hasPair = true;
+              return !hasPair;
+            });
+          }
           if (ext !== 'pdf' && !hasPair) extraItems.push({ id: 'expand-pdf', label: 'PDF 짝 만들기' });
           extraItems.push({ id: 'expand-images', label: '그림으로 펼치기' });
         }

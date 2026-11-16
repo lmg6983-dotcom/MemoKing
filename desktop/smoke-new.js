@@ -1499,9 +1499,9 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
             const r = ps[ps.length - 1].getBoundingClientRect();
             document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
           })()`);
-          // 묻지 않고 원본 칩 바로 아래 줄에 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목 — 누르면 앱 안 미리보기)
-          const thumb = await until(() => js(aw, `(() => { const t = document.querySelector('.mk-doc img.mk-pdf-thumb'); return t && t.complete && t.naturalWidth > 0 && { chip: t.closest('p')?.previousElementSibling?.querySelector('a[data-file]')?.textContent ?? null }; })()`), 'PDF 첫 쪽', 20000).catch(() => null);
-          check('PDF 는 묻지 않고 언제나 원본 칩 바로 아래 줄에 첫 쪽 썸네일', thumb?.chip === '설명서.pdf', JSON.stringify({ thumb }));
+          // 묻지 않고 원본 칩과 한 문단(칩 · 줄바꿈 · 썸네일)에 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목 — 누르면 앱 안 미리보기)
+          const thumb = await until(() => js(aw, `(() => { const t = document.querySelector('.mk-doc img.mk-pdf-thumb'); return t && t.complete && t.naturalWidth > 0 && { chip: t.closest('p')?.querySelector('a[data-file]')?.textContent ?? null, br: Boolean(t.closest('p')?.querySelector('br')) }; })()`), 'PDF 첫 쪽', 20000).catch(() => null);
+          check('PDF 는 묻지 않고 언제나 원본 칩과 한 문단(칩 아래 줄)에 첫 쪽 썸네일', thumb?.chip === '설명서.pdf' && thumb.br, JSON.stringify({ thumb }));
           // 파일 칩 › 그림으로 펼치기: 장마다 그림 묶음 (PDFium 으로 실제로 바꿔 본다)
           await js(aw, `(() => { const a = [...document.querySelectorAll('.mk-doc a[data-file]')].find((x) => x.textContent === '설명서.pdf'); window.dispatchEvent(new CustomEvent('mk:expand-document-images', { detail: { href: a.getAttribute('href'), name: '설명서.pdf' } })); })()`);
           const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 5 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);
