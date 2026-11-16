@@ -332,9 +332,13 @@ export async function runSmoke({
     check('밑줄(Ctrl+U) → "<u>"', md1.includes('<u>밑줄</u>'));
     check('글자 색(색판) → <span style="color">', md1.includes('<span style="color: #e03131">빨강</span>'));
     check('하이라이트(Ctrl+Shift+H) → "<mark>"', md1.includes('<mark>형광</mark>'));
-    const attachments = [...md1.matchAll(/!?\[[^\]]*\]\((attachments\/[^)]+)\)/g)].map((m) => m[1]);
-    check('이미지·소리·동영상·파일이 attachments 폴더에 저장되고 md로 참조됨',
+    // 글 파일(.txt)은 PDF 와 한 쌍 — 칩 아래 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목)은 따로 센다
+    const refs = [...md1.matchAll(/!?\[[^\]]*\]\((attachments\/[^)\s]+)(?: "([^"]*)")?\)/g)];
+    const attachments = refs.filter((m) => !/^pdf /.test(m[2] ?? '')).map((m) => m[1]);
+    const pdfPair = refs.find((m) => /^pdf /.test(m[2] ?? ''));
+    check('이미지·소리·동영상·파일이 attachments 폴더에 저장되고 md로 참조됨 (글 파일은 PDF 짝과 함께)',
       attachments.length === 4 && attachments.every((a) => fs.existsSync(path.join(VAULT, a)))
+        && Boolean(pdfPair) && [pdfPair[1], pdfPair[2].slice(4)].every((a) => fs.existsSync(path.join(VAULT, a)))
         && md1.includes('![동영상 데모 영상](attachments/') && md1.includes('[회의자료.txt](attachments/'),
       attachments.join(', '));
 
@@ -873,8 +877,8 @@ export async function runSmoke({
     // 사진은 누르면 크게 보기 (묶음 사진과 같은 보기 — 한 장이면 번호 · 장 목록 없이)
     await key(linkNote.win, 'End', ['control']);
     await js(linkNote.win, PASTE_IMAGE);
-    await until(() => js(linkNote.win, `document.querySelector('.mk-image')?.naturalWidth > 0`), '사진').catch(() => {});
-    await js(linkNote.win, `document.querySelector('.mk-image').click()`);
+    await until(() => js(linkNote.win, `document.querySelector('.mk-image:not(.mk-pdf-thumb)')?.naturalWidth > 0`), '사진').catch(() => {});
+    await js(linkNote.win, `document.querySelector('.mk-image:not(.mk-pdf-thumb)').click()`); // 위의 회의록.txt 의 PDF 짝 썸네일 말고 붙인 사진
     const bigView = await until(() => js(linkNote.win, `(() => { const v = document.querySelector('.mk-album-view'); return v && { big: Boolean(v.querySelector('.mk-album-big')?.src), count: v.querySelector('.mk-album-count').textContent, strip: !v.querySelector('.mk-album-strip').hidden }; })()`), '사진 크게 보기').catch(() => null);
     check('사진 한 장 누르기 → 크게 보기 (번호 · 장 목록 없이)', Boolean(bigView?.big) && bigView.count === '' && bigView.strip === false, JSON.stringify(bigView));
     await key(linkNote.win, 'Escape');
