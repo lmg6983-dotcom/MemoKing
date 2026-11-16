@@ -29,11 +29,31 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show, hi
   let job = null; // 지금 묻는 작업 id
   let seq = 0;
 
+  // 답이 나올 자리(결과 칸)에 임시 칸: 글줄 모양 + 지나가는 빛 + 진행 막대 — 첫 글자가 오면 그 자리에 글이 흘러나온다
+  function pending(label) {
+    const box = h('div', 'ai-pending');
+    box.setAttribute('role', 'status');
+    const bar = h('span', 'mk-doc-pending-bar indeterminate');
+    bar.append(h('span'));
+    box.append(h('span', 'ai-pending-lines'), bar, h('span', 'mk-doc-pending-label', label));
+    return box;
+  }
+  /** 답 글 칸 (임시 칸이 있으면 그것을 걷고) */
+  function out() {
+    let p = result.querySelector('.ai-out');
+    if (!p) result.replaceChildren((p = h('p', 'ai-out')));
+    return p;
+  }
   api.on('ai:token', ({ id, text }) => {
-    if (id === job) result.querySelector('.ai-out').textContent = text;
+    if (id === job) out().textContent = text;
   });
   api.on('ai:progress', ({ id, done, total }) => {
-    if (id === job) state.textContent = `맞춤법을 보는 중이에요 (${done + 1}/${total} 문단)`;
+    const box = id === job && result.querySelector('.ai-pending');
+    if (!box) return;
+    const bar = box.querySelector('.mk-doc-pending-bar');
+    bar.classList.remove('indeterminate');
+    bar.firstChild.style.width = `${Math.round(((done + 1) / total) * 100)}%`;
+    box.querySelector('.mk-doc-pending-label').textContent = `맞춤법을 보는 중 · ${done + 1} / ${total} 문단`;
   });
 
   function busy(on) {
@@ -44,18 +64,20 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show, hi
   async function run(payload, waiting) {
     job = `w${++seq}`;
     const id = job;
-    result.replaceChildren(h('p', 'ai-out'));
-    state.textContent = waiting;
+    result.replaceChildren(pending(waiting));
+    state.textContent = '';
     busy(true);
     const r = await api.ai.write({ id, ...payload });
     if (id !== job) return null; // 그사이 다른 작업 · 닫기
     job = null;
     busy(false);
     if (r.error) {
+      result.replaceChildren();
       state.textContent = r.error;
       return null;
     }
-    if (r.text) result.querySelector('.ai-out').textContent = r.text; // 마지막 조각보다 답이 먼저 올 수 있다
+    if (r.text) out().textContent = r.text; // 마지막 조각보다 답이 먼저 올 수 있다
+    else result.querySelector('.ai-pending')?.remove();
     return r;
   }
 
@@ -75,7 +97,7 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show, hi
   async function spell() {
     const blocks = editor().aiBlocks();
     if (!blocks.length) return (state.textContent = '고칠 글이 없어요');
-    const r = await run({ task: 'spell', blocks: blocks.map((b) => b.text) }, '모델을 올리는 중이에요…');
+    const r = await run({ task: 'spell', blocks: blocks.map((b) => b.text) }, '모델을 올리는 중');
     if (!r) return;
     const found = blocks.map((b, i) => ({ ...b, fixed: r.fixed[i] })).filter((b) => b.fixed !== b.text);
     result.replaceChildren();
@@ -109,7 +131,7 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show, hi
     if (!range) return (state.textContent = '그림, 표, 파일이 섞인 곳은 문체를 바꿀 수 없어요. 글만 골라 주세요');
     if (!range.text.trim()) return (state.textContent = '바꿀 글이 없어요');
     if (range.text.length > MAX_CHARS) return (state.textContent = `글이 길어요. ${MAX_CHARS}자 안으로 골라 주세요`);
-    const r = await run({ task: 'style', text: range.text, style }, `${style}로 바꾸는 중이에요…`);
+    const r = await run({ task: 'style', text: range.text, style }, `${style}로 바꾸는 중`);
     if (!r) return;
     state.textContent = `${style}로 바꿨어요. 마음에 들면 바꾸기를 눌러 주세요`;
     actions(
@@ -132,7 +154,7 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show, hi
     const editing = isEditRequest(req, hasSelection ? range.text : body);
     const r = await run(
       { task: 'draft', title: title(), text: body, selection: hasSelection ? range.text : '', request: req },
-      editing ? '지시대로 메모를 다듬는 중이에요…' : '초안을 쓰는 중이에요…',
+      editing ? '지시대로 메모를 다듬는 중' : '초안을 쓰는 중',
     );
     if (!r) return;
     state.textContent = editing ? '지시대로 정리했어요. 반영할 방식을 골라 주세요' : '초안이에요. [ ] 칸은 직접 채워 주세요';

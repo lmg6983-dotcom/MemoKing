@@ -1822,8 +1822,9 @@ try {
       const held = await page.evaluate(() => ({ knob: document.querySelector('.mode-knob')?.dataset.mode, lifted: document.querySelectorAll('.mk-block-lift').length }));
       await touch('touchEnd', chip.x + 10, chip.y + chip.height / 2);
       await page.waitForTimeout(400);
-      check('글 고치기: 콘텐츠를 꾹 누르면 옮기기 방식으로 바뀌고 바로 들림', held.knob === 'move' && held.lifted === 1, JSON.stringify(held));
-      await setMode('edit');
+      const back = await page.evaluate(() => document.querySelector('.mode-knob')?.dataset.mode);
+      check('글 고치기: 콘텐츠를 꾹 누르면 옮기기 방식으로 바뀌고 바로 들림 → 놓으면 글 고치기로 저절로 돌아옴', held.knob === 'move' && held.lifted === 1 && back === 'edit', JSON.stringify({ held, back }));
+      if (back !== 'edit') await setMode('edit');
       await page.waitForTimeout(1900);
     }
     // 파일 칩을 짧게 눌러도 바로 열지 않고 단추 + 노란 "열기" (맨 왼쪽) → "열기"를 누르면 그때 연다

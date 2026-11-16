@@ -390,7 +390,7 @@ export function createBlockMove({ readOnly = false } = {}) {
           if (!canDrag()) {
             // 글 고치기: 콘텐츠(사진 · 파일 칩 · 링크 카드 · 수식 · 소리 · 동영상)를 꾹 누르면 옮기기 방식으로 바꾸고 바로 들어 올린다
             //   (휴대폰 화면이 mk:want-move 를 받아 다이얼을 옮기기로 — 받는 곳이 없으면 예전처럼 단추 줄)
-            const host = tap && event.target instanceof Element ? event.target.closest(`${HOLD_TARGET}, ${TAP_TARGET}`) : null;
+            const host = tap && event.target instanceof Element ? event.target.closest(`${HOLD_TARGET}, ${TAP_TARGET}, hr`) : null; // 가로줄도 (누르면 하는 일이 없어 꾹 누르기로 옮긴다)
             const block = host && view.dom.contains(host) ? blockFromTarget(view, host) : null;
             if (block && isContentBlock(block.node) && touchMode() === 'edit') {
               hold = { x: t.clientX, y: t.clientY };
@@ -696,7 +696,10 @@ class Mover {
     const { view } = this;
     // 누른 사이 문서가 바뀌었을 수 있으니 같은 자리의 줄을 다시 찾는다
     const block = blockInfo(view.state.doc, p.block.pos, p.block.inner);
-    if (!block || block.count < 2) return;
+    if (!block || block.count < 2) {
+      window.dispatchEvent(new CustomEvent('mk:move-done')); // 옮길 곳이 없다 — 저절로 옮기기가 됐으면 되돌린다 (옮기기에 갇히지 않게)
+      return;
+    }
     const parent = view.state.doc.resolve(block.pos).parent;
     const positions = [];
     let q = block.start;
@@ -1223,8 +1226,8 @@ class Mover {
     const hint = document.createElement('div');
     hint.className = 'mk-move-hint';
     hint.setAttribute('role', 'status');
-    // 휴대폰 다이얼이 글 고치기면 옮기는 방법은 다이얼부터 (옮기기 방식에서는 짧게 눌러 끈다)
-    hint.textContent = touchMode() === 'edit' ? '옮기려면 오른쪽 아래 다이얼을 옮기기로 돌려요'
+    // 휴대폰 글 고치기: 꾹 누르면 저절로 옮기기가 되고 놓으면 돌아온다 (옮기기 방식에서는 짧게 눌러 끈다)
+    hint.textContent = touchMode() === 'edit' ? '꾹 누르면 옮길 수 있어요. 놓으면 글 고치기로 돌아와요'
       : touchMode() === 'move' ? '짧게 눌러 끌면 다른 줄로 옮겨요'
         : coarse() ? '꾹 눌러 끌면 다른 줄로 옮겨요' : '끌어서 다른 줄로 옮길 수 있어요 (Alt+↑↓)';
     document.body.append(hint);
