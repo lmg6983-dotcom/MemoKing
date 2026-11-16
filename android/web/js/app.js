@@ -1633,7 +1633,7 @@ async function memoFromShare(payload) {
       if (files.length) {
         const items = note.tempsToItems(files);
         audioItems = items.filter((it) => it.kind === 'audio');
-        editor.insertItems(await editor.arrangeItems(items)); // 사진 여러 장 · 문서는 어떻게 넣을지 묻는다
+        editor.insertItems(await editor.arrangeItems(items)); // 사진 여러 장은 어떻게 넣을지 묻고, 문서는 첫 쪽 썸네일과 함께
       }
       await new Promise((r) => setTimeout(r, 30));
       editor.appendMarkdown(sourceLine(payload.app));

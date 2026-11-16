@@ -1351,10 +1351,9 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
           const r = document.querySelector('.mk-doc p').getBoundingClientRect();
           document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
         })()`);
-        // PDF 는 어떻게 넣을지 묻는다 → 이번엔 "파일만" (TXT 는 묻지 않고 PDF 짝과 함께)
-        const askDoc = await until(() => js(win, `(() => { const p = document.querySelector('.mk-prompt'); return p && { title: p.querySelector('b').textContent, buttons: [...p.querySelectorAll('button')].map((b) => b.textContent) }; })()`), '문서 넣기 질문', 4000).catch(() => null);
-        check('PDF 를 넣으면 파일만 · 첫 쪽 보이게 중 고르게 물음 (다른 문서는 묻지 않고 PDF 와 한 쌍)', /\.pdf|PDF \d+개/.test(askDoc?.title ?? '') && askDoc.buttons.join() === '파일만,첫 쪽 보이게', JSON.stringify(askDoc));
-        await js(win, `[...document.querySelectorAll('.mk-prompt button')].find((b) => /^파일(로|만)$/.test(b.textContent))?.click()`);
+        // 문서(PDF 도)는 묻지 않고 언제나 원본 칩 + PDF 첫 쪽 썸네일 (이 PDF 는 깨져서 칩만)
+        const askDoc = await wait(500).then(() => js(win, `!!document.querySelector('.mk-prompt')`));
+        check('문서를 넣으면 묻지 않음 (PDF 도 언제나 첫 쪽 썸네일과 한 쌍)', askDoc === false, JSON.stringify(askDoc));
         const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
         const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length })`);
         const dropNote = await js(win, `(window.__statusLog ?? []).find((t) => /4개를 넣었어요/.test(t)) ?? document.getElementById('status').textContent`);
@@ -1500,12 +1499,9 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
             const r = ps[ps.length - 1].getBoundingClientRect();
             document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
           })()`);
-          await until(() => js(aw, `!!document.querySelector('.mk-prompt')`), 'PDF 질문', 4000).catch(() => null);
-          const askPdf = await js(aw, `[...document.querySelectorAll('.mk-prompt button')].map((b) => b.textContent).join()`);
-          await js(aw, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '첫 쪽 보이게')?.click()`);
-          // 첫 쪽 보이게: 원본 칩 바로 아래 줄에 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목 — 누르면 앱 안 미리보기)
+          // 묻지 않고 원본 칩 바로 아래 줄에 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목 — 누르면 앱 안 미리보기)
           const thumb = await until(() => js(aw, `(() => { const t = document.querySelector('.mk-doc img.mk-pdf-thumb'); return t && t.complete && t.naturalWidth > 0 && { chip: t.closest('p')?.previousElementSibling?.querySelector('a[data-file]')?.textContent ?? null }; })()`), 'PDF 첫 쪽', 20000).catch(() => null);
-          check('PDF 는 파일만 · 첫 쪽 보이게 중 묻고, 첫 쪽 보이게면 원본 칩 바로 아래 줄에 첫 쪽 썸네일', askPdf === '파일만,첫 쪽 보이게' && thumb?.chip === '설명서.pdf', JSON.stringify({ askPdf, thumb }));
+          check('PDF 는 묻지 않고 언제나 원본 칩 바로 아래 줄에 첫 쪽 썸네일', thumb?.chip === '설명서.pdf', JSON.stringify({ thumb }));
           // 파일 칩 › 그림으로 펼치기: 장마다 그림 묶음 (PDFium 으로 실제로 바꿔 본다)
           await js(aw, `(() => { const a = [...document.querySelectorAll('.mk-doc a[data-file]')].find((x) => x.textContent === '설명서.pdf'); window.dispatchEvent(new CustomEvent('mk:expand-document-images', { detail: { href: a.getAttribute('href'), name: '설명서.pdf' } })); })()`);
           const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 5 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);
