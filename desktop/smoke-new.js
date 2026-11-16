@@ -1337,6 +1337,8 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
       // 4) 여러 파일을 한꺼번에 끌어다 놓기 · 메모 밖으로 끌어내기 · 다른 창에 가 있으면 고른 테두리 해제
       {
         const { win } = await openMemo('# 파일 놓기\n\n끝\n', '파일 놓기');
+        // 안내는 곧 다른 안내(글 파일의 PDF 짝)로 바뀌므로 지나간 안내도 모아 둔다
+        await js(win, `new MutationObserver(() => (window.__statusLog ??= []).push(document.getElementById('status').textContent)).observe(document.getElementById('status'), { childList: true, characterData: true, subtree: true })`);
         const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
         await js(win, `(async () => {
           const bin = Uint8Array.from(atob(${JSON.stringify(png)}), (c) => c.charCodeAt(0));
@@ -1355,7 +1357,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
         await js(win, `[...document.querySelectorAll('.mk-prompt button')].find((b) => /^파일(로|만)$/.test(b.textContent))?.click()`);
         const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
         const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length })`);
-        const dropNote = await js(win, `document.getElementById('status').textContent`);
+        const dropNote = await js(win, `(window.__statusLog ?? []).find((t) => /4개를 넣었어요/.test(t)) ?? document.getElementById('status').textContent`);
         check('여러 파일 놓기: 4개 (글 파일 2 · PDF · 사진)가 한 번에 모두 들어감, 읽지 못한 하나(폴더)는 알리고 나머지는 그대로', fallback.chips.length === 3 && fallback.imgs === 1 && ['가.txt', '다.pdf', '라.txt'].every((n) => fallback.chips.includes(n)) && /4개를 넣었어요.*1개.*읽지 못해/.test(dropNote.replace('파일 ', '')), JSON.stringify({ fallback, dropNote }));
         // 사진 여러 장: 묶음 사진으로 넣을지 묻고, 고르면 한 줄에 모아 격자로 · 누르면 크게 넘겨 보기
         {
@@ -1499,12 +1501,16 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
             document.querySelector('.ProseMirror').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true, clientX: r.left + 4, clientY: r.top + 4 }));
           })()`);
           await until(() => js(aw, `!!document.querySelector('.mk-prompt')`), 'PDF 질문', 4000).catch(() => null);
-          await js(aw, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '그림으로')?.click()`);
+          const askPdf = await js(aw, `[...document.querySelectorAll('.mk-prompt button')].map((b) => b.textContent).join()`);
+          await js(aw, `[...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '첫 쪽 보이게')?.click()`);
+          // 첫 쪽 보이게: 원본 칩 바로 아래 줄에 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목 — 누르면 앱 안 미리보기)
+          const thumb = await until(() => js(aw, `(() => { const t = document.querySelector('.mk-doc img.mk-pdf-thumb'); return t && t.complete && t.naturalWidth > 0 && { chip: t.closest('p')?.previousElementSibling?.querySelector('a[data-file]')?.textContent ?? null }; })()`), 'PDF 첫 쪽', 20000).catch(() => null);
+          check('PDF 는 파일만 · 첫 쪽 보이게 중 묻고, 첫 쪽 보이게면 원본 칩 바로 아래 줄에 첫 쪽 썸네일', askPdf === '파일만,첫 쪽 보이게' && thumb?.chip === '설명서.pdf', JSON.stringify({ askPdf, thumb }));
+          // 파일 칩 › 그림으로 펼치기: 장마다 그림 묶음 (PDFium 으로 실제로 바꿔 본다)
+          await js(aw, `(() => { const a = [...document.querySelectorAll('.mk-doc a[data-file]')].find((x) => x.textContent === '설명서.pdf'); window.dispatchEvent(new CustomEvent('mk:expand-document-images', { detail: { href: a.getAttribute('href'), name: '설명서.pdf' } })); })()`);
           const pages = await until(() => js(aw, `(() => { const imgs = [...document.querySelectorAll('.mk-doc img.mk-album-img')].filter((i) => /설명서 \\d쪽/.test(i.alt)); return imgs.length === 5 && imgs.every((i) => i.complete && i.naturalWidth > 500) && imgs.map((i) => i.alt + ':' + i.naturalWidth); })()`), 'PDF 장 그림', 20000).catch(() => null);
           const pdfNote = await js(aw, `document.getElementById('status').textContent`);
-          const chipAbove = await js(aw, `(() => { const p = [...document.querySelectorAll('.mk-doc p')].find((x) => x.querySelector('img.mk-album-page')); return p?.previousElementSibling?.querySelector('a[data-file]')?.textContent ?? null; })()`);
-          check('PDF를 그림으로 넣으면 원본 문서 파일(칩)도 묶음 바로 위 줄에', chipAbove === '설명서.pdf', String(chipAbove));
-          check('PDF를 "그림으로" 넣으면 장마다 그림 (5쪽 → 5장, 또렷한 크기) 종이 묶음으로', Boolean(pages), JSON.stringify({ pages, pdfNote }));
+          check('파일 칩 › 그림으로 펼치기: PDF 장마다 그림 (5쪽 → 5장, 또렷한 크기) 종이 묶음으로', Boolean(pages), JSON.stringify({ pages, pdfNote }));
           await js(aw, `document.querySelectorAll('.mk-doc img.mk-album-img')[5]?.scrollIntoView({ block: 'center' })`);
           await capture(aw, 'album-pdf.png');
           // 좁은 창 (휴대폰 폭쯤)
