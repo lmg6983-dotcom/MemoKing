@@ -17,11 +17,15 @@
 | fullcalendar | 7.1.0 | MIT | https://github.com/fullcalendar/fullcalendar |
 | temporal-polyfill | 1.0.5 | MIT | https://github.com/fullcalendar/temporal-polyfill |
 | ical.js | 2.2.1 | MPL-2.0 | https://github.com/kewisch/ical.js |
+| @embedpdf/pdfium | 2.15.1 | MIT | https://github.com/embedpdf/embed-pdf-viewer |
+| @embedpdf/engines | 2.15.1 | MIT | https://github.com/embedpdf/embed-pdf-viewer |
+| @embedpdf/models | 2.15.1 | MIT | https://github.com/embedpdf/embed-pdf-viewer |
+| @embedpdf/fonts-kr | 1.0.0 | OFL-1.1 | https://github.com/embedpdf/embed-pdf-viewer |
+| @rhwp/core | 0.9.0 | MIT | https://github.com/edwardkim/rhwp |
+| docx-preview | 0.4.1 | Apache-2.0 | https://github.com/VolodymyrBaydalka/docxjs |
+| hwp.js | 0.0.3 | Apache-2.0 | https://github.com/hahnlee/hwp.js |
+| jszip | 3.10.1 | (MIT OR GPL-3.0-or-later) | https://github.com/Stuk/jszip |
 | canvas-confetti | 1.9.4 | ISC | https://github.com/catdad/canvas-confetti |
 | tesseract.js (+ tesseract.js-core, kor tessdata_best) | 7.0.0 | Apache-2.0 | https://github.com/naptha/tesseract.js |
 | qrcode-generator | 1.4.4 | MIT | https://github.com/kazuhikoarase/qrcode-generator |
 | perfect-freehand | 1.2.3 | MIT | https://github.com/steveruizok/perfect-freehand |
-| pdfjs-dist | 5.4.149 | Apache-2.0 | https://github.com/mozilla/pdf.js |
-| docx-preview | 0.4.1 | Apache-2.0 | https://github.com/VolodymyrBaydalka/docxjs |
-| hwp.js | 0.0.3 | Apache-2.0 | https://github.com/hahnlee/hwp.js |
-| jszip | 3.10.1 | (MIT OR GPL-3.0-or-later) | https://github.com/Stuk/jszip |

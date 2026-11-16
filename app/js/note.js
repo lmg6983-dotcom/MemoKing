@@ -2,7 +2,7 @@
 import { injectIcons, icon } from './icons.js';
 import { COPY_ICON, SHARE_ICON, SAVE_ICON, TRASH_ICON } from './content-icons.js';
 import { shareMemo } from './list-card-menu.js';
-import { createNoteEditor } from './editor.js';
+import { createNoteEditor, previewPdf } from './editor.js';
 import { setCopyHost } from './copy-content.js';
 import { hideDeleteButton } from './delete-button.js';
 import { attachStatusBubble, statusChanged } from './status-bubble.js';
@@ -1058,9 +1058,21 @@ $('photo-input').addEventListener('change', (e) => {
 // ---------- 링크·파일 한 번 눌러 열기 ----------
 // 인터넷 링크는 기본 브라우저로, 파일 칩은 메모 폴더의 복사본을 기본 앱으로. 사진은 누르면 크게 보기 (editor.js).
 
-async function openAttachment(rel) {
+async function openAttachmentOutside(rel) {
   const result = await api.attachments.open(rel);
   if (result && result !== 'cancelled') setStatus(result, true);
+}
+// PDF 는 앱 안에서 미리 본다 ("다른 앱으로" 단추로 기본 앱) — 미리 보지 못하면 기본 앱으로
+async function openAttachment(rel) {
+  if (/\.pdf$/i.test(rel)) {
+    try {
+      await previewPdf(rel, decodePath(rel).split('/').pop());
+      return;
+    } catch (err) {
+      console.warn('[PDF 미리보기]', err);
+    }
+  }
+  return openAttachmentOutside(rel);
 }
 
 function openHref(href) {
@@ -2075,6 +2087,7 @@ if (!memo) {
     readAttachment: async (src) => new TextDecoder().decode(await api.attachments.read(decodePath(src))),
     fetchPreview: (url) => api.links.preview(url),
     openLink: (url) => api.links.open(url),
+    openFile: (rel) => openAttachmentOutside(rel), // PDF 미리보기의 "다른 앱으로"
     getTags: () => api.tags.list(),
     onEmpty: showPlaceholder,
     onTasks: showTasks,

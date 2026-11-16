@@ -1,7 +1,8 @@
 // 메모 화면 — 데스크탑 스티커 창(app/js/note.js)을 휴대폰 한 화면으로.
 // 편집기(app/js/editor.js)·예약 알림 패널(app/js/reminder-panel.js)은 데스크탑과 같은 코드를 쓴다.
-import { createNoteEditor } from '../../app/js/editor.js';
+import { createNoteEditor, previewPdf } from '../../app/js/editor.js';
 import { closeAlbumViewer } from '../../app/js/album-viewer.js';
+import { closePdfViewer } from '../../app/js/pdf-viewer.js';
 import { setCopyHost } from '../../app/js/copy-content.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from '../../app/js/core/html-marks.js';
 import { fileExtension, mediaKind, baseName, vaultUrl } from '../../app/js/media.js';
@@ -554,7 +555,26 @@ async function pickAndInsert(accept) {
 
 // ---------- 링크·파일 눌러 열기 ----------
 
+// PDF 는 앱 안에서 미리 본다 ("다른 앱으로" 단추로 휴대폰의 앱) — 미리 보지 못하면 휴대폰의 앱으로
 async function openAttachment(rel) {
+  if (/\.pdf$/i.test(rel)) {
+    try {
+      let name = rel.split('/').pop();
+      try {
+        name = decodeURIComponent(name);
+      } catch {
+        // 그대로
+      }
+      await previewPdf(rel, name);
+      return;
+    } catch (err) {
+      console.warn('[PDF 미리보기]', err);
+    }
+  }
+  return openAttachmentOutside(rel);
+}
+
+async function openAttachmentOutside(rel) {
   try {
     const result = await call('openFile', { rel });
     if (result) setStatus(result, true);
@@ -683,6 +703,7 @@ window.addEventListener('resize', () => {
 });
 /** 뒤로 가기: 손 메모 그리기 화면 → 주석 모드 순으로 저장하고 닫는다 (취소는 없다) */
 export function closeInk() {
+  if (closePdfViewer()) return true; // PDF 미리보기
   if (closeAlbumViewer()) return true; // 묶음 사진 보기 (그리던 중이면 저장하고)
   if (document.querySelector('.ink-sheet:not(.closing)')) {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -1325,6 +1346,7 @@ export async function openNote(memoId, options = {}) {
       linkPreviews: linkPreviewsOn(),
       fetchPreview: (url) => app.previews.get(url),
       openLink: (url) => call('openUrl', { url }),
+      openFile: (rel) => openAttachmentOutside(rel), // PDF 미리보기의 "다른 앱으로"
       getTags: async () => collectTags(app.vault.list()),
       onEmpty: showPlaceholder,
       onTasks: showTasks,

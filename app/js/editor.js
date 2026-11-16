@@ -12,7 +12,7 @@ import {
 } from '../vendor/milkdown.js';
 import { Plyr } from '../vendor/plyr.js';
 import plyrSprite from '../vendor/plyr-sprite.js';
-import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, isAlbumPageTitle, isInkedAlbumTitle, inkedAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE, mediaWidthOf, plainAlt } from './core/memo-file.js';
+import { mediaKindOf, trimTrailingBreaks, isAlbumTitle, isAlbumPageTitle, isInkedAlbumTitle, inkedAlbumTitle, ALBUM_TITLE, ALBUM_PAGE_TITLE, mediaWidthOf, plainAlt, pdfOfTitle, pdfThumbTitle } from './core/memo-file.js';
 import { mediaResizePlugin } from './media-resize.js';
 import { hideDeleteButton } from './delete-button.js';
 import { isInk, inkAlt, bgOfAlt, inkToSvg, parseInkSvg, inkForDark } from './core/ink.js';
@@ -27,7 +27,9 @@ import { videoPoster } from './video-poster.js';
 import { openAlbumViewer } from './album-viewer.js';
 import { touchMode } from './keyboard-guard.js';
 import { promptChoice } from './rename-content.js';
-import { isDocumentFile, documentPages, decodeTxtBytes } from './doc-pages.js';
+import { isDocumentFile, documentPages, documentPdf, decodeTxtBytes, preloadDocument } from './doc-pages.js';
+import { openPdfViewer } from './pdf-viewer.js';
+import { warmPdf, pdfThumbnail } from './pdf-engine.js';
 import { CARD_TITLE, remarkLinkCards, loneUrl, pastedLinkTitle, hostOf } from './core/link-preview.js';
 import { extOf, fileKind } from './core/file-kinds.js';
 import { wrapOrphanRows, cellsToGrid, gridToHtml, parseTsv, CELL_BREAK_HTML } from './core/tables.js';
@@ -100,6 +102,18 @@ const MEDIA_CONTROL = `${MEDIA_SCRUB}, .plyr__progress, input, [role="slider"], 
 let inkEditHandler = null;
 // 묶음 사진 한 장을 누르면 크게 넘겨 보기 (편집기마다 createNoteEditor 가 정함: (view, pos) => void)
 let albumHandler = null;
+let fileOpener = null; // 첨부를 다른 앱으로 열기 (PC · 휴대폰 화면이 준다 — PDF 미리보기의 "다른 앱으로")
+
+/** 메모 폴더의 PDF 를 앱 안에서 미리 본다 (PDF 썸네일 · PDF 파일 칩) — 열지 못하면 오류 */
+/** @param {{ onSave?: (pdf: Uint8Array) => Promise<void> }} [o] onSave: 주석을 넣은 PDF (없으면 주석 단추 없음) */
+export async function previewPdf(src, name = 'PDF', { onSave = null } = {}) {
+  // 읽는 동안에도 보기를 먼저 띄운다 ("여는 중") — 큰 PDF 도 누르자마자 반응하게
+  const bytes = fetch(vaultUrl(src)).then((res) => {
+    if (!res.ok) throw new Error('PDF 파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 삭제됐는지 확인해 주세요');
+    return res.arrayBuffer();
+  });
+  return openPdfViewer({ bytes, name, onExternal: fileOpener ? () => fileOpener(src) : null, onSave });
+}
 
 let inkReader = null; // 손 메모 SVG 글 읽기 (createNoteEditor 의 readAttachment)
 const DOUBLE_TAP_MS = 450; // 휴대폰 사진: 이 안에 다시 누르면 크게 보기
@@ -214,10 +228,13 @@ function mediaView(node, view, getPos) {
   const dom = document.createElement('img');
   let lastTap = 0; // 휴대폰 두 번 누르기 (이 그림을 마지막으로 누른 때)
   const album = isAlbumTitle(title);
-  dom.className = album ? `mk-image mk-album-img${isAlbumPageTitle(title) ? ' mk-album-page' : ''}` : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
+  const pdfThumb = Boolean(pdfOfTitle(title)); // 문서를 PDF 로 넣은 첫 쪽 썸네일 — 누르면 PDF 미리보기
+  dom.className = album ? `mk-image mk-album-img${isAlbumPageTitle(title) ? ' mk-album-page' : ''}` : pdfThumb ? 'mk-image mk-pdf-thumb' : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
+  dom.decoding = 'async'; // 큰 사진이 많은 메모도 여는 순간 멈추지 않게 (푸는 동안 글은 먼저 보인다)
   dom.src = vaultUrl(src);
   dom.alt = plainAlt(alt);
-  if (title && !album) dom.title = title;
+  if (title && !album && !pdfThumb) dom.title = title;
+  if (pdfThumb) warmPdf();
   // 크기 (설명 끝의 "|50%" — media-resize.js 로 끌어서 바꾼다). 묶음 사진은 묶음 모양 그대로
   const w = album ? null : mediaWidthOf(alt);
   if (w) {
@@ -1177,7 +1194,7 @@ function normalizePastedTables(html) {
  *   linkPreviews: 링크 미리보기 카드 (설정, 기본 켜짐) — 끄면 주소를 붙여도 링크 글자, 있던 카드도 링크 글자로 보임
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, linkPreviews = true, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false, scrollMargin = 0, onDateReminder, hasReminderAt }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, openFile, linkPreviews = true, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false, scrollMargin = 0, onDateReminder, hasReminderAt }) {
   if (readAttachment) inkReader = readAttachment; // 그림 칸(inkView)이 만들어지기 전에
   let previewsOn = linkPreviews !== false;
   const linkCardRenders = new Set(); // 그려진 링크 카드들 — 설정을 바꾸면 다시 그린다
@@ -1222,7 +1239,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       if (item.kind === 'file') {
         return schema.nodes.paragraph.create(null, schema.text(item.name, [schema.marks.link.create({ href: item.src })]));
       }
-      return schema.nodes.paragraph.create(null, schema.nodes.image.create({ src: item.src, alt: item.alt, title: '' }));
+      return schema.nodes.paragraph.create(null, schema.nodes.image.create({ src: item.src, alt: item.alt, title: item.title ?? '' })); // title: PDF 썸네일이면 "pdf <경로>"
     });
     const $pos = v.state.doc.resolve(Math.min(pos, v.state.doc.content.size));
     const size = paragraphs.reduce((sum, p) => sum + p.nodeSize, 0);
@@ -1309,7 +1326,31 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   if (!readOnly) inkEditHandler = (v, pos) => editInk(v, pos); // 보기만 하는 편집기(PDF·옆 메모)는 이어 그리기 없음
   // 묶음 사진: 누른 장부터 크게 넘겨 보기 · 그 장 위에 그리면 그린 것을 합친 새 그림으로 바꾼다 (보기만 하는 편집기는 그리기 없음)
   // 창 하나에 편집기가 여럿일 수 있어(옆 메모 · 스택 탭) 그리기는 그 편집기(v)가 고칠 수 있을 때만 — 보기만 하는 편집기가 나중에 만들어져도 덮어쓰지 않게
+  if (!readOnly && openFile) fileOpener = openFile; // PDF 미리보기의 "다른 앱으로"
   if (!readOnly || !albumHandler) albumHandler = (v, pos) => {
+    // PDF 썸네일: 그 PDF 를 앱 안에서 미리 본다
+    const pdf = pdfOfTitle(v.state.doc.nodeAt(pos)?.attrs.title);
+    if (pdf) {
+      const name = plainAlt(v.state.doc.nodeAt(pos).attrs.alt) || 'PDF';
+      // 주석: 원본은 그대로 두고 주석을 넣은 새 PDF · 새 썸네일로 바꾼다 (되돌리기로 원래대로)
+      let shown = pdf;
+      const onSave = readOnly ? null : async (bytes) => {
+        const pdfSrc = await saveFile(new File([bytes], `${baseName(name)}.pdf`, { type: 'application/pdf' }));
+        const thumbSrc = await saveFile(new File([await pdfThumbnail(bytes, 600)], `${baseName(name)} 미리보기.png`, { type: 'image/png' }));
+        // 그사이 글이 바뀌었을 수 있다 — 그 썸네일을 다시 찾는다
+        let at = -1;
+        v.state.doc.descendants((n, p) => {
+          if (at < 0 && n.type.name === 'image' && pdfOfTitle(n.attrs.title) === shown) at = p;
+          return at < 0;
+        });
+        if (at < 0) throw new Error('메모에서 이 PDF 를 찾지 못해 주석을 넣지 못했어요');
+        const node = v.state.doc.nodeAt(at);
+        v.dispatch(v.state.tr.setNodeMarkup(at, null, { ...node.attrs, src: thumbSrc, title: pdfThumbTitle(pdfSrc) }));
+        shown = pdfSrc;
+      };
+      previewPdf(pdf, name, { onSave }).catch((err) => onNotice?.(err.message, true));
+      return;
+    }
     // 묶음 줄의 장들 (줄 자리 para 는 지우기 · 되돌리기 뒤에도 따라간다)
     let para = v.state.doc.resolve(pos).before();
     const album = isAlbumTitle(v.state.doc.nodeAt(pos)?.attrs.title);
@@ -1472,12 +1513,18 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   async function arrangeItems(items) {
     if (readOnly) return items;
     const docs = items.filter((it) => it.kind === 'file' && isDocumentFile({ name: it.name }));
-    const docsAsPages = docs.length > 0 && await promptChoice({
-      title: docs.length > 1 ? `문서 ${docs.length}개를 어떻게 넣을까요?` : `${docs[0].name}을 어떻게 넣을까요?`,
-      message: '그림으로 넣으면 장마다 넘겨 보고, 그 위에 펜으로 쓸 수 있어요',
-      choices: [{ id: 'file', label: '파일로' }, { id: 'pages', label: '그림으로', primary: true }],
+    // 문서는 원본 + PDF 한 쌍: 원본 파일(칩) 아래에 PDF 첫 쪽 썸네일 — 누르면 앱 안에서 모든 쪽을 미리 본다
+    //   PDF 가 아닌 문서(한글 · Word · 파워포인트 · 글)는 언제나 한 쌍으로 (묻지 않는다)
+    //   PDF 는 이미 PDF 라 첫 쪽을 보일지만 묻는다. 장마다 그림으로 펼치려면 파일 칩 오른쪽 클릭 › 그림으로 펼치기
+    for (const d of docs) preloadDocument(d.name); // 묻는 동안(· 바로) 그릴 도구를 미리 올린다
+    const pdfs = docs.filter((d) => extOf(d.name) === 'pdf');
+    const showPdfs = pdfs.length > 0 && await promptChoice({
+      title: pdfs.length > 1 ? `PDF ${pdfs.length}개를 어떻게 넣을까요?` : `${pdfs[0].name}을 어떻게 넣을까요?`,
+      message: '첫 쪽이 보이게 넣으면, 누르면 앱 안에서 모든 쪽을 넘겨 보고 주석도 달 수 있어요',
+      choices: [{ id: 'file', label: '파일만' }, { id: 'pages', label: '첫 쪽 보이게', primary: true }],
       remember: 'doc-insert',
     }) === 'pages';
+    const paired = new Set(docs.filter((d) => extOf(d.name) !== 'pdf' || showPdfs));
     const photos = items.filter((it) => it.kind === 'image');
     const asAlbum = photos.length > 1 && await promptChoice({
       title: `사진 ${photos.length}장을 어떻게 넣을까요?`,
@@ -1488,11 +1535,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const out = [];
     let album = null; // 모으는 중인 묶음 (처음 사진 자리에 한 묶음)
     for (const it of items) {
-      if (docsAsPages && docs.includes(it)) {
-        // 원본 문서 파일(칩)을 묶음 바로 위 줄에 — 그림으로 본 뒤에도 원본을 열거나 보낼 수 있게 (바꾸지 못하면 칩만)
-        const pages = await documentAlbum(it);
+      if (paired.has(it)) {
+        // 원본 문서 파일(칩) 바로 아래 줄에 PDF 썸네일 — 원본을 열거나 보낼 수도 있게 (바꾸지 못하면 칩만)
+        const thumb = await documentPdfItem(it);
         out.push(it);
-        if (pages !== it) out.push(pages);
+        if (thumb) out.push(thumb);
         continue;
       }
       if (asAlbum && it.kind === 'image') {
@@ -1505,19 +1552,42 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return out;
   }
 
-  // 메모 폴더에 넣은 문서 → 장마다 그림 → 묶음 사진 (바꾸지 못하면 받은 것(파일 칩) 그대로 돌려준다)
+  // 넣은 문서 파일 → 읽을 File. PC: Word · PowerPoint 는 Office 로 만든 PDF (직접 그리면 그림이 깨지고 장이 어긋남 — Office 가 없으면 직접 그린다)
+  async function documentSource(it) {
+    const name = it.name;
+    const fileName = extOf(name) ? name : `${name}.${extOf(it.src) || 'txt'}`;
+    const pdf = extOf(fileName) === 'pdf' ? null : await window.memoking?.attachments?.toPdf?.(it.src).catch(() => null);
+    if (pdf) return new File([pdf], `${baseName(name)}.pdf`, { type: 'application/pdf' });
+    if (it.file instanceof File) return new File([await it.file.arrayBuffer()], fileName, { type: it.file.type });
+    return new File([await (await fetch(vaultUrl(it.src))).blob()], fileName);
+  }
+
+  // 메모 폴더에 넣은 문서 → PDF (PDF 는 그대로) → 첫 쪽 썸네일 그림 (누르면 그 PDF 미리보기). 바꾸지 못하면 null (칩만)
+  async function documentPdfItem(it) {
+    const name = it.name;
+    try {
+      onNotice?.(`${name}을 PDF로 바꾸고 있어요`);
+      const srcFile = await documentSource(it);
+      const isPdf = extOf(srcFile.name) === 'pdf';
+      const { pdf, total, pages, thumb } = await documentPdf(srcFile, (n, all) => onNotice?.(`${name}을 PDF로 바꾸고 있어요 (${n}/${all})`));
+      // 원래 PDF 면 넣은 파일 그대로, 바꾼 것이면 PDF 를 새로 남긴다
+      const pdfSrc = isPdf && extOf(name) === 'pdf' ? it.src : await saveFile(new File([pdf], `${baseName(name)}.pdf`, { type: 'application/pdf' }));
+      const thumbSrc = await saveFile(new File([thumb], `${baseName(name)} 미리보기.png`, { type: 'image/png' }));
+      onNotice?.(total > pages ? `${name}의 앞 ${pages}장을 PDF로 넣었어요 (모두 ${total}장)` : `${name}을 PDF로 넣었어요 (${pages}쪽). 누르면 넘겨 봐요`);
+      return { kind: 'image', src: thumbSrc, alt: baseName(name), title: pdfThumbTitle(pdfSrc) };
+    } catch (err) {
+      console.warn('문서를 PDF로 바꾸지 못했어요', name, err);
+      onNotice?.(`${name}은 PDF로 바꾸지 못해 파일로 넣었어요`, true);
+      return null;
+    }
+  }
+
+  // 메모 폴더에 넣은 문서 → 장마다 그림 → 묶음 사진 (바꾸지 못하면 받은 것(파일 칩) 그대로 돌려준다) — 파일 칩 › 그림으로 펼치기
   async function documentAlbum(it) {
     const name = it.name;
     try {
       onNotice?.(`${name}을 그림으로 바꾸고 있어요`);
-      const fileName = extOf(name) ? name : `${name}.${extOf(it.src) || 'txt'}`;
-      // PC: Word · PowerPoint 는 Office 로 PDF 를 만들어 그 장들을 넣는다 (직접 그리면 그림이 깨지고 장이 어긋남) — Office 가 없으면 직접 그린다
-      const pdf = await window.memoking?.attachments?.toPdf?.(it.src).catch(() => null);
-      const srcFile = pdf
-        ? new File([pdf], `${baseName(name)}.pdf`, { type: 'application/pdf' })
-        : it.file instanceof File
-        ? new File([await it.file.arrayBuffer()], fileName, { type: it.file.type })
-        : new File([await (await fetch(vaultUrl(it.src))).blob()], fileName);
+      const srcFile = await documentSource(it);
       const { pages, total } = await documentPages(srcFile, (n, all) => onNotice?.(`${name}을 그림으로 바꾸고 있어요 (${n}/${all})`));
       const images = [];
       for (let i = 0; i < pages.length; i++) {
@@ -1545,6 +1615,17 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const insertAt = pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head;
       insertBlocks(insertAt, [album]);
     }
+  });
+
+  // 파일 칩 우클릭 메뉴 › PDF 짝 만들기 (예전에 파일로만 넣은 문서) — 칩 바로 아래에 PDF 첫 쪽 썸네일
+  window.addEventListener('mk:expand-document-pdf', async (e) => {
+    if (readOnly) return;
+    const { pos, node, href, name } = e.detail ?? {};
+    if (!href) return;
+    const thumb = await documentPdfItem({ kind: 'file', src: href, name: name || href.split('/').pop() });
+    if (!thumb) return;
+    const v = view();
+    insertBlocks(pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head, [thumb]);
   });
 
   // 파일 칩 우클릭 메뉴 › 텍스트로 본문에 풀기

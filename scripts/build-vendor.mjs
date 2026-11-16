@@ -4,6 +4,7 @@
 // node_modules 는 Google Drive 동기화 부담을 피하려고 프로젝트 밖
 // (%LOCALAPPDATA%\memoking-build) 에 설치하고, 묶은 결과물만 프로젝트에 넣는다.
 import { execSync } from 'node:child_process';
+import { gzipSync } from 'node:zlib';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -25,7 +26,11 @@ const DEPS = {
   fullcalendar: '7.1.0',
   'temporal-polyfill': '1.0.5',
   'ical.js': '2.2.1',
-  'pdfjs-dist': '5.4.149',
+  '@embedpdf/pdfium': '2.15.1',
+  '@embedpdf/engines': '2.15.1',
+  '@embedpdf/models': '2.15.1',
+  '@embedpdf/fonts-kr': '1.0.0',
+  '@rhwp/core': '0.9.0',
   'docx-preview': '0.4.1',
   'hwp.js': '0.0.3',
   jszip: '3.10.1',
@@ -95,7 +100,28 @@ await esbuild.build({
   alias: { fs: emptyModule },
   logLevel: 'info',
 });
-copyFileSync(join(MODULES, 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.min.mjs'), join(OUT, 'pdf.worker.js'));
+// PDF 읽기 (PDFium wasm) — 묶음 + wasm, 글꼴을 넣지 않은 한글 PDF 용 Noto Sans KR (보통 굵기 하나 — 앱 크기)
+await esbuild.build({
+  entryPoints: { pdfium: join(ROOT, 'scripts', 'vendor', 'pdfium.js') },
+  outdir: OUT,
+  bundle: true,
+  format: 'esm',
+  platform: 'browser',
+  target: 'es2022',
+  minify: true,
+  legalComments: 'eof',
+  nodePaths: [MODULES],
+  alias: { fs: emptyModule, path: emptyModule, crypto: emptyModule, url: emptyModule, module: emptyModule },
+  logLevel: 'info',
+});
+// wasm 은 gzip 으로 (앱 용량 — 열 때 DecompressionStream 으로 푼다, app/js/pdf-engine.js assetBytes)
+const gz = (from, to) => writeFileSync(to, gzipSync(readFileSync(from), { level: 9 }));
+gz(join(MODULES, '@embedpdf', 'pdfium', 'dist', 'pdfium.wasm'), join(OUT, 'pdfium.wasm.gz'));
+mkdirSync(join(OUT, 'fonts'), { recursive: true });
+copyFileSync(join(MODULES, '@embedpdf', 'fonts-kr', 'fonts', 'NotoSansKR-Regular.otf'), join(OUT, 'fonts', 'NotoSansKR-Regular.otf'));
+// 한글 HWP · HWPX (rhwp — Rust · wasm, MIT): wasm-bindgen 이 만든 모듈 그대로
+copyFileSync(join(MODULES, '@rhwp', 'core', 'rhwp.js'), join(OUT, 'rhwp.js'));
+gz(join(MODULES, '@rhwp', 'core', 'rhwp_bg.wasm'), join(OUT, 'rhwp_bg.wasm.gz'));
 // AI 비서 연결(MCP) 서버는 PC 메인 프로세스(node)에서만 — desktop/vendor 로 따로
 await esbuild.build({
   entryPoints: { 'mcp-sdk': join(ROOT, 'scripts', 'vendor', 'mcp-sdk.js') },

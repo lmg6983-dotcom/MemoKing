@@ -364,8 +364,22 @@ export function registerVaultProtocol(getVault, getHistory) {
     if (url.host === 'ocr') {
       const safe = path.normalize(rel).replace(/^(\.\.(\/|\\|$))+/, '');
       const file = path.join(APP_DIR, safe);
-      if (file.startsWith(APP_DIR) && fs.existsSync(file)) return net.fetch(pathToFileURL(file).href, { headers: request.headers });
+      if (file.startsWith(APP_DIR) && fs.existsSync(file)) {
+        // 앱에 든 파일 (OCR 창 · 메모 창의 wasm · 글꼴) — 메모 창(file://, origin null)에서도 읽을 수 있게
+        return net.fetch(pathToFileURL(file).href, { headers: request.headers }).then((res) => {
+          const headers = new Headers(res.headers);
+          headers.set('Access-Control-Allow-Origin', '*');
+          if (file.endsWith('.wasm')) headers.set('Content-Type', 'application/wasm');
+          return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+        });
+      }
       return new Response('not found', { status: 404 });
+    }
+    if (url.host === 'font') {
+      // PDF 미리보기의 한글 대체 글꼴 — Windows 맑은 고딕을 빌려 쓴다 (앱에 4.4MB 글꼴을 넣지 않게). 없으면 404 → 앱에 든 것
+      const file = path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts', 'malgun.ttf');
+      if (rel !== 'kr' || !fs.existsSync(file)) return new Response('not found', { status: 404 });
+      return net.fetch(pathToFileURL(file).href).then((res) => new Response(res.body, { status: res.status, headers: { 'Content-Type': 'font/ttf', 'Access-Control-Allow-Origin': '*' } }));
     }
     const vault = getVault?.();
     const history = getHistory?.();

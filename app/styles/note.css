@@ -2465,3 +2465,110 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-album-thumb.lifting { transform: scale(1.15); z-index: 1; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5); transition: transform 0.12s ease-out; }
 /* 잠긴 메모: 지문 · 얼굴로 열기 (휴대폰, lock-ui.js) */
 .lock-screen .lock-bio { margin-top: 10px; width: 100%; }
+/* ---------- 앱 안 PDF 미리보기 (pdf-viewer.js) ---------- */
+.mk-pdf-view {
+  --pdf-bg: #1c1c1e; --pdf-bar: rgba(28, 28, 30, 0.82); --pdf-fg: #f5f5f7; --pdf-muted: rgba(245, 245, 247, 0.62); --pdf-btn: rgba(255, 255, 255, 0.08); --pdf-btn-hover: rgba(255, 255, 255, 0.16);
+  position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: var(--pdf-bg); color: var(--pdf-fg);
+  animation: mk-pdf-in 0.18s ease-out; -webkit-app-region: no-drag; font-family: inherit;
+}
+.mk-pdf-view.closing { animation: mk-pdf-out 0.14s ease-in forwards; }
+@keyframes mk-pdf-in { from { opacity: 0; transform: scale(0.985); } }
+@keyframes mk-pdf-out { to { opacity: 0; transform: scale(0.985); } }
+/* 위 막대: 쪽 위에 반투명으로 떠 있다 (쪽이 막대 아래로 지나간다) */
+.mk-pdf-bar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 4px;
+  padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top)); background: var(--pdf-bar);
+  backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px); border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.mk-pdf-heading { flex: 1; min-width: 0; padding: 0 6px; line-height: 1.25; }
+.mk-pdf-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 650; font-size: 15px; letter-spacing: -0.01em; }
+.mk-pdf-sub { font-size: 12px; color: var(--pdf-muted); font-variant-numeric: tabular-nums; }
+.mk-pdf-ibtn {
+  flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px;
+  background: transparent; color: var(--pdf-fg); cursor: pointer; transition: background 0.12s, transform 0.12s ease-out;
+}
+.mk-pdf-ibtn svg { width: 21px; height: 21px; }
+.mk-pdf-ibtn:active { transform: scale(0.92); }
+@media (hover: hover) { .mk-pdf-ibtn:hover { background: var(--pdf-btn-hover); } }
+.mk-pdf-ibtn:focus-visible, .mk-pdf-pill:focus-visible, .mk-pdf-done:focus-visible, .mk-pdf-zoomval:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 2px; }
+.mk-pdf-annot { background: var(--pdf-btn); }
+.mk-pdf-done { display: none; flex: none; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--brand-yellow, #ffcc00); color: #1a1a1a; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.mk-pdf-view[data-mode="ink"] .mk-pdf-done { display: block; }
+.mk-pdf-view[data-mode="ink"] .mk-pdf-annot, .mk-pdf-view[data-mode="ink"] .mk-pdf-zoombar, .mk-pdf-view[data-mode="ink"] .mk-pdf-pill { display: none; }
+/* 쪽들 */
+.mk-pdf-scroll { flex: 1; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
+.mk-pdf-pages { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: calc(68px + env(safe-area-inset-top)) 8px calc(96px + env(safe-area-inset-bottom)); min-width: min-content; }
+@media (min-width: 600px) { .mk-pdf-pages { padding-left: 24px; padding-right: 24px; gap: 20px; } }
+.mk-pdf-page {
+  position: relative; flex: none; border-radius: 3px; overflow: hidden; background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+/* 그리기 전: 반짝이는 빈 쪽 */
+.mk-pdf-page:not(.drawn) { background: linear-gradient(100deg, #f1f1f1 30%, #fafafa 50%, #f1f1f1 70%) 0 0 / 300% 100%; animation: mk-pdf-shimmer 1.4s linear infinite; }
+@keyframes mk-pdf-shimmer { to { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) { .mk-pdf-page:not(.drawn) { animation: none; } .mk-pdf-view, .mk-pdf-view.closing { animation: none; } }
+.mk-pdf-page.failed::after { content: attr(data-msg); position: absolute; inset: 0; display: grid; place-items: center; color: #777; font-size: 13px; }
+.mk-pdf-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.mk-pdf-ink { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.mk-pdf-view[data-mode="ink"] .mk-pdf-ink { pointer-events: auto; touch-action: none; cursor: crosshair; }
+.mk-pdf-view[data-mode="ink"] .mk-pdf-page { box-shadow: 0 0 0 2px rgba(255, 204, 0, 0.55), 0 8px 28px rgba(0, 0, 0, 0.35); }
+.mk-pdf-ink .ink-cursor { vector-effect: non-scaling-stroke; --note-text: #1f1f1c; }
+.mk-pdf-view[data-mode="ink"] .mk-pdf-ink.has-cursor { cursor: none; }
+.mk-pdf-note { display: flex; align-items: center; justify-content: center; gap: 10px; padding: calc(120px + env(safe-area-inset-top)) 16px 40px; color: var(--pdf-muted); font-size: 14px; }
+.mk-pdf-note.error { color: #ffb4b4; }
+.mk-pdf-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2); border-top-color: var(--pdf-fg); animation: mk-pdf-spin 0.8s linear infinite; }
+@keyframes mk-pdf-spin { to { transform: rotate(360deg); } }
+/* 아래: 쪽 번호 알약 · 확대 막대 · 알림 */
+.mk-pdf-pill, .mk-pdf-zoombar, .mk-pdf-toast {
+  position: absolute; z-index: 3; bottom: calc(18px + env(safe-area-inset-bottom)); background: var(--pdf-bar); color: var(--pdf-fg);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.mk-pdf-pill {
+  left: 50%; transform: translate(-50%, 8px); padding: 7px 14px; border: 0; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+}
+.mk-pdf-view.ready .mk-pdf-pill.show, .mk-pdf-pill.editing { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+@media (hover: hover) { .mk-pdf-view.ready:hover .mk-pdf-pill { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; } }
+.mk-pdf-goto { width: 3.2em; padding: 0 2px; border: 0; border-bottom: 1.5px solid var(--brand-yellow, #ffcc00); background: transparent; color: inherit; font: inherit; text-align: right; outline: none; -moz-appearance: textfield; }
+.mk-pdf-goto::-webkit-inner-spin-button { display: none; }
+.mk-pdf-zoombar { right: 16px; display: none; align-items: center; gap: 2px; padding: 4px; border-radius: 14px; }
+@media (hover: hover) and (pointer: fine) { .mk-pdf-view.ready .mk-pdf-zoombar { display: flex; } }
+.mk-pdf-zoombar .mk-pdf-ibtn { width: 34px; height: 34px; border-radius: 10px; }
+.mk-pdf-zsym { font-size: 18px; line-height: 1; }
+.mk-pdf-zoomval { min-width: 52px; height: 34px; border: 0; border-radius: 10px; background: transparent; color: var(--pdf-fg); font: inherit; font-size: 12.5px; font-variant-numeric: tabular-nums; cursor: pointer; }
+@media (hover: hover) { .mk-pdf-zoomval:hover { background: var(--pdf-btn-hover); } }
+.mk-pdf-toast {
+  left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); max-width: calc(100% - 32px); padding: 9px 16px; border-radius: 12px; font-size: 13.5px;
+  transform: translate(-50%, 8px); opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+}
+.mk-pdf-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.mk-pdf-view .ink-dock { position: absolute; z-index: 4; }
+/* 글자 고르기: 고른 글자 위 파란 칠 · 위에 떠 있는 [복사 · 형광펜] */
+.mk-pdf-view { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.mk-pdf-view[data-mode="view"] .mk-pdf-page.drawn { cursor: text; }
+.mk-pdf-sel { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; }
+.mk-pdf-sel > div { position: absolute; background: rgba(56, 132, 255, 0.32); border-radius: 1px; }
+.mk-pdf-sel > div.area { background: rgba(56, 132, 255, 0.12); outline: 1.5px dashed rgba(36, 112, 235, 0.9); outline-offset: -1px; border-radius: 2px; }
+.mk-pdf-selframe { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
+.mk-pdf-selframe::before { content: ""; width: 18px; height: 14px; border: 2px solid #ff6b6f; border-radius: 2px; }
+@media (hover: hover) { .mk-pdf-selframe:hover { background: rgba(255, 255, 255, 0.14); } }
+.mk-pdf-selframe:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 1px; }
+.mk-pdf-selmenu {
+  position: absolute; left: 0; top: 0; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 4px;
+  border-radius: 14px; background: #2c2c2e; color: #fff; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: mk-pdf-pop 0.14s ease-out;
+}
+.mk-pdf-selmenu[hidden] { display: none; }
+@keyframes mk-pdf-pop { from { opacity: 0; scale: 0.94; } }
+.mk-pdf-selbtn { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+@media (hover: hover) { .mk-pdf-selbtn:hover, .mk-pdf-seldot:hover { background: rgba(255, 255, 255, 0.14); } }
+.mk-pdf-selsep { width: 1px; height: 20px; margin: 0 4px; background: rgba(255, 255, 255, 0.16); }
+.mk-pdf-seldot { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
+.mk-pdf-seldot::before { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.mk-pdf-selbtn:focus-visible, .mk-pdf-seldot:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 1px; }
+@media (max-width: 480px) { .mk-pdf-bar { padding-left: 6px; padding-right: 8px; } .mk-pdf-title { font-size: 14.5px; } }
+@media print { .mk-pdf-view { display: none !important; } }
+/* 메모 속 PDF 썸네일: 누르면 미리보기 — 오른쪽 아래 "PDF" 표시 */
+.mk-doc img.mk-pdf-thumb { box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12); background: #fff; cursor: zoom-in; }
+.mk-doc p:has(> img.mk-pdf-thumb) { position: relative; width: fit-content; max-width: 100%; }
+.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF"; position: absolute; right: 8px; bottom: 10px; padding: 2px 7px; border-radius: 6px; background: #c4282e; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; }

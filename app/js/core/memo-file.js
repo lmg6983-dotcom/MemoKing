@@ -234,6 +234,9 @@ const isLocalPath = (src) => !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWit
 export const ALBUM_TITLE = 'album';
 export const ALBUM_PAGE_TITLE = 'album page';
 export const isAlbumTitle = (t) => /^album( page)?( ink)?$/.test(t ?? '');
+// PDF 썸네일: 그림의 설명(title)에 "pdf <PDF 경로>" — 누르면 그 PDF 를 앱 안에서 미리 본다 (문서를 PDF 로 넣을 때)
+export const pdfThumbTitle = (src) => `pdf ${src}`;
+export const pdfOfTitle = (t) => /^pdf (\S+)$/.exec(t ?? '')?.[1] ?? null;
 
 // 사진 · 동영상 크기: 그 줄 폭의 % 를 설명(alt) 끝에 "|50%" 로 (Obsidian 의 ![설명|300] 처럼 — 휴대폰 · PC 화면 폭이 달라 px 대신 %)
 const SIZE_RE = /\|(\d{1,3})%$/;
@@ -268,6 +271,12 @@ export function extractMedia(body) {
     if (!embed && !src.startsWith('attachments/')) continue; // 다른 메모로 가는 링크 등은 첨부가 아님
     seen.add(src);
     found.push({ src, alt: m[2], kind: embed ? mediaKindOf(src, m[2]) ?? 'file' : 'file', title: m[4] ?? '' });
+    // PDF 썸네일이 가리키는 PDF 도 이 메모의 첨부 (지우기 · 되살리기 · 동기화가 함께 다루게)
+    const pdf = embed ? safeDecode(pdfOfTitle(m[4]) ?? '') : '';
+    if (pdf && isLocalPath(pdf) && !seen.has(pdf)) {
+      seen.add(pdf);
+      found.push({ src: pdf, alt: m[2], kind: 'file', title: '' });
+    }
   }
   return found;
 }

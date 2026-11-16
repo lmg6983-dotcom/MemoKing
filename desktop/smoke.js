@@ -317,7 +317,7 @@ export async function runSmoke({
     const plyrIcons = await js(n1.win, `(() => { const u = document.querySelector('.plyr use'); const id = (u?.getAttribute('href') ?? '').replace(/^#/, ''); return !!id && !!document.getElementById(id); })()`);
     check('플레이어 아이콘이 인터넷 없이 표시 (문서 안 아이콘 사용)', plyrIcons);
     await js(n1.win, PASTE_FILE);
-    const chip = await until(() => js(n1.win, `(() => { [...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '파일로')?.click(); return document.querySelector('.mk-doc a[href^="attachments/"]')?.textContent; })()`), '파일 칩').catch(() => null);
+    const chip = await until(() => js(n1.win, `(() => { [...document.querySelectorAll('.mk-prompt button')].find((b) => /^파일(로|만)$/.test(b.textContent))?.click(); return document.querySelector('.mk-doc a[href^="attachments/"]')?.textContent; })()`), '파일 칩').catch(() => null);
     check('그 밖의 파일 → 파일 칩', chip === '회의자료.txt', chip);
     await capture(n1.win, 'smoke-note.png');
 
@@ -332,9 +332,13 @@ export async function runSmoke({
     check('밑줄(Ctrl+U) → "<u>"', md1.includes('<u>밑줄</u>'));
     check('글자 색(색판) → <span style="color">', md1.includes('<span style="color: #e03131">빨강</span>'));
     check('하이라이트(Ctrl+Shift+H) → "<mark>"', md1.includes('<mark>형광</mark>'));
-    const attachments = [...md1.matchAll(/!?\[[^\]]*\]\((attachments\/[^)]+)\)/g)].map((m) => m[1]);
-    check('이미지·소리·동영상·파일이 attachments 폴더에 저장되고 md로 참조됨',
+    // 글 파일(.txt)은 PDF 와 한 쌍 — 칩 아래 PDF 첫 쪽 썸네일 ("pdf <경로>" 제목)은 따로 센다
+    const refs = [...md1.matchAll(/!?\[[^\]]*\]\((attachments\/[^)\s]+)(?: "([^"]*)")?\)/g)];
+    const attachments = refs.filter((m) => !/^pdf /.test(m[2] ?? '')).map((m) => m[1]);
+    const pdfPair = refs.find((m) => /^pdf /.test(m[2] ?? ''));
+    check('이미지·소리·동영상·파일이 attachments 폴더에 저장되고 md로 참조됨 (글 파일은 PDF 짝과 함께)',
       attachments.length === 4 && attachments.every((a) => fs.existsSync(path.join(VAULT, a)))
+        && Boolean(pdfPair) && [pdfPair[1], pdfPair[2].slice(4)].every((a) => fs.existsSync(path.join(VAULT, a)))
         && md1.includes('![동영상 데모 영상](attachments/') && md1.includes('[회의자료.txt](attachments/'),
       attachments.join(', '));
 
@@ -845,7 +849,7 @@ export async function runSmoke({
       dt.items.add(new File(['@echo off'], '설치.bat', { type: 'application/x-bat' }));
       document.querySelector('.mk-doc').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
     })()`);
-    const chips = await until(() => js(linkNote.win, `(() => { [...document.querySelectorAll('.mk-prompt button')].find((b) => b.textContent === '파일로')?.click(); const a = [...document.querySelectorAll('.mk-doc a[data-file]')]; return a.length === 2 && a.map((x) => ({ name: x.textContent, kind: x.dataset.file, ext: x.dataset.ext, href: x.getAttribute('href') })); })()`), '파일 칩 2개').catch(() => null);
+    const chips = await until(() => js(linkNote.win, `(() => { [...document.querySelectorAll('.mk-prompt button')].find((b) => /^파일(로|만)$/.test(b.textContent))?.click(); const a = [...document.querySelectorAll('.mk-doc a[data-file]')]; return a.length === 2 && a.map((x) => ({ name: x.textContent, kind: x.dataset.file, ext: x.dataset.ext, href: x.getAttribute('href') })); })()`), '파일 칩 2개').catch(() => null);
     check('파일 칩: 종류·확장자 표시 (프로그램 파일 구분)', chips?.[0]?.kind === 'doc' && chips[0].ext === 'TXT' && chips[1]?.kind === 'program' && chips[1].ext === 'BAT', JSON.stringify(chips));
     const chipAt = (i) => `document.querySelectorAll('.mk-doc a[data-file]')[${i}]`;
     const clickChip = async (i) => {
@@ -873,8 +877,8 @@ export async function runSmoke({
     // 사진은 누르면 크게 보기 (묶음 사진과 같은 보기 — 한 장이면 번호 · 장 목록 없이)
     await key(linkNote.win, 'End', ['control']);
     await js(linkNote.win, PASTE_IMAGE);
-    await until(() => js(linkNote.win, `document.querySelector('.mk-image')?.naturalWidth > 0`), '사진').catch(() => {});
-    await js(linkNote.win, `document.querySelector('.mk-image').click()`);
+    await until(() => js(linkNote.win, `document.querySelector('.mk-image:not(.mk-pdf-thumb)')?.naturalWidth > 0`), '사진').catch(() => {});
+    await js(linkNote.win, `document.querySelector('.mk-image:not(.mk-pdf-thumb)').click()`); // 위의 회의록.txt 의 PDF 짝 썸네일 말고 붙인 사진
     const bigView = await until(() => js(linkNote.win, `(() => { const v = document.querySelector('.mk-album-view'); return v && { big: Boolean(v.querySelector('.mk-album-big')?.src), count: v.querySelector('.mk-album-count').textContent, strip: !v.querySelector('.mk-album-strip').hidden }; })()`), '사진 크게 보기').catch(() => null);
     check('사진 한 장 누르기 → 크게 보기 (번호 · 장 목록 없이)', Boolean(bigView?.big) && bigView.count === '' && bigView.strip === false, JSON.stringify(bigView));
     await key(linkNote.win, 'Escape');

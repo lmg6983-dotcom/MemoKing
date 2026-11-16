@@ -7,7 +7,7 @@ import {
 import { indexOutput, indexKey, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
-import { fs, toBase64 } from './native.js';
+import { fs, toBase64, scanCache } from './native.js';
 import { isLockedBody, parseLocked } from '../../app/js/core/memo-lock.js';
 import { isLiveCached } from '../../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles, diskCopy } from '../../app/js/core/vault-locks.js';
@@ -60,6 +60,37 @@ export class Vault extends EventTarget {
     this.indexTimer = null;
     this.pollTimer = null;
     this.latestVersion = new Map(); // 메모 id → 가장 최근 버전 {at, body} (저장할 때마다 폴더를 읽지 않게)
+    // 폴더에서 읽은 그대로의 글: 파일 → [바뀐 때, 크기, 글] — 앱 캐시에 남겨 두고 다음에 켤 때 바뀐 때 · 크기가 같으면 다시 읽지 않는다 (Bridge.kt scanCache)
+    //   읽은 것만 담는다 (이 기기가 쓴 파일은 다음 켤 때 한 번 더 읽는다) — 디스크와 다른 글이 들어갈 길이 없게
+    this.disk = new Map();
+    this.diskDirty = false;
+    this.cacheKey = null;
+    this.cacheTimer = null;
+    this.quietUntil = 0;
+  }
+
+  // 지난번 캐시 → this.disk (못 읽으면 빈 채로 — 모두 폴더에서 읽는다)
+  loadScanCache() {
+    try {
+      this.cacheKey = scanCache.key();
+      const saved = this.cacheKey && JSON.parse(scanCache.read(this.cacheKey) ?? 'null');
+      if (saved?.v === 1 && Array.isArray(saved.files)) for (const [file, mtime, size, text] of saved.files) this.disk.set(file, [mtime, size, text]);
+    } catch {
+      this.disk.clear();
+    }
+  }
+
+  /** 읽은 글을 앱 캐시에 (바뀐 게 있을 때만 — 화면을 떠날 때 · 폴더를 읽고 잠시 뒤) */
+  saveScanCache() {
+    clearTimeout(this.cacheTimer);
+    if (!this.diskDirty || !this.cacheKey) return;
+    this.diskDirty = false;
+    try {
+      const files = [...this.disk].map(([file, [mtime, size, text]]) => [file, mtime, size, text]);
+      scanCache.write(this.cacheKey, JSON.stringify({ v: 1, files }));
+    } catch {
+      // 캐시 — 다음에 켤 때 폴더에서 읽으면 된다
+    }
   }
 
   emit(type, detail) {
@@ -80,6 +111,7 @@ export class Vault extends EventTarget {
     } catch {
       this.index = null;
     }
+    this.loadScanCache();
     this.scan({ silent: true });
     // 꺼 둔 사이 다른 기기에서 잠근 메모의 풀린 버전이 이 기기에 남지 않게
     for (const e of this.entries.values()) if (isLockedBody(e.body)) this.dropUnsafeVersions(e.id);
@@ -92,12 +124,19 @@ export class Vault extends EventTarget {
   // 화면이 보이는 동안만 폴더를 살핀다 (배터리)
   resume() {
     clearInterval(this.pollTimer);
-    this.pollTimer = setInterval(() => this.scan(), SCAN_INTERVAL);
+    // 글을 쓰는 동안은 건너뛴다 — 폴더 읽기는 화면과 같은 줄에서 돌아(SAF 폴더는 수십 ms) 글자가 멈칫한다. 덮어쓰기 전 확인(keepChangedOnDisk)은 그대로
+    this.pollTimer = setInterval(() => Date.now() >= this.quietUntil && this.scan(), SCAN_INTERVAL);
+  }
+
+  /** 글을 쓰고 있다 (app.js) — 잠시 폴더 살피기를 쉰다 */
+  typing() {
+    this.quietUntil = Date.now() + 2000;
   }
 
   pause() {
     clearInterval(this.pollTimer);
     this.pollTimer = null;
+    this.saveScanCache();
     if (this.indexTimer || this.indexing) this.writeIndex({ now: true }); // 뒤로 가면 작업 스레드가 멈출 수 있어 여기서 바로
   }
 
@@ -118,6 +157,12 @@ export class Vault extends EventTarget {
       return;
     }
     const prevByFile = new Map([...this.entries.values()].filter((e) => e.file).map((e) => [e.file, e]));
+    const disk = new Map(); // 이번에 본 파일들의 읽은 글 (없어진 파일은 빠진다)
+    const known = (file, mtime, size) => {
+      const d = this.disk.get(file);
+      if (d && d[0] === mtime && d[1] === size) disk.set(file, d);
+      return d && d[0] === mtime && d[1] === size ? d[2] : undefined;
+    };
     const next = new Map([...this.entries].filter(([, e]) => !e.file)); // 아직 파일이 없는 새 메모
     const changed = new Set();
     const external = [];
@@ -128,13 +173,20 @@ export class Vault extends EventTarget {
       const prev = prevByFile.get(file);
       if (prev && prev.mtimeMs === mtime && prev.size === size && !next.has(prev.id)) {
         next.set(prev.id, prev);
+        known(file, mtime, size);
         continue;
       }
-      let text;
-      try {
-        text = fs.readText(file);
-      } catch {
-        text = null;
+      let text = known(file, mtime, size);
+      if (text === undefined) {
+        try {
+          text = fs.readText(file);
+        } catch {
+          text = null;
+        }
+        if (text != null) {
+          disk.set(file, [mtime, size, text]);
+          this.diskDirty = true;
+        }
       }
       if (text == null) {
         // 잠깐 못 읽었다 (목록에는 있는 파일) — 아는 내용 그대로 둔다 (사라진 메모로 보지 않게)
@@ -182,6 +234,12 @@ export class Vault extends EventTarget {
     }
     this.rememberRemoved(removed); // 파일이 잠깐 없던 메모를 곧 다시 저장할 때 머리말(알림·잠금 설정)을 잃지 않게
     this.entries = next;
+    if (disk.size !== this.disk.size) this.diskDirty = true;
+    this.disk = disk;
+    if (this.diskDirty) {
+      clearTimeout(this.cacheTimer);
+      this.cacheTimer = setTimeout(() => this.saveScanCache(), 5000); // 켜자마자 쓰지 않게 · 연달아 바뀌면 한 번만
+    }
     for (const id of lockedNow) this.dropUnsafeVersions(id);
     if (twins.length) {
       for (const t of twins) this.settleTwin(t);

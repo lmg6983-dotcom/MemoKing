@@ -1039,6 +1039,14 @@ class Mover {
         const name = chip.textContent.trim();
         const ext = extOf(name) || extOf(href);
         if (isDocumentFile({ name }) || isDocumentFile({ name: href })) {
+          // PDF 가 아닌 문서: 아직 PDF 짝(바로 아래 PDF 썸네일)이 없으면 만들기
+          const after = view.state.doc.nodeAt(block.pos + block.node.nodeSize);
+          let hasPair = false;
+          after?.descendants((n) => {
+            if (n.type.name === 'image' && /^pdf \S+$/.test(n.attrs.title ?? '')) hasPair = true;
+            return !hasPair;
+          });
+          if (ext !== 'pdf' && !hasPair) extraItems.push({ id: 'expand-pdf', label: 'PDF 짝 만들기' });
           extraItems.push({ id: 'expand-images', label: '그림으로 펼치기' });
         }
         if (['txt', 'md', 'csv', 'json', 'xml', 'log'].includes(ext)) {
@@ -1047,7 +1055,9 @@ class Mover {
         opts.extraItems = extraItems;
         opts.onExtra = (id) => {
           if (id === 'rename') this.renameAt(block.pos, block.node);
-          else if (id === 'expand-images') {
+          else if (id === 'expand-pdf') {
+            window.dispatchEvent(new CustomEvent('mk:expand-document-pdf', { detail: { pos: block.pos, node: block.node, href, name } }));
+          } else if (id === 'expand-images') {
             window.dispatchEvent(new CustomEvent('mk:expand-document-images', { detail: { pos: block.pos, node: block.node, href, name } }));
           } else if (id === 'expand-text') {
             window.dispatchEvent(new CustomEvent('mk:expand-document-text', { detail: { pos: block.pos, node: block.node, href, name } }));

@@ -76,6 +76,30 @@ class Bridge(private val activity: MainActivity) {
         null
     }
 
+    // 첫 화면을 빨리: 지난번에 읽은 메모 파일의 글(파일 · 바뀐 때 · 크기 · 글)을 앱 캐시에 둔다 — 다음에 켤 때 바뀐 때 · 크기가 같은 파일은 다시 읽지 않는다
+    //   (SAF 폴더는 파일 하나 읽는 데 수 ms — 메모가 많으면 켤 때 몇 초). 메모 폴더마다 따로, 연습 공간은 두지 않는다. 캐시라 백업되지 않고 지워져도 괜찮다
+    private fun currentScanKey(): String? {
+        if (Vaults.sandbox != null) return null
+        val spec = Vaults.spec(ctx) ?: return null
+        return java.security.MessageDigest.getInstance("SHA-256").digest(spec.toByteArray()).take(8).joinToString("") { "%02x".format(it) }
+    }
+
+    private fun scanCacheFile(key: String): File? = key.takeIf { it == currentScanKey() }?.let { File(ctx.cacheDir, "scan-$it.json") }
+
+    @JavascriptInterface
+    fun scanCacheKey(): String = reply { currentScanKey() }
+
+    @JavascriptInterface
+    fun readScanCache(key: String): String = reply { scanCacheFile(key)?.takeIf { it.isFile }?.readText() }
+
+    @JavascriptInterface
+    fun writeScanCache(key: String, text: String): String = reply {
+        val f = scanCacheFile(key) ?: return@reply false // 그사이 다른 폴더 · 연습 공간으로 바뀌었다
+        val tmp = File(f.path + ".tmp")
+        tmp.writeText(text)
+        tmp.renameTo(f)
+    }
+
     // 메모 파일(.md) 목록 — 데스크탑 Vault.listFiles 와 같은 규칙: 숨김·임시 파일, 맨 위의 _memoking·attachments 는 뺀다
     @JavascriptInterface
     fun scan(): String = reply {
