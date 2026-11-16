@@ -126,6 +126,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
   //   떠오른 직후 잠깐은 사진 밖 click 을 버린다 (사진 보기를 연 누르기도 같다)
   let guardUntil = Date.now() + 400;
   view.addEventListener('click', (e) => {
+    if (e.pointerType === 'mouse') return; // 마우스는 누른 자리 그대로 (연 직후 바로 닫기를 눌러도 닫히게)
     if (Date.now() < guardUntil && !stage.contains(e.target)) {
       e.preventDefault();
       e.stopPropagation();
@@ -243,6 +244,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     const job = ++sliding;
     moving = false; // 앞 미끄럼은 그만 (아래 timeout 이 job 이 달라 돌지 않으므로 여기서 푼다)
     i = k;
+    count.textContent = `${i + 1} / ${images.length}`; // 장 번호는 누르자마자 (그림은 미끄러진 뒤에 바뀐다)
     if (still || z.s > 1) {
       show();
       return;
