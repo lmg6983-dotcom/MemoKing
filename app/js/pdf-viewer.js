@@ -5,10 +5,13 @@
 //   - 확대: 두 손가락 · Ctrl+휠 · 두 번 누르기(100% ↔ 200%) · PC 는 오른쪽 아래 확대 막대
 //   - 주석(onSave 가 있을 때): 쪽 위에 펜 · 형광펜 · 지우개 (메모 주석과 같은 도구 막대) — 완료하면 PDF 안에 잉크 주석으로 저장
 //     (원본은 그대로, 주석을 넣은 새 PDF 를 onSave 로 넘긴다). 손가락 하나는 그리기, 두 손가락은 넘기기
+//   - 글자 고르기: PC 는 끌기 · 두 번 눌러 낱말, 휴대폰은 꾹 눌러 낱말 → 그대로 끌어 늘리기. 고르면 위에 [복사 · 형광펜 색들]
+//     형광펜은 고른 줄마다 형광펜 획으로 넣는다 (주석과 같이 PDF 에 저장 · 주석 모드의 지우개 · 되돌리기로 고친다)
 //   Esc · 휴대폰 뒤로 가기: 주석 중이면 주석 끝내기(저장), 아니면 닫기
 import { openPdf } from './pdf-engine.js';
 import { icon } from './icons.js';
 import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys, strokeEl } from './ink-editor.js';
+import { point, HIGHLIGHT_COLORS } from './core/ink.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const el = (tag, cls, props = {}) => Object.assign(document.createElement(tag), cls ? { className: cls } : {}, props);
@@ -357,7 +360,8 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   // 두 번 누르기: 100% ↔ 200% (누른 자리를 가운데로)
   let lastTap = null;
   scroller.addEventListener('pointerup', (e) => {
-    if (inking || touches.size || e.button) return;
+    if (inking || touches.size || e.button || selecting || justSelected) return;
+    if (e.pointerType === 'mouse' && hit(e)?.c >= 0) return; // 글자 위 두 번 누르기는 낱말 고르기 (dblclick)
     const now = performance.now();
     if (lastTap && now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
       lastTap = null;
@@ -393,12 +397,208 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   scroller.addEventListener('pointercancel', lift);
   // 두 손가락일 때는 브라우저가 스크롤로 가져가지 않게 (가져가면 pointercancel 로 확대가 끊긴다)
   scroller.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 1 && !inking) e.preventDefault();
+    if ((e.touches.length > 1 && !inking) || selecting) e.preventDefault(); // 고르는 동안은 넘기지 않는다
   }, { passive: false });
   scroller.addEventListener('scroll', () => {
     showCount();
+    placeMenu();
     if (!inking) flashPill();
   }, { passive: true });
+
+  // ---------- 글자 고르기 · 복사 · 형광펜 ----------
+  let sel = null; // { i, a, b } 글자 번호 (a: 시작, b: 끝)
+  let selecting = null; // 끌고 있는 { id, i, anchor: [a, b] }
+  let justSelected = false; // 막 고른 뒤의 pointerup 은 두 번 누르기로 세지 않는다
+  let pressTimer = 0;
+  const menu = el('div', 'mk-pdf-selmenu', { role: 'toolbar', ariaLabel: '고른 글자' });
+  const copyBtn = el('button', 'mk-pdf-selbtn', { type: 'button', textContent: '복사' });
+  copyBtn.addEventListener('click', () => copySel());
+  menu.append(copyBtn);
+  if (onSave) {
+    menu.append(el('span', 'mk-pdf-selsep'));
+    for (const color of HIGHLIGHT_COLORS) {
+      const b = el('button', 'mk-pdf-seldot', { type: 'button', title: '형광펜', ariaLabel: `형광펜 ${color}` });
+      b.style.setProperty('--c', color);
+      b.addEventListener('click', () => highlightSel(color));
+      menu.append(b);
+    }
+  }
+  menu.hidden = true;
+  view.append(menu);
+  for (const b of menu.querySelectorAll('button')) b.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  const textOf = (i) => {
+    try {
+      return pdf?.text(i) ?? null;
+    } catch {
+      return null;
+    }
+  };
+  /** 누른 자리 → { i, x, y (pt), c (글자 번호 | -1) } */
+  function hit(e, tol) {
+    if (!pdf) return null;
+    // 쪽은 누른 자리로 찾는다 (포인터를 붙잡은 뒤의 이벤트는 대상이 스크롤 상자로 바뀐다)
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const box = (selecting ? pages[selecting.i]?.box : null) ?? under?.closest?.('.mk-pdf-page');
+    if (!box) return null;
+    const i = Number(box.dataset.i);
+    const p = pages[i];
+    const r = box.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * p.w;
+    const y = ((e.clientY - r.top) / r.height) * p.h;
+    const t = textOf(i);
+    return { i, x, y, c: t ? t.charAt(x, y, tol ?? 6) : -1 };
+  }
+  function layerOf(i) {
+    const p = pages[i];
+    let l = p.box.querySelector('.mk-pdf-sel');
+    if (!l) {
+      l = el('div', 'mk-pdf-sel');
+      p.box.querySelector('canvas') ? p.box.querySelector('canvas').after(l) : p.box.prepend(l);
+    }
+    return l;
+  }
+  function paintSel() {
+    for (const l of view.querySelectorAll('.mk-pdf-sel')) l.replaceChildren();
+    if (!sel) return;
+    const p = pages[sel.i];
+    const t = textOf(sel.i);
+    if (!t) return;
+    layerOf(sel.i).append(...t.rects(sel.a, sel.b).map((r) => {
+      const d = el('div');
+      Object.assign(d.style, { left: `${(r.x / p.w) * 100}%`, top: `${(r.y / p.h) * 100}%`, width: `${(r.w / p.w) * 100}%`, height: `${(r.h / p.h) * 100}%` });
+      return d;
+    }));
+  }
+  function placeMenu() {
+    if (!sel || selecting) {
+      menu.hidden = true;
+      return;
+    }
+    const marks = [...(pages[sel.i]?.box.querySelectorAll('.mk-pdf-sel > div') ?? [])];
+    if (!marks.length) {
+      menu.hidden = true;
+      return;
+    }
+    const first = marks[0].getBoundingClientRect();
+    const last = marks[marks.length - 1].getBoundingClientRect();
+    const vr = view.getBoundingClientRect();
+    menu.hidden = false;
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    const top = first.top - mh - 10 > vr.top + 70 ? first.top - mh - 10 : last.bottom + 10; // 위에 자리가 없으면 아래에
+    const left = Math.max(8, Math.min(vr.width - mw - 8, (first.left + last.right) / 2 - mw / 2 - vr.left));
+    menu.style.transform = `translate(${Math.round(left)}px, ${Math.round(top - vr.top)}px)`;
+    menu.hidden = top < vr.top + 56 || top > vr.bottom - 40; // 고른 데가 화면 밖이면 숨긴다
+  }
+  function setSel(next) {
+    sel = next && next.a >= 0 && next.b >= 0 ? next : null;
+    paintSel();
+    placeMenu();
+  }
+  const clearSel = () => sel && setSel(null);
+  function startSel(e, h, word) {
+    const t = textOf(h.i);
+    const [a, b] = word ? t.word(h.c) : [h.c, h.c];
+    selecting = { id: e.pointerId, i: h.i, anchor: [a, b], moved: false };
+    setSel({ i: h.i, a, b });
+    try {
+      scroller.setPointerCapture(e.pointerId);
+    } catch {
+      // 합성 이벤트
+    }
+  }
+  scroller.addEventListener('pointerdown', (e) => {
+    if (inking || !pdf || e.button || (e.target instanceof Element && e.target.closest('.mk-pdf-selmenu'))) return;
+    clearTimeout(pressTimer);
+    if (e.pointerType === 'mouse') {
+      const h = hit(e);
+      if (h && h.c >= 0) {
+        e.preventDefault();
+        startSel(e, h, false);
+      } else clearSel();
+      return;
+    }
+    // 손가락 · 펜: 꾹 누르면 낱말을 고르고, 떼지 않고 끌면 늘린다 (움직이면 넘기기)
+    if (touches.size > 1) return;
+    const start = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    const cancel = (ev) => {
+      if (ev.pointerId === start.id && (ev.type !== 'pointermove' || Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 8)) {
+        clearTimeout(pressTimer);
+        scroller.removeEventListener('pointermove', cancel);
+      }
+    };
+    scroller.addEventListener('pointermove', cancel);
+    scroller.addEventListener('pointerup', cancel, { once: true });
+    scroller.addEventListener('pointercancel', cancel, { once: true });
+    const target = e.target;
+    pressTimer = setTimeout(() => {
+      scroller.removeEventListener('pointermove', cancel);
+      if (touches.size > 1) return;
+      const h = hit({ target, clientX: start.x, clientY: start.y }, 8);
+      if (!h || h.c < 0) return;
+      navigator.vibrate?.(10);
+      startSel({ pointerId: start.id }, h, true);
+    }, 450);
+  });
+  scroller.addEventListener('pointermove', (e) => {
+    if (!selecting || e.pointerId !== selecting.id) return;
+    const h = hit(e, 12);
+    if (!h || h.i !== selecting.i || h.c < 0) return;
+    selecting.moved = true;
+    const [a, b] = selecting.anchor;
+    setSel(h.c < a ? { i: h.i, a: b, b: h.c } : { i: h.i, a, b: Math.max(b, h.c) });
+  });
+  const endSel = (e) => {
+    if (!selecting || e.pointerId !== selecting.id) return;
+    const { moved } = selecting;
+    selecting = null;
+    justSelected = true;
+    setTimeout(() => (justSelected = false), 0);
+    if (e.pointerType === 'mouse' && !moved) return setSel(null); // 글자 위를 한 번 누르기만: 고르지 않음
+    placeMenu();
+  };
+  scroller.addEventListener('pointerup', endSel);
+  scroller.addEventListener('pointercancel', endSel);
+  scroller.addEventListener('dblclick', (e) => {
+    if (inking) return;
+    const h = hit(e);
+    if (!h || h.c < 0) return;
+    const [a, b] = textOf(h.i).word(h.c);
+    setSel({ i: h.i, a, b });
+  });
+  scroller.addEventListener('contextmenu', (e) => e.preventDefault()); // 휴대폰 꾹 누르기의 기본 메뉴 대신 우리 메뉴
+
+  async function copySel() {
+    if (!sel) return;
+    const txt = textOf(sel.i)?.text(sel.a, sel.b) ?? '';
+    if (!txt.trim()) return showToast('고른 곳에 글자가 없어요');
+    try {
+      await navigator.clipboard.writeText(txt);
+    } catch {
+      const ta = el('textarea', '', { value: txt });
+      ta.style.cssText = 'position:fixed;opacity:0';
+      view.append(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    setSel(null);
+    showToast('복사했어요');
+  }
+  let hlTimer = 0;
+  function highlightSel(color) {
+    if (!sel || !onSave) return;
+    const rects = textOf(sel.i)?.rects(sel.a, sel.b) ?? [];
+    const strokes = rects.map((r) => ({ tool: 'highlighter', color, size: Math.max(4, r.h * 1.1), pen: false, pts: [point(r.x, r.y + r.h / 2), point(r.x + r.w, r.y + r.h / 2)] }));
+    if (!strokes.length) return;
+    const i = sel.i;
+    hist.set({ ...hist.get(), [i]: [...inkOf(i), ...strokes] });
+    setSel(null);
+    paintInk(i);
+    clearTimeout(hlTimer);
+    hlTimer = setTimeout(() => persist(), 600); // 연달아 칠하면 한 번에 저장
+  }
 
   // ---------- 키 ----------
   const onKey = (e) => {
@@ -413,7 +613,8 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      if (toolbar?.popoverOpen) toolbar.closePopover();
+      if (sel) clearSel();
+      else if (toolbar?.popoverOpen) toolbar.closePopover();
       else if (inking) setInk(false);
       else shut();
       return;
@@ -423,6 +624,11 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
       return;
     }
     const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.code === 'KeyC' && sel) {
+      e.preventDefault();
+      copySel();
+      return;
+    }
     if (!mod && !e.altKey && PAGE_KEYS[e.key] && !(e.key === ' ' && e.target instanceof HTMLButtonElement)) {
       // 단추에 초점이 있어도 넘기기 (↑↓ 조금 · PageUp/Down · Space 한 화면 · Home/End) — 단추 위 Space 는 단추 누르기
       e.preventDefault();

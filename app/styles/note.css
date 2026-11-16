@@ -2543,6 +2543,24 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 }
 .mk-pdf-toast.show { opacity: 1; transform: translate(-50%, 0); }
 .mk-pdf-view .ink-dock { position: absolute; z-index: 4; }
+/* 글자 고르기: 고른 글자 위 파란 칠 · 위에 떠 있는 [복사 · 형광펜] */
+.mk-pdf-view { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.mk-pdf-view[data-mode="view"] .mk-pdf-page.drawn { cursor: text; }
+.mk-pdf-sel { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; }
+.mk-pdf-sel > div { position: absolute; background: rgba(56, 132, 255, 0.32); border-radius: 1px; }
+.mk-pdf-selmenu {
+  position: absolute; left: 0; top: 0; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 4px;
+  border-radius: 14px; background: #2c2c2e; color: #fff; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: mk-pdf-pop 0.14s ease-out;
+}
+.mk-pdf-selmenu[hidden] { display: none; }
+@keyframes mk-pdf-pop { from { opacity: 0; scale: 0.94; } }
+.mk-pdf-selbtn { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+@media (hover: hover) { .mk-pdf-selbtn:hover, .mk-pdf-seldot:hover { background: rgba(255, 255, 255, 0.14); } }
+.mk-pdf-selsep { width: 1px; height: 20px; margin: 0 4px; background: rgba(255, 255, 255, 0.16); }
+.mk-pdf-seldot { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
+.mk-pdf-seldot::before { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.mk-pdf-selbtn:focus-visible, .mk-pdf-seldot:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 1px; }
 @media (max-width: 480px) { .mk-pdf-bar { padding-left: 6px; padding-right: 8px; } .mk-pdf-title { font-size: 14.5px; } }
 @media print { .mk-pdf-view { display: none !important; } }
 /* 메모 속 PDF 썸네일: 누르면 미리보기 — 오른쪽 아래 "PDF" 표시 */

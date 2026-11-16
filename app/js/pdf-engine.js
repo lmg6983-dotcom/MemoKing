@@ -85,6 +85,7 @@ const hexRgb = (hex) => {
  * PDF 열기 → { pageCount, size(i) → { width, height } (pt), render(i, width) → canvas, takeInk(i), save(inkByPage), close() }
  *   render: 쪽을 폭 width(px)로 그린 캔버스 (흰 바탕)
  *   takeInk(i): 그 쪽의 메모킹 주석 획들 (쪽 왼쪽 위 기준 pt, 아래로 +) — 꺼낸 주석은 이 문서에서 빼서 render 에 그려지지 않는다 (화면 층이 그린다)
+ *   text(i): 그 쪽의 글자 — { count, charAt(x, y) → 글자 번호 | -1, rects(a, b) → [{ x, y, w, h }], text(a, b), word(k) → [a, b] } (pt, 왼쪽 위 기준)
  *   save(Map 쪽 → 획들): 꺼낸 쪽마다 획들을 잉크 주석으로 다시 넣은 PDF 바이트. 저장한 뒤 이 문서는 닫고 그 바이트로 다시 연다
  * @param {{ keepInk?: boolean }} [opts] keepInk: 주석을 꺼내지 않고 그대로 그린다 (썸네일)
  */
@@ -182,6 +183,65 @@ export async function openPdf(bytes, { keepInk = false } = {}) {
       m.FPDFPage_CloseAnnot(annot);
     }
   };
+  // ---------- 글자 (끌어서 고르기 · 복사 · 형광펜) ----------
+  const texts = new Map(); // 쪽 → { page, tp, ph, n } — 문서를 닫을 때 함께 닫는다
+  const text = (i) => {
+    if (closed) throw new Error('닫힌 PDF 예요');
+    let t = texts.get(i);
+    if (!t) {
+      const page = m.FPDF_LoadPage(doc, i);
+      const tp = m.FPDFText_LoadPage(page);
+      t = { page, tp, ph: m.FPDF_GetPageHeightF(page), n: tp ? m.FPDFText_CountChars(tp) : 0 };
+      texts.set(i, t);
+    }
+    const { tp, ph, n } = t;
+    const uni = (k) => (k >= 0 && k < n ? String.fromCodePoint(m.FPDFText_GetUnicode(tp, k) || 32) : ' ');
+    return {
+      count: n,
+      charAt: (x, y, tol = 4) => (n ? m.FPDFText_GetCharIndexAtPos(tp, x, ph - y, tol, tol) : -1),
+      rects(a, b) {
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        if (!n || lo < 0) return [];
+        const out = [];
+        const H = heap();
+        const buf = H.wasmExports.malloc(32);
+        try {
+          const cnt = m.FPDFText_CountRects(tp, lo, hi - lo + 1);
+          for (let k = 0; k < cnt; k++) {
+            if (!m.FPDFText_GetRect(tp, k, buf, buf + 8, buf + 16, buf + 24)) continue;
+            const [l, t2, r, b2] = H.HEAPF64.subarray(buf >> 3, (buf >> 3) + 4);
+            if (r - l > 0.5 && t2 - b2 > 0.5) out.push({ x: l, y: ph - t2, w: r - l, h: t2 - b2 });
+          }
+        } finally {
+          H.wasmExports.free(buf);
+        }
+        return out;
+      },
+      text(a, b) {
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        if (!n || lo < 0) return '';
+        const cnt = hi - lo + 1;
+        const H = heap();
+        const buf = H.wasmExports.malloc((cnt + 1) * 2);
+        try {
+          const got = m.FPDFText_GetText(tp, lo, cnt, buf);
+          return new TextDecoder('utf-16le').decode(H.HEAPU8.slice(buf, buf + Math.max(0, got - 1) * 2)).replace(/\r\n/g, '\n');
+        } finally {
+          H.wasmExports.free(buf);
+        }
+      },
+      word(k) {
+        const isWord = (c) => /[\p{L}\p{N}_]/u.test(c);
+        if (!isWord(uni(k))) return [k, k];
+        let a = k;
+        let b = k;
+        while (a > 0 && isWord(uni(a - 1))) a--;
+        while (b < n - 1 && isWord(uni(b + 1))) b++;
+        return [a, b];
+      },
+    };
+  };
+
   const save = (inkByPage) => {
     if (closed) throw new Error('닫힌 PDF 예요');
     for (const [i, strokes] of inkByPage) {
@@ -250,10 +310,15 @@ export async function openPdf(bytes, { keepInk = false } = {}) {
   const close = () => {
     if (closed) return;
     closed = true;
+    for (const t of texts.values()) {
+      if (t.tp) m.FPDFText_ClosePage(t.tp);
+      m.FPDF_ClosePage(t.page);
+    }
+    texts.clear();
     m.FPDF_CloseDocument(doc);
     m.pdfium.wasmExports.free(ptr);
   };
-  return { pageCount, size, render, takeInk, save, close };
+  return { pageCount, size, render, takeInk, text, save, close };
 }
 
 /** 첫 쪽 썸네일 (PNG Blob, 폭 width px) — 주석까지 그린다 */
