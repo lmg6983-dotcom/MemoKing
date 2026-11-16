@@ -106,9 +106,12 @@ let fileOpener = null; // 첨부를 다른 앱으로 열기 (PC · 휴대폰 화
 
 /** 메모 폴더의 PDF 를 앱 안에서 미리 본다 (PDF 썸네일 · PDF 파일 칩) — 열지 못하면 오류 */
 export async function previewPdf(src, name = 'PDF') {
-  const res = await fetch(vaultUrl(src));
-  if (!res.ok) throw new Error('PDF 파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 삭제됐는지 확인해 주세요');
-  return openPdfViewer({ bytes: new Uint8Array(await res.arrayBuffer()), name, onExternal: fileOpener ? () => fileOpener(src) : null });
+  // 읽는 동안에도 보기를 먼저 띄운다 ("여는 중") — 큰 PDF 도 누르자마자 반응하게
+  const bytes = fetch(vaultUrl(src)).then((res) => {
+    if (!res.ok) throw new Error('PDF 파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 삭제됐는지 확인해 주세요');
+    return res.arrayBuffer();
+  });
+  return openPdfViewer({ bytes, name, onExternal: fileOpener ? () => fileOpener(src) : null });
 }
 
 let inkReader = null; // 손 메모 SVG 글 읽기 (createNoteEditor 의 readAttachment)

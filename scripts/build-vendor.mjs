@@ -4,6 +4,7 @@
 // node_modules 는 Google Drive 동기화 부담을 피하려고 프로젝트 밖
 // (%LOCALAPPDATA%\memoking-build) 에 설치하고, 묶은 결과물만 프로젝트에 넣는다.
 import { execSync } from 'node:child_process';
+import { gzipSync } from 'node:zlib';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -113,12 +114,14 @@ await esbuild.build({
   alias: { fs: emptyModule, path: emptyModule, crypto: emptyModule, url: emptyModule, module: emptyModule },
   logLevel: 'info',
 });
-copyFileSync(join(MODULES, '@embedpdf', 'pdfium', 'dist', 'pdfium.wasm'), join(OUT, 'pdfium.wasm'));
+// wasm 은 gzip 으로 (앱 용량 — 열 때 DecompressionStream 으로 푼다, app/js/pdf-engine.js assetBytes)
+const gz = (from, to) => writeFileSync(to, gzipSync(readFileSync(from), { level: 9 }));
+gz(join(MODULES, '@embedpdf', 'pdfium', 'dist', 'pdfium.wasm'), join(OUT, 'pdfium.wasm.gz'));
 mkdirSync(join(OUT, 'fonts'), { recursive: true });
 copyFileSync(join(MODULES, '@embedpdf', 'fonts-kr', 'fonts', 'NotoSansKR-Regular.otf'), join(OUT, 'fonts', 'NotoSansKR-Regular.otf'));
 // 한글 HWP · HWPX (rhwp — Rust · wasm, MIT): wasm-bindgen 이 만든 모듈 그대로
 copyFileSync(join(MODULES, '@rhwp', 'core', 'rhwp.js'), join(OUT, 'rhwp.js'));
-copyFileSync(join(MODULES, '@rhwp', 'core', 'rhwp_bg.wasm'), join(OUT, 'rhwp_bg.wasm'));
+gz(join(MODULES, '@rhwp', 'core', 'rhwp_bg.wasm'), join(OUT, 'rhwp_bg.wasm.gz'));
 // AI 비서 연결(MCP) 서버는 PC 메인 프로세스(node)에서만 — desktop/vendor 로 따로
 await esbuild.build({
   entryPoints: { 'mcp-sdk': join(ROOT, 'scripts', 'vendor', 'mcp-sdk.js') },

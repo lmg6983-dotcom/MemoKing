@@ -375,6 +375,12 @@ export function registerVaultProtocol(getVault, getHistory) {
       }
       return new Response('not found', { status: 404 });
     }
+    if (url.host === 'font') {
+      // PDF 미리보기의 한글 대체 글꼴 — Windows 맑은 고딕을 빌려 쓴다 (앱에 4.4MB 글꼴을 넣지 않게). 없으면 404 → 앱에 든 것
+      const file = path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts', 'malgun.ttf');
+      if (rel !== 'kr' || !fs.existsSync(file)) return new Response('not found', { status: 404 });
+      return net.fetch(pathToFileURL(file).href).then((res) => new Response(res.body, { status: res.status, headers: { 'Content-Type': 'font/ttf', 'Access-Control-Allow-Origin': '*' } }));
+    }
     const vault = getVault?.();
     const history = getHistory?.();
     const file = url.host === 'vault' ? vault?.resolve(rel) : url.host === 'history' ? history?.resolveImage(rel) : null;

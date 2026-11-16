@@ -4,7 +4,7 @@
 //   PDF: PDFium (pdf-engine.js) · 한글 HWP · HWPX: rhwp (Rust · wasm, 못 읽으면 hwp.js · HWPX 글 뽑기)
 //   DOCX: docx-preview · PPTX: JSZip — 화면 밖에 그린 장을 html-to-image 로 찍는다 (app/vendor/docpages.js — 넣을 때만 불러온다)
 import { toCanvas } from '../vendor/html-to-image.js';
-import { openPdf, makeImagePdf, appAsset } from './pdf-engine.js';
+import { openPdf, makeImagePdf, pageJpeg, assetBytes } from './pdf-engine.js';
 
 export const DOC_EXTS = ['pdf', 'docx', 'pptx', 'hwp', 'hwpx', 'txt'];
 const extOf = (name) => String(name ?? '').split('.').pop().toLowerCase();
@@ -24,9 +24,7 @@ export async function documentPages(file, onProgress) {
   const ext = extOf(file.name);
   const data = new Uint8Array(await file.arrayBuffer());
   if (ext === 'pdf') return pdfPages(data, onProgress);
-  const { canvases, total } = await documentCanvases(ext, data, onProgress);
-  const pages = [];
-  for (const c of canvases) pages.push(await canvasBlob(c));
+  const { items: pages, total } = await documentCanvases(ext, data, onProgress, canvasBlob);
   return { pages, total };
 }
 
@@ -43,16 +41,24 @@ export async function documentPdf(file, onProgress) {
     pdf.close();
     return { pdf: data, total: n, pages: n };
   }
-  const { canvases, total } = await documentCanvases(ext, data, onProgress);
-  return { pdf: await makeImagePdf(canvases), total, pages: canvases.length };
+  const { items, total } = await documentCanvases(ext, data, onProgress, pageJpeg);
+  return { pdf: makeImagePdf(items), total, pages: items.length };
 }
 
-// 문서(PDF 가 아닌 것) → 장마다 캔버스
-async function documentCanvases(ext, data, onProgress) {
-  if (ext === 'txt') return domPages((box) => txtPages(data, box), onProgress);
+// 문서(PDF 가 아닌 것) → 장마다 그린 캔버스를 바로 take 로 넘겨(PNG · JPEG 로 바꾸고) 캔버스는 버린다 — 60장을 한꺼번에 들고 있지 않게 (휴대폰 메모리)
+//   → { items: take 가 돌려준 것들, total }
+async function documentCanvases(ext, data, onProgress, take) {
+  const keep = async (canvas) => {
+    try {
+      return await take(canvas);
+    } finally {
+      canvas.width = canvas.height = 0; // 픽셀 메모리를 바로 놓는다
+    }
+  };
+  if (ext === 'txt') return domPages((box) => txtPages(data, box), onProgress, keep);
   if (ext === 'hwp' || ext === 'hwpx') {
     try {
-      return await rhwpPages(data, onProgress);
+      return await rhwpPages(data, onProgress, keep);
     } catch (err) {
       console.warn('[rhwp] 읽지 못해 예전 방식으로', err);
     }
@@ -62,11 +68,11 @@ async function documentCanvases(ext, data, onProgress) {
     return domPages(async (box) => {
       await lib.renderDocx(data, box, null, { inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false, experimental: true });
       return fitDocxPages([...box.querySelectorAll('section.docx')]);
-    }, onProgress);
+    }, onProgress, keep);
   }
-  if (ext === 'pptx') return domPages((box) => pptxPages(lib, data, box), onProgress);
-  if (ext === 'hwp') return domPages((box) => hwpPages(lib, data, box), onProgress);
-  if (ext === 'hwpx') return domPages((box) => hwpxPages(lib, data, box), onProgress);
+  if (ext === 'pptx') return domPages((box) => pptxPages(lib, data, box), onProgress, keep);
+  if (ext === 'hwp') return domPages((box) => hwpPages(lib, data, box), onProgress, keep);
+  if (ext === 'hwpx') return domPages((box) => hwpxPages(lib, data, box), onProgress, keep);
   throw new Error('그림으로 바꿀 수 없는 문서예요');
 }
 
@@ -78,7 +84,9 @@ async function pdfPages(data, onProgress) {
   try {
     for (let i = 0; i < n; i++) {
       const { width } = pdf.size(i);
-      pages.push(await canvasBlob(pdf.render(i, Math.min(width * 3, PAGE_WIDTH))));
+      const canvas = pdf.render(i, Math.min(width * 3, PAGE_WIDTH));
+      pages.push(await canvasBlob(canvas));
+      canvas.width = canvas.height = 0;
       onProgress?.(i + 1, n);
     }
   } finally {
@@ -105,9 +113,7 @@ function rhwp() {
         return ctx.measureText(text).width;
       };
     }
-    const res = await fetch(appAsset('vendor/rhwp_bg.wasm'));
-    if (!res.ok) throw new Error('한글 문서 도구를 읽지 못했어요');
-    await mod.default({ module_or_path: await res.arrayBuffer() });
+    await mod.default({ module_or_path: (await assetBytes('vendor/rhwp_bg.wasm.gz')).buffer });
     return mod;
   })().catch((err) => {
     rhwpReady = null;
@@ -116,29 +122,29 @@ function rhwp() {
   return rhwpReady;
 }
 
-async function rhwpPages(data, onProgress) {
+async function rhwpPages(data, onProgress, take) {
   const mod = await rhwp();
   const doc = new mod.HwpDocument(data);
   try {
     const total = doc.pageCount();
     if (!total) throw new Error('문서에서 장을 찾지 못했어요');
     const n = Math.min(total, MAX_PAGES);
-    const canvases = [];
+    const items = [];
     for (let i = 0; i < n; i++) {
       const canvas = document.createElement('canvas');
       doc.renderPageToCanvas(i, canvas, 1.5); // A4(794px) × 1.5 ≈ 1190px — PAGE_WIDTH 쯤
       if (!canvas.width || !canvas.height) throw new Error('한글 문서의 장을 그리지 못했어요'); // → 예전 방식으로
-      canvases.push(canvas);
+      items.push(await take(canvas));
       onProgress?.(i + 1, n);
     }
-    return { canvases, total };
+    return { items, total };
   } finally {
     doc.free?.();
   }
 }
 
-// 화면 밖 상자에 문서를 그리고 장마다 찍는다 → 캔버스들
-async function domPages(render, onProgress) {
+// 화면 밖 상자에 문서를 그리고 장마다 찍어 take 로 넘긴다
+async function domPages(render, onProgress, take) {
   const box = document.createElement('div');
   box.className = 'mk-doc-render';
   Object.assign(box.style, { position: 'fixed', left: '-20000px', top: '0', background: '#fff', color: '#000', zIndex: '-1' });
@@ -148,14 +154,14 @@ async function domPages(render, onProgress) {
     if (!all.length) throw new Error('문서에서 장을 찾지 못했어요');
     const list = all.slice(0, MAX_PAGES);
     await document.fonts?.ready;
-    const canvases = [];
+    const items = [];
     for (let i = 0; i < list.length; i++) {
       const el = list[i];
       const w = el.offsetWidth || PAGE_WIDTH;
-      canvases.push(await toCanvas(el, { backgroundColor: '#ffffff', pixelRatio: Math.min(2.5, PAGE_WIDTH / w), skipFonts: true }));
+      items.push(await take(await toCanvas(el, { backgroundColor: '#ffffff', pixelRatio: Math.min(2.5, PAGE_WIDTH / w), skipFonts: true })));
       onProgress?.(i + 1, list.length);
     }
-    return { canvases, total: all.length };
+    return { items, total: all.length };
   } finally {
     box.remove();
     for (const u of box.urls ?? []) URL.revokeObjectURL(u); // HWPX 그림 주소 (찍은 뒤에는 필요 없음)

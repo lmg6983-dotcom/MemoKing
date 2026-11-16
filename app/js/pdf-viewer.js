@@ -6,6 +6,7 @@ import { icon } from './icons.js';
 
 const el = (tag, cls, props = {}) => Object.assign(document.createElement(tag), cls ? { className: cls } : {}, props);
 let current = null; // 열린 보기의 닫기
+const PAGE_KEYS = { ArrowDown: 1, ArrowUp: -1, PageDown: 2, PageUp: -2, ' ': 2, Home: 'top', End: 'end' };
 
 /** 떠 있는 미리보기를 닫는다 → 닫았는가 (휴대폰 뒤로 가기) */
 export const closePdfViewer = () => {
@@ -16,7 +17,8 @@ export const closePdfViewer = () => {
 export const pdfViewerOpen = () => Boolean(current);
 
 /**
- * @param {{ bytes: Uint8Array | ArrayBuffer, name?: string, onExternal?: () => void }} o
+ * @param {{ bytes: Uint8Array | ArrayBuffer | Promise<ArrayBuffer>, name?: string, onExternal?: () => void }} o
+ *   bytes 가 Promise 면 보기를 먼저 띄우고 기다린다 (못 읽으면 보기 안에 알린다)
  *   onExternal: "다른 앱으로 열기" (없으면 단추 없음)
  */
 export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) {
@@ -52,7 +54,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
   let shutDown = false;
   const pages = []; // { box, canvas, drawnAt (그린 폭) }
   const io = new IntersectionObserver((entries) => {
-    for (const e of entries) if (e.isIntersecting) draw(Number(e.target.dataset.i));
+    for (const e of entries) (e.isIntersecting ? draw : drop)(Number(e.target.dataset.i));
     showCount();
   }, { root: scroller, rootMargin: '600px 0px' });
 
@@ -79,6 +81,15 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
       p.box.textContent = '이 쪽을 그리지 못했어요';
       console.warn('[PDF 미리보기]', err);
     }
+  }
+  // 멀리 지나간 쪽은 그림을 놓는다 — 긴 PDF 를 끝까지 내려도 메모리가 쌓이지 않게 (쪽 하나 최대 수십 MB)
+  function drop(i) {
+    const p = pages[i];
+    if (!p?.drawnAt) return;
+    const c = p.box.firstChild;
+    if (c instanceof HTMLCanvasElement) c.width = c.height = 0;
+    p.box.replaceChildren();
+    p.drawnAt = 0;
   }
   function showCount() {
     if (!pages.length) return;
@@ -131,6 +142,10 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
     touches.delete(e.pointerId);
     if (touches.size < 2) pinch = null;
   };
+  // 두 손가락일 때는 브라우저가 스크롤로 가져가지 않게 (가져가면 pointercancel 로 확대가 끊긴다)
+  scroller.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
   scroller.addEventListener('pointerup', lift);
   scroller.addEventListener('pointercancel', lift);
   scroller.addEventListener('scroll', showCount, { passive: true });
@@ -140,6 +155,12 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
       e.preventDefault();
       e.stopPropagation();
       shut();
+    } else if (!e.ctrlKey && !e.metaKey && !e.altKey && PAGE_KEYS[e.key] && !(e.key === ' ' && e.target instanceof HTMLButtonElement)) {
+      // 단추에 초점이 있어도 넘기기 (↑↓ 조금 · PageUp/Down · Space 한 화면 · Home/End) — 단추 위 Space 는 단추 누르기
+      e.preventDefault();
+      const k = PAGE_KEYS[e.key];
+      if (k === 'top' || k === 'end') scroller.scrollTo({ top: k === 'top' ? 0 : scroller.scrollHeight });
+      else scroller.scrollBy({ top: Math.abs(k) === 1 ? k * 60 : Math.sign(k) * scroller.clientHeight * 0.9 });
     } else if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
       e.preventDefault();
       setZoom(zoom * 1.25);
@@ -173,7 +194,9 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null }) 
   current = shut;
 
   try {
-    pdf = await openPdf(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+    const data = await bytes;
+    if (shutDown) return shut;
+    pdf = await openPdf(data instanceof Uint8Array ? data : new Uint8Array(data));
   } catch (err) {
     note.textContent = err?.message || 'PDF 를 열지 못했어요';
     return shut;

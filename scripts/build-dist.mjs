@@ -98,7 +98,8 @@ const config = {
   electronVersion: ELECTRON_VERSION,
   directories: { output: OUT },
   // 점검용 스크립트(desktop/smoke*.js)는 설치 파일에 넣지 않는다 (--smoke 는 개발 실행에서만)
-  files: ['**/*', '!desktop/smoke*.js'],
+  //   PDF 미리보기의 한글 대체 글꼴(Noto Sans KR 4.4MB)도 뺀다 — PC 는 Windows 맑은 고딕을 빌려 쓴다 (desktop/utils.js memoking://font)
+  files: ['**/*', '!desktop/smoke*.js', '!app/vendor/fonts/NotoSansKR-Regular.otf'],
   asar: true,
   // 용량 줄이기: Electron 언어 파일은 한국어 · 영어만 (나머지 50여 개는 앱 화면에 쓰이지 않는다), 설치 파일은 최대 압축
   electronLanguages: ['ko', 'en-US'],
