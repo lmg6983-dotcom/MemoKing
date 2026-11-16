@@ -748,7 +748,12 @@ export function registerIpc(ctx) {
     return p ? { copy: side(p.copy), original: side(p.original) } : null;
   });
   // keep: 'copy' 사본 내용으로 원본을 바꾸고 사본은 휴지통 · 'original' 원본 그대로, 사본만 휴지통
-  ipcMain.handle('conflict:resolve', (_e, copyId, keep) => {
+  ipcMain.handle('conflict:resolve', async (_e, copyId, keep) => {
+    // 사본 창을 열어 둔 채 막 고쳤으면 그 글부터 저장 (아직 저장 전인 0.6초 안의 글이 빠지지 않게) — 멈춘 창이면 2초까지만
+    const copyWin = wm.noteWins.get(String(copyId));
+    if (copyWin && !copyWin.isDestroyed()) {
+      await Promise.race([copyWin.webContents.executeJavaScript('window.mkFlushSync?.()', true).catch(() => {}), new Promise((r) => setTimeout(r, 2000))]);
+    }
     const p = conflictPair(copyId);
     if (!p) return { ok: false, message: '사본을 찾지 못했어요. 이미 지웠을 수 있어요' };
     if (p.copy.locked || p.original?.locked) return { ok: false, message: '잠긴 메모는 직접 열어 고쳐 주세요' };
@@ -850,7 +855,7 @@ export function registerIpc(ctx) {
     }
     return n;
   });
-  ipcMain.on('memo:save-sync', (event, id, body) => {
+  ipcMain.on('memo:save-sync', (event, id, body, opts) => {
     try {
       const vault = getVault();
       if (typeof body === 'string' && !vault) throw new Error(UI.noVault); // 메모 폴더가 없다 — 아래에서 따로 남긴다 (예전: 저장한 척했다)
@@ -867,7 +872,19 @@ export function registerIpc(ctx) {
     } catch (err) {
       console.error('저장 실패', err);
       // 창을 닫는 마지막 저장이라 다시 할 수 없다 — 쓴 글을 앱 폴더에 따로 남기고 알린다 (예전: 말없이 사라졌다. 디스크 가득 참 · 드라이브 빠짐 등)
-      if (typeof body === 'string' && !isBlankBody(body)) {
+      const vault = getVault();
+      if (typeof body === 'string' && !isBlankBody(body) && (opts?.locked || vault?.locks.has(id))) {
+        // 잠긴 메모: 풀린 글을 파일로 남기면 잠금이 풀린다 — 잠긴 사본으로만 (그것도 안 되면 알리기만)
+        let kept = null;
+        try {
+          kept = vault?.locks.has(id) ? vault.importCopyOf(id, body, { color: vault.get(id)?.color }) : null;
+        } catch (err2) {
+          console.error('잠긴 사본 남기기 실패', err2);
+        }
+        toast(kept
+          ? { title: '메모를 저장하지 못해 잠긴 사본으로 남겼어요', body: '같은 비밀번호로 열 수 있어요' }
+          : { title: '잠긴 메모를 저장하지 못했어요', body: '잠긴 메모라 따로 남기지 않았어요. 메모 폴더를 확인해 주세요' });
+      } else if (typeof body === 'string' && !isBlankBody(body)) {
         try {
           const dir = path.join(app.getPath('userData'), 'recovered');
           fs.mkdirSync(dir, { recursive: true });

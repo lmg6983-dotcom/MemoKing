@@ -314,7 +314,7 @@ async function flush() {
 function flushSync() {
   clearTimeout(saveTimer);
   if (isDirty()) {
-    api.memo.saveSync(id, current);
+    api.memo.saveSync(id, current, { locked: Boolean(memo?.locked) });
     saved = current;
   }
   flushTables();

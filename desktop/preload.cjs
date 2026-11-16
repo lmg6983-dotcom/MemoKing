@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld('memoking', {
     save: invoke('memo:save'),
     keepCopy: invoke('memo:keep-copy'),
     // 창이 닫히는 순간에는 비동기 저장이 끝나기 전에 창이 사라질 수 있어 동기 저장을 쓴다.
-    saveSync: (id, body) => ipcRenderer.sendSync('memo:save-sync', id, body),
+    saveSync: (id, body, opts) => ipcRenderer.sendSync('memo:save-sync', id, body, opts), // opts.locked: 잠긴 메모 (못 저장해도 풀린 글을 파일로 남기지 않게)
     set: invoke('memo:set'),
     remove: invoke('memo:remove'),
     links: invoke('memo:links'),

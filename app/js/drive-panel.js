@@ -215,7 +215,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     } catch {
       // 기억을 못 읽으면 보인다
     }
-    syncBtn?.classList.toggle('invite', sum.tone === 'off' && !seen);
+    syncBtn?.classList.toggle('invite', sum.tone === 'off' && !sum.on && !seen); // 연결된 채 오프라인이면 권하지 않는다
   }
   function fillPop(sum = summary()) {
     const st = info.status ?? {};
