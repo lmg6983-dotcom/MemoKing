@@ -17,6 +17,8 @@ export function appAsset(rel) {
 /** 앱에 든 파일 → 바이트 (.gz 는 풀어서) */
 export async function assetBytes(rel, url = appAsset(rel)) {
   const res = await fetch(url);
+  // 안드로이드 빌드(AGP)는 assets 의 .gz 를 미리 풀고 이름에서 .gz 를 뗀다 → 푼 파일을 그대로 읽는다
+  if (res.status === 404 && rel.endsWith('.gz')) return assetBytes(rel.slice(0, -3));
   if (!res.ok || !res.body) throw new Error(`${rel} 을(를) 읽지 못했어요`);
   const body = rel.endsWith('.gz') ? res.body.pipeThrough(new DecompressionStream('gzip')) : res.body;
   return new Uint8Array(await new Response(body).arrayBuffer());
