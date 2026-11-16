@@ -303,6 +303,7 @@
     <button class="menu-item" data-memo-action="lock"><svg><use href="#i-lock"/></svg><span>잠그기</span></button>
     <button class="menu-item" data-memo-action="find"><svg><use href="#i-search"/></svg><span>찾기, 바꾸기</span></button>
     <button class="menu-item" data-memo-action="versions"><svg><use href="#i-history"/></svg><span>이전 버전</span></button>
+    <button class="menu-item" data-memo-action="compare" hidden><svg><use href="#i-copy"/></svg><span>원본과 견주기</span></button>
     <button class="menu-item" data-memo-action="share"><svg><use href="#i-share"/></svg><span>공유</span></button>
     <button class="menu-item" data-memo-action="widget"><svg><use href="#i-widget"/></svg><span>홈 화면에 놓기</span></button>
     <button class="menu-item" data-memo-action="copy"><svg><use href="#i-copy"/></svg><span>글 복사</span></button>
@@ -331,6 +332,21 @@
     </header>
     <p class="versions-hint">쓰는 동안 10분마다 그때 내용을 남겨 둬요(30일). 되돌려도 지금 내용이 여기에 남아요.</p>
     <ul id="versions-list" class="link-list versions-list"></ul>
+  </section>
+
+  <!-- 충돌 사본 ↔ 원본 견주기 (두 기기에서 동시에 고쳐 따로 남긴 사본) -->
+  <section id="compare-sheet" class="sheet links-panel versions-panel" role="dialog" aria-labelledby="compare-sheet-title" hidden>
+    <div class="sheet-grip"></div>
+    <header class="links-head">
+      <b id="compare-sheet-title">충돌 사본 견주기</b>
+      <button id="compare-close" class="icon-btn" aria-label="견주기 닫기"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <p class="versions-hint">두 기기에서 같은 메모를 동시에 고쳐 따로 남긴 사본이에요. 남길 쪽을 골라 주세요.</p>
+    <div id="compare-body" class="compare-cols"></div>
+    <div class="dialog-actions compare-actions">
+      <button id="compare-drop" class="btn">사본 지우기</button>
+      <button id="compare-take" class="btn primary">사본 내용으로 바꾸기</button>
+    </div>
   </section>
 
   <!-- 다른 앱으로 보내기: 글 · 그림 · PDF -->

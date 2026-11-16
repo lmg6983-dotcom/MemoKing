@@ -22,6 +22,7 @@ import { driveShareLink } from './share-drive.js';
 import { officeToPdf } from './office-pdf.js';
 import { UI } from '../app/js/core/ui-text.js';
 import { summaryBody } from '../app/js/core/agent.js';
+import { originalFileOf } from '../app/js/core/conflicts.js';
 
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 // 메뉴를 띄울 자리 (화면이 준 창 안 좌표 — 키보드로 연 메뉴는 마우스 자리가 아니라 그 카드 · 내용 자리에). 없으면 마우스 자리
@@ -726,12 +727,11 @@ export function registerIpc(ctx) {
     return id;
   });
   // ---------- 충돌 사본 비교: "제목 (PC 충돌 2026-11-15 1530).md" ↔ 원본 "제목.md" ----------
-  const CONFLICT_TAG = / \((?:PC|휴대폰) 충돌 \d{4}-\d{2}-\d{2} \d{4}(?: \d+)?\)(?=\.md$)/;
   const conflictPair = (copyId) => {
     const vault = getVault();
     const copy = vault?.get(String(copyId));
-    if (!copy?.file || !CONFLICT_TAG.test(copy.file)) return null;
-    const origFile = copy.file.replace(CONFLICT_TAG, '');
+    const origFile = originalFileOf(copy?.file);
+    if (!origFile) return null;
     const original = vault.list().find((m) => m.file === origFile);
     return { vault, copy, original: original ? vault.get(original.id) : null };
   };

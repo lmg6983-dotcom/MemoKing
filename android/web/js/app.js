@@ -36,6 +36,7 @@ import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWai
 import * as panes from './panes.js';
 import { attachSliders } from '../../app/js/seg-slider.js';
 import { printHtml, pagePx, pageFullPx } from './print-html.js';
+import { originalFileOf } from '../../app/js/core/conflicts.js';
 import { fitPages, spaceBreaks } from '../../app/js/print-fit.js';
 import { haptic, reduceMotion, radioGroups } from '../../app/js/dom.js';
 import { renderVersions } from '../../app/js/versions-view.js';
@@ -491,6 +492,7 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="mode"]').hidden = !list.workLifeOn(); // Work / Life 를 나눠 쓸 때만
   memoSheet.querySelector('[data-memo-action="folder"] small').textContent = folderOf(memo.file) || '폴더 없음';
   memoSheet.querySelector('[data-memo-action="pick"]').hidden = inNote; // 여러 장 고르기는 목록에서만
+  memoSheet.querySelector('[data-memo-action="compare"]').hidden = !conflictOriginal(memo); // 충돌 사본이고 원본이 있을 때만
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -588,6 +590,10 @@ memoSheet.addEventListener('click', async (e) => {
       closeSheet(memoSheet);
       openVersions(id);
       break;
+    case 'compare':
+      closeSheet(memoSheet);
+      openCompare(id);
+      break;
     case 'lock':
       closeSheet(memoSheet);
       note.flush();
@@ -628,6 +634,62 @@ memoSheet.addEventListener('click', async (e) => {
     default:
   }
 });
+
+// ---------- 충돌 사본 ↔ 원본 견주기 (PC 목록 창과 같은 일, core/conflicts.js) ----------
+
+function conflictOriginal(memo) {
+  const file = originalFileOf(memo?.file);
+  return file ? app.vault.list().find((m) => m.file === file) ?? null : null;
+}
+const compareSheet = $('compare-sheet');
+let compareFor = null;
+function openCompare(copyId) {
+  const copy = app.vault.get(copyId);
+  const orig = conflictOriginal(copy);
+  if (!copy || !orig) return toast('원본 메모를 찾지 못했어요. 이름을 바꿨거나 지웠을 수 있어요', true);
+  note.flush();
+  const original = app.vault.get(orig.id);
+  compareFor = { copyId, origId: orig.id };
+  const col = (label, m) => {
+    const box = document.createElement('section');
+    box.className = 'compare-col';
+    const t = document.createElement('b');
+    t.textContent = `${label}${m.updated ? `, ${new Date(m.updated).toLocaleString('ko-KR')}` : ''}`;
+    const pre = document.createElement('pre');
+    pre.className = 'compare-text';
+    pre.textContent = m.locked ? '(잠긴 메모라 내용을 볼 수 없어요)' : m.body;
+    box.append(t, pre);
+    return box;
+  };
+  $('compare-body').replaceChildren(col('지금 메모', original), col('충돌 사본', copy));
+  const locked = copy.locked || original.locked;
+  $('compare-take').disabled = locked;
+  $('compare-drop').disabled = locked;
+  openSheet(compareSheet);
+}
+$('compare-close').addEventListener('click', () => closeSheet(compareSheet));
+async function resolveCompare(take) {
+  const job = compareFor;
+  if (!job) return;
+  const copy = app.vault.get(job.copyId);
+  if (!copy) return closeSheet(compareSheet);
+  if (take && app.vault.save(job.origId, copy.body)?.refused) return toast('원본을 바꾸지 못했어요. 잠시 뒤 다시 해 주세요', true);
+  closeSheet(compareSheet);
+  if (note.currentId() === job.copyId) {
+    note.discardAndClose(); // 사본을 보던 중이면 닫고 목록으로 (지울 메모)
+    app.showList();
+  }
+  if (take && note.currentId() === job.origId) note.showRestored(app.vault.get(job.origId)); // 원본을 보던 중이면 바꾼 글로
+  try {
+    app.vault.trash(job.copyId);
+  } catch (err) {
+    return toast(err.message, true);
+  }
+  list.refresh();
+  toast(take ? '사본 내용으로 바꾸고 사본은 휴지통으로 옮겼어요' : '사본을 휴지통으로 옮겼어요');
+}
+$('compare-take').addEventListener('click', () => resolveCompare(true));
+$('compare-drop').addEventListener('click', () => resolveCompare(false));
 
 // ---------- 이전 버전 ----------
 
