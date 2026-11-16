@@ -138,6 +138,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   async function setInk(on) {
     if (on === inking || !pdf) return;
     if (on) {
+      clearSel();
       inking = true;
       view.dataset.mode = 'ink';
       hist = inkHistory(hist.get());
@@ -181,18 +182,24 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
       const ink = new Map();
       for (const i of new Set([...base.keys(), ...Object.keys(hist.get()).map(Number)])) ink.set(i, inkOf(i));
       showToast('주석을 저장하는 중이에요', true);
+      let out = null;
       try {
-        const out = pdf.save(ink);
+        out = pdf.save(ink); // 이 문서에 주석이 다시 들어간다 — 저장이 되든 안 되든 아래에서 out 으로 다시 연다 (두 번 그려지지 않게)
         await onSave(out);
-        pdf.close();
-        pdf = await openPdf(out);
-        base.clear();
-        for (const i of ink.keys()) base.set(i, pdf.takeInk(i)); // 방금 넣은 주석을 다시 꺼내 위 층으로
-        hist = inkHistory({});
+        hist = inkHistory({}); // 저장됨 — 못 했으면 고친 기록을 남겨 다음에 다시 저장한다
         showToast('주석을 저장했어요');
       } catch (err) {
         console.warn('[PDF 주석]', err);
         showToast(err?.message || '주석을 저장하지 못했어요');
+      }
+      try {
+        if (out) {
+          const next = await openPdf(out);
+          pdf.close();
+          pdf = next;
+          base.clear();
+          for (const i of ink.keys()) base.set(i, pdf.takeInk(i)); // 방금 넣은 주석을 다시 꺼내 위 층으로
+        }
       } finally {
         saving = null;
       }
@@ -721,7 +728,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
     window.dispatchEvent(new Event('mk:pdf-closed'));
     if (restore instanceof HTMLElement && restore.isConnected) restore.focus({ preventScroll: true });
   }
-  current = () => void shut();
+  current = () => (sel ? clearSel() : void shut()); // 휴대폰 뒤로 가기: 고른 글자부터 풀고, 그다음 주석 끝내기 · 닫기
 
   try {
     const data = await bytes;
