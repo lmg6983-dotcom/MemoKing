@@ -1357,6 +1357,8 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
         const dropped = await until(() => js(win, `(() => { const chips = [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()); const imgs = document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length; return chips.length >= 3 && { chips, imgs }; })()`), '여러 파일 놓기', 4000).catch(() => null);
         const fallback = dropped || await js(win, `({ chips: [...document.querySelectorAll('.mk-doc a[data-file]')].map((a) => a.textContent.trim()), imgs: document.querySelectorAll('.mk-doc img.mk-image:not(.mk-pdf-thumb)').length })`);
         const dropNote = await js(win, `(window.__statusLog ?? []).find((t) => /4개를 넣었어요/.test(t)) ?? document.getElementById('status').textContent`);
+        // 문서 셋(글 둘 · 깨진 PDF)을 PDF 로 바꾸는 일이 끝날 때까지 — 뒤 점검(다른 창의 휠 · 클릭)과 CPU 를 다투지 않게
+        await until(() => js(win, `document.querySelectorAll('.mk-doc img.mk-pdf-thumb').length >= 2 && (window.__statusLog ?? []).some((t) => /다\\.pdf.*바꾸지 못해/.test(t))`), '문서 PDF 바꾸기', 30000).catch(() => null);
         check('여러 파일 놓기: 4개 (글 파일 2 · PDF · 사진)가 한 번에 모두 들어감, 읽지 못한 하나(폴더)는 알리고 나머지는 그대로', fallback.chips.length === 3 && fallback.imgs === 1 && ['가.txt', '다.pdf', '라.txt'].every((n) => fallback.chips.includes(n)) && /4개를 넣었어요.*1개.*읽지 못해/.test(dropNote.replace('파일 ', '')), JSON.stringify({ fallback, dropNote }));
         // 사진 여러 장: 묶음 사진으로 넣을지 묻고, 고르면 한 줄에 모아 격자로 · 누르면 크게 넘겨 보기
         {
@@ -1557,7 +1559,7 @@ export async function runSmoke({ getVault, getSettings, getList, noteWins, creat
         const outOk = out && /가\.txt$/.test(out.target) && fs.readFileSync(out.target, 'utf8') === '첫째 파일' && /memoking-drag/.test(out.target);
         check('파일 칩을 메모 밖으로 끌어내면 (탐색기 · 카카오톡) 보이는 이름의 복사본 파일이 감 — 메모의 첨부는 그대로', prevented && Boolean(outOk) && fs.readdirSync(path.join(vault.root, 'attachments')).length >= 4, JSON.stringify({ prevented, out }));
         const dragBefore2 = smokeOpened.filter((o) => o.kind === 'drag-out').length;
-        await js(win, `(() => { const a = document.querySelector('.mk-doc img.mk-image'); a.dispatchEvent(new DragEvent('dragstart', { dataTransfer: new DataTransfer(), bubbles: true, cancelable: true })); })()`);
+        await js(win, `(() => { const a = document.querySelector('.mk-doc img.mk-image:not(.mk-pdf-thumb)'); a.dispatchEvent(new DragEvent('dragstart', { dataTransfer: new DataTransfer(), bubbles: true, cancelable: true })); })()`);
         const outImg = await until(() => smokeOpened.filter((o) => o.kind === 'drag-out').length > dragBefore2 && smokeOpened.filter((o) => o.kind === 'drag-out').at(-1), '사진 끌어내기', 3000).catch(() => null);
         check('사진도 끌어내면 그림 파일 (확장자 유지)', Boolean(outImg) && /\.png$/i.test(outImg.target) && fs.statSync(outImg.target).size > 50, JSON.stringify(outImg));
         // 끌어낸 파일이 도로 이 메모에 떨어지면 무시 (메모킹이 끌어낸 임시 파일 경로면)
