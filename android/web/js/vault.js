@@ -66,6 +66,7 @@ export class Vault extends EventTarget {
     this.diskDirty = false;
     this.cacheKey = null;
     this.cacheTimer = null;
+    this.quietUntil = 0;
   }
 
   // 지난번 캐시 → this.disk (못 읽으면 빈 채로 — 모두 폴더에서 읽는다)
@@ -123,7 +124,13 @@ export class Vault extends EventTarget {
   // 화면이 보이는 동안만 폴더를 살핀다 (배터리)
   resume() {
     clearInterval(this.pollTimer);
-    this.pollTimer = setInterval(() => this.scan(), SCAN_INTERVAL);
+    // 글을 쓰는 동안은 건너뛴다 — 폴더 읽기는 화면과 같은 줄에서 돌아(SAF 폴더는 수십 ms) 글자가 멈칫한다. 덮어쓰기 전 확인(keepChangedOnDisk)은 그대로
+    this.pollTimer = setInterval(() => Date.now() >= this.quietUntil && this.scan(), SCAN_INTERVAL);
+  }
+
+  /** 글을 쓰고 있다 (app.js) — 잠시 폴더 살피기를 쉰다 */
+  typing() {
+    this.quietUntil = Date.now() + 2000;
   }
 
   pause() {

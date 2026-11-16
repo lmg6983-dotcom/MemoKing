@@ -229,6 +229,7 @@ function mediaView(node, view, getPos) {
   const album = isAlbumTitle(title);
   const pdfThumb = Boolean(pdfOfTitle(title)); // 문서를 PDF 로 넣은 첫 쪽 썸네일 — 누르면 PDF 미리보기
   dom.className = album ? `mk-image mk-album-img${isAlbumPageTitle(title) ? ' mk-album-page' : ''}` : pdfThumb ? 'mk-image mk-pdf-thumb' : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
+  dom.decoding = 'async'; // 큰 사진이 많은 메모도 여는 순간 멈추지 않게 (푸는 동안 글은 먼저 보인다)
   dom.src = vaultUrl(src);
   dom.alt = plainAlt(alt);
   if (title && !album && !pdfThumb) dom.title = title;

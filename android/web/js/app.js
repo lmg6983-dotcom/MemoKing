@@ -1853,6 +1853,7 @@ window.addEventListener('resize', () => {
   fullHeight = Math.max(fullHeight, window.innerHeight);
   note.setKeyboard(window.innerHeight < fullHeight * 0.8);
 });
+document.addEventListener('input', () => app.vault?.typing(), true); // 글 쓰는 동안 폴더 살피기를 쉰다 (vault.js resume)
 on('app', (state) => {
   if (state === 'pause') {
     note.flush();
