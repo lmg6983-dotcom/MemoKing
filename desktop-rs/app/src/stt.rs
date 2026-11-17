@@ -620,7 +620,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             use base64::Engine;
             let bytes = arg(1)["$bytes"].as_str().and_then(|b| base64::engine::general_purpose::STANDARD.decode(b).ok());
             if let Some(b) = bytes {
-                let samples = b.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect();
+                let samples = b.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect();
                 send(app, Msg::Audio { key: key(label, &arg(0)), samples });
             }
             Value::Null

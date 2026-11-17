@@ -33,7 +33,7 @@ window.addEventListener('load', () => setTimeout(async () => {
     mk.on('memo:trashed', (t) => (trashed = t));
     await check('window.memoking (preload.cjs 그대로)', () => mk?.platform === 'desktop');
     await check('메모 폴더 열림', async () => Boolean((await mk.info()).vaultPath));
-    await check('옮기지 않은 채널은 실패로', () => mk.tags.aiStatus().then(() => false, (e) => /tags:ai-status/.test(e.message)));
+    await check('모르는 채널은 실패로', () => window.__TAURI_INTERNALS__.invoke('ipc', { channel: 'smoke:nope', args: [] }).then(() => false, (e) => /smoke:nope/.test(String(e))));
     const seed = (await mk.memos.list()).find((m) => m.title === '시험 메모');
     await check('목록: 메모 · 태그 · 그림', () => seed?.color === 'green' && seed.tags.includes('점검') && seed.thumb === 'attachments/dot.png');
     await check('목록 카드가 화면에', () => until(() => document.body.innerText.includes('시험 메모')));
