@@ -4,9 +4,9 @@ name: PC Rust 점검
 
 on:
   push:
-    paths: ['desktop-rs/**', 'app/**', 'desktop/preload.cjs', '.github/workflows/desktop-rs.yml']
+    paths: ['desktop-rs/**', 'app/**', 'android/web/dev/roundtrip-sample.md', 'desktop/preload.cjs', '.github/workflows/desktop-rs.yml']
   pull_request:
-    paths: ['desktop-rs/**', 'app/**', 'desktop/preload.cjs', '.github/workflows/desktop-rs.yml']
+    paths: ['desktop-rs/**', 'app/**', 'android/web/dev/roundtrip-sample.md', 'desktop/preload.cjs', '.github/workflows/desktop-rs.yml']
   workflow_dispatch:
 
 permissions:
@@ -17,6 +17,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # JS 규칙(app/js/core)과 Rust core 가 같은 답인지 — JS 가 바뀌어 fixtures 가 달라졌으면 Rust 도 고쳐야 한다
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JS 의 답 다시 만들기 (바뀌면 실패 — node desktop-rs/parity/gen.mjs 로 만들어 커밋하고 Rust 를 맞춘다)
+        run: node desktop-rs/parity/gen.mjs && git diff --exit-code desktop-rs/core/tests/fixtures
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-rs
+      - run: cargo test -p memoking-core
+        working-directory: desktop-rs
+
   windows:
     runs-on: windows-latest
     timeout-minutes: 40

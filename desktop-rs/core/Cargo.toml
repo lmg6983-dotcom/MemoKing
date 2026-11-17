@@ -7,4 +7,8 @@ license.workspace = true
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# 머리말 키 순서를 지켜 다시 쓴다 (JS 객체처럼)
+serde_json = { version = "1", features = ["preserve_order"] }
+yaml-rust2 = "0.13"
+fancy-regex = "0.20"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
