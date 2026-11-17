@@ -6,7 +6,6 @@ resolver = "2"
 version = "0.88.0"
 edition = "2021"
 license = "MIT"
-authors = ["lmg6983"]
 
 [profile.release]
 opt-level = "s"
