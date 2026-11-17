@@ -1,5 +1,5 @@
-// 곁가지 기능 — 화면 캡처 메모 · AI 비서 연결(MCP).
-//   Electron 의 window-manager.js(startAreaCapture · finishAreaCapture · openCaptureMemo) · utils.js(mcpStatus · mcpConnect) 자리.
+// 곁가지 기능 — 화면 캡처 메모 · AI 비서 연결(MCP) · PDF.
+//   Electron 의 window-manager.js(startAreaCapture · finishAreaCapture · openCaptureMemo · openPdfWindow) · utils.js(mcpStatus · mcpConnect) · office-pdf.js 자리.
 use crate::state::State;
 use memoking_core::vault::write_atomic;
 use serde_json::{json, Map, Value};
@@ -228,6 +228,67 @@ pub fn start(app: &AppHandle) {
     }
 }
 
+// ---------- PDF ----------
+
+// PDF로 저장 창 (pdf.html 이 미리 보기와 고르기를 맡는다)
+fn open_pdf_window(app: &AppHandle, id: &str) -> Result<Value, String> {
+    if st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(id)).is_none() {
+        return Ok(false.into());
+    }
+    if let Some(w) = app.get_webview_window("pdf") {
+        let _ = w.destroy();
+    }
+    let page = format!("pdf.html?id={}", id.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect::<String>());
+    crate::window(app, "pdf", &page).title("PDF로 저장").inner_size(820.0, 600.0).min_inner_size(640.0, 480.0).center().build().map_err(|e| e.to_string())?;
+    Ok(true.into())
+}
+
+// Word · PowerPoint 문서 → PDF (이 PC 의 Office 로). 경로는 환경 변수로 넘긴다 (명령 줄에 끼우면 따옴표 · 특수 문자가 섞인다)
+//   사용자가 이미 띄워 둔 PowerPoint 에 붙는 경우(PowerPoint 는 한 개만 뜬다) 사용자의 창은 닫지 않는다
+const OFFICE_PDF: &str = r#"
+$ErrorActionPreference = 'Stop'
+$src = $env:MK_SRC; $out = $env:MK_OUT
+if ($src -match '\.pptx$') {
+  $running = [bool](Get-Process POWERPNT -ErrorAction SilentlyContinue)
+  $app = New-Object -ComObject PowerPoint.Application
+  try {
+    $doc = $app.Presentations.Open($src, -1, 0, 0)
+    try { $doc.SaveAs($out, 32) } finally { $doc.Close() }
+  } finally { if (-not $running -and $app.Presentations.Count -eq 0) { $app.Quit() } }
+} else {
+  $app = New-Object -ComObject Word.Application
+  $app.Visible = $false; $app.DisplayAlerts = 0
+  try {
+    $doc = $app.Documents.Open($src, $false, $true, $false, 'mk-no-password')
+    try { $doc.ExportAsFixedFormat($out, 17) } finally { $doc.Close(0) }
+  } finally { if ($app.Documents.Count -eq 0) { $app.Quit() } }
+}
+"#;
+
+/// 메모 폴더의 Word · PowerPoint 첨부 → PDF 내용 | null (Windows 아님 · Office 없음 · 실패 → 화면이 직접 그린다)
+fn office_to_pdf(app: &AppHandle, rel: &str) -> Value {
+    let rel = memoking_core::js::decode_uri(rel).unwrap_or_else(|| rel.to_string());
+    let file = st(app).vault.lock().unwrap().as_ref().filter(|_| rel.starts_with("attachments/")).and_then(|v| v.resolve(&rel)).filter(|f| f.is_file());
+    let Some(src) = file.filter(|f| cfg!(windows) && !crate::ipc::smoke() && f.extension().is_some_and(|e| e.eq_ignore_ascii_case("docx") || e.eq_ignore_ascii_case("pptx"))) else { return Value::Null };
+    let out = std::env::temp_dir().join(format!("memoking-pdf-{}-{}.pdf", chrono::Utc::now().timestamp_millis(), std::process::id()));
+    let child = crate::history::powershell(false).args(["-Command", OFFICE_PDF]).env("MK_SRC", &src).env("MK_OUT", &out).stdout(std::process::Stdio::null()).spawn();
+    // shortcut: 암호 걸린 PowerPoint 처럼 Office 가 물어보며 멈추면 90초 뒤 포기 (Office 프로그램은 남을 수 있음)
+    let ok = child.is_ok_and(|mut c| {
+        for _ in 0..900 {
+            if let Ok(Some(status)) = c.try_wait() {
+                return status.success();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        let _ = c.kill();
+        false
+    });
+    let pdf = std::fs::read(&out).ok().filter(|_| ok);
+    let _ = std::fs::remove_file(&out);
+    use base64::Engine;
+    pdf.map_or(Value::Null, |b| json!({ "$bytes": base64::engine::general_purpose::STANDARD.encode(b) }))
+}
+
 pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     Some(match channel {
         "capture:done" => finish_area_capture(app, label, args.first().unwrap_or(&Value::Null)),
@@ -247,6 +308,14 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             st(app).set_setting("mcp", mcp.into());
             Ok(mcp_status(app))
         }
+        "pdf:open" => open_pdf_window(app, &memoking_core::js::string(args.first().unwrap_or(&Value::Null))),
+        "pdf:memo" => {
+            let m = st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(&memoking_core::js::string(args.first().unwrap_or(&Value::Null))));
+            Ok(m.map_or(Value::Null, |m| json!({ "title": m["title"], "body": m["body"], "color": m["color"], "tables": m["tables"], "created": m["created"], "updated": m["updated"] })))
+        }
+        // shortcut: PDF 만들기는 Electron 의 printToPDF 자리 — Tauri 에는 없어 WebView2 PrintToPdf(webview2-com)로 옮길 때까지 실패(null)로 돌려준다
+        "pdf:save" => Ok(Value::Null),
+        "attachment:to-pdf" => Ok(office_to_pdf(app, args.first().and_then(Value::as_str).unwrap_or_default())),
         _ => return None,
     })
 }
