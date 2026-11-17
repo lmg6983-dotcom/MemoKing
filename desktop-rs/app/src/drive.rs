@@ -3,6 +3,7 @@
 // 로그인: 기본 브라우저 → 이 PC 안 작은 서버(127.0.0.1)로 결과를 받는다 ("데스크톱 앱" OAuth 클라이언트 + PKCE).
 // 받은 토큰은 이 PC 에만 (%APPDATA%\MemoKing\google-auth.json) — Windows 에서는 Electron safeStorage 와 같은 암호로 (서로 읽는다).
 // 기준 기록은 %APPDATA%\MemoKing\drive\<Drive 폴더 id>.<열쇠>.json (Electron 과 같은 파일).
+use crate::memos::arg_str;
 use crate::state::State;
 use base64::Engine as _;
 use memoking_core::drive_sync::{self, inside_drive_for_desktop, Changes, RemoteItem, SyncState, FOLDER};
@@ -883,10 +884,6 @@ fn switch_folder(app: &AppHandle, folder_id: &str, folder_name: &str) -> Value {
     json!({ "info": st.vault_info(app), "status": status, "drive": info(app) })
 }
 
-fn arg(args: &[Value], i: usize) -> String {
-    args.get(i).and_then(Value::as_str).unwrap_or_default().to_string()
-}
-
 pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let dr = d();
     let err = |e: io::Error| e.to_string();
@@ -895,8 +892,8 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         "drive:set-client" => {
             {
                 let mut data = dr.data.lock().unwrap();
-                data.insert("clientId".into(), arg(args, 0).trim().into());
-                data.insert("clientSecret".into(), arg(args, 1).trim().into());
+                data.insert("clientId".into(), arg_str(args, 0).trim().into());
+                data.insert("clientSecret".into(), arg_str(args, 1).trim().into());
             }
             dr.save().map(|()| info(app)).map_err(err)
         }
@@ -913,17 +910,17 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             Ok(Value::Null)
         }
         "drive:folders" => {
-            let parent = Some(arg(args, 0)).filter(|p| !p.is_empty()).unwrap_or("root".into());
+            let parent = Some(arg_str(args, 0)).filter(|p| !p.is_empty()).unwrap_or("root".into());
             Api.folders(&parent).map(|list| list.into_iter().map(|f| json!({ "id": f.id, "name": f.name, "created": f.created })).collect()).map_err(err)
         }
         // 같은 이름 폴더가 이미 있으면 새로 만들지 않고 그것을 돌려준다 (existed: true)
         "drive:create-folder" => {
-            let parent = Some(arg(args, 0)).filter(|p| !p.is_empty()).unwrap_or("root".into());
-            find_or_create_folder(&parent, arg(args, 1).trim()).map(|(f, existed)| json!({ "id": f.id, "name": f.name, "created": f.created, "existed": existed })).map_err(err)
+            let parent = Some(arg_str(args, 0)).filter(|p| !p.is_empty()).unwrap_or("root".into());
+            find_or_create_folder(&parent, arg_str(args, 1).trim()).map(|(f, existed)| json!({ "id": f.id, "name": f.name, "created": f.created, "existed": existed })).map_err(err)
         }
         "drive:use" => {
             let _one = dr.folder_busy.lock().unwrap();
-            Ok(switch_folder(app, &arg(args, 0), &arg(args, 1)))
+            Ok(switch_folder(app, &arg_str(args, 0), &arg_str(args, 1)))
         }
         // 내 드라이브의 "메모킹 동기화" 를 찾거나 만들어 맞춘다 — 같은 이름이 여럿이면 늘 가장 먼저 만든 것 (PC · 휴대폰이 같은 폴더를 고르게)
         "drive:auto" => {

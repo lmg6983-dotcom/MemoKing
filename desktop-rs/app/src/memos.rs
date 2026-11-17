@@ -19,7 +19,7 @@ const DOT_PNG: &[u8] = &[
 
 const NO_VAULT: &str = "메모 폴더가 아직 없어요. 먼저 메모 폴더를 골라 주세요";
 
-fn arg_str(args: &[Value], i: usize) -> String {
+pub(crate) fn arg_str(args: &[Value], i: usize) -> String {
     args.get(i).and_then(Value::as_str).unwrap_or_default().to_string()
 }
 

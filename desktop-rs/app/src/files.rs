@@ -1,6 +1,7 @@
 // 목록 창 늘 위 · 메모 폴더 보기 · 링크(열기 · 미리보기) · 그림 복사 · 저장 · 첨부 복사 · 받기 · 공유 · 새 버전 안내 · 문제 보내기.
 //   Electron 의 ipc-handlers.js · main.js(whatsNew · reportProblem) · utils.js(fetchRemoteImage · copyFileToClipboard) ·
 //   link-previews.js · share-file.js · window-manager.js(setListOnTop) 의 그 부분.
+use crate::memos::arg_str;
 use crate::state::State;
 use memoking_core::link_preview::{detect_charset, host_of, image_ext_from_type, image_ext_from_url, parse_link_preview, parse_youtube_oembed, stale_youtube_entry, youtube_oembed_url};
 use serde_json::{json, Map, Value};
@@ -18,10 +19,6 @@ fn state(app: &AppHandle) -> tauri::State<'_, State> {
 
 fn vault_root(app: &AppHandle) -> Option<PathBuf> {
     state(app).vault.lock().unwrap().as_ref().map(|v| v.root.clone())
-}
-
-fn arg_str(args: &[Value], i: usize) -> String {
-    args.get(i).and_then(Value::as_str).unwrap_or_default().to_string()
 }
 
 // ---------- 인터넷에서 받기 (Electron net.fetch 자리) ----------

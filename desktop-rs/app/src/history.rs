@@ -2,6 +2,7 @@
 //   Windows 는 알림 센터의 알림을 wpndatabase.db(SQLite)에 두다가 지우면 없앤다 — 15초마다 그 파일의 "복사본"을 읽어 새 토스트를 기록한다.
 //   알림 센터를 쓰지 않는 앱(카카오톡 PC)은 PowerShell 도우미(scripts/popup-watch.ps1)가 알림 창을 읽어 한 줄(JSON)씩 보낸다.
 //   기록은 이 PC 에만 (설정 폴더\notification-history) — 메모 폴더(Google Drive)로 동기화하지 않는다.
+use crate::memos::arg_str;
 use crate::state::State;
 use memoking_core::notify;
 use memoking_core::vault::write_atomic;
@@ -535,7 +536,6 @@ fn ko_locale(t: chrono::DateTime<chrono::Local>) -> String {
 }
 
 pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
-    let arg = |i: usize| args.get(i).and_then(Value::as_str).unwrap_or_default().to_string();
     Some(Ok(match channel {
         "history:list" => {
             let f = args.first().cloned().unwrap_or_default();
@@ -551,7 +551,7 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             on.into()
         }
         "history:remove" => update(app, |h, _| {
-            let r = h.remove(&arg(0));
+            let r = h.remove(&arg_str(args, 0));
             (r, r)
         })
         .into(),
@@ -560,7 +560,7 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             let _ = std::fs::remove_dir_all(h.image_dir());
             (Value::Null, true)
         }),
-        "history:to-memo" => return Some(to_memo(app, &arg(0))),
+        "history:to-memo" => return Some(to_memo(app, &arg_str(args, 0))),
         "history:apps" => {
             // 앱 id 별 이름 · 개수 (많은 순, 메모킹 자신 빼고) + 막아 둔 앱
             let blocked = blocked(app);
@@ -581,7 +581,7 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             apps.into()
         }
         "history:block" => {
-            let (id, name) = (args.first().filter(|v| !v.is_null()).map(memoking_core::js::string).unwrap_or_default(), arg(1));
+            let (id, name) = (args.first().filter(|v| !v.is_null()).map(memoking_core::js::string).unwrap_or_default(), arg_str(args, 1));
             if id.is_empty() {
                 return Some(Ok(0.into()));
             }
@@ -603,7 +603,7 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         }
         "history:unblock" => {
             let mut b = blocked(app);
-            b.remove(&arg(0));
+            b.remove(&arg_str(args, 0));
             st(app).set_setting("historyBlocked", b.into());
             changed(app);
             Value::Null
