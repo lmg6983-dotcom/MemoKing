@@ -76,39 +76,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![ipc::ipc])
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
         //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상 · history/<이름>: 알림 보관함 그림
-        .register_uri_scheme_protocol("memoking", |ctx, req| {
-            let path = req.uri().path().to_string();
-            let status = |code| http::Response::builder().status(code).body(Vec::new()).unwrap();
-            // 앱 화면만 (출처 없는 <img> 는 그림만 보일 뿐 읽지 못한다 — 동기 호출은 늘 출처가 있다)
-            let origin = req.headers().get("origin").and_then(|o| o.to_str().ok()).map(str::to_string);
-            if origin.as_deref().is_some_and(|o| !is_app_origin(o)) {
-                return status(403);
-            }
-            let allow = origin.clone().unwrap_or_default();
-            let served = match (path.strip_prefix("/vault/"), path.strip_prefix("/history/")) {
-                (Some(rel), _) => Some(memos::serve_vault(ctx.app_handle(), rel)),
-                (_, Some(name)) => Some(history::serve_image(ctx.app_handle(), name)),
-                _ => None,
-            };
-            if let Some(served) = served {
-                return match served {
-                    Some((bytes, mime)) => http::Response::builder().header("Content-Type", mime).header("Access-Control-Allow-Origin", allow).body(bytes).unwrap(),
-                    None => status(404),
-                };
-            }
-            // 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
-            let (Some(channel), Some(_)) = (path.strip_prefix("/sync/"), &origin) else { return status(404) };
-            let label = ctx.webview_label().to_string();
-            let args = serde_json::from_slice(req.body()).unwrap_or_default();
-            let body = match ipc::dispatch(ctx.app_handle(), &label, channel, args) {
-                Ok(v) => serde_json::json!({ "v": v }),
-                Err(e) => serde_json::json!({ "err": e }),
-            };
-            http::Response::builder()
-                .header("Content-Type", "application/json")
-                .header("Access-Control-Allow-Origin", allow)
-                .body(body.to_string().into_bytes())
-                .unwrap()
+        .register_asynchronous_uri_scheme_protocol("memoking", |ctx, req, responder| {
+            // 파일 읽기 · 동기 호출은 화면 스레드 밖에서 — 큰 영상을 읽거나 창을 만드는 호출이 화면을 멈추지 않게
+            let (app, label) = (ctx.app_handle().clone(), ctx.webview_label().to_string());
+            std::thread::spawn(move || responder.respond(memoking_uri(&app, &label, &req)));
         })
         .setup(|app| {
             let app = app.handle();
@@ -133,6 +104,68 @@ fn main() {
         });
 }
 
+/// memoking 주소 하나에 답한다 (main 의 register 설명)
+fn memoking_uri(app: &AppHandle, label: &str, req: &http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
+    let path = req.uri().path().to_string();
+    let status = |code| http::Response::builder().status(code).body(Vec::new()).unwrap();
+    // 앱 화면만 (출처 없는 <img> 는 그림만 보일 뿐 읽지 못한다 — 동기 호출은 늘 출처가 있다)
+    let origin = req.headers().get("origin").and_then(|o| o.to_str().ok()).map(str::to_string);
+    if origin.as_deref().is_some_and(|o| !is_app_origin(o)) {
+        return status(403);
+    }
+    let allow = origin.clone().unwrap_or_default();
+    let served = match (path.strip_prefix("/vault/"), path.strip_prefix("/history/")) {
+        (Some(rel), _) => Some(memos::serve_vault(app, rel)),
+        (_, Some(name)) => Some(history::serve_image(app, name)),
+        _ => None,
+    };
+    if let Some(served) = served {
+        let range = req.headers().get("range").and_then(|r| r.to_str().ok());
+        return served.and_then(|(file, mime)| file_response(&file, mime, range, allow)).unwrap_or_else(|| status(404));
+    }
+    // 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
+    let (Some(channel), Some(_)) = (path.strip_prefix("/sync/"), &origin) else { return status(404) };
+    let args = serde_json::from_slice(req.body()).unwrap_or_default();
+    let body = match ipc::dispatch(app, label, channel, args) {
+        Ok(v) => serde_json::json!({ "v": v }),
+        Err(e) => serde_json::json!({ "err": e }),
+    };
+    http::Response::builder()
+        .header("Content-Type", "application/json")
+        .header("Access-Control-Allow-Origin", allow)
+        .body(body.to_string().into_bytes())
+        .unwrap()
+}
+
+/// 파일 하나 — Range 가 있으면 그 조각만 206 (영상 · 소리를 끝까지 다 읽지 않고 넘겨 보게)
+fn file_response(file: &std::path::Path, mime: &str, range: Option<&str>, allow: String) -> Option<http::Response<Vec<u8>>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(file).ok()?;
+    let len = f.metadata().ok()?.len();
+    let res = http::Response::builder().header("Content-Type", mime).header("Access-Control-Allow-Origin", allow).header("Accept-Ranges", "bytes");
+    let mut bytes = Vec::new();
+    let Some((a, b)) = range.and_then(|r| byte_range(r, len)) else {
+        f.read_to_end(&mut bytes).ok()?;
+        return res.body(bytes).ok();
+    };
+    f.seek(SeekFrom::Start(a)).ok()?;
+    f.take(b - a + 1).read_to_end(&mut bytes).ok()?;
+    res.status(206).header("Content-Range", format!("bytes {a}-{b}/{len}")).body(bytes).ok()
+}
+
+/// Range: bytes=a-b · bytes=a- → (a, b) 끝 포함. 못 읽거나 파일 밖이면 None (통째로 200)
+// shortcut: bytes=-n (끝에서 n) · 여러 조각은 통째로 — 그런 것을 청하는 화면이 생기면 더한다
+fn byte_range(h: &str, len: u64) -> Option<(u64, u64)> {
+    // 끝을 안 정한 청은 8MB 씩 — 영상은 보는 쪽이 이어서 다시 청한다
+    const CHUNK: u64 = 8 << 20;
+    let (a, b) = h.trim().strip_prefix("bytes=")?.split_once('-')?;
+    let a: u64 = a.trim().parse().ok()?;
+    let b = match b.trim() {
+        "" => a.saturating_add(CHUNK - 1),
+        b => b.parse().ok()?,
+    };
+    (a <= b && a < len).then(|| (a, b.min(len - 1)))
+}
 
 /// 주소의 %XX 풀기 (메모 폴더 파일 이름은 한글이라 UTF-8 로 적혀 온다)
 pub fn percent_decode(s: &str) -> String {
@@ -157,7 +190,7 @@ pub fn percent_decode(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::is_app_origin;
+    use super::{byte_range, is_app_origin};
 
     #[test]
     fn only_app_pages_reach_memos() {
@@ -165,5 +198,17 @@ mod tests {
         for bad in ["null", "https://evil.example", "http://tauri.localhost.evil.example", "http://memoking.localhost", "file://"] {
             assert!(!is_app_origin(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn byte_ranges() {
+        assert_eq!(byte_range("bytes=0-99", 1000), Some((0, 99)));
+        assert_eq!(byte_range("bytes=900-", 1000), Some((900, 999)));
+        assert_eq!(byte_range("bytes=0-", 100 << 20), Some((0, (8 << 20) - 1)));
+        assert_eq!(byte_range("bytes=500-5000", 1000), Some((500, 999)));
+        for bad in ["bytes=1000-", "bytes=5-2", "bytes=-100", "bytes=0-1,5-6", "items=0-1", ""] {
+            assert_eq!(byte_range(bad, 1000), None, "{bad}");
+        }
+        assert_eq!(byte_range("bytes=0-", 0), None);
     }
 }

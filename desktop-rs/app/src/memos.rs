@@ -860,10 +860,9 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
 }
 
 /// memoking://localhost/vault/<경로> — 메모 폴더 안 파일만 (그림 · 소리 · 영상). 앱 화면만 읽게 (main.rs)
-pub fn serve_vault(app: &AppHandle, rel: &str) -> Option<(Vec<u8>, &'static str)> {
+pub fn serve_vault(app: &AppHandle, rel: &str) -> Option<(PathBuf, &'static str)> {
     let rel = crate::percent_decode(rel);
     let file = state(app).vault.lock().unwrap().as_ref()?.resolve(&rel)?;
-    let bytes = std::fs::read(&file).ok()?;
     let mime = match file.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase().as_str() {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
@@ -884,7 +883,7 @@ pub fn serve_vault(app: &AppHandle, rel: &str) -> Option<(Vec<u8>, &'static str)
         "json" => "application/json",
         _ => "application/octet-stream",
     };
-    Some((bytes, mime))
+    Some((file, mime))
 }
 
 #[cfg(test)]
