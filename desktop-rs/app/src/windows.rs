@@ -1401,7 +1401,9 @@ fn sync_sticker(app: &AppHandle, owner: &str) {
                 if let Some(s) = wm().stickers.get_mut(owner) {
                     s.win = None;
                 }
-                open_sticker_win(app, owner, false);
+                // 창 · 알림 영역 이벤트 처리 안에서 창을 만들면 Windows 에서 멈춘다 — 다른 스레드에서
+                let (app, owner) = (app.clone(), owner.to_string());
+                std::thread::spawn(move || open_sticker_win(&app, &owner, false));
             }
             _ => {}
         }
