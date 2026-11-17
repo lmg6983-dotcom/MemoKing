@@ -1,9 +1,9 @@
 [workspace]
-members = ["core", "app", "mcp"]
+members = ["core", "app"]
 resolver = "2"
 
 [workspace.package]
-version = "0.88.0"
+version = "0.88.1"
 edition = "2021"
 license = "MIT"
 
