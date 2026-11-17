@@ -6,6 +6,10 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
 
+pub fn state(app: &AppHandle) -> tauri::State<'_, State> {
+    app.state::<State>()
+}
+
 pub struct State {
     pub settings_dir: PathBuf,
     pub settings: Mutex<Map<String, Value>>,

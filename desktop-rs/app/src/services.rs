@@ -1,6 +1,6 @@
 // 곁가지 기능 — 화면 캡처 메모 · AI 비서 연결(MCP) · PDF · 자동 업데이트.
 //   Electron 의 window-manager.js(startAreaCapture · finishAreaCapture · openCaptureMemo · openPdfWindow) · utils.js(mcpStatus · mcpConnect) · office-pdf.js · updater.js 자리.
-use crate::state::State;
+use crate::state::state;
 use memoking_core::time::now_ms;
 use memoking_core::vault::write_atomic;
 use serde_json::{json, Map, Value};
@@ -8,10 +8,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
-
-fn st(app: &AppHandle) -> tauri::State<'_, State> {
-    app.state::<State>()
-}
 
 // ---------- 영역 캡처 (Ctrl+Alt+C 두 번 · 트레이) ----------
 
@@ -45,7 +41,7 @@ fn screens() -> Vec<((i32, i32), image::RgbaImage)> {
 
 /// 모니터마다 찍은 화면을 띄우고 사각형을 고르게 한다 (capture.html) — 창 만들기라 이벤트 처리 밖의 스레드에서 부른다
 pub fn start_area_capture(app: &AppHandle) -> bool {
-    if st(app).vault.lock().unwrap().is_none() {
+    if state(app).vault.lock().unwrap().is_none() {
         return false;
     }
     {
@@ -124,7 +120,7 @@ fn finish_area_capture(app: &AppHandle, label: &str, rect: &Value) -> Result<Val
     use tauri_plugin_clipboard_manager::ClipboardExt;
     let _ = app.clipboard().write_image(&tauri::image::Image::new(crop.as_raw(), crop.width(), crop.height()));
     let (id, src) = {
-        let state = st(app);
+        let state = state(app);
         let mut guard = state.vault.lock().unwrap();
         let Some(v) = guard.as_mut() else { return Ok(Value::Null) };
         let src = v.save_attachment(png.get_ref(), "png").map_err(|e| e.to_string())?;
@@ -161,7 +157,7 @@ fn claude_config_file(app: &AppHandle) -> PathBuf {
 // shortcut: 설치 파일에 memoking-mcp 를 넣는 일(tauri.conf.json externalBin)은 릴리스를 Tauri 로 바꿀 때 — 그때까지는 빌드 폴더의 것을 가리킨다
 fn mcp_entry(app: &AppHandle) -> Value {
     let exe = std::env::current_exe().unwrap_or_default().with_file_name(format!("memoking-mcp{}", std::env::consts::EXE_SUFFIX));
-    let settings = st(app).settings_dir.join("settings.json");
+    let settings = state(app).settings_dir.join("settings.json");
     json!({ "command": exe, "args": ["--settings", settings, "--version", app.package_info().version.to_string()] })
 }
 
@@ -185,7 +181,7 @@ pub fn mcp_status(app: &AppHandle) -> Value {
         "connected": entry.is_some(),
         "stale": entry.is_some_and(|e| e["command"] != mcp_entry(app)["command"]),
         "broken": config.is_err(),
-        "write": st(app).setting("mcp")["write"] != false,
+        "write": state(app).setting("mcp")["write"] != false,
     })
 }
 
@@ -234,7 +230,7 @@ pub fn start(app: &AppHandle) {
 
 // PDF로 저장 창 (pdf.html 이 미리 보기와 고르기를 맡는다)
 fn open_pdf_window(app: &AppHandle, id: &str) -> Result<Value, String> {
-    if st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(id)).is_none() {
+    if state(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(id)).is_none() {
         return Ok(false.into());
     }
     if let Some(w) = app.get_webview_window("pdf") {
@@ -251,7 +247,7 @@ fn query_value(v: &str) -> String {
 
 /// pdf:save — 숨은 창에 print.html 을 그려 PDF 파일로 (Electron savePdf) → { file, pages } | { cancelled } | null
 fn save_pdf(app: &AppHandle, id: &str, o: &Value) -> Value {
-    let title = st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(id)).map(|m| m["title"].as_str().unwrap_or_default().to_string());
+    let title = state(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(id)).map(|m| m["title"].as_str().unwrap_or_default().to_string());
     let Some(title) = title else { return Value::Null };
     let file = if crate::ipc::smoke() {
         Some(std::env::temp_dir().join(format!("memoking-smoke-{}.pdf", chrono::Utc::now().timestamp_millis())))
@@ -378,7 +374,7 @@ if ($src -match '\.pptx$') {
 /// 메모 폴더의 Word · PowerPoint 첨부 → PDF 내용 | null (Windows 아님 · Office 없음 · 실패 → 화면이 직접 그린다)
 fn office_to_pdf(app: &AppHandle, rel: &str) -> Value {
     let rel = memoking_core::js::decode_uri(rel).unwrap_or_else(|| rel.to_string());
-    let file = st(app).vault.lock().unwrap().as_ref().filter(|_| rel.starts_with("attachments/")).and_then(|v| v.resolve(&rel)).filter(|f| f.is_file());
+    let file = state(app).vault.lock().unwrap().as_ref().filter(|_| rel.starts_with("attachments/")).and_then(|v| v.resolve(&rel)).filter(|f| f.is_file());
     let Some(src) = file.filter(|f| cfg!(windows) && !crate::ipc::smoke() && f.extension().is_some_and(|e| e.eq_ignore_ascii_case("docx") || e.eq_ignore_ascii_case("pptx"))) else { return Value::Null };
     let out = std::env::temp_dir().join(format!("memoking-pdf-{}-{}.pdf", chrono::Utc::now().timestamp_millis(), std::process::id()));
     let child = crate::history::powershell(false).args(["-Command", OFFICE_PDF]).env("MK_SRC", &src).env("MK_OUT", &out).stdout(std::process::Stdio::null()).spawn();
@@ -429,7 +425,7 @@ fn update_enabled() -> bool {
 fn update_state(app: &AppHandle) -> Value {
     let mut s = updates(|u| u.state.clone());
     let offering = s["status"] == "ready" || s["status"] == "available";
-    let ask = offering && !memoking_core::update::is_snoozed(&st(app).setting("updateSnooze"), s.get("version").unwrap_or(&Value::Null), now_ms() as f64);
+    let ask = offering && !memoking_core::update::is_snoozed(&state(app).setting("updateSnooze"), s.get("version").unwrap_or(&Value::Null), now_ms() as f64);
     s.insert("ask".into(), ask.into());
     s.insert("current".into(), app.package_info().version.to_string().into());
     s.insert("enabled".into(), update_enabled().into());
@@ -489,7 +485,7 @@ fn check_update(app: &AppHandle, manual: bool) {
             let date = up.date.and_then(|d| chrono::DateTime::from_timestamp(d.unix_timestamp(), 0)).map(|d| d.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)).unwrap_or_default();
             set_update(app, json!({ "status": "available", "version": version, "notes": memoking_core::update::notes_text(up.body.as_deref().unwrap_or_default()), "date": date }));
             updates(|u| u.update = Some(up));
-            if !manual && memoking_core::update::is_snoozed(&st(app).setting("updateSnooze"), &version.clone().into(), now_ms() as f64) {
+            if !manual && memoking_core::update::is_snoozed(&state(app).setting("updateSnooze"), &version.clone().into(), now_ms() as f64) {
                 return; // "나중에" 고른 버전 — 24시간 조용히
             }
             let fresh = updates(|u| {
@@ -542,14 +538,14 @@ fn download_update(app: &AppHandle) {
 /// 지금 재시작: 쓰던 메모를 저장하고 설치 → 다시 켬
 fn install_update(app: &AppHandle) -> bool {
     let Some((up, bytes)) = updates(|u| if u.state["status"] == "ready" { u.update.clone().zip(u.bytes.clone()) } else { None }) else { return false };
-    let labels: Vec<String> = st(app).note_labels.lock().unwrap().values().cloned().collect();
+    let labels: Vec<String> = state(app).note_labels.lock().unwrap().values().cloned().collect();
     for l in labels {
         if let Some(w) = app.get_webview_window(&l) {
             let _ = w.eval("window.mkFlushSync?.()");
         }
     }
     std::thread::sleep(std::time::Duration::from_millis(500)); // 메모 창이 저장할 틈
-    st(app).save_settings();
+    state(app).save_settings();
     // 설치 파일이 이전 설치 폴더를 지우려면 메모킹이 띄운 PowerShell 도우미가 꺼져 있어야 한다
     crate::history::stop_helpers();
     // 업데이트 플러그인은 설치 파일을 띄우고 바로 끝내(Exit 이벤트 없음) 여기서 끈다. 남은 AI 엔진이 설치 폴더의 파일을 잡고 있지 않게
@@ -590,14 +586,14 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             app.clipboard().write_text(serde_json::to_string_pretty(&snippet).unwrap()).map(|()| Value::Bool(true)).map_err(|e| e.to_string())
         }
         "mcp:set-write" => {
-            let mut mcp = st(app).setting("mcp").as_object().cloned().unwrap_or_default();
+            let mut mcp = state(app).setting("mcp").as_object().cloned().unwrap_or_default();
             mcp.insert("write".into(), crate::settings::truthy(args.first()).into());
-            st(app).set_setting("mcp", mcp.into());
+            state(app).set_setting("mcp", mcp.into());
             Ok(mcp_status(app))
         }
         "pdf:open" => open_pdf_window(app, &memoking_core::js::string(args.first().unwrap_or(&Value::Null))),
         "pdf:memo" => {
-            let m = st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(&memoking_core::js::string(args.first().unwrap_or(&Value::Null))));
+            let m = state(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(&memoking_core::js::string(args.first().unwrap_or(&Value::Null))));
             Ok(m.map_or(Value::Null, |m| json!({ "title": m["title"], "body": m["body"], "color": m["color"], "tables": m["tables"], "created": m["created"], "updated": m["updated"] })))
         }
         // shortcut: PDF 만들기는 WebView2(Windows)의 PrintToPdf 로만 — 그 밖(개발용 Linux)은 실패(null). 다른 OS 판을 낼 때 그 웹뷰의 인쇄로
@@ -623,7 +619,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "update:later" => {
             let s = updates(|u| u.state.clone());
             if (s["status"] == "available" || s["status"] == "ready") && s.get("version").is_some_and(|v| !v.is_null()) {
-                st(app).set_setting("updateSnooze", json!({ "version": s["version"], "until": now_ms() as f64 + memoking_core::update::SNOOZE_MS as f64 }));
+                state(app).set_setting("updateSnooze", json!({ "version": s["version"], "until": now_ms() as f64 + memoking_core::update::SNOOZE_MS as f64 }));
             }
             Ok(update_state(app))
         }

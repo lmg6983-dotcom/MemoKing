@@ -4,7 +4,7 @@
 //   자리는 모두 화면 논리 좌표 [x, y, 폭, 높이] (Electron 의 DIP 처럼).
 //   Tauri 에는 창 보이기 · 숨기기 이벤트가 없어 메모 창을 보이고 숨기는 곳에서 스티커도 직접 맞춘다 (shown · hide_note).
 //   잠금 차례: 앱 상태(메모 폴더 · 설정 · note_labels)를 잡은 채로 WM 을 잡지 않고, WM 을 잡은 채로 창을 부르지 않는다.
-use crate::state::State;
+use crate::state::state;
 use memoking_core::placement::{drop_bounds, is_inside, place_bubble, Rect, BAR_H, BUBBLE_SIZE, DEFAULT_NOTE_SIZE};
 use memoking_core::stacks::{Stack, Stacks};
 use serde_json::{json, Value};
@@ -118,10 +118,6 @@ fn next_seq() -> u64 {
     g.seq
 }
 
-fn st(app: &AppHandle) -> tauri::State<'_, State> {
-    app.state::<State>()
-}
-
 fn later(ms: u64, f: impl FnOnce() + Send + 'static) {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(ms));
@@ -136,7 +132,7 @@ fn emit(app: &AppHandle, label: &str, event: &str, payload: Value) {
 // ---------- 창 · 자리 ----------
 
 fn note_label(app: &AppHandle, id: &str) -> Option<String> {
-    st(app).note_labels.lock().unwrap().get(id).cloned()
+    state(app).note_labels.lock().unwrap().get(id).cloned()
 }
 
 fn note_win(app: &AppHandle, id: &str) -> Option<WebviewWindow> {
@@ -144,7 +140,7 @@ fn note_win(app: &AppHandle, id: &str) -> Option<WebviewWindow> {
 }
 
 fn note_id(app: &AppHandle, label: &str) -> Option<String> {
-    st(app).note_labels.lock().unwrap().iter().find(|(_, l)| *l == label).map(|(id, _)| id.clone())
+    state(app).note_labels.lock().unwrap().iter().find(|(_, l)| *l == label).map(|(id, _)| id.clone())
 }
 
 fn is_shown(w: &WebviewWindow) -> bool {
@@ -189,11 +185,11 @@ fn cursor(app: &AppHandle) -> Option<(f64, f64)> {
 
 /// 기억한 이 메모 창 자리 (지금 있는 화면 안일 때만)
 fn saved_bounds(app: &AppHandle, id: &str) -> Option<Rect> {
-    crate::os::on_screen(&st(app).setting("noteBounds")[id], &crate::os::work_areas(app))
+    crate::os::on_screen(&state(app).setting("noteBounds")[id], &crate::os::work_areas(app))
 }
 
 fn remember_bounds(app: &AppHandle, ids: &[String], b: Rect) {
-    let st = st(app);
+    let st = state(app);
     {
         let mut s = st.settings.lock().unwrap();
         let all = s.entry("noteBounds").or_insert_with(|| json!({}));
@@ -211,11 +207,11 @@ fn remember_bounds(app: &AppHandle, ids: &[String], b: Rect) {
 
 /// 지금 메모 폴더의 스택으로 f — 바뀌었으면 stacks.json 에 쓴다 (메모 폴더가 바뀌면 그 폴더 것을 읽는다)
 fn stacks<T>(app: &AppHandle, f: impl FnOnce(&mut Stacks) -> T) -> Option<T> {
-    let root = st(app).vault.lock().unwrap().as_ref()?.root.clone();
+    let root = state(app).vault.lock().unwrap().as_ref()?.root.clone();
     let file = root.join(memoking_core::vault::APP_DIR).join("stacks.json");
     if !matches!(&wm().stacks, Some((r, _)) if *r == root) {
         let text = std::fs::read_to_string(&file).ok();
-        let state = st(app);
+        let state = state(app);
         let loaded = {
             let g = state.vault.lock().unwrap();
             let v = g.as_ref()?;
@@ -247,7 +243,7 @@ pub fn in_stack(app: &AppHandle, id: &str) -> bool {
 /// 메모 창이 그리는 탭 줄 { active, members: [{ id, title, color }] } (스택이 아니면 빈 줄)
 pub fn stack_state(app: &AppHandle, id: &str) -> Value {
     let Some(s) = stack_of(app, id) else { return json!({ "members": [], "active": id }) };
-    let state = st(app);
+    let state = state(app);
     let g = state.vault.lock().unwrap();
     let members: Vec<Value> = s
         .memos
@@ -276,10 +272,10 @@ pub fn push_all_stacks(app: &AppHandle) {
 
 /// 목록 카드에 붙이는 것: 메모 id → [열림(창이 보임), 스택 탭 수, 테이프로 바탕화면에 붙어 있음]
 pub fn card_flags(app: &AppHandle) -> impl Fn(&str) -> [Value; 3] {
-    let labels: Vec<(String, String)> = st(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let labels: Vec<(String, String)> = state(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
     let visible: HashSet<String> = labels.into_iter().filter(|(_, l)| app.get_webview_window(l).is_some_and(|w| is_shown(&w))).map(|(id, _)| id).collect();
     let all = stacks(app, |s| s.stacks.clone()).unwrap_or_default();
-    let bottom = st(app).setting("onBottom");
+    let bottom = state(app).setting("onBottom");
     move |id| {
         let stack = all.iter().find(|s| s.memos.iter().any(|m| m == id));
         let taped = bottom[id] == true && stack.map_or(visible.contains(id), |s| s.memos.iter().any(|m| visible.contains(m)));
@@ -358,7 +354,7 @@ fn destroyed(app: &AppHandle, id: &str, label: &str) {
         pin_send(app, "unpin", h, 0); // 같은 번호를 다른 앱 창이 받아도 건드리지 않게
     }
     // 비워서 치운 메모 · 휴지통으로 간 메모는 스택에서도 뺀다
-    let gone = st(app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(id).is_none());
+    let gone = state(app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(id).is_none());
     if gone {
         if let Some(r) = stacks(app, |s| s.stack_of(id).is_some().then(|| s.remove(id))).flatten() {
             push_stack_to(app, &r.rest.unwrap_or_default());
@@ -438,7 +434,7 @@ fn hover(g: &mut Wm, who: Who) -> Option<&mut Hover> {
 /// 이 점 아래의 다른 메모 창 (끄는 메모 · 그 스택은 빼고)
 fn stack_target_at(app: &AppHandle, p: (f64, f64), exclude: &str) -> Option<String> {
     let own = stack_of(app, exclude).map_or_else(|| vec![exclude.to_string()], |s| s.memos);
-    let labels: Vec<(String, String)> = st(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let labels: Vec<(String, String)> = state(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
     let (inking, pinned) = {
         let g = wm();
         (g.inking.clone(), g.pinned.clone())
@@ -541,7 +537,7 @@ pub fn show_tab(app: &AppHandle, id: &str, at: Option<Rect>, focus: bool) -> boo
         for m in &s.memos {
             set_layer_flags(app, m, layer);
         }
-        st(app).save_settings();
+        state(app).save_settings();
     }
     let ok = if note_win(app, id).is_some() {
         reveal_tab(app, id, b, focus);
@@ -594,7 +590,7 @@ fn reveal_tab(app: &AppHandle, id: &str, b: Option<Rect>, focus: bool) {
 /// moving 메모를 target 메모 창의 스택으로 (target 이 혼자면 새 스택) — 받는 쪽 자리 · 층을 따른다
 fn stack_into(app: &AppHandle, target: &str, moving: &str) -> bool {
     let Some(target_win) = note_win(app, target) else { return false };
-    let exists = st(app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(moving).is_some());
+    let exists = state(app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(moving).is_some());
     let Some(b) = bounds(&target_win).filter(|_| target != moving && exists) else { return false };
     let layer = stack_layer(app, &stack_of(app, target).map_or_else(|| vec![target.to_string()], |s| s.memos));
     let Some(Some(s)) = stacks(app, |s| s.merge(target, &[moving.to_string()], Some(moving))) else { return false };
@@ -711,7 +707,7 @@ pub fn remove_from_stack(app: &AppHandle, id: &str, mode: &str) -> bool {
 
 /// 윗막대 + · 탭 메뉴: 보이는 탭 바로 뒤에 새 메모 (같은 색)
 fn new_tab_after(app: &AppHandle, from: &str) -> Value {
-    let state = st(app);
+    let state = state(app);
     let id = {
         let mut g = state.vault.lock().unwrap();
         let Some(v) = g.as_mut() else { return Value::Null };
@@ -808,7 +804,7 @@ fn menu_item(app: &AppHandle, text: &str, act: Option<Action>) -> tauri::Result<
 /// 이 창을 합칠 수 있는 다른 메모 창들 (스택이면 하나로)
 fn join_items(app: &AppHandle, me: &str) -> tauri::Result<Vec<MenuItem<Wry>>> {
     let mine = stack_of(app, me).map(|s| s.memos).unwrap_or_default();
-    let labels: Vec<(String, String)> = st(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let labels: Vec<(String, String)> = state(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
     let mut seen = HashSet::new();
     let mut items = vec![];
     for (m, l) in labels {
@@ -819,7 +815,7 @@ fn join_items(app: &AppHandle, me: &str) -> tauri::Result<Vec<MenuItem<Wry>>> {
         if !seen.insert(s.as_ref().map_or(m.clone(), |s| s.memos[0].clone())) {
             continue;
         }
-        let title = st(app).vault.lock().unwrap().as_ref().and_then(|v| v.entry(&m).map(|e| memoking_core::body::extract_title(&e.body))).filter(|t| !t.is_empty()).unwrap_or_else(|| "제목 없음".into());
+        let title = state(app).vault.lock().unwrap().as_ref().and_then(|v| v.entry(&m).map(|e| memoking_core::body::extract_title(&e.body))).filter(|t| !t.is_empty()).unwrap_or_else(|| "제목 없음".into());
         let count = s.map_or(1, |s| s.memos.len());
         let text = if count > 1 { format!("{title} (탭 {count}개)") } else { title };
         let me = me.to_string();
@@ -878,7 +874,7 @@ fn stack_menu(app: &AppHandle, me: &str) -> tauri::Result<Menu<Wry>> {
 //   (settings.onTop / settings.onBottom — 스택은 탭 모두 같게, 다시 켜도 그대로)
 
 fn layer_of(app: &AppHandle, id: &str) -> Option<&'static str> {
-    let st = st(app);
+    let st = state(app);
     if st.setting("onTop")[id] == true {
         Some("top")
     } else if st.setting("onBottom")[id] == true {
@@ -889,7 +885,7 @@ fn layer_of(app: &AppHandle, id: &str) -> Option<&'static str> {
 }
 
 fn set_layer_flags(app: &AppHandle, id: &str, layer: Option<&str>) {
-    let st = st(app);
+    let st = state(app);
     let mut s = st.settings.lock().unwrap();
     for (key, mine) in [("onTop", "top"), ("onBottom", "bottom")] {
         let m = s.entry(key).or_insert_with(|| json!({}));
@@ -943,7 +939,7 @@ fn set_note_layer(app: &AppHandle, id: &str, layer: Option<&str>, note: &str) ->
     for m in &members {
         set_layer_flags(app, m, layer);
     }
-    st(app).save_settings();
+    state(app).save_settings();
     for m in &members {
         let Some(w) = note_win(app, m) else { continue };
         apply_layer(app, m, &w, m == id);
@@ -1138,8 +1134,8 @@ fn reassert_top(w: &WebviewWindow) {
 }
 
 fn on_top_wins(app: &AppHandle) -> Vec<WebviewWindow> {
-    let on_top = st(app).setting("onTop");
-    let labels: Vec<(String, String)> = st(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let on_top = state(app).setting("onTop");
+    let labels: Vec<(String, String)> = state(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
     labels.into_iter().filter(|(id, _)| on_top[id] == true).filter_map(|(_, l)| app.get_webview_window(&l)).collect()
 }
 
@@ -1550,13 +1546,13 @@ fn hide_ghost(app: &AppHandle) {
 }
 
 fn drop_at(app: &AppHandle, id: &str, p: (f64, f64)) -> Rect {
-    let saved = &st(app).setting("noteBounds")[id];
+    let saved = &state(app).setting("noteBounds")[id];
     let size = saved["width"].as_f64().zip(saved["height"].as_f64()).unwrap_or(DEFAULT_NOTE_SIZE);
     drop_bounds(p, size, area_at(app, p))
 }
 
 fn drag_start(app: &AppHandle, id: &str) -> bool {
-    let memo = st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(id));
+    let memo = state(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(id));
     let Some(memo) = memo.filter(|_| app.get_webview_window("list").is_some()) else { return false };
     let (w, h) = DEFAULT_NOTE_SIZE;
     if ensure_overlay(app, "ghost", "ghost.html", (w + GHOST_MARGIN * 2.0, h + GHOST_MARGIN * 2.0), None).is_none() {

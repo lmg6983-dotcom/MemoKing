@@ -1,14 +1,10 @@
 // 메모 채널 — 메모 폴더 · 목록 · 메모 창 열고 닫기 · 저장. Electron 의 ipc-handlers.js · window-manager.js 의 그 부분.
-use crate::state::State;
+use crate::state::{state, State};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
-
-fn state(app: &AppHandle) -> tauri::State<'_, State> {
-    app.state::<State>()
-}
 
 // 1×1 빨간 점 (점검용 그림)
 const DOT_PNG: &[u8] = &[

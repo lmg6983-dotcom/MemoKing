@@ -1,5 +1,5 @@
 // 일정 · 알림 채널과 알림 실행기, 다른 캘린더 구독. Electron 의 ipc-handlers.js(예약 알림 · 다른 캘린더) · main.js(fireReminder) · alarms.js · calendar-feeds.js 자리.
-use crate::state::State;
+use crate::state::state;
 use memoking_core::calendar_feeds::{self as feeds, Reply};
 use memoking_core::reminders::{self as rem, Alert};
 use memoking_core::vault::Vault;
@@ -9,14 +9,10 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 pub(crate) const SAVED_ELSEWHERE: &str = "그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요";
 pub(crate) const MEMO_PICK_AGAIN: &str = "메모를 찾지 못했어요. 목록에서 다시 골라 주세요";
-
-fn state(app: &AppHandle) -> tauri::State<'_, State> {
-    app.state::<State>()
-}
 
 /// 메모 폴더를 쓰는 일 (열린 폴더가 없으면 None)
 fn vault<T>(app: &AppHandle, f: impl FnOnce(&mut Vault) -> T) -> Option<T> {

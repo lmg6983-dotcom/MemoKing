@@ -3,7 +3,7 @@
 //   알림 센터를 쓰지 않는 앱(카카오톡 PC)은 PowerShell 도우미(scripts/popup-watch.ps1)가 알림 창을 읽어 한 줄(JSON)씩 보낸다.
 //   기록은 이 PC 에만 (설정 폴더\notification-history) — 메모 폴더(Google Drive)로 동기화하지 않는다.
 use crate::memos::arg_str;
-use crate::state::State;
+use crate::state::state;
 use memoking_core::notify;
 use memoking_core::time::now_ms;
 use memoking_core::vault::write_atomic;
@@ -35,10 +35,6 @@ pub struct History {
 
 static ON: AtomicBool = AtomicBool::new(false);
 static WATCHER: Mutex<Option<Child>> = Mutex::new(None);
-
-fn st(app: &AppHandle) -> tauri::State<'_, State> {
-    app.state::<State>()
-}
 
 fn iso(ms: i64) -> String {
     chrono::DateTime::from_timestamp_millis(ms).unwrap_or_default().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
@@ -219,7 +215,7 @@ fn rand24() -> u64 {
 }
 
 fn blocked(app: &AppHandle) -> Map<String, Value> {
-    st(app).setting("historyBlocked").as_object().cloned().unwrap_or_default()
+    state(app).setting("historyBlocked").as_object().cloned().unwrap_or_default()
 }
 
 fn changed(app: &AppHandle) {
@@ -242,7 +238,7 @@ fn update<T>(app: &AppHandle, f: impl FnOnce(&mut History, &Map<String, Value>) 
 
 /// 켤 때: 기록을 읽고, 켜 둔 사람이면 모으기 시작
 pub fn start(app: &AppHandle) {
-    let dir = st(app).settings_dir.join("notification-history");
+    let dir = state(app).settings_dir.join("notification-history");
     let mut h = History { dir, ..Default::default() };
     if let Ok(Value::Object(data)) = std::fs::read_to_string(h.file()).map(|t| serde_json::from_str(&t).unwrap_or_default()) {
         if let Some(entries) = data.get("entries").and_then(Value::as_array) {
@@ -265,7 +261,7 @@ pub fn start(app: &AppHandle) {
             std::thread::sleep(Duration::from_secs(15));
         }
     });
-    set_on(app, st(app).setting("historyEnabled") == true);
+    set_on(app, state(app).setting("historyEnabled") == true);
 }
 
 fn set_on(app: &AppHandle, on: bool) {
@@ -367,10 +363,10 @@ fn watch_popups(app: &AppHandle) {
     if !cfg!(windows) {
         return;
     }
-    let script = st(app).settings_dir.join("popup-watch.ps1");
+    let script = state(app).settings_dir.join("popup-watch.ps1");
     let _ = std::fs::create_dir_all(popup_dir());
     let _ = std::fs::write(&script, include_str!("../../../scripts/popup-watch.ps1"));
-    let log = st(app).settings_dir.join("popup-debug.log");
+    let log = state(app).settings_dir.join("popup-debug.log");
     let processes = notify::POPUP_APPS.map(|a| a.0).join(",");
     while ON.load(Ordering::SeqCst) {
         let child = powershell(true)
@@ -505,7 +501,7 @@ fn to_memo(app: &AppHandle, id: &str) -> Result<Value, String> {
         let file = e["image"].as_str().map(|n| h.image_dir().join(n)).filter(|f| f.is_file());
         (e, file)
     };
-    let state = st(app);
+    let state = state(app);
     let id = {
         let mut guard = state.vault.lock().unwrap();
         let Some(v) = guard.as_mut() else { return Ok(Value::Null) };
@@ -539,11 +535,11 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             let h = app.state::<Mutex<History>>();
             let h = h.lock().unwrap();
             let entries: Vec<&Value> = h.list(f["query"].as_str().unwrap_or_default(), f["app"].as_str().unwrap_or_default()).into_iter().take(500).collect();
-            json!({ "enabled": st(app).setting("historyEnabled") == true, "total": h.entries.len(), "apps": h.apps(), "entries": entries })
+            json!({ "enabled": state(app).setting("historyEnabled") == true, "total": h.entries.len(), "apps": h.apps(), "entries": entries })
         }
         "history:set-enabled" => {
             let on = crate::settings::truthy(args.first());
-            st(app).set_setting("historyEnabled", on.into());
+            state(app).set_setting("historyEnabled", on.into());
             set_on(app, on);
             on.into()
         }
@@ -584,7 +580,7 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             }
             let mut b = blocked(app);
             b.insert(id.clone(), if name.is_empty() { id.clone() } else { name }.into());
-            st(app).set_setting("historyBlocked", b.into());
+            state(app).set_setting("historyBlocked", b.into());
             if !crate::settings::truthy(args.get(2)) {
                 return Some(Ok(0.into()));
             }
@@ -601,7 +597,7 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         "history:unblock" => {
             let mut b = blocked(app);
             b.remove(&arg_str(args, 0));
-            st(app).set_setting("historyBlocked", b.into());
+            state(app).set_setting("historyBlocked", b.into());
             changed(app);
             Value::Null
         }

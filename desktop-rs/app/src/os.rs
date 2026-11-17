@@ -1,7 +1,7 @@
 // 운영체제와 붙는 곳 — 한 번만 켜기 · 실행 인자(MagicKey 약속, docs/magickey.md) · 알림 영역 아이콘 · 창 자리 기억.
 //   Electron 의 main.js(handleLaunch · 트레이) · jump-list.js(launchAction · readMagicKeyFile) · window-manager.js(listBounds · noteBounds · openNotes) 자리.
 use crate::memos;
-use crate::state::State;
+use crate::state::state;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -14,10 +14,6 @@ type Builder<'a> = WebviewWindowBuilder<'a, Wry, AppHandle>;
 
 /// 끝내는 중 — 이때 닫히는 메모는 "열려 있던 메모"로 남긴다 (다음에 켜면 다시 연다)
 static QUITTING: AtomicBool = AtomicBool::new(false);
-
-fn state(app: &AppHandle) -> tauri::State<'_, State> {
-    app.state::<State>()
-}
 
 // ---------- 창 자리 ----------
 

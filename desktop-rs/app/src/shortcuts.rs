@@ -1,6 +1,6 @@
 // 전역 단축키(매직 카피 · 메모 목록) · 메모 단축키(Ctrl+Alt+1~9) · 처음 실행 튜토리얼 · 화면이 그린 메뉴와 편집 명령.
 //   Electron 의 main.js(전역 단축키 · 튜토리얼) · memo-hotkeys.js · ipc-handlers.js 의 그 부분.
-use crate::state::State;
+use crate::state::state;
 use memoking_core::accelerators::{self as acc, SHORTCUTS};
 use memoking_core::{js, tutorial};
 use serde_json::{json, Map, Value};
@@ -25,10 +25,6 @@ struct Keys {
 }
 static KEYS: LazyLock<Mutex<Keys>> = LazyLock::new(Default::default);
 
-fn st(app: &AppHandle) -> tauri::State<'_, State> {
-    app.state::<State>()
-}
-
 fn is_slot(name: &str) -> bool {
     acc::HOTKEY_SLOTS.contains(&name)
 }
@@ -36,13 +32,13 @@ fn is_slot(name: &str) -> bool {
 /// 설정의 전역 단축키 하나 (SHORTCUTS 이름)
 fn shortcut_key(app: &AppHandle, name: &str) -> String {
     let i = SHORTCUTS.iter().position(|s| s.0 == name).unwrap_or(0);
-    acc::normalize_shortcuts(&st(app).setting("shortcuts"))[i].clone()
+    acc::normalize_shortcuts(&state(app).setting("shortcuts"))[i].clone()
 }
 
 fn enabled(app: &AppHandle, name: &str) -> bool {
     match name {
         // 매직 카피는 Windows 에서만 (Electron 과 같게)
-        "quickMemo" => st(app).setting("quickMemo") != false && cfg!(windows),
+        "quickMemo" => state(app).setting("quickMemo") != false && cfg!(windows),
         // 매직키는 따로 설치하는 MagicKey 앱이 맡는다 — 키 칸만 남겨 MagicKey 가 이어받게
         "magic" => false,
         _ => true,
@@ -65,16 +61,16 @@ pub fn status(app: &AppHandle, name: &str) -> Value {
 
 /// 메모 단축키 칸 (설정의 memoHotkeys 를 정리한 것)
 pub fn hotkeys(app: &AppHandle) -> Map<String, Value> {
-    acc::normalize_hotkeys(&st(app).setting("memoHotkeys"))
+    acc::normalize_hotkeys(&state(app).setting("memoHotkeys"))
 }
 
 fn memo_exists(app: &AppHandle, id: &str) -> bool {
-    st(app).vault.lock().unwrap().as_ref().is_none_or(|v| v.entry(id).is_some())
+    state(app).vault.lock().unwrap().as_ref().is_none_or(|v| v.entry(id).is_some())
 }
 
 /// 다른 메모킹 단축키가 쓰는 칸이면 그 이름
 fn reserved_by(app: &AppHandle, slot: &str) -> Option<&'static str> {
-    let keys = acc::normalize_shortcuts(&st(app).setting("shortcuts"));
+    let keys = acc::normalize_shortcuts(&state(app).setting("shortcuts"));
     SHORTCUTS.iter().zip(keys).find(|(_, k)| *k == acc::hotkey_accelerator(slot)).map(|(s, _)| s.2)
 }
 
@@ -169,7 +165,7 @@ pub fn start(app: &AppHandle) {
     register_memo(app);
     app.on_menu_event(|_, e| menu_chosen(e.id.as_ref()));
     // 처음 켰을 때 (메모 폴더가 있고 숨겨 켜지 않았으면) 사용법부터
-    if st(app).setting("tutorialDone") != true && !crate::ipc::smoke() && !std::env::args().any(|a| a == "--hidden") {
+    if state(app).setting("tutorialDone") != true && !crate::ipc::smoke() && !std::env::args().any(|a| a == "--hidden") {
         start_tutorial(app);
     }
     let app = app.clone();
@@ -214,12 +210,12 @@ fn pressed(app: &AppHandle, name: &str) {
 fn memo_hotkey_pressed(app: &AppHandle, slot: &str) {
     let b = hotkeys(app).get(slot).cloned().unwrap_or_default();
     let id = b["id"].as_str().unwrap_or_default().to_string();
-    let get = || st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(&id));
+    let get = || state(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(&id));
     let Some(memo) = get() else {
         crate::windows::show_hud(app, &format!("{}: 메모를 찾지 못했어요", acc::hotkey_label(slot)), "삭제했거나 다른 메모 폴더의 메모예요", "warn");
         return;
     };
-    let label = st(app).note_labels.lock().unwrap().get(&id).cloned();
+    let label = state(app).note_labels.lock().unwrap().get(&id).cloned();
     let mut copied = false;
     if b["copy"] == true && memo["needsPassword"] != true {
         // 그 메모 창에서 막 고친 글까지 (저장 기다림 600ms 안에 눌러도)
@@ -236,15 +232,15 @@ fn memo_hotkey_pressed(app: &AppHandle, slot: &str) {
     // shortcut: 복사도 했을 때 포커스를 쓰던 앱에 남기기(inactive)는 아직 — 창을 띄우면 포커스를 가져간다
     if b["show"] == true || (b["copy"] == true && !copied) {
         let _ = crate::memos::open_note(app, &id);
-        if let Some(l) = st(app).note_labels.lock().unwrap().get(&id) {
+        if let Some(l) = state(app).note_labels.lock().unwrap().get(&id) {
             let _ = app.emit_to(l.as_str(), "memo:highlight", [Value::Null; 0]);
         }
     }
     // 붙여 넣는 법은 처음 몇 번만 (매일 수십 번 쓰는 사람에게는 군더더기)
-    let tips = st(app).setting("hotkeyTips").as_u64().unwrap_or(0);
+    let tips = state(app).setting("hotkeyTips").as_u64().unwrap_or(0);
     let tip = copied && tips < 3;
     if tip {
-        st(app).set_setting("hotkeyTips", (tips + 1).into());
+        state(app).set_setting("hotkeyTips", (tips + 1).into());
     }
     let title = memo["title"].as_str().filter(|t| !t.is_empty()).unwrap_or("제목 없음");
     if copied {
@@ -277,7 +273,7 @@ fn set_shortcut(app: &AppHandle, name: &str, wanted: Option<String>) -> Value {
         return fail(json!({ "reason": "same", "other": "메모 단축키" }));
     }
     // 메모 창 단축키가 쓰는 키를 전역으로 가져가면 그 기능이 모든 메모 창에서 멈춘다
-    if let Some(label) = acc::combo_from_accelerator(&next).and_then(|c| crate::settings::action_using(&st(app).setting("keymap"), &c)) {
+    if let Some(label) = acc::combo_from_accelerator(&next).and_then(|c| crate::settings::action_using(&state(app).setting("keymap"), &c)) {
         return fail(json!({ "reason": "same", "other": format!("메모 창의 '{label}'") }));
     }
     if enabled(app, name) && next != shortcut_key(app, name) {
@@ -286,9 +282,9 @@ fn set_shortcut(app: &AppHandle, name: &str, wanted: Option<String>) -> Value {
         }
         let _ = app.global_shortcut().unregister(next.as_str());
     }
-    let mut all: Map<String, Value> = SHORTCUTS.iter().map(|s| s.0.to_string()).zip(acc::normalize_shortcuts(&st(app).setting("shortcuts")).map(Value::from)).collect();
+    let mut all: Map<String, Value> = SHORTCUTS.iter().map(|s| s.0.to_string()).zip(acc::normalize_shortcuts(&state(app).setting("shortcuts")).map(Value::from)).collect();
     all.insert(name.into(), next.into());
-    st(app).set_setting("shortcuts", Value::Object(all));
+    state(app).set_setting("shortcuts", Value::Object(all));
     if name != "magic" {
         register_global(app, name);
     }
@@ -311,7 +307,7 @@ fn hotkey_state(app: &AppHandle, id: &str) -> Value {
             let b = map.get(slot);
             let other_id = b.and_then(|b| b["id"].as_str()).filter(|o| *o != id);
             // 다른 메모가 쓰는 칸: 그 메모 제목 (지워진 메모면 빈 칸처럼)
-            let other = other_id.and_then(|o| st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(o)));
+            let other = other_id.and_then(|o| state(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(o)));
             let title = other.map(|m| m["title"].as_str().filter(|t| !t.is_empty()).unwrap_or("제목 없음").to_string());
             let reserved = reserved_by(app, slot);
             json!({ "slot": slot, "label": acc::hotkey_label(slot), "mine": b.is_some_and(|b| b["id"] == id), "title": title, "reserved": reserved, "failed": failed.contains(slot) && reserved.is_none() })
@@ -327,7 +323,7 @@ fn set_hotkey(app: &AppHandle, id: &str, slot: Option<String>, copy: bool, show:
     if let Some(name) = slot.as_deref().and_then(|s| reserved_by(app, s)) {
         return fail(format!("{}: {name} 단축키라 쓸 수 없어요", acc::hotkey_label(slot.as_deref().unwrap())));
     }
-    let next = match acc::assign_hotkey(&st(app).setting("memoHotkeys"), id, slot.as_deref(), copy, show) {
+    let next = match acc::assign_hotkey(&state(app).setting("memoHotkeys"), id, slot.as_deref(), copy, show) {
         Ok(n) => n,
         Err(e) => return fail(e),
     };
@@ -341,16 +337,16 @@ fn set_hotkey(app: &AppHandle, id: &str, slot: Option<String>, copy: bool, show:
         }
         let _ = app.global_shortcut().unregister(key.as_str());
     }
-    let before = st(app).setting("memoHotkeys");
-    st(app).settings.lock().unwrap().insert("memoHotkeys".into(), Value::Object(next));
+    let before = state(app).setting("memoHotkeys");
+    state(app).settings.lock().unwrap().insert("memoHotkeys".into(), Value::Object(next));
     register_memo(app);
     if let Some(s) = slot.as_deref().filter(|s| !paused && !KEYS.lock().unwrap().held.contains_key(*s)) {
         // 다른 앱이 이미 쓰는 키 — 예전대로 되돌린다
-        st(app).settings.lock().unwrap().insert("memoHotkeys".into(), before);
+        state(app).settings.lock().unwrap().insert("memoHotkeys".into(), before);
         register_memo(app);
         return fail(taken(s));
     }
-    st(app).save_settings();
+    state(app).save_settings();
     json!({ "ok": true, "state": hotkey_state(app, id) })
 }
 
@@ -378,13 +374,13 @@ fn payload(app: &AppHandle) -> Value {
     let Some(raw) = usize::try_from(index).ok().and_then(|i| tutorial::steps().get(i)) else { return Value::Null };
     // 직접 해 볼 기능이 꺼져 있으면 안내만 (Work / Life 나누기 · 매직 카피 키 · 알림 보관함)
     let has = |need: &str| match need {
-        "workLife" => st(app).setting("workLife") == true,
-        "history" => st(app).setting("historyEnabled") == true,
+        "workLife" => state(app).setting("workLife") == true,
+        "history" => state(app).setting("historyEnabled") == true,
         "quickMemo" => status(app, "quickMemo")["registered"] == true,
         _ => true,
     };
     let mut step = tutorial::step_for(raw, has);
-    let shortcuts = st(app).setting("shortcuts");
+    let shortcuts = state(app).setting("shortcuts");
     // 테이프는 아직 옮기지 않아 테이프를 못 쓰는 PC 처럼 왕관만 (noTape)
     let text = if step["noTape"].is_null() { step["text"].clone() } else { step["noTape"].clone() };
     let s = step.as_object_mut().unwrap();
@@ -415,7 +411,7 @@ fn target(step: &Value) -> Option<&'static str> {
 fn send(app: &AppHandle) {
     let p = payload(app);
     let to = target(&p);
-    let notes: Vec<String> = st(app).note_labels.lock().unwrap().values().cloned().collect();
+    let notes: Vec<String> = state(app).note_labels.lock().unwrap().values().cloned().collect();
     for l in std::iter::once("list".to_string()).chain(notes) {
         let _ = app.emit_to(l.as_str(), "tutorial:step", [if Some(l.as_str()) == to { p.clone() } else { Value::Null }]);
     }
@@ -427,15 +423,15 @@ fn list_to_front(app: &AppHandle) {
 }
 
 pub fn start_tutorial(app: &AppHandle) -> bool {
-    if st(app).vault.lock().unwrap().is_none() {
+    if state(app).vault.lock().unwrap().is_none() {
         return false;
     }
     {
         let mut t = TUTORIAL.lock().unwrap();
         if !t.active {
-            t.work_life = st(app).setting("workLife");
+            t.work_life = state(app).setting("workLife");
         }
-        (t.active, t.index, t.praise, t.again) = (true, 0, false, st(app).setting("tutorialDone") == true);
+        (t.active, t.index, t.praise, t.again) = (true, 0, false, state(app).setting("tutorialDone") == true);
     }
     list_to_front(app);
     send(app);
@@ -448,12 +444,12 @@ fn finish_tutorial(app: &AppHandle) {
         (t.active, t.index, t.praise) = (false, -1, false);
         std::mem::take(&mut t.work_life)
     };
-    st(app).set_setting("tutorialDone", true.into());
+    state(app).set_setting("tutorialDone", true.into());
     send(app);
     // 목록 창: 연습하며 바꾼 보기 · 확대 · 태그 고르기 · 늘 위에를 처음대로
     let _ = app.emit_to("list", "tutorial:finished", [Value::Null; 0]);
     // 연습하며 켠 Work / Life 나누기도 처음대로
-    if st(app).setting("workLife") != work_life {
+    if state(app).setting("workLife") != work_life {
         let _ = crate::settings::handle(app, "list", "mode:work-life", &[work_life]);
     }
 }
@@ -623,7 +619,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             Value::Null
         }
         "app:set-quick-memo" => {
-            st(app).set_setting("quickMemo", crate::settings::truthy(args.first()).into());
+            state(app).set_setting("quickMemo", crate::settings::truthy(args.first()).into());
             register_global(app, "quickMemo");
             return Some(crate::memos::handle(app, label, "app:settings", &[]).unwrap_or(Ok(Value::Null)).map(|s| s["quickMemo"].clone()));
         }

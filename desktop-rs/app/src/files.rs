@@ -2,7 +2,7 @@
 //   Electron 의 ipc-handlers.js · main.js(whatsNew · reportProblem) · utils.js(fetchRemoteImage · copyFileToClipboard) ·
 //   link-previews.js · share-file.js · window-manager.js(setListOnTop) 의 그 부분.
 use crate::memos::arg_str;
-use crate::state::State;
+use crate::state::state;
 use memoking_core::link_preview::{detect_charset, host_of, image_ext_from_type, image_ext_from_url, parse_link_preview, parse_youtube_oembed, stale_youtube_entry, youtube_oembed_url};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -12,10 +12,6 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, Url};
 use tauri_plugin_opener::OpenerExt;
-
-fn state(app: &AppHandle) -> tauri::State<'_, State> {
-    app.state::<State>()
-}
 
 fn vault_root(app: &AppHandle) -> Option<PathBuf> {
     state(app).vault.lock().unwrap().as_ref().map(|v| v.root.clone())
