@@ -2,7 +2,7 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **33 / 187**
+- 채널 (화면 → Rust): **36 / 187**
 - 이벤트 (Rust → 화면): **6 / 61**
 
 ## 채널
@@ -109,16 +109,16 @@
 | ⬜ | `memo:keep-copy` |
 | ✅ | `memo:link` |
 | ✅ | `memo:links` |
-| ⬜ | `memo:lock` |
+| ✅ | `memo:lock` |
 | ✅ | `memo:move-folder` |
 | ✅ | `memo:open` |
-| ⬜ | `memo:open-lock` |
+| ✅ | `memo:open-lock` |
 | ✅ | `memo:remove` |
 | ✅ | `memo:restore-version` |
 | ✅ | `memo:save` |
 | ✅ | `memo:save-sync` |
 | ✅ | `memo:set` |
-| ⬜ | `memo:unlock` |
+| ✅ | `memo:unlock` |
 | ✅ | `memo:version` |
 | ✅ | `memo:versions` |
 | ✅ | `memos:folders` |

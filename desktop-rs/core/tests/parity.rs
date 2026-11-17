@@ -125,3 +125,20 @@ fn search() {
         .collect();
     report("search", fails, cases.len());
 }
+
+#[test]
+fn lock() {
+    use memoking_core::lock::*;
+    let cases = fixtures("lock");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = open_lock(c["locked"].as_str().unwrap(), c["password"].as_str().unwrap()).map(|r| r.0);
+            (got.as_deref() != Ok(c["plain"].as_str().unwrap())).then(|| format!("{:?}: {got:?}", c["password"]))
+        })
+        .collect();
+    report("lock", fails, cases.len());
+    let refs = fixtures("lock_ref");
+    let fails = refs.iter().filter(|c| lock_ref_key(c["src"].as_str().unwrap(), c["salt"].as_str().unwrap()) != c["key"]).map(|c| c.to_string()).collect();
+    report("lock_ref", fails, refs.len());
+}

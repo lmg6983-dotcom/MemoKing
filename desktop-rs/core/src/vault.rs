@@ -4,7 +4,7 @@
 //!   잠긴 메모는 열쇠가 없으니 늘 "저장 거절" — 풀린 글이 잠긴 메모를 덮어쓰는 일은 없다.
 use crate::body::{self, Tasks};
 use crate::memo_file::{self, Meta};
-use crate::time;
+use crate::{lock, time};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -55,6 +55,8 @@ enum Wrote {
     Locked,
     /// 파일이 잠깐 없다 — 다시 읽은 뒤 화면이 곧 다시 저장
     Skipped,
+    /// 그사이 다른 기기가 다른 비밀번호로 잠갔다 — 우리 글은 사본 메모로 남겼다
+    Copied,
 }
 
 pub struct Vault {
@@ -69,6 +71,8 @@ pub struct Vault {
     /// 이 기기가 되살린 파일 — "다른 기기에서 고침" 으로 알리지 않게
     own_files: HashSet<String>,
     seen_dirs: Option<String>,
+    /// 연 잠긴 메모의 열쇠 (메모를 닫으면 잊는다)
+    locks: HashMap<String, lock::Session>,
 }
 
 fn stamp_of(path: &Path) -> io::Result<(SystemTime, u64)> {
@@ -119,6 +123,7 @@ impl Vault {
             removed_meta: HashMap::new(),
             own_files: HashSet::new(),
             seen_dirs: None,
+            locks: HashMap::new(),
         }
     }
 
@@ -137,6 +142,11 @@ impl Vault {
             fs::create_dir_all(dir)?;
         }
         self.scan();
+        // 꺼 둔 사이 다른 기기에서 잠근 메모의 풀린 버전이 이 기기에 남지 않게
+        let locked: Vec<String> = self.entries.values().filter(|e| body::is_locked_body(&e.body)).map(|e| e.id.clone()).collect();
+        for id in locked {
+            self.drop_unsafe_versions(&id);
+        }
         Ok(())
     }
 
@@ -171,6 +181,7 @@ impl Vault {
         let mut next: HashMap<String, Entry> = self.entries.iter().filter(|(_, e)| e.file.is_none()).map(|(k, e)| (k.clone(), e.clone())).collect();
         let mut changed: Vec<String> = vec![];
         let mut external = vec![];
+        let mut locked_now: Vec<String> = vec![];
         for file in files {
             let path = self.abs(&file);
             let Ok(stamp) = stamp_of(&path) else { continue };
@@ -206,6 +217,11 @@ impl Vault {
                 meta.created = Some(local(born));
             }
             let old_body = self.entries.get(&id).map(|e| e.body.clone());
+            // 다른 기기에서 잠갔거나 비밀번호를 바꾼 메모: 이 기기에 남은 풀린 버전 · 예전 비밀번호 버전을 지운다 (아래에서)
+            let salt = |b: &str| lock::parse_locked(b).map(|p| p.salt);
+            if body::is_locked_body(&body) && old_body.as_deref().is_some_and(|o| salt(o) != salt(&body)) {
+                locked_now.push(id.clone());
+            }
             if old_body.as_deref() != Some(&body) && !self.own_files.contains(&file) {
                 external.push(id.clone());
             }
@@ -222,6 +238,9 @@ impl Vault {
             changed.push(id.clone());
         }
         self.entries = next;
+        for id in &locked_now {
+            self.drop_unsafe_versions(id);
+        }
         // 폴더만 생기거나 없어져도 목록이 폴더 목록을 다시 읽게
         let dirs = self.folders().join("\n");
         let dirs_changed = self.seen_dirs.as_ref().is_some_and(|d| *d != dirs);
@@ -298,17 +317,26 @@ impl Vault {
         self.entries.get(id)
     }
 
-    /// 메모 창이 여는 메모 (잠긴 메모는 열쇠가 없어 늘 needsPassword)
+    /// 이 메모의 본문 (잠겼으면 열쇠로 푼 글, 못 풀면 None)
+    fn plain_of(&self, e: &Entry) -> Option<String> {
+        if !body::is_locked_body(&e.body) {
+            return Some(e.body.clone());
+        }
+        lock::unseal(&e.body, self.locks.get(&e.id)?)
+    }
+
+    /// 메모 창이 여는 메모 (잠긴 메모는 연 동안만 풀린 글)
     pub fn get(&self, id: &str) -> Option<Value> {
         let e = self.entries.get(id)?;
         let locked = body::is_locked_body(&e.body);
+        let plain = self.plain_of(e);
         let extra_list = |k: &str| e.meta.extra.get(k).filter(|v| v.is_array()).cloned().unwrap_or(Value::Null);
         Some(json!({
             "id": id,
             "file": e.file,
-            "body": e.body,
+            "body": plain.as_deref().unwrap_or(&e.body),
             "locked": locked,
-            "needsPassword": locked,
+            "needsPassword": locked && plain.is_none(),
             "title": body::extract_title(&e.body),
             "color": e.meta.color,
             "pinned": e.meta.pinned,
@@ -357,7 +385,7 @@ impl Vault {
         let id = self.create(color, None, "");
         let mut e = self.entries.remove(&id).unwrap();
         e.body = body.into();
-        let wrote = self.write(&mut e, "");
+        let wrote = self.write(&mut e, "", true);
         self.entries.insert(id.clone(), e);
         wrote?;
         Ok(Some(id))
@@ -406,29 +434,48 @@ impl Vault {
         if body::is_locked_body(body) {
             return if e.file.is_some() && body == e.body { Ok((None, false)) } else { refuse(true, false) };
         }
-        // 잠긴 메모: 열쇠가 있어야 저장 (아직 열쇠를 다루지 않으니 늘 거절 — 풀린 글로 덮어쓰지 않게)
-        if body::is_locked_body(&e.body) {
-            return refuse(false, false);
-        }
+        let before = e.meta.clone();
+        // 잠긴 메모: 연 동안만 저장하고, 저장은 늘 다시 잠근 글로 (풀린 글이 파일에 닿지 않게)
+        let session = self.locks.get(&e.id).cloned();
+        let body: String = if body::is_locked_body(&e.body) {
+            let Some(s) = session else { return refuse(false, false) }; // 열지 않았다 — 덮어쓰지 않음
+            let Some(plain) = lock::unseal(&e.body, &s) else { return refuse(false, false) }; // 다른 비밀번호로 다시 잠금
+            if e.file.is_some() && plain == body {
+                return Ok((None, false));
+            }
+            self.seal_into(e, body, &s)
+        } else if let (Some(s), None) = (&session, &e.file) {
+            // 열쇠를 든 메모인데 파일이 사라져 다시 만드는 중: 풀린 글이 새 파일로 나가지 않게 잠근 채로
+            self.seal_into(e, body, s)
+        } else {
+            body.to_string()
+        };
         if e.body == body && e.file.is_some() {
+            e.meta = before;
             return Ok((None, false));
         }
-        let before = e.meta.clone();
-        let known = std::mem::replace(&mut e.body, body.into());
+        let known = std::mem::replace(&mut e.body, body.clone());
         e.meta.updated = Some(time::now_iso());
         e.meta.device = Some(self.device.clone());
-        if e.file.is_none() && body::is_blank_body(body) {
+        if e.file.is_none() && body::is_blank_body(&body) {
             return Ok((None, false));
         }
         if e.file.is_some() {
             self.keep_version(&e.id, &known, false);
         }
-        match self.write(e, &known) {
+        match self.write(e, &known, true) {
             Ok(Wrote::Yes) => Ok((None, true)),
             Ok(other) => {
                 e.meta = before; // 쓰지 않았으니 글 · 머리말도 그대로 (다시 저장할 때 "같은 글" 로 건너뛰지 않게)
                 e.body = known;
-                refuse(false, other == Wrote::Skipped)
+                let r = refuse(false, other == Wrote::Skipped);
+                if other == Wrote::Copied {
+                    if let Ok((Some(mut m), c)) = r {
+                        m.insert("copied".into(), true.into());
+                        return Ok((Some(m), c));
+                    }
+                }
+                r
             }
             Err(err) => {
                 e.meta = before;
@@ -438,10 +485,18 @@ impl Vault {
         }
     }
 
-    /// known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것)
-    fn write(&mut self, e: &mut Entry, known: &str) -> io::Result<Wrote> {
+    /// 열쇠로 잠근 글 — 머리말에 첨부 표를 (첨부 정리가 이 메모의 사진을 치우지 않게)
+    fn seal_into(&self, e: &mut Entry, plain: &str, s: &lock::Session) -> String {
+        let sealed = lock::seal(plain, s, e.meta.extra.get("lockHideTitle") == Some(&Value::Bool(true)));
+        e.meta.extra.insert("lockRefs".into(), json!(lock::lock_refs(plain, &sealed)));
+        sealed
+    }
+
+    /// known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것).
+    ///   copy: 그사이 다른 기기가 고친 글을 사본으로 남기고 쓴다 — 잠그기 · 풀기 · 되돌리기는 false (멈추고 "다시 해 주세요")
+    fn write(&mut self, e: &mut Entry, known: &str, copy: bool) -> io::Result<Wrote> {
         if e.file.is_some() {
-            if let Some(w) = self.keep_changed_on_disk(e, known)? {
+            if let Some(w) = self.keep_changed_on_disk(e, known, copy)? {
                 return Ok(w);
             }
         }
@@ -462,7 +517,7 @@ impl Vault {
 
     /// 마지막으로 읽은(쓴) 뒤 다른 기기가 이 파일을 바꿨는데 아직 알아채기 전에 덮어쓰려 할 때.
     ///   None: 그대로 쓴다 · Some: 쓰지 않는다
-    fn keep_changed_on_disk(&mut self, e: &mut Entry, known: &str) -> io::Result<Option<Wrote>> {
+    fn keep_changed_on_disk(&mut self, e: &mut Entry, known: &str, copy: bool) -> io::Result<Option<Wrote>> {
         let path = self.abs(e.file.as_ref().unwrap());
         let stamp = match stamp_of(&path) {
             Ok(s) => s,
@@ -487,7 +542,10 @@ impl Vault {
             return Ok(Some(Wrote::Skipped));
         }
         if body::is_locked_body(&theirs) {
-            // 그사이 다른 기기가 잠갔다: 덮어쓰지 않는다 (JS lockedOnDisk 의 "다른 비밀번호" 쪽 — 열쇠가 없으니 늘 이쪽)
+            return self.locked_on_disk(e, known, &theirs, copy);
+        }
+        if !copy {
+            // 잠그기 · 풀기 · 되돌리기 중: 그쪽 글을 덮어쓰지 않고 멈춘다
             e.body = known.into();
             return Ok(Some(Wrote::Locked));
         }
@@ -495,6 +553,191 @@ impl Vault {
         self.keep_version(&e.id, &theirs, true);
         self.import(&memo_file::conflict_copy_body(&theirs, &memo_file::conflict_label(chrono::Local::now())), Some(&e.meta.color.clone()))?;
         Ok(None)
+    }
+
+    /// 덮어쓰려는 사이 다른 기기가 잠근 글로 바꿨다 (JS lockedOnDisk)
+    ///   같은 비밀번호로 고친 것(들고 있는 열쇠로 풀림): 그쪽 글을 잠근 사본으로 남기고 저장은 계속 → None
+    ///   잠갔거나 다른 비밀번호: 파일은 그대로, 우리 글은 사본으로(copy 일 때) → Copied · Locked
+    fn locked_on_disk(&mut self, e: &mut Entry, known: &str, theirs: &str, copy: bool) -> io::Result<Option<Wrote>> {
+        let session = self.locks.get(&e.id).cloned();
+        if let Some(theirs_plain) = session.as_ref().and_then(|s| lock::unseal(theirs, s)) {
+            if !copy {
+                e.body = known.into();
+                return Ok(Some(Wrote::Locked));
+            }
+            self.keep_version(&e.id, theirs, true);
+            if !body::is_blank_body(&theirs_plain) {
+                let copy_body = memo_file::conflict_copy_body(&theirs_plain, &memo_file::conflict_label(chrono::Local::now()));
+                self.new_locked_copy(e, &copy_body, session.as_ref().unwrap())?;
+            }
+            return Ok(None);
+        }
+        let mine = e.body.clone();
+        let mut copied = false;
+        if copy && !body::is_blank_body(&mine) && !body::same_body(&mine, known) {
+            // 우리 글: 잠근 글이면 그대로(열쇠로 표를 만들어), 풀린 글이면 풀린 사본으로 — 잃지 않게
+            let plain = session.as_ref().and_then(|s| lock::unseal(&mine, s));
+            match (plain, &session) {
+                (Some(p), Some(s)) => {
+                    self.new_locked_copy(e, &p, s)?;
+                }
+                _ => {
+                    self.import(&mine, Some(&e.meta.color.clone()))?;
+                }
+            }
+            copied = true;
+        }
+        e.body = known.into(); // 곧 다시 읽을 때 "바뀌었다" 로 알아채고 열린 화면에 알리게
+        Ok(Some(if copied { Wrote::Copied } else { Wrote::Locked }))
+    }
+
+    /// 잠긴 메모의 사본: 같은 열쇠로 잠근다 (풀린 글이 사본으로 새지 않게). 사본은 따로 열 때 비밀번호를 묻는다
+    ///   shortcut: JS 는 원래 메모가 열려 있는 동안 사본 열쇠도 들고 있다(lockCopies) — 여기서는 사본은 늘 비밀번호로
+    fn new_locked_copy(&mut self, source: &Entry, plain: &str, s: &lock::Session) -> io::Result<String> {
+        let id = self.create(Some(&source.meta.color.clone()), Some(&source.meta.mode.clone()), "");
+        let mut c = self.entries.remove(&id).unwrap();
+        if source.meta.extra.get("lockHideTitle") == Some(&Value::Bool(true)) {
+            c.meta.extra.insert("lockHideTitle".into(), true.into());
+        }
+        c.body = self.seal_into(&mut c, plain, s);
+        let r = self.write(&mut c, "", true);
+        self.entries.insert(id.clone(), c);
+        r?;
+        Ok(id)
+    }
+
+    // ---------- 잠금 ----------
+
+    /// 비밀번호로 연다 (열쇠가 이 메모를 풀 수 있어야) → 메모
+    pub fn open_lock(&mut self, id: &str, s: lock::Session) -> Option<Value> {
+        let e = self.entries.get(id)?;
+        if !body::is_locked_body(&e.body) || lock::unseal(&e.body, &s).is_none() {
+            return None;
+        }
+        self.locks.insert(id.into(), s.clone());
+        // 첨부 표가 없는 예전 잠금: 연 김에 적어 둔다 — 없으면 첨부 정리가 모두 멈추므로
+        if !self.entries[id].meta.extra.get("lockRefs").is_some_and(Value::is_array) {
+            let mut e = self.entries.remove(id).unwrap();
+            let before = e.meta.clone();
+            let plain = lock::unseal(&e.body, &s).unwrap_or_default();
+            e.meta.extra.insert("lockRefs".into(), json!(lock::lock_refs(&plain, &e.body)));
+            let known = e.body.clone();
+            if !matches!(self.write(&mut e, &known, false), Ok(Wrote::Yes)) {
+                e.meta = before; // 쓰지 못한 표는 남기지 않는다 (다음에 다시)
+            }
+            self.entries.insert(id.into(), e);
+        }
+        self.get(id)
+    }
+
+    /// 열쇠를 들고 있는 메모인가
+    pub fn is_open_lock(&self, id: &str) -> bool {
+        self.locks.contains_key(id)
+    }
+
+    /// 저장하지 못한 글을 사본 메모로 — 원래 메모가 잠겼으면 같은 열쇠로 잠근 사본 (풀린 글이 새지 않게)
+    pub fn import_copy_of(&mut self, source_id: &str, body: &str) -> io::Result<Option<String>> {
+        let Some(src) = self.entries.get(source_id).cloned() else { return self.import(body, None) };
+        match self.locks.get(source_id).cloned() {
+            Some(s) if !body::is_locked_body(body) => self.new_locked_copy(&src, body, &s).map(Some),
+            _ if body::is_locked_body(&src.body) || body::is_locked_body(body) => Ok(None), // 열쇠 없이는 사본도 만들지 않는다
+            _ => self.import(body, Some(&src.meta.color)),
+        }
+    }
+
+    /// 메모를 닫을 때 열쇠를 잊는다
+    pub fn close_lock(&mut self, id: &str) {
+        self.locks.remove(id);
+    }
+
+    /// 잠그기: 지금 본문을 잠근 글로, 잠그기 전 버전(풀린 글)은 지운다. keep_open: 열린 메모면 열쇠를 들고 있는다
+    pub fn lock(&mut self, id: &str, s: lock::Session, keep_open: bool, hide_title: bool) -> io::Result<Option<Value>> {
+        let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
+        if body::is_locked_body(&e.body) {
+            self.entries.insert(id.into(), e);
+            return Ok(None);
+        }
+        let known = e.body.clone();
+        let before = e.meta.clone();
+        e.meta.extra.shift_remove("lockHideTitle");
+        if hide_title {
+            e.meta.extra.insert("lockHideTitle".into(), true.into());
+        }
+        e.body = self.seal_into(&mut e, &known, &s);
+        // 글에서 짐작한 일정 이름은 비밀일 수 있어 풀린 머리말에 남기지 않는다 (알림엔 메모 제목)
+        for r in &mut e.meta.reminders {
+            if let Some(o) = r.as_object_mut() {
+                o.shift_remove("title");
+            }
+        }
+        e.meta.updated = Some(time::now_iso());
+        e.meta.device = Some(self.device.clone());
+        let r = self.write(&mut e, &known, false);
+        let ok = matches!(r, Ok(Wrote::Yes));
+        if !ok {
+            e.body = known;
+            e.meta = before;
+        }
+        self.entries.insert(id.into(), e);
+        r?;
+        if !ok {
+            return Ok(None); // 그사이 다른 기기가 바꿈 — 아무것도 바꾸지 않음
+        }
+        self.purge_versions(id);
+        if keep_open {
+            self.locks.insert(id.into(), s);
+        } else {
+            self.locks.remove(id);
+        }
+        if hide_title {
+            self.finalize(id)?; // 파일 이름도 바로 "잠긴 메모" 로
+        }
+        Ok(self.get(id))
+    }
+
+    /// 잠금 풀기 (연 동안만): 본문을 풀린 글로
+    pub fn unlock(&mut self, id: &str) -> io::Result<Option<Value>> {
+        let Some(plain) = self.entries.get(id).filter(|e| body::is_locked_body(&e.body)).and_then(|e| self.plain_of(e)) else { return Ok(None) };
+        let mut e = self.entries.remove(id).unwrap();
+        let known = std::mem::replace(&mut e.body, plain);
+        let before = e.meta.clone();
+        e.meta.extra.shift_remove("lockRefs");
+        e.meta.extra.shift_remove("lockHideTitle");
+        e.meta.updated = Some(time::now_iso());
+        e.meta.device = Some(self.device.clone());
+        let r = self.write(&mut e, &known, false);
+        let ok = matches!(r, Ok(Wrote::Yes));
+        if !ok {
+            e.body = known;
+            e.meta = before;
+        }
+        self.entries.insert(id.into(), e);
+        r?;
+        if !ok {
+            return Ok(None);
+        }
+        self.purge_versions(id); // 잠긴 동안의 버전은 이제 열 수 없는 글이므로
+        self.locks.remove(id);
+        Ok(self.get(id))
+    }
+
+    fn purge_versions(&self, id: &str) {
+        if let Some(dir) = self.version_dir(id) {
+            let _ = fs::remove_dir_all(dir);
+        }
+    }
+
+    /// 잠긴 메모의 버전 중 지금 비밀번호로 잠긴 것이 아닌 것(잠기기 전 풀린 글 · 예전 비밀번호)이 있으면 모두 지운다
+    fn drop_unsafe_versions(&self, id: &str) {
+        let Some(salt) = self.entries.get(id).and_then(|e| lock::parse_locked(&e.body)).map(|p| p.salt) else { return };
+        let Some(dir) = self.version_dir(id) else { return };
+        let mut timed: Vec<(u128, String)> = version_names(&dir).into_iter().map(|n| (version_time(&n).unwrap_or(0), n)).collect();
+        timed.sort();
+        let newest = timed.last().map(|v| v.0);
+        let check = timed.first().into_iter().chain(timed.iter().filter(|v| Some(v.0) == newest));
+        if check.into_iter().any(|(_, n)| self.version(id, n).and_then(|b| lock::parse_locked(&b)).map(|p| p.salt) != Some(salt.clone())) {
+            self.purge_versions(id);
+        }
     }
 
     /// 같은 폴더에서 겹치지 않는 이름: "제목.md", "제목 (2).md", …
@@ -553,6 +796,7 @@ impl Vault {
     ///   shortcut: 이 메모만 쓰던 첨부를 휴지통으로 옮기는 정리(trashAttachments)는 아직 — 첨부는 그대로 남는다 (잃는 것 없음)
     pub fn trash(&mut self, id: &str) -> io::Result<Option<String>> {
         let Some(e) = self.entries.remove(id) else { return Ok(None) };
+        self.locks.remove(id); // 지운 잠긴 메모의 열쇠를 남기지 않는다 (되살리면 다시 비밀번호로)
         let Some(file) = &e.file else { return Ok(None) };
         let base = file.rsplit('/').next().unwrap_or(file).trim_end_matches(".md");
         let dest = self.trash_path(base);
@@ -664,7 +908,7 @@ impl Vault {
             e.meta.mode = m.into();
         }
         let known = e.body.clone();
-        let wrote = if e.file.is_some() { self.write(&mut e, &known) } else { Ok(Wrote::Yes) };
+        let wrote = if e.file.is_some() { self.write(&mut e, &known, true) } else { Ok(Wrote::Yes) };
         let ok = matches!(wrote, Ok(Wrote::Yes));
         if !ok {
             e.meta = prev; // 쓰지 못했다 — 바뀐 것처럼 보이지 않게
@@ -693,7 +937,7 @@ impl Vault {
         if on {
             let mut t = self.entries.remove(target).unwrap();
             let known = t.body.clone();
-            let r = if t.file.is_some() && !t.id_saved { self.write(&mut t, &known) } else { Ok(Wrote::Yes) };
+            let r = if t.file.is_some() && !t.id_saved { self.write(&mut t, &known, true) } else { Ok(Wrote::Yes) };
             self.entries.insert(target.into(), t);
             if !matches!(r?, Wrote::Yes) {
                 return Ok(None);
@@ -706,7 +950,7 @@ impl Vault {
             e.meta.links.push(target.into());
         }
         let known = e.body.clone();
-        let r = if e.file.is_some() { self.write(&mut e, &known) } else { Ok(Wrote::Yes) };
+        let r = if e.file.is_some() { self.write(&mut e, &known, true) } else { Ok(Wrote::Yes) };
         let ok = matches!(r, Ok(Wrote::Yes));
         if !ok {
             e.meta.links = prev;
@@ -739,8 +983,10 @@ impl Vault {
     /// 지금 내용도 버전으로 남겨 두고(되돌리기를 되돌릴 수 있게) 고른 버전으로 바꾼다
     pub fn restore_version(&mut self, id: &str, name: &str) -> io::Result<Value> {
         let (Some(text), Some(e)) = (self.version(id, name), self.entries.get(id)) else { return Ok(Value::Null) };
-        // 잠긴 메모 · 잠긴 버전은 열쇠를 다룰 때까지 되돌리지 않는다 (잠금이 풀리거나 비밀번호가 되돌아가지 않게)
-        if body::is_locked_body(&e.body) || body::is_locked_body(&text) {
+        // 풀린 메모에는 잠긴 버전을, 잠긴 메모에는 풀린 버전 · 다른 비밀번호 버전을 되돌리지 않는다 (잠긴 메모는 연 동안만)
+        let salt = |b: &str| lock::parse_locked(b).map(|p| p.salt);
+        let can = if body::is_locked_body(&e.body) { self.locks.contains_key(id) && body::is_locked_body(&text) && salt(&text) == salt(&e.body) } else { !body::is_locked_body(&text) };
+        if !can {
             return Ok(json!({ "error": "잠긴 메모에는 잠기기 전 버전을 되돌릴 수 없어요" }));
         }
         let current = e.body.clone();
@@ -750,7 +996,18 @@ impl Vault {
         e.body = text;
         e.meta.updated = Some(time::now_iso());
         e.meta.device = Some(self.device.clone());
-        let r = self.write(&mut e, &current);
+        if body::is_locked_body(&e.body) {
+            // 되돌린 잠긴 글의 첨부 표도 그 글에 맞게 (첨부 정리가 치우지 않게)
+            match self.locks.get(id).and_then(|s| lock::unseal(&e.body, s)) {
+                Some(plain) => {
+                    e.meta.extra.insert("lockRefs".into(), json!(lock::lock_refs(&plain, &e.body)));
+                }
+                None => {
+                    e.meta.extra.shift_remove("lockRefs");
+                }
+            }
+        }
+        let r = self.write(&mut e, &current, false);
         let ok = matches!(r, Ok(Wrote::Yes));
         if !ok {
             e.body = current;
@@ -970,24 +1227,37 @@ impl Vault {
     }
 
     /// 휴지통의 첨부 중 살아 있는 메모 · 휴지통의 메모가 쓰지 않는 것을 지운다
-    ///   잠긴 메모가 하나라도 있으면(어느 첨부를 쓰는지 열쇠 없이는 모른다) 아무것도 지우지 않는다 — 잃지 않게
+    ///   열지 않은 잠긴 메모는 머리말의 첨부 표(lockRefs)로 본다
     fn purge_trash_attachments(&self, older_than: i64) -> usize {
         let trash = self.trash_entries();
-        let bodies = self.entries.values().map(|e| e.body.as_str()).chain(trash.iter().map(|t| t.4.as_str()));
         let mut used = HashSet::new();
-        for b in bodies {
-            if body::is_locked_body(b) {
-                return 0;
+        let mut sealed: Vec<(String, HashSet<String>)> = vec![]; // 열지 않은 잠긴 메모: (소금, 첨부 표)
+        let live = self.entries.values().map(|e| (e.body.clone(), e.meta.extra.get("lockRefs").cloned(), self.plain_of(e), true));
+        let held = trash.iter().map(|t| (t.4.clone(), t.3.extra.get("lockRefs").cloned(), None, false));
+        for (b, refs, plain, is_live) in live.chain(held) {
+            if !body::is_locked_body(&b) {
+                used.extend(body::extract_media(&b).into_iter().map(|m| m.src));
+                continue;
             }
-            used.extend(body::extract_media(b).into_iter().map(|m| m.src));
+            if let Some(p) = plain {
+                used.extend(body::extract_media(&p).into_iter().map(|m| m.src));
+                continue;
+            }
+            match refs.as_ref().and_then(Value::as_array) {
+                Some(list) => sealed.push((lock::parse_locked(&b).map(|p| p.salt).unwrap_or_default(), list.iter().filter_map(Value::as_str).map(str::to_string).collect())),
+                // 표가 없는 예전 잠금: 살아 있는 메모면 무엇을 쓰는지 몰라 아무것도 지우지 않는다 (열면 표가 생김)
+                None if is_live => return 0,
+                None => {}
+            }
         }
+        let in_use = |src: &str| used.contains(src) || sealed.iter().any(|(salt, refs)| refs.contains(&lock::lock_ref_key(src, salt)));
         let dir = self.trash_dir().join(ATTACH_DIR);
         let Ok(rd) = fs::read_dir(&dir) else { return 0 };
         rd.flatten()
             .filter(|d| {
                 let src = format!("{ATTACH_DIR}/{}", d.file_name().to_string_lossy());
                 let old = d.metadata().and_then(|m| m.modified()).is_ok_and(|t| (ms(t) as i64) <= older_than);
-                d.path().is_file() && old && !used.contains(&src) && fs::remove_file(d.path()).is_ok()
+                d.path().is_file() && old && !in_use(&src) && fs::remove_file(d.path()).is_ok()
             })
             .count()
     }
@@ -1180,6 +1450,62 @@ mod tests {
         assert_eq!(restored["body"], "# 가\n본문 하나");
         assert!(!v.versions(&a).is_empty());
         assert!(v.version(&a, "../x.md").is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn lock_open_save_unlock() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let id = v.create(None, None, "");
+        v.save(&id, "# 비밀\n![](attachments/p.png) 첫 글").unwrap();
+        v.save(&id, "# 비밀\n![](attachments/p.png) 둘째 글").unwrap();
+        assert!(!v.versions(&id).is_empty());
+        let s = lock::new_session("비밀번호", 1000).unwrap();
+        let m = v.lock(&id, s.clone(), true, false).unwrap().unwrap();
+        assert!(m["locked"] == true && m["needsPassword"] == false && m["body"].as_str().unwrap().contains("둘째 글"));
+        assert!(v.versions(&id).is_empty(), "잠그기 전 풀린 버전은 지운다");
+        let file = root.join("비밀.md");
+        let text = fs::read_to_string(&file).unwrap();
+        assert!(!text.contains("둘째 글") && text.contains("lockRefs") && text.contains("memoking-lock v1"));
+        // 연 동안 저장 → 늘 다시 잠근 글로
+        v.save(&id, "# 비밀\n셋째 글").unwrap();
+        let text = fs::read_to_string(&file).unwrap();
+        assert!(!text.contains("셋째 글") && lock::unseal(&memo_file::parse_memo_file(&text).1, &s).as_deref() == Some("# 비밀\n셋째 글"));
+        // 닫으면 열쇠를 잊는다 → 비밀번호 필요, 저장 거절
+        v.close_lock(&id);
+        assert_eq!(v.get(&id).unwrap()["needsPassword"], true);
+        assert_eq!(v.save(&id, "풀린 글").unwrap().0["refused"], true);
+        // 다시 열기 · 풀기
+        let (_, s2) = lock::open_lock(&memo_file::parse_memo_file(&fs::read_to_string(&file).unwrap()).1, "비밀번호").unwrap();
+        assert_eq!(v.open_lock(&id, s2).unwrap()["body"], "# 비밀\n셋째 글");
+        let m = v.unlock(&id).unwrap().unwrap();
+        assert_eq!(m["locked"], false);
+        let text = fs::read_to_string(&file).unwrap();
+        assert!(text.contains("셋째 글") && !text.contains("lockRefs"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn other_device_relocked_keeps_ours_as_copy() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let id = v.create(None, None, "");
+        v.save(&id, "# 메모\n처음").unwrap();
+        // 다른 기기가 다른 비밀번호로 잠갔는데 아직 다시 읽기 전에 이 기기가 저장
+        let file = root.join("메모.md");
+        let other = lock::new_session("다른비번", 1000).unwrap();
+        let text = fs::read_to_string(&file).unwrap();
+        let (meta, _) = memo_file::parse_memo_file(&text);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(&file, memo_file::serialize_memo_file(&meta, &lock::seal("# 메모\n처음", &other, false))).unwrap();
+        let (card, _) = v.save(&id, "# 메모\n이 기기 글").unwrap();
+        assert!(card["refused"] == true && card["copied"] == true);
+        assert!(body::is_locked_body(&memo_file::parse_memo_file(&fs::read_to_string(&file).unwrap()).1), "잠근 파일은 그대로");
+        v.scan();
+        assert!(v.list().iter().any(|m| v.get(m["id"].as_str().unwrap()).unwrap()["body"] == "# 메모\n이 기기 글"), "우리 글은 사본으로");
         fs::remove_dir_all(root).unwrap();
     }
 }

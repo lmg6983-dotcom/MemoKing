@@ -13,3 +13,10 @@ yaml-rust2 = "0.13"
 fancy-regex = "0.20"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 uuid = { version = "1", features = ["v4"] }
+# 잠금 메모 (memo-lock.js 와 같은 암호: PBKDF2-SHA256 → AES-256-GCM)
+sha2 = "0.10"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+aes-gcm = "0.10"
+base64 = "0.23"
+unicode-normalization = "0.1"
+getrandom = "0.3"

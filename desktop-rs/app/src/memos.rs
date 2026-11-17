@@ -190,7 +190,10 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
 // 메모 창이 닫혔다: 빈 메모는 치우고 제목에 맞춰 파일 이름을
 fn closed_note(app: &AppHandle, id: &str) {
     state(app).note_labels.lock().unwrap().remove(id);
-    let _ = with_vault(app, |v| v.finalize(id).map_err(|e| e.to_string()));
+    let _ = with_vault(app, |v| {
+        v.close_lock(id); // 닫은 잠긴 메모의 열쇠를 남기지 않는다
+        v.finalize(id).map_err(|e| e.to_string())
+    });
     push_list(app);
 }
 
@@ -213,6 +216,20 @@ fn remove_memo(app: &AppHandle, id: &str) -> Result<Value, String> {
     }
     push_list(app);
     r.map(|n| n.is_some().into())
+}
+
+// 비밀번호로 잠긴 메모 열기 → 풀린 메모 | { error }
+fn open_locked(app: &AppHandle, id: &str, password: &str) -> Result<Value, String> {
+    let sealed = with_vault(app, |v| Ok(v.entry(id).map(|e| e.body.clone())))?;
+    Ok(match sealed {
+        Some(b) if !memoking_core::body::is_locked_body(&b) => with_vault(app, |v| Ok(v.get(id).unwrap_or(Value::Null)))?,
+        Some(b) => match memoking_core::lock::open_lock(&b, password) {
+            Err(e) => json!({ "error": e }),
+            Ok(_) if !state(app).note_labels.lock().unwrap().contains_key(id) => json!({ "error": "메모 창이 닫혔어요" }),
+            Ok((_, s)) => with_vault(app, |v| Ok(v.open_lock(id, s)))?.unwrap_or_else(|| json!({ "error": "메모를 열지 못했어요" })),
+        },
+        None => json!({ "error": "메모를 찾지 못했어요" }),
+    })
 }
 
 /// 메모 채널 — 이 파일이 맡지 않는 채널이면 None
@@ -269,14 +286,42 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
                     v.scan();
                     r = v.save(&id, &body).map_err(|e| e.to_string())?;
                 }
-                if r.0["refused"] == true && r.0["invalid"] != true && !memoking_core::body::is_blank_body(&body) {
-                    let color = v.entry(&id).map(|e| e.meta.color.clone());
-                    v.import(&body, color.as_deref()).map_err(|e| e.to_string())?;
+                if r.0["refused"] == true && r.0["copied"] != true && r.0["invalid"] != true && !memoking_core::body::is_blank_body(&body) {
+                    v.import_copy_of(&id, &body).map_err(|e| e.to_string())?;
                 }
                 Ok(())
             });
             push_list(app);
             r.map(|()| true.into())
+        }
+        // 잠그기 · 열기: 열쇠 만들기(PBKDF2)는 일부러 느리다 — 메모 폴더를 붙잡지 않고 먼저 만든다
+        "memo:lock" => {
+            let (id, password) = (arg_str(args, 0), arg_str(args, 1));
+            let hide = args.get(2).is_some_and(|o| o["hideTitle"] == true);
+            let keep_open = st.note_labels.lock().unwrap().contains_key(&id);
+            let r = memoking_core::lock::new_session(&password, memoking_core::lock::LOCK_ITERATIONS).and_then(|s| with_vault(app, |v| v.lock(&id, s, keep_open, hide).map_err(|e| e.to_string())));
+            push_list(app);
+            Ok(match r {
+                Ok(Some(m)) => m,
+                Ok(None) => json!({ "error": "잠그지 못했어요. 이미 잠겼거나 그사이 다른 기기에서 잠갔을 수 있어요" }),
+                Err(e) => json!({ "error": e }),
+            })
+        }
+        "memo:open-lock" => open_locked(app, &arg_str(args, 0), &arg_str(args, 1)),
+        "memo:unlock" => {
+            let id = arg_str(args, 0);
+            let r = with_vault(app, |v| {
+                let Some(m) = v.get(&id) else { return Ok(json!({ "error": "메모를 찾지 못했어요" })) };
+                if m["locked"] != true {
+                    return Ok(m);
+                }
+                if m["needsPassword"] == true {
+                    return Ok(json!({ "error": "먼저 비밀번호로 열어 주세요" }));
+                }
+                Ok(v.unlock(&id).map_err(|e| e.to_string())?.unwrap_or_else(|| json!({ "error": "그사이 다른 기기에서 이 메모가 바뀌어 풀지 못했어요. 다시 해 주세요" })))
+            });
+            push_list(app);
+            r
         }
         "memos:search" => {
             let exclude = args.get(1).and_then(Value::as_str).map(str::to_string);

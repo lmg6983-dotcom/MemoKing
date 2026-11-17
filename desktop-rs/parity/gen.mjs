@@ -7,7 +7,7 @@ import { stringify } from '../../app/vendor/yaml.js';
 import * as mf from '../../app/js/core/memo-file.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
-import { isLockedBody } from '../../app/js/core/memo-lock.js';
+import { isLockedBody, lockBody, lockRefKey } from '../../app/js/core/memo-lock.js';
 import { cleanFolderName } from '../../app/js/core/folders.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import { corpus, yamlStrings } from './corpus.mjs';
@@ -62,3 +62,16 @@ write('conflict_copy', corpus().map((t) => mf.parseMemoFile(t).body).map((body) 
 const texts = ['장보기 목록', '회의록 2026', 'P2026-1170-KR01 견적', 'FPD/202608-0118/E', 'Hello World', '회 의 록', 'ㅎㅇㄹ 그대로', 'C# 언어 메모', '가나다'];
 const queries = ['', '장보기', 'ㅈㅂㄱ', 'ㅎㅇㄹ', 'hello world', 'HELLO', 'p20261170kr01', 'FPD2026080118E', '2026', '회의 2026', 'ㄱㅈ', 'c#', '없는말', 'ㄱㄴㄷ', 'kr01 견적', '0118'];
 write('search', queries.flatMap((q) => texts.map((t) => ({ q, t, hit: textMatcher(q)(t) }))));
+
+// 잠금: JS 가 잠근 글을 Rust 가 같은 비밀번호로 푼다 (암호문은 돌릴 때마다 달라 한 번 만든 것을 둔다 — 있으면 다시 만들지 않음)
+const lockFile = path.join(out, 'lock.json');
+if (!fs.existsSync(lockFile)) {
+  const plains = ['# 비밀 메모\n\n![사진](attachments/a.png) 계좌 123', '제목 없는 글', '😀 이모지 · 한글 NFC 정규화 비밀번호', ''];
+  const cases = [];
+  for (const [i, plain] of plains.entries()) {
+    const password = ['비밀번호', 'pass word', '한글\u1100\u1161', '1234'][i];
+    cases.push({ password, plain, locked: await lockBody(plain, password, { iterations: 1000, hideTitle: i === 1 }) });
+  }
+  write('lock', cases);
+}
+write('lock_ref', ['attachments/a.png', 'attachments/한글 사진.jpg'].map((src) => ({ src, salt: 'c2FsdHNhbHQ=', key: lockRefKey(src, 'c2FsdHNhbHQ=') })));

@@ -77,6 +77,12 @@ window.addEventListener('load', () => setTimeout(async () => {
   await check('저장 → 목록 카드', async () => (await mk.memo.save(id, '# 새 메모\n\n본문 #태그')).title === '새 메모');
   await check('다시 읽기', async () => (await mk.memo.get(id)).body === '# 새 메모\n\n본문 #태그');
   await check('창을 닫을 때 저장 (동기)', () => mk.memo.saveSync(id, '# 새 메모\n\n본문 #태그\n닫으며 저장', {}) === true);
+  await check('잠그기 (연 채로 읽힘)', async () => {
+    const m = await mk.memo.lock(id, '비밀번호1');
+    return m.locked === true && m.needsPassword === false && m.body.includes('닫으며 저장');
+  });
+  await check('짧은 비밀번호는 거절', async () => /4자/.test((await mk.memo.lock(id, '12'))?.error ?? '') || (await mk.memo.get(id)).locked);
+  await check('풀기', async () => (await mk.memo.unlock(id)).locked === false);
   await check('CSS app-region 읽힘 (창 끌기)', () => dragRegion('.bar'));
   done();
 }, 1500));
