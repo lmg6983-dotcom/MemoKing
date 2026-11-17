@@ -1,0 +1,3494 @@
+[
+ {
+  "file": null,
+  "loaded": "{\n \"version\": 1,\n \"stacks\": []\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "b"
+    ]
+   ],
+   [
+    "merge",
+    "a",
+    [
+     "c"
+    ],
+    "a"
+   ],
+   [
+    "addAfter",
+    "c",
+    "d"
+   ],
+   [
+    "reorder",
+    "d",
+    0
+   ],
+   [
+    "reorder",
+    "d",
+    "2.7"
+   ],
+   [
+    "reorder",
+    "d",
+    "x"
+   ],
+   [
+    "reorder",
+    "a",
+    -5
+   ],
+   [
+    "reorder",
+    "a",
+    99
+   ],
+   [
+    "neighbor",
+    "a",
+    1
+   ],
+   [
+    "neighbor",
+    "a",
+    -1
+   ],
+   [
+    "setActive",
+    "b"
+   ],
+   [
+    "remove",
+    "b"
+   ],
+   [
+    "remove",
+    "c"
+   ],
+   [
+    "remove",
+    "a"
+   ],
+   [
+    "remove",
+    "z"
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "b"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "b"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "c",
+      "b"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "b"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "d",
+      "a",
+      "c",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "a",
+       "c",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": "c",
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": "b",
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "c",
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s1",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": true,
+     "nextActive": "d",
+     "rest": [
+      "d"
+     ]
+    },
+    "stacks": []
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": false,
+     "nextActive": null
+    },
+    "stacks": []
+   }
+  ]
+ },
+ {
+  "file": null,
+  "loaded": "{\n \"version\": 1,\n \"stacks\": []\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "d"
+    ]
+   ],
+   [
+    "merge",
+    "e",
+    [
+     "b",
+     "c"
+    ]
+   ],
+   [
+    "merge",
+    "d",
+    [
+     "e"
+    ]
+   ],
+   [
+    "merge",
+    "b",
+    [
+     "a",
+     "f"
+    ]
+   ],
+   [
+    "merge",
+    "c",
+    []
+   ],
+   [
+    "addAfter",
+    "f",
+    "b"
+   ],
+   [
+    "remove",
+    "d"
+   ],
+   [
+    "neighbor",
+    "zz",
+    1
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "d"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "d"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "e",
+      "b",
+      "c"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "d"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "d",
+      "e",
+      "b",
+      "c"
+     ],
+     "active": "e"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "d",
+       "e",
+       "b",
+       "c"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "d",
+      "e",
+      "b",
+      "a",
+      "f",
+      "c"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "e",
+       "b",
+       "a",
+       "f",
+       "c"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "d",
+      "e",
+      "b",
+      "a",
+      "f",
+      "c"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "e",
+       "b",
+       "a",
+       "f",
+       "c"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "d",
+      "e",
+      "a",
+      "f",
+      "b",
+      "c"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s1",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     },
+     "dissolved": false,
+     "nextActive": "b",
+     "rest": [
+      "e",
+      "a",
+      "f",
+      "b",
+      "c"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "file": "not json",
+  "loaded": "{\n \"version\": 1,\n \"stacks\": []\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "b"
+    ]
+   ],
+   [
+    "merge",
+    "a",
+    [
+     "c"
+    ],
+    "a"
+   ],
+   [
+    "addAfter",
+    "c",
+    "d"
+   ],
+   [
+    "reorder",
+    "d",
+    0
+   ],
+   [
+    "reorder",
+    "d",
+    "2.7"
+   ],
+   [
+    "reorder",
+    "d",
+    "x"
+   ],
+   [
+    "reorder",
+    "a",
+    -5
+   ],
+   [
+    "reorder",
+    "a",
+    99
+   ],
+   [
+    "neighbor",
+    "a",
+    1
+   ],
+   [
+    "neighbor",
+    "a",
+    -1
+   ],
+   [
+    "setActive",
+    "b"
+   ],
+   [
+    "remove",
+    "b"
+   ],
+   [
+    "remove",
+    "c"
+   ],
+   [
+    "remove",
+    "a"
+   ],
+   [
+    "remove",
+    "z"
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "b"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "b"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "c",
+      "b"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "b"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "d",
+      "a",
+      "c",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "a",
+       "c",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": "c",
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": "b",
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "c",
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s1",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": true,
+     "nextActive": "d",
+     "rest": [
+      "d"
+     ]
+    },
+    "stacks": []
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": false,
+     "nextActive": null
+    },
+    "stacks": []
+   }
+  ]
+ },
+ {
+  "file": "not json",
+  "loaded": "{\n \"version\": 1,\n \"stacks\": []\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "d"
+    ]
+   ],
+   [
+    "merge",
+    "e",
+    [
+     "b",
+     "c"
+    ]
+   ],
+   [
+    "merge",
+    "d",
+    [
+     "e"
+    ]
+   ],
+   [
+    "merge",
+    "b",
+    [
+     "a",
+     "f"
+    ]
+   ],
+   [
+    "merge",
+    "c",
+    []
+   ],
+   [
+    "addAfter",
+    "f",
+    "b"
+   ],
+   [
+    "remove",
+    "d"
+   ],
+   [
+    "neighbor",
+    "zz",
+    1
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "d"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "d"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "e",
+      "b",
+      "c"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "d"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "a",
+      "d",
+      "e",
+      "b",
+      "c"
+     ],
+     "active": "e"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "a",
+       "d",
+       "e",
+       "b",
+       "c"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "d",
+      "e",
+      "b",
+      "a",
+      "f",
+      "c"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "e",
+       "b",
+       "a",
+       "f",
+       "c"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "d",
+      "e",
+      "b",
+      "a",
+      "f",
+      "c"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "e",
+       "b",
+       "a",
+       "f",
+       "c"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s1",
+     "memos": [
+      "d",
+      "e",
+      "a",
+      "f",
+      "b",
+      "c"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "d",
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s1",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     },
+     "dissolved": false,
+     "nextActive": "b",
+     "rest": [
+      "e",
+      "a",
+      "f",
+      "b",
+      "c"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s1",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "file": "{\"stacks\":[{\"memos\":[\"a\"]}]}",
+  "loaded": "{\n \"version\": 1,\n \"stacks\": []\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "b"
+    ]
+   ],
+   [
+    "merge",
+    "a",
+    [
+     "c"
+    ],
+    "a"
+   ],
+   [
+    "addAfter",
+    "c",
+    "d"
+   ],
+   [
+    "reorder",
+    "d",
+    0
+   ],
+   [
+    "reorder",
+    "d",
+    "2.7"
+   ],
+   [
+    "reorder",
+    "d",
+    "x"
+   ],
+   [
+    "reorder",
+    "a",
+    -5
+   ],
+   [
+    "reorder",
+    "a",
+    99
+   ],
+   [
+    "neighbor",
+    "a",
+    1
+   ],
+   [
+    "neighbor",
+    "a",
+    -1
+   ],
+   [
+    "setActive",
+    "b"
+   ],
+   [
+    "remove",
+    "b"
+   ],
+   [
+    "remove",
+    "c"
+   ],
+   [
+    "remove",
+    "a"
+   ],
+   [
+    "remove",
+    "z"
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "a",
+      "b"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "b"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "a",
+      "c",
+      "b"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "c",
+       "b"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "d",
+      "a",
+      "c",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "d",
+       "a",
+       "c",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": "c",
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": "b",
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s2",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "c",
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s2",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": true,
+     "nextActive": "d",
+     "rest": [
+      "d"
+     ]
+    },
+    "stacks": []
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": false,
+     "nextActive": null
+    },
+    "stacks": []
+   }
+  ]
+ },
+ {
+  "file": "{\"stacks\":[{\"memos\":[\"a\"]}]}",
+  "loaded": "{\n \"version\": 1,\n \"stacks\": []\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "d"
+    ]
+   ],
+   [
+    "merge",
+    "e",
+    [
+     "b",
+     "c"
+    ]
+   ],
+   [
+    "merge",
+    "d",
+    [
+     "e"
+    ]
+   ],
+   [
+    "merge",
+    "b",
+    [
+     "a",
+     "f"
+    ]
+   ],
+   [
+    "merge",
+    "c",
+    []
+   ],
+   [
+    "addAfter",
+    "f",
+    "b"
+   ],
+   [
+    "remove",
+    "d"
+   ],
+   [
+    "neighbor",
+    "zz",
+    1
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "a",
+      "d"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "d"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s3",
+     "memos": [
+      "e",
+      "b",
+      "c"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "d"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s3",
+      "memos": [
+       "e",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "a",
+      "d",
+      "e",
+      "b",
+      "c"
+     ],
+     "active": "e"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "d",
+       "e",
+       "b",
+       "c"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "d",
+      "e",
+      "b",
+      "a",
+      "f",
+      "c"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "d",
+       "e",
+       "b",
+       "a",
+       "f",
+       "c"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "d",
+      "e",
+      "b",
+      "a",
+      "f",
+      "c"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "d",
+       "e",
+       "b",
+       "a",
+       "f",
+       "c"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "d",
+      "e",
+      "a",
+      "f",
+      "b",
+      "c"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "d",
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s2",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     },
+     "dissolved": false,
+     "nextActive": "b",
+     "rest": [
+      "e",
+      "a",
+      "f",
+      "b",
+      "c"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "file": "{\"version\":1,\"stacks\":[{\"id\":\"x\",\"memos\":[\"a\",\"b\",\"gone\",\"a\"],\"active\":\"gone\"},{\"memos\":[\"b\",\"c\",\"d\"],\"active\":\"d\"},{\"id\":0,\"memos\":[\"e\",\"f\"]},{\"id\":7,\"memos\":[\"c\",\"d\",3]}]}",
+  "loaded": "{\n \"version\": 1,\n \"stacks\": [\n  {\n   \"id\": \"x\",\n   \"memos\": [\n    \"a\",\n    \"b\"\n   ],\n   \"active\": \"a\"\n  },\n  {\n   \"id\": \"s1\",\n   \"memos\": [\n    \"c\",\n    \"d\"\n   ],\n   \"active\": \"d\"\n  },\n  {\n   \"id\": \"s2\",\n   \"memos\": [\n    \"e\",\n    \"f\"\n   ],\n   \"active\": \"e\"\n  }\n ]\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "b"
+    ]
+   ],
+   [
+    "merge",
+    "a",
+    [
+     "c"
+    ],
+    "a"
+   ],
+   [
+    "addAfter",
+    "c",
+    "d"
+   ],
+   [
+    "reorder",
+    "d",
+    0
+   ],
+   [
+    "reorder",
+    "d",
+    "2.7"
+   ],
+   [
+    "reorder",
+    "d",
+    "x"
+   ],
+   [
+    "reorder",
+    "a",
+    -5
+   ],
+   [
+    "reorder",
+    "a",
+    99
+   ],
+   [
+    "neighbor",
+    "a",
+    1
+   ],
+   [
+    "neighbor",
+    "a",
+    -1
+   ],
+   [
+    "setActive",
+    "b"
+   ],
+   [
+    "remove",
+    "b"
+   ],
+   [
+    "remove",
+    "c"
+   ],
+   [
+    "remove",
+    "a"
+   ],
+   [
+    "remove",
+    "z"
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "x",
+     "memos": [
+      "a",
+      "b"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "a",
+       "b"
+      ],
+      "active": "b"
+     },
+     {
+      "id": "s1",
+      "memos": [
+       "c",
+       "d"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "x",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "a"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "x",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "x",
+     "memos": [
+      "d",
+      "a",
+      "c",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "d",
+       "a",
+       "c",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "x",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "x",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": "c",
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": "b",
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "x",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "b"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "x",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "c",
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "x",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": true,
+     "nextActive": "d",
+     "rest": [
+      "d"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": false,
+     "nextActive": null
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "file": "{\"version\":1,\"stacks\":[{\"id\":\"x\",\"memos\":[\"a\",\"b\",\"gone\",\"a\"],\"active\":\"gone\"},{\"memos\":[\"b\",\"c\",\"d\"],\"active\":\"d\"},{\"id\":0,\"memos\":[\"e\",\"f\"]},{\"id\":7,\"memos\":[\"c\",\"d\",3]}]}",
+  "loaded": "{\n \"version\": 1,\n \"stacks\": [\n  {\n   \"id\": \"x\",\n   \"memos\": [\n    \"a\",\n    \"b\"\n   ],\n   \"active\": \"a\"\n  },\n  {\n   \"id\": \"s1\",\n   \"memos\": [\n    \"c\",\n    \"d\"\n   ],\n   \"active\": \"d\"\n  },\n  {\n   \"id\": \"s2\",\n   \"memos\": [\n    \"e\",\n    \"f\"\n   ],\n   \"active\": \"e\"\n  }\n ]\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "d"
+    ]
+   ],
+   [
+    "merge",
+    "e",
+    [
+     "b",
+     "c"
+    ]
+   ],
+   [
+    "merge",
+    "d",
+    [
+     "e"
+    ]
+   ],
+   [
+    "merge",
+    "b",
+    [
+     "a",
+     "f"
+    ]
+   ],
+   [
+    "merge",
+    "c",
+    []
+   ],
+   [
+    "addAfter",
+    "f",
+    "b"
+   ],
+   [
+    "remove",
+    "d"
+   ],
+   [
+    "neighbor",
+    "zz",
+    1
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "x",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "x",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "e",
+      "a",
+      "c",
+      "d",
+      "b",
+      "f"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "e",
+       "a",
+       "c",
+       "d",
+       "b",
+       "f"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "e",
+      "b",
+      "f"
+     ],
+     "active": "e"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "e",
+       "b",
+       "f"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "c",
+      "d",
+      "e",
+      "b",
+      "a",
+      "f"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "d",
+       "e",
+       "b",
+       "a",
+       "f"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "c",
+      "d",
+      "e",
+      "b",
+      "a",
+      "f"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "d",
+       "e",
+       "b",
+       "a",
+       "f"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s2",
+     "memos": [
+      "c",
+      "d",
+      "e",
+      "a",
+      "f",
+      "b"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "d",
+       "e",
+       "a",
+       "f",
+       "b"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s2",
+      "memos": [
+       "c",
+       "e",
+       "a",
+       "f",
+       "b"
+      ],
+      "active": "b"
+     },
+     "dissolved": false,
+     "nextActive": "b",
+     "rest": [
+      "c",
+      "e",
+      "a",
+      "f",
+      "b"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "e",
+       "a",
+       "f",
+       "b"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s2",
+      "memos": [
+       "c",
+       "e",
+       "a",
+       "f",
+       "b"
+      ],
+      "active": "b"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "file": "{\"stacks\":[{\"id\":\"s\",\"memos\":[\"a\",\"b\",\"c\"],\"active\":\"b\"},{\"id\":\"t\",\"memos\":[\"d\",\"e\"],\"active\":\"e\"}]}",
+  "loaded": "{\n \"version\": 1,\n \"stacks\": [\n  {\n   \"id\": \"s\",\n   \"memos\": [\n    \"a\",\n    \"b\",\n    \"c\"\n   ],\n   \"active\": \"b\"\n  },\n  {\n   \"id\": \"t\",\n   \"memos\": [\n    \"d\",\n    \"e\"\n   ],\n   \"active\": \"e\"\n  }\n ]\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "b"
+    ]
+   ],
+   [
+    "merge",
+    "a",
+    [
+     "c"
+    ],
+    "a"
+   ],
+   [
+    "addAfter",
+    "c",
+    "d"
+   ],
+   [
+    "reorder",
+    "d",
+    0
+   ],
+   [
+    "reorder",
+    "d",
+    "2.7"
+   ],
+   [
+    "reorder",
+    "d",
+    "x"
+   ],
+   [
+    "reorder",
+    "a",
+    -5
+   ],
+   [
+    "reorder",
+    "a",
+    99
+   ],
+   [
+    "neighbor",
+    "a",
+    1
+   ],
+   [
+    "neighbor",
+    "a",
+    -1
+   ],
+   [
+    "setActive",
+    "b"
+   ],
+   [
+    "remove",
+    "b"
+   ],
+   [
+    "remove",
+    "c"
+   ],
+   [
+    "remove",
+    "a"
+   ],
+   [
+    "remove",
+    "z"
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "a",
+      "b",
+      "c"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "a",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "d",
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "a",
+      "c",
+      "b"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "a",
+       "c",
+       "b"
+      ],
+      "active": "a"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "d",
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "d",
+      "a",
+      "c",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "d",
+       "a",
+       "c",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "a",
+      "c",
+      "d",
+      "b"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "a",
+       "c",
+       "d",
+       "b"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": "c",
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": "b",
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "d"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "c",
+      "d",
+      "b",
+      "a"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "c",
+       "d",
+       "b",
+       "a"
+      ],
+      "active": "b"
+     },
+     {
+      "id": "t",
+      "memos": [
+       "e"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "c",
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "c",
+       "d",
+       "a"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     },
+     "dissolved": false,
+     "nextActive": "a",
+     "rest": [
+      "d",
+      "a"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "d",
+       "a"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": true,
+     "nextActive": "d",
+     "rest": [
+      "d"
+     ]
+    },
+    "stacks": []
+   },
+   {
+    "ret": {
+     "stack": null,
+     "dissolved": false,
+     "nextActive": null
+    },
+    "stacks": []
+   }
+  ]
+ },
+ {
+  "file": "{\"stacks\":[{\"id\":\"s\",\"memos\":[\"a\",\"b\",\"c\"],\"active\":\"b\"},{\"id\":\"t\",\"memos\":[\"d\",\"e\"],\"active\":\"e\"}]}",
+  "loaded": "{\n \"version\": 1,\n \"stacks\": [\n  {\n   \"id\": \"s\",\n   \"memos\": [\n    \"a\",\n    \"b\",\n    \"c\"\n   ],\n   \"active\": \"b\"\n  },\n  {\n   \"id\": \"t\",\n   \"memos\": [\n    \"d\",\n    \"e\"\n   ],\n   \"active\": \"e\"\n  }\n ]\n}",
+  "ops": [
+   [
+    "merge",
+    "a",
+    [
+     "d"
+    ]
+   ],
+   [
+    "merge",
+    "e",
+    [
+     "b",
+     "c"
+    ]
+   ],
+   [
+    "merge",
+    "d",
+    [
+     "e"
+    ]
+   ],
+   [
+    "merge",
+    "b",
+    [
+     "a",
+     "f"
+    ]
+   ],
+   [
+    "merge",
+    "c",
+    []
+   ],
+   [
+    "addAfter",
+    "f",
+    "b"
+   ],
+   [
+    "remove",
+    "d"
+   ],
+   [
+    "neighbor",
+    "zz",
+    1
+   ]
+  ],
+  "steps": [
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "a",
+      "d",
+      "e",
+      "b",
+      "c"
+     ],
+     "active": "d"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "a",
+       "d",
+       "e",
+       "b",
+       "c"
+      ],
+      "active": "d"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "a",
+      "d",
+      "e",
+      "b",
+      "c"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "a",
+       "d",
+       "e",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "a",
+      "d",
+      "e",
+      "b",
+      "c"
+     ],
+     "active": "e"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "a",
+       "d",
+       "e",
+       "b",
+       "c"
+      ],
+      "active": "e"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "d",
+      "e",
+      "b",
+      "a",
+      "f",
+      "c"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "d",
+       "e",
+       "b",
+       "a",
+       "f",
+       "c"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "d",
+      "e",
+      "b",
+      "a",
+      "f",
+      "c"
+     ],
+     "active": "a"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "d",
+       "e",
+       "b",
+       "a",
+       "f",
+       "c"
+      ],
+      "active": "a"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "id": "s",
+     "memos": [
+      "d",
+      "e",
+      "a",
+      "f",
+      "b",
+      "c"
+     ],
+     "active": "b"
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "d",
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": {
+     "stack": {
+      "id": "s",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     },
+     "dissolved": false,
+     "nextActive": "b",
+     "rest": [
+      "e",
+      "a",
+      "f",
+      "b",
+      "c"
+     ]
+    },
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   },
+   {
+    "ret": null,
+    "stacks": [
+     {
+      "id": "s",
+      "memos": [
+       "e",
+       "a",
+       "f",
+       "b",
+       "c"
+      ],
+      "active": "b"
+     }
+    ]
+   }
+  ]
+ }
+]
