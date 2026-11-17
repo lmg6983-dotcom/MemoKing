@@ -1708,14 +1708,17 @@ fn status_bubble(app: &AppHandle, owner: &str, b: &Value) -> Value {
         return false.into();
     };
     // 바탕화면 층(테이프) 메모는 앞에 나와 있을 때만 — 다른 창 뒤에 있으면 말풍선만 혼자 떠 보인다
-    if wm().pinned.contains_key(owner) && !o.is_focused().unwrap_or(false) {
+    // WM 을 놓고 창에 묻는다 — 창 묻기는 메인 스레드를 기다리고, 메인 스레드는 WM 을 기다릴 수 있다
+    let pinned = wm().pinned.contains_key(owner);
+    if pinned && !o.is_focused().unwrap_or(false) {
         return false.into();
     }
     let label = format!("bubble-{owner}");
     let (Some(w), Some(ob)) = (ensure_overlay(app, &label, "bubble.html", BUBBLE_SIZE, Some(&o)), bounds(&o)) else { return false.into() };
     // shortcut: 메모 창 확대(zoom)는 1 로 본다 — 확대한 창에서 꼬리가 어긋나면 화면이 확대율을 함께 보내게
     let anchor = ob[0] + b["x"].as_f64().unwrap_or(0.0);
-    let sticker = wm().stickers.get(owner).and_then(|s| s.win.clone()).and_then(|l| app.get_webview_window(&l)).filter(is_shown).and_then(|s| bounds(&s));
+    let sl = wm().stickers.get(owner).and_then(|s| s.win.clone());
+    let sticker = sl.and_then(|l| app.get_webview_window(&l)).filter(is_shown).and_then(|s| bounds(&s));
     let mut spot = place_bubble(ob, area_at(app, (anchor.round(), ob[1] + 4.0)), anchor, BAR_H, sticker);
     let r = &spot["bounds"];
     set_bounds(&w, [r["x"].as_f64().unwrap_or(0.0), r["y"].as_f64().unwrap_or(0.0), BUBBLE_SIZE.0, BUBBLE_SIZE.1]);
