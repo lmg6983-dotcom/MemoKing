@@ -52,7 +52,8 @@ jobs:
         with:
           workspaces: desktop-rs
       - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+      # JS 비교(parity)는 시간대를 서울로 고정한 parity 잡에서 — Windows 는 TZ 를 따르지 않아 단위 테스트만
+      - run: cargo test --workspace --lib --bins
       - run: cargo build
       # 점검하는 동안(목록 · 메모 창 · 왕관 스티커) 화면 사진을 찍는다 — 점검이 끝나도 6초 더 떠 있다 (ipc.rs smoke:done)
       - name: 앱 안 점검 (--smoke) · 화면 사진
