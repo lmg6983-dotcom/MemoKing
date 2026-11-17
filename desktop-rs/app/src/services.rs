@@ -301,7 +301,7 @@ fn print_to_pdf(win: &tauri::WebviewWindow, file: &Path, w: f64, h: f64) -> bool
     use std::time::{Duration, Instant};
     use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2Environment6, ICoreWebView2_7};
     use webview2_com::{ExecuteScriptCompletedHandler, PrintToPdfCompletedHandler};
-    use windows_core::{Interface, HSTRING};
+    use windows::core::{Interface, HSTRING};
     let until = Instant::now() + Duration::from_secs(15);
     while Instant::now() < until {
         let (tx, rx) = mpsc::channel();
@@ -323,7 +323,7 @@ fn print_to_pdf(win: &tauri::WebviewWindow, file: &Path, w: f64, h: f64) -> bool
     let path = HSTRING::from(file.as_os_str());
     let asked = win.with_webview(move |wv| unsafe {
         let done = tx.clone();
-        let r = (|| -> windows_core::Result<()> {
+        let r = (|| -> windows::core::Result<()> {
             let core = wv.controller().CoreWebView2()?.cast::<ICoreWebView2_7>()?;
             let s = wv.environment().cast::<ICoreWebView2Environment6>()?.CreatePrintSettings()?;
             s.SetPageWidth(w / 25.4)?;

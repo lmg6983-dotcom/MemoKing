@@ -385,6 +385,83 @@ fn save_attachment_as(app: &AppHandle, f: &Value) -> Result<Value, String> {
     })
 }
 
+/// 첨부를 메모 밖(탐색기 · 바탕화면 · 카카오톡)으로 끌어내기: { name, rel? | base64? } — 임시 폴더에 그 이름으로 복사해 파일 끌기 (Electron startDrag)
+fn drag_out(app: &AppHandle, f: &Value) -> Option<()> {
+    use base64::Engine;
+    let source = match (f["rel"].as_str(), f["base64"].as_str()) {
+        (Some(rel), _) if !rel.is_empty() => Ok(attachment_file(app, rel).ok()?),
+        (_, Some(b)) => Err(base64::engine::general_purpose::STANDARD.decode(b).ok()?),
+        _ => return None,
+    };
+    let root = std::env::temp_dir().join("memoking-drag");
+    std::fs::create_dir_all(&root).ok()?;
+    // 받는 앱이 복사를 마쳤을 만한 것(한 시간 지남)은 치운다
+    for e in std::fs::read_dir(&root).ok()?.flatten() {
+        if e.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|d| d.as_secs() > 3600) {
+            let _ = std::fs::remove_dir_all(e.path());
+        }
+    }
+    let mut name = memoking_core::js::slice16(&safe_name(f["name"].as_str().unwrap_or_default()), 120);
+    // 이름에 확장자가 없으면 원래 파일의 것을 (받는 쪽이 파일 종류를 알도록)
+    if let (Ok(src), None) = (&source, Path::new(&name).extension()) {
+        if let Some(ext) = src.extension() {
+            name = format!("{name}.{}", ext.to_string_lossy());
+        }
+    }
+    let dir = root.join(format!("d-{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()));
+    std::fs::create_dir(&dir).ok()?;
+    let file = dir.join(name);
+    match source {
+        Ok(src) => std::fs::copy(src, &file).map(|_| ()),
+        Err(bytes) => std::fs::write(&file, bytes),
+    }
+    .ok()?;
+    if !crate::ipc::smoke() {
+        start_file_drag(app, file);
+    }
+    Some(())
+}
+
+/// OLE 파일 끌기 — 창 스레드(메인)에서, 놓거나 Esc 를 누를 때까지 그 안에서 메시지를 돌린다
+// shortcut: 끄는 동안 마우스 옆 그림은 Windows 기본(커서만) — Electron 은 앱 아이콘을 붙였다. 아쉬우면 IDragSourceHelper 로
+#[cfg(windows)]
+fn start_file_drag(app: &AppHandle, file: PathBuf) {
+    use windows::Win32::System::Com::IDataObject;
+    use windows::Win32::System::Ole::{DoDragDrop, IDropSource, DROPEFFECT, DROPEFFECT_COPY};
+    use windows::Win32::UI::Shell::{BHID_DataObject, IShellItem, SHCreateItemFromParsingName};
+    let _ = app.run_on_main_thread(move || unsafe {
+        let Ok(item) = SHCreateItemFromParsingName::<_, _, IShellItem>(&windows::core::HSTRING::from(file.as_os_str()), None) else { return };
+        let Ok(data) = item.BindToHandler::<_, IDataObject>(None, &BHID_DataObject) else { return };
+        let mut effect = DROPEFFECT::default();
+        let _ = DoDragDrop(&data, &IDropSource::from(DropSource), DROPEFFECT_COPY, &mut effect);
+    });
+}
+
+#[cfg(windows)]
+#[windows_core::implement(windows::Win32::System::Ole::IDropSource)]
+struct DropSource;
+
+#[cfg(windows)]
+impl windows::Win32::System::Ole::IDropSource_Impl for DropSource_Impl {
+    fn QueryContinueDrag(&self, escape: windows::core::BOOL, keys: windows::Win32::System::SystemServices::MODIFIERKEYS_FLAGS) -> windows::core::HRESULT {
+        use windows::Win32::Foundation::{DRAGDROP_S_CANCEL, DRAGDROP_S_DROP, S_OK};
+        if escape.as_bool() {
+            DRAGDROP_S_CANCEL
+        } else if keys.0 & windows::Win32::System::SystemServices::MK_LBUTTON.0 == 0 {
+            DRAGDROP_S_DROP
+        } else {
+            S_OK
+        }
+    }
+
+    fn GiveFeedback(&self, _: windows::Win32::System::Ole::DROPEFFECT) -> windows::core::HRESULT {
+        windows::Win32::Foundation::DRAGDROP_S_USEDEFAULTCURSORS
+    }
+}
+
+#[cfg(not(windows))]
+fn start_file_drag(_: &AppHandle, _: PathBuf) {}
+
 /// 글로 새 메모 (목록의 파일 가져오기 · 매직키): 문서 첨부는 메모 창이 열리며 편집기가 넣는다
 fn import_memo(app: &AppHandle, args: &[Value]) -> Result<Value, String> {
     let body: String = args.first().and_then(Value::as_str).unwrap_or_default().chars().take(5_000_000).collect();
@@ -614,6 +691,12 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         "attachment:open" => open_attachment(app, &arg_str(args, 0)),
         "attachment:save-as" => save_attachment_as(app, args.first().unwrap_or(&Value::Null)),
+        "attachment:drag-out" => {
+            if drag_out(app, args.first().unwrap_or(&Value::Null)).is_none() {
+                eprintln!("[drag-out] 끌어낼 파일을 만들지 못했어요");
+            }
+            Ok(Value::Null)
+        }
         "memo:handoff" => {
             let last = st.handoff.lock().unwrap().1.clone();
             let open = |id: &Value| st.note_labels.lock().unwrap().contains_key(id.as_str().unwrap_or_default());
