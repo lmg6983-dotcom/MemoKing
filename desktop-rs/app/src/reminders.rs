@@ -115,15 +115,22 @@ fn run(app: &AppHandle, pick: impl Fn(&Value, chrono::DateTime<chrono::Local>) -
     let mut rang = false;
     for item in all {
         let (id, r) = (item["memoId"].as_str().unwrap_or_default(), &item["reminder"]);
-        let Some(due) = pick(r, now) else { continue };
-        // 울리기 "전에" 먼저 울림 표시(last)를 파일에 적는다 — 적지 못했으면(그사이 파일이 바뀜) 이번엔 울리지 않는다 (두 번 울리지 않게)
+        if pick(r, now).is_none() {
+            continue;
+        }
+        // 울리기 "전에" 먼저 울림 표시(last)를 파일에 적는다 — 적지 못했으면(그사이 파일이 바뀜) 이번엔 울리지 않는다 (두 번 울리지 않게).
+        //   목록을 읽은 뒤 채널이 알림을 옮기거나 끄거나 지웠을 수 있다 — 지금 알림으로 다시 고르고 적는다 (옛 것으로 되돌리지 않게)
         let marked = vault(app, |v| {
-            let list = v.entry(id).map(|e| e.meta.reminders.iter().map(|x| if x["id"] == r["id"] { rem::mark_fired(r, now) } else { x.clone() }).collect())?;
-            v.set_reminders(id, list).map_err(|e| eprintln!("울림 표시를 적지 못했습니다: {e}")).ok().flatten() // 이 메모만 건너뛰고 다른 알림은 계속
+            let now_list = &v.entry(id)?.meta.reminders;
+            let cur = now_list.iter().find(|x| x["id"] == r["id"])?.clone();
+            let due = pick(&cur, now)?;
+            let list = now_list.iter().map(|x| if x["id"] == cur["id"] { rem::mark_fired(&cur, now) } else { x.clone() }).collect();
+            v.set_reminders(id, list).map_err(|e| eprintln!("울림 표시를 적지 못했습니다: {e}")).ok().flatten()?; // 이 메모만 건너뛰고 다른 알림은 계속
+            Some((cur, due))
         })
         .flatten();
-        if marked.is_some() {
-            fire(app, id, r, due, now);
+        if let Some((cur, due)) = marked {
+            fire(app, id, &cur, due, now);
             rang = true;
         }
     }
