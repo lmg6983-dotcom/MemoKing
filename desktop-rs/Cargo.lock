@@ -2692,6 +2692,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoking-mcp"
+version = "0.88.0"
+dependencies = [
+ "chrono",
+ "memoking-core",
+ "serde_json",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,7 +1,10 @@
-// 곁가지 기능 — 화면 캡처 메모. Electron 의 window-manager.js(startAreaCapture · finishAreaCapture · openCaptureMemo) 자리.
+// 곁가지 기능 — 화면 캡처 메모 · AI 비서 연결(MCP).
+//   Electron 의 window-manager.js(startAreaCapture · finishAreaCapture · openCaptureMemo) · utils.js(mcpStatus · mcpConnect) 자리.
 use crate::state::State;
-use serde_json::{json, Value};
+use memoking_core::vault::write_atomic;
+use serde_json::{json, Map, Value};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
@@ -142,12 +145,107 @@ fn finish_area_capture(app: &AppHandle, label: &str, rect: &Value) -> Result<Val
     Ok(id.into())
 }
 
+// ---------- AI 비서 연결 (MCP) ----------
+
+const MCP_NAME: &str = "memoking";
+
+fn claude_config_file(app: &AppHandle) -> PathBuf {
+    match std::env::var_os("MEMOKING_CLAUDE_CONFIG") {
+        Some(f) => f.into(),
+        None => app.path().config_dir().unwrap_or_default().join("Claude").join("claude_desktop_config.json"),
+    }
+}
+
+// AI 비서가 띄울 것: 메모킹 옆의 memoking-mcp (desktop-rs/mcp)
+// shortcut: 설치 파일에 memoking-mcp 를 넣는 일(tauri.conf.json externalBin)은 릴리스를 Tauri 로 바꿀 때 — 그때까지는 빌드 폴더의 것을 가리킨다
+fn mcp_entry(app: &AppHandle) -> Value {
+    let exe = std::env::current_exe().unwrap_or_default().with_file_name(format!("memoking-mcp{}", std::env::consts::EXE_SUFFIX));
+    let settings = st(app).settings_dir.join("settings.json");
+    json!({ "command": exe, "args": ["--settings", settings, "--version", app.package_info().version.to_string()] })
+}
+
+/// Claude 데스크톱 설정 (없거나 비었으면 {}, 객체가 아니면 Err — 건드리지 않는다)
+fn read_claude_config(app: &AppHandle) -> Result<Map<String, Value>, ()> {
+    let Ok(text) = std::fs::read_to_string(claude_config_file(app)) else { return Ok(Map::new()) };
+    if text.trim().is_empty() {
+        return Ok(Map::new());
+    }
+    match serde_json::from_str(&text) {
+        Ok(Value::Object(m)) => Ok(m),
+        _ => Err(()),
+    }
+}
+
+pub fn mcp_status(app: &AppHandle) -> Value {
+    let config = read_claude_config(app);
+    let entry = config.as_ref().ok().and_then(|c| c.get("mcpServers")?.get(MCP_NAME).cloned()).filter(|e| !e.is_null());
+    json!({
+        "claudeFound": claude_config_file(app).parent().is_some_and(Path::exists),
+        "connected": entry.is_some(),
+        "stale": entry.is_some_and(|e| e["command"] != mcp_entry(app)["command"]),
+        "broken": config.is_err(),
+        "write": st(app).setting("mcp")["write"] != false,
+    })
+}
+
+fn mcp_connect(app: &AppHandle, on: bool) -> Value {
+    let file = claude_config_file(app);
+    let Ok(mut config) = read_claude_config(app) else {
+        return with_error(mcp_status(app), "Claude 데스크톱 설정 파일을 읽지 못해서 건드리지 않았어요. \"설정 복사\" 로 직접 넣어 주세요".into());
+    };
+    let mut servers = config.get("mcpServers").and_then(Value::as_object).cloned().unwrap_or_default();
+    if on {
+        servers.insert(MCP_NAME.into(), mcp_entry(app));
+    } else {
+        servers.remove(MCP_NAME);
+    }
+    config.insert("mcpServers".into(), servers.into());
+    let backup = PathBuf::from(format!("{}.memoking-backup", file.display()));
+    let r = (|| {
+        std::fs::create_dir_all(file.parent().unwrap_or(Path::new(".")))?;
+        if file.exists() && !backup.exists() {
+            std::fs::copy(&file, &backup)?;
+        }
+        // 임시 파일에 쓰고 바꿔치기 — 쓰는 도중 꺼져도 Claude 설정 파일이 깨지지 않게
+        write_atomic(&file, format!("{}\n", serde_json::to_string_pretty(&config).unwrap()).as_bytes())
+    })();
+    match r {
+        Ok(()) => mcp_status(app),
+        Err(err) => with_error(mcp_status(app), format!("설정 파일에 쓰지 못했어요 ({err})")),
+    }
+}
+
+fn with_error(mut status: Value, error: String) -> Value {
+    status["error"] = error.into();
+    status
+}
+
+/// 켤 때: 메모킹을 옮겨 설치했으면(연결된 실행 파일 자리가 다르면) 다시 연결
+pub fn start(app: &AppHandle) {
+    let mcp = mcp_status(app);
+    if !cfg!(debug_assertions) && mcp["stale"] == true && mcp["broken"] == false {
+        mcp_connect(app, true);
+    }
+}
+
 pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     Some(match channel {
         "capture:done" => finish_area_capture(app, label, args.first().unwrap_or(&Value::Null)),
         "capture:cancel" => {
             end_area_capture(app);
             Ok(Value::Null)
+        }
+        "mcp:connect" => Ok(mcp_connect(app, args.first() != Some(&Value::Bool(false)))),
+        "mcp:copy" => {
+            use tauri_plugin_clipboard_manager::ClipboardExt;
+            let snippet = json!({ "mcpServers": { MCP_NAME: mcp_entry(app) } });
+            app.clipboard().write_text(serde_json::to_string_pretty(&snippet).unwrap()).map(|()| Value::Bool(true)).map_err(|e| e.to_string())
+        }
+        "mcp:set-write" => {
+            let mut mcp = st(app).setting("mcp").as_object().cloned().unwrap_or_default();
+            mcp.insert("write".into(), crate::settings::truthy(args.first()).into());
+            st(app).set_setting("mcp", mcp.into());
+            Ok(mcp_status(app))
         }
         _ => return None,
     })
