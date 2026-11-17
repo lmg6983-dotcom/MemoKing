@@ -2,8 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ipc;
+mod memos;
+mod state;
 
-use tauri::{http, AppHandle, WebviewUrl, WebviewWindowBuilder};
+use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 // desktop/preload.cjs 를 그대로 끼워 넣는다 (shim.js 가 require('electron') 을 Tauri 로 바꿔 줌)
 fn init_script() -> String {
@@ -28,13 +30,23 @@ fn main() {
         .invoke_handler(tauri::generate_handler![ipc::ipc])
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
         //   sync/<채널>: 동기 호출 (shim.js sendSync). 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
+        // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
+        //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상
         .register_uri_scheme_protocol("memoking", |ctx, req| {
+            let path = req.uri().path().to_string();
+            let not_found = || http::Response::builder().status(404).body(Vec::new()).unwrap();
+            if let Some(rel) = path.strip_prefix("/vault/") {
+                let origin = req.headers().get("origin").and_then(|o| o.to_str().ok());
+                return match memos::serve_vault(ctx.app_handle(), rel, origin) {
+                    Some((bytes, mime, allow)) => http::Response::builder().header("Content-Type", mime).header("Access-Control-Allow-Origin", allow).body(bytes).unwrap(),
+                    None => not_found(),
+                };
+            }
+            // 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
+            let Some(channel) = path.strip_prefix("/sync/") else { return not_found() };
             let label = ctx.webview_label().to_string();
-            let Some(channel) = req.uri().path().strip_prefix("/sync/").map(str::to_string) else {
-                return http::Response::builder().status(404).body(Vec::new()).unwrap();
-            };
             let args = serde_json::from_slice(req.body()).unwrap_or_default();
-            let body = match ipc::dispatch(ctx.app_handle(), &label, &channel, args) {
+            let body = match ipc::dispatch(ctx.app_handle(), &label, channel, args) {
                 Ok(v) => serde_json::json!({ "v": v }),
                 Err(e) => serde_json::json!({ "err": e }),
             };
@@ -46,25 +58,33 @@ fn main() {
         })
         .setup(|app| {
             let app = app.handle();
+            app.manage(state::State::load(app));
+            memos::start(app);
             window(app, "list", "index.html").title("메모킹").inner_size(440.0, 680.0).min_inner_size(440.0, 380.0).build()?;
-            if ipc::smoke() {
-                // 0단계 확인용: 메모 창(테두리 없음) + 그 위 가장자리에 걸친 왕관 스티커(투명 · 클릭 통과) — 화면 사진으로 본다
-                let note = window(app, "note", "note.html").title("메모").inner_size(320.0, 300.0).min_inner_size(240.0, 200.0).position(520.0, 160.0).build()?;
-                let crown = window(app, "sticker", "sticker.html?kind=crown")
-                    .parent(&note)?
-                    .transparent(true)
-                    .shadow(false)
-                    .resizable(false)
-                    .focusable(false)
-                    .skip_taskbar(true)
-                    .inner_size(64.0, 52.0)
-                    .position(640.0, 134.0)
-                    .build()?;
-                crown.set_ignore_cursor_events(true)?;
-            }
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("메모킹을 켜지 못했어요");
 }
 
+
+/// 주소의 %XX 풀기 (메모 폴더 파일 이름은 한글이라 UTF-8 로 적혀 온다)
+pub fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let hex = (b[i] == b'%').then(|| s.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(h, 16).ok())).flatten();
+        match hex {
+            Some(v) => {
+                out.push(v);
+                i += 3;
+            }
+            None => {
+                out.push(b[i]);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}

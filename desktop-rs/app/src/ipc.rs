@@ -1,6 +1,6 @@
 // window.memoking 의 모든 채널이 들어오는 곳 — Electron 의 ipcMain.handle 들 (desktop/ipc-handlers.js · main.js) 자리.
 //   옮긴 채널은 dispatch 의 match 에 한 줄씩. 어디까지 옮겼는지는 desktop-rs/checklist.mjs 가 이 파일에서 센다.
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter, Webview};
@@ -17,6 +17,9 @@ pub fn smoke() -> bool {
 }
 
 pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -> Result<Value, String> {
+    if let Some(r) = crate::memos::handle(app, label, channel, &args) {
+        return r;
+    }
     match channel {
         "smoke:emit" if smoke() => app.emit_to(label, args[0].as_str().unwrap_or_default(), [42]).map(|_| Value::Null).map_err(|e| e.to_string()),
         "smoke:done" if smoke() => {
@@ -39,10 +42,6 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
             }
             Ok(Value::Null)
         }
-        "app:info" => Ok(json!({
-            "vaultPath": null, "vaultError": null, "missingPath": null, "suggestedPath": null,
-            "version": app.package_info().version.to_string(), "sandbox": false, "settingsReset": false,
-        })),
         _ => Err(unported(channel)),
     }
 }

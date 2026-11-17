@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **1 / 187**
-- 이벤트 (Rust → 화면): **0 / 61**
+- 채널 (화면 → Rust): **13 / 187**
+- 이벤트 (Rust → 화면): **3 / 61**
 
 ## 채널
 
@@ -102,8 +102,8 @@
 | ⬜ | `mcp:copy` |
 | ⬜ | `mcp:set-write` |
 | ⬜ | `memo:copy-text` |
-| ⬜ | `memo:create` |
-| ⬜ | `memo:get` |
+| ✅ | `memo:create` |
+| ✅ | `memo:get` |
 | ⬜ | `memo:handoff` |
 | ⬜ | `memo:import` |
 | ⬜ | `memo:keep-copy` |
@@ -111,18 +111,18 @@
 | ⬜ | `memo:links` |
 | ⬜ | `memo:lock` |
 | ⬜ | `memo:move-folder` |
-| ⬜ | `memo:open` |
+| ✅ | `memo:open` |
 | ⬜ | `memo:open-lock` |
 | ⬜ | `memo:remove` |
 | ⬜ | `memo:restore-version` |
-| ⬜ | `memo:save` |
-| ⬜ | `memo:save-sync` |
+| ✅ | `memo:save` |
+| ✅ | `memo:save-sync` |
 | ⬜ | `memo:set` |
 | ⬜ | `memo:unlock` |
 | ⬜ | `memo:version` |
 | ⬜ | `memo:versions` |
-| ⬜ | `memos:folders` |
-| ⬜ | `memos:list` |
+| ✅ | `memos:folders` |
+| ✅ | `memos:list` |
 | ⬜ | `memos:search` |
 | ⬜ | `menu:choose` |
 | ⬜ | `mode:hours` |
@@ -186,14 +186,14 @@
 | ⬜ | `vault:retry` |
 | ⬜ | `vault:reveal` |
 | ⬜ | `vault:reveal-index` |
-| ⬜ | `vault:use` |
-| ⬜ | `win:close` |
+| ✅ | `vault:use` |
+| ✅ | `win:close` |
 | ⬜ | `win:dim-titlebar` |
 | ⬜ | `win:grow-width` |
 | ⬜ | `win:inking` |
-| ⬜ | `win:minimize` |
-| ⬜ | `win:painted` |
-| ⬜ | `win:spare` |
+| ✅ | `win:minimize` |
+| ✅ | `win:painted` |
+| ✅ | `win:spare` |
 | ⬜ | `win:status-bubble` |
 | ⬜ | `win:toggle-layer` |
 
@@ -228,16 +228,16 @@
 | ⬜ | `list:tab` |
 | ⬜ | `memo:alarm` |
 | ⬜ | `memo:command` |
-| ⬜ | `memo:external` |
+| ✅ | `memo:external` |
 | ⬜ | `memo:handoff` |
 | ⬜ | `memo:highlight` |
 | ⬜ | `memo:layer` |
 | ⬜ | `memo:links-changed` |
 | ⬜ | `memo:meta` |
 | ⬜ | `memo:reminders` |
-| ⬜ | `memo:removed` |
+| ✅ | `memo:removed` |
 | ⬜ | `memo:trashed` |
-| ⬜ | `memos:changed` |
+| ✅ | `memos:changed` |
 | ⬜ | `mode:changed` |
 | ⬜ | `reminders:changed` |
 | ⬜ | `settings:link-previews` |
