@@ -3,6 +3,7 @@
 //   link-previews.js · share-file.js · window-manager.js(setListOnTop) 의 그 부분.
 use crate::memos::arg_str;
 use crate::state::state;
+use memoking_core::js::encode_uri_component;
 use memoking_core::link_preview::{detect_charset, host_of, image_ext_from_type, image_ext_from_url, parse_link_preview, parse_youtube_oembed, stale_youtube_entry, youtube_oembed_url};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -512,10 +513,6 @@ fn share_once(app: &AppHandle, f: &Value) -> Value {
 // ---------- 새 버전 안내 · 문제 보내기 ----------
 
 /// encodeURIComponent
-fn encode_uri_component(s: &str) -> String {
-    s.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.!~*'()".contains(&b) { char::from(b).to_string() } else { format!("%{b:02X}") }).collect()
-}
-
 /// 문제 보내기 메일 (mailto 주소) — 버전 · 운영체제 · 들어가는 만큼의 최근 기록 (error-log.js problemMail: 긴 것은 오래된 줄부터 뺀다)
 fn problem_mail(to: &str, version: &str, os: &str, lines: &[String]) -> String {
     // mailto 주소는 메일 앱마다 2000자 안팎에서 잘린다 (한글은 한 글자가 9자) — 다 안 들어가면 클립보드로

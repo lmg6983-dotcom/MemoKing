@@ -152,11 +152,6 @@ fn import_model(app: &AppHandle, role: &str) -> Result<Value, String> {
     })
 }
 
-/// encodeURIComponent
-fn uri_component(s: &str) -> String {
-    s.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.!~*'()".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect()
-}
-
 /// 저장소 파일 목록 → 받을 것 (이름, 주소, 크기, SHA-256) — 보조 파일(mtp 초안 · mmproj 그림)은 빼고, 목록을 받은 그 커밋으로 고정
 fn pick_model_file(info: &Value) -> Result<(String, String, u64, String), String> {
     let f = info["siblings"].as_array().into_iter().flatten().find(|s| {
@@ -168,7 +163,7 @@ fn pick_model_file(info: &Value) -> Result<(String, String, u64, String), String
         return Err("받을 모델 파일을 찾지 못했어요. 잠시 뒤 다시 해 주세요".into());
     };
     let path = f["rfilename"].as_str().unwrap_or_default();
-    let url = format!("https://huggingface.co/{MODEL_REPO}/resolve/{}/{}", info["sha"].as_str().unwrap_or("main"), path.split('/').map(uri_component).collect::<Vec<_>>().join("/"));
+    let url = format!("https://huggingface.co/{MODEL_REPO}/resolve/{}/{}", info["sha"].as_str().unwrap_or("main"), path.split('/').map(memoking_core::js::encode_uri_component).collect::<Vec<_>>().join("/"));
     let size = f["lfs"]["size"].as_u64().or(f["size"].as_u64()).unwrap_or(0);
     Ok((path.rsplit('/').next().unwrap_or(path).to_string(), url, size, sha.to_string()))
 }
@@ -634,7 +629,7 @@ fn run_agent_action(app: &AppHandle, a: &Value) -> Value {
                 return fail("잠긴 메모에는 덧붙일 수 없어요");
             }
             let text = s(&a["text"], 8000);
-            if memoking_core::js::re(r"<!--\s*memoking-lock").is_match(&text).unwrap_or(false) {
+            if memoking_core::body::has_lock_marker(&text) {
                 return fail("잠금 정보가 든 글은 덧붙일 수 없어요");
             }
             let Some(body) = memoking_core::agent::append_to_body(old, &text) else { return fail("덧붙일 내용이 없어요") };

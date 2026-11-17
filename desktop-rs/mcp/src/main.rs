@@ -3,7 +3,7 @@
 //   메모 폴더는 메모킹 설정 파일(--settings)에서 매번 읽는다 (설정에서 폴더를 바꿔도 다시 연결할 필요 없게).
 //   쓰기(새 메모 · 덧붙이기)는 설정의 "AI 가 메모를 쓰도록 허용" 이 켜져 있을 때만. 잠근 메모는 내용을 보여 주지 않는다.
 //   이 프로세스는 읽고 쓰기만 — 색인 · 첨부 치우기 · 폴더 지켜보기는 켜져 있는 메모킹 앱이 맡는다.
-use memoking_core::body::{extract_tags, is_locked_body};
+use memoking_core::body::{extract_tags, has_lock_marker, is_locked_body};
 use memoking_core::js;
 use memoking_core::vault::Vault;
 use serde_json::{json, Map, Value};
@@ -39,10 +39,6 @@ fn text(value: &Value) -> Value {
 
 fn fail(message: impl Into<String>) -> Value {
     json!({ "content": [{ "type": "text", "text": message.into() }], "isError": true })
-}
-
-fn is_lock_marker(s: &str) -> bool {
-    s.split("<!--").skip(1).any(|rest| rest.trim_start_matches(js::is_space).starts_with("memoking-lock"))
 }
 
 fn summary_of(m: &Value) -> Value {
@@ -201,7 +197,7 @@ impl Server {
         if content.is_empty() {
             return Ok(fail("메모 내용이 비어 있어요. content에 남길 글을 넣어 주세요."));
         }
-        if is_locked_body(s(&a["content"])) || is_lock_marker(&content) {
+        if is_locked_body(s(&a["content"])) || has_lock_marker(&content) {
             return Ok(fail("잠금 정보가 든 글은 남길 수 없어요 (아무도 열 수 없는 메모가 될 수 있어요)."));
         }
         let v = self.vault()?;
@@ -241,7 +237,7 @@ impl Server {
         if add.is_empty() {
             return Ok(fail("덧붙일 내용이 비어 있어요."));
         }
-        if is_lock_marker(&content) {
+        if has_lock_marker(&content) {
             return Ok(fail("잠금 정보가 든 글은 덧붙일 수 없어요."));
         }
         // 목록 끝에 목록을 덧붙이면 한 목록으로 이어지게 (빈 줄 없이)

@@ -345,3 +345,8 @@ pub static LOCK: LazyLock<Regex> = LazyLock::new(|| {
 pub fn is_locked_body(body: &str) -> bool {
     LOCK.is_match(body).unwrap_or(false)
 }
+
+/// 글 어딘가에 잠금 정보(<!-- memoking-lock) 가 들었나: 덧붙이거나 새로 쓰는 글로 잠긴 메모를 흉내 내지 못하게
+pub fn has_lock_marker(s: &str) -> bool {
+    s.split("<!--").skip(1).any(|rest| rest.trim_start_matches(js::is_space).starts_with("memoking-lock"))
+}
