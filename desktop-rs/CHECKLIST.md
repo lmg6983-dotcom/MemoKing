@@ -5,6 +5,8 @@
 - 채널 (화면 → Rust): **184 / 184**
 - 이벤트 (Rust → 화면): **58 / 58**
 
+➖ 는 Rust 판에 일부러 두지 않은 것 (AI 비서 연결 MCP: AI 는 Google Drive 의 메모 폴더를 직접 읽고 쓴다)
+
 ## 채널
 
 | | 이름 |
@@ -98,9 +100,9 @@
 | ✅ | `list:on-top` |
 | ✅ | `list:show` |
 | ✅ | `list:toggle-top` |
-| ✅ | `mcp:connect` |
-| ✅ | `mcp:copy` |
-| ✅ | `mcp:set-write` |
+| ➖ | `mcp:connect` |
+| ➖ | `mcp:copy` |
+| ➖ | `mcp:set-write` |
 | ✅ | `memo:create` |
 | ✅ | `memo:get` |
 | ✅ | `memo:handoff` |

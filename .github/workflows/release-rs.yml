@@ -1,7 +1,7 @@
 # PC Rust 판 베타 배포 (desktop-rs/). Actions 탭 › Run workflow 로만 돈다.
 #   올라가는 곳: 이 저장소의 사전 배포 `desktop-rs` (안드로이드의 `android` 와 같은 방식, 정식 Release 와 따로)
 #   올라가는 것: MemoKing-Rust-Setup-<버전>.exe, MemoKing-Rust-Setup.exe (늘 같은 이름), latest-tauri.json (자동 업데이트)
-#   설치 파일에 함께 넣는 것: AI 엔진 llama-server (npm run llama), MCP 서버 memoking-mcp.exe
+#   설치 파일에 함께 넣는 것: AI 엔진 llama-server (npm run llama)
 #   버전은 desktop-rs/app/tauri.conf.json 의 version. 올려야 자동 업데이트가 새 버전으로 알아본다
 #   처음 한 번 준비: guides/RELEASE.md 의 "PC Rust 판 베타"
 name: Release (PC Rust 베타)
@@ -40,14 +40,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/get-llama.mjs
 
-      # Tauri 는 함께 넣을 실행 파일 이름 끝에 대상(target triple)이 붙어 있기를 바란다. 설치하면 MemoKing 옆에 memoking-mcp.exe 로 놓인다
-      - name: MCP 서버 빌드
-        working-directory: desktop-rs
-        run: |
-          cargo build --release -p memoking-mcp
-          mkdir -p app/binaries
-          cp target/release/memoking-mcp.exe app/binaries/memoking-mcp-x86_64-pc-windows-msvc.exe
-
       # 배포판에만 쓰는 설정: 이름(Electron 판과 바로가기, 설치 폴더가 겹치지 않게), 함께 넣을 파일, 업데이트 파일 만들기
       #   서명 공개 열쇠와 업데이트 주소는 tauri.conf.json 에 있다. 개인 열쇠(비밀값)가 없으면 업데이트 파일 없이 설치 파일만 만든다
       - name: 배포 설정 만들기
@@ -61,7 +53,6 @@ jobs:
               productName: "MemoKing Beta",
               bundle: {
                 resources: { "../../desktop/vendor/llama/": "llama/" },
-                externalBin: ["binaries/memoking-mcp"],
                 createUpdaterArtifacts: signed,
               },
             };

@@ -170,7 +170,6 @@ fn app_settings(app: &AppHandle) -> Value {
         "workLife": s("workLife") == true,
         "workHours": crate::settings::normalize_hours(&s("workHours")),
         "keymap": Value::Object(crate::settings::clean_overrides(&s("keymap"))),
-        "mcp": crate::services::mcp_status(app),
         "version": app.package_info().version.to_string(),
     })
 }
