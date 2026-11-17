@@ -56,7 +56,7 @@ pub fn start(app: &AppHandle) {
     });
 }
 
-fn rescan(app: &AppHandle) {
+pub fn rescan(app: &AppHandle) {
     let st = state(app);
     let (external, removed) = {
         let mut guard = st.vault.lock().unwrap();
@@ -167,13 +167,14 @@ fn app_settings(app: &AppHandle) -> Value {
 
 pub fn push_list(app: &AppHandle) {
     crate::index::mark(); // 메모가 바뀌면 목록에 알릴 때마다 — 색인도 다시
+    crate::drive::request(1000); // Google Drive 에도 (메모 저장은 이미 0.6초 모아서 오므로 1초면 충분)
     let _ = app.emit_to("list", "memos:changed", [list_memos(app)]);
 }
 
 // 창 이름에 쓸 수 있는 글자만 — 메모 id 는 다른 앱이 쓴 아무 글자일 수 있다
 static NEXT_NOTE: AtomicU64 = AtomicU64::new(1);
 
-fn query_escape(s: &str) -> String {
+pub fn query_escape(s: &str) -> String {
     s.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect()
 }
 

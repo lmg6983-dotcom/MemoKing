@@ -20,3 +20,12 @@ serde_json = "1"
 base64 = "0.23"
 fancy-regex = "0.20"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Google Drive 동기화: Google 과 주고받기 · 로그인(PKCE)
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+getrandom = "0.3"
+sha2 = "0.10"
+
+# Google 로그인 토큰을 Electron safeStorage 와 같게 감싼다 (DPAPI 로 감싼 열쇠 + AES-256-GCM)
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+aes-gcm = "0.10"
