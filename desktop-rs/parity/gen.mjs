@@ -16,8 +16,11 @@ import { hotkeyCopyText } from '../../app/js/core/memo-hotkeys.js';
 import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, pendingAlerts, fallbackAlert } from '../../app/js/core/reminders.js';
 import { indexOutput, tokenize, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { NOUNS } from '../../app/js/core/korean-nouns.js';
-import { suggestTagsFor, matchExisting } from '../../app/js/core/tag-suggest.js';
+import { suggestTagsFor, matchExisting, appendTags, removeTags } from '../../app/js/core/tag-suggest.js';
 import { autoTagsFor } from '../../app/js/core/auto-tags.js';
+import { noThink, sseText, engineError, chatBody } from '../../app/js/core/llama-client.js';
+import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibleFix } from '../../app/js/core/ai-write.js';
+import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -221,3 +224,42 @@ write('tag_match', ['memoking', '미팅', '회의록', '쇼핑', '프로잭트',
   return { word, name: m ? m.name : null, rank: m ? m.rank : null };
 }));
 
+// 로컬 AI 에 묻는 말 · 답 거르기 (llama-client · ai-write · ai-tags)
+const thinks = ['답', '  <think>생각\n중</think>\n답 ', '<think>아직 생각 중', '앞 <think>a</think> 가운데 <think>b</think> 끝', ''];
+const sse = ['data: {"choices":[{"delta":{"content":"안녕"}}]}', 'data: [DONE]', '', ': ping', 'data: {"choices":[{"delta":{}}]}', 'data:   {"choices":[]}  '];
+const logs = [["llama_model_load: error: unknown model architecture: 'gemma9'", 1], ['CUDA error: out of memory', 3221225477], ['ggml: failed to allocate buffer', -1], ['something else', 1]];
+const writeTexts = ['', '오늘 회의 했는데 됬어요.', '되니 ?', '#업무 https://a.com/x 회의록 정리 해야됨', '   ', '긴 글 '.repeat(400)];
+const fixes = [['오늘 회의 했는데 됬어요.', '오늘 회의했는데 됐어요.'], ['되니 ?', '네, 잘 돼요'], ['되니 ?', '되니?'], ['#업무 회의', '업무 회의'], ['회의록', '會議錄'], ['abc', ''],
+  ['https://a.com/x 링크', 'https://a.com/x 링크.'], ['짧은 글', '아주 아주 길게 늘어난 다른 글'], ['한자 漢字 그대로', '한자 漢字 그대로.'], ['맞춤법 검사 할 글 입니다', '맞춤법 검사할 글입니다']];
+const outs = ['  네, 요청하신 대로 정리했습니다:\n\n## 결과\n- 하나', '```markdown\n## 제목\n본문\n```', '```\n코드\n```', '다음은 요약입니다：\n내용', '그대로', '알겠습니다. 아래는 표예요:\n\n| a |'];
+const drafts = [
+  { title: '회의', body: '', request: '', selection: '' },
+  { title: '', body: '오늘 회의 내용\n- 일정 확정', request: '요약해 줘', selection: '' },
+  { title: '장보기', body: '우유', request: '이어서 써 줘', selection: '' },
+  { title: '장보기', body: '우유', request: '이어서 목록으로 정리', selection: '' },
+  { title: 't', body: '본문', request: '영어로', selection: '  고른 글  ' },
+  { title: '긴 글', body: '가'.repeat(2000), request: '짧게', selection: '' },
+  { title: '', body: '   ', request: '  ', selection: '' },
+];
+write('ai_text', [
+  ...thinks.map((text) => ({ kind: 'noThink', text, out: noThink(text) })),
+  ...sse.map((text) => ({ kind: 'sse', text, out: sseText(text) })),
+  ...logs.map(([text, code]) => ({ kind: 'engine', text, code: String(code), out: engineError(text, code) })),
+  ...outs.map((text) => ({ kind: 'clean', text, out: cleanWriteOutput(text) })),
+  ...fixes.map(([before, after]) => ({ kind: 'fix', text: before, after, out: plausibleFix(before, after) })),
+  ...writeTexts.map((text) => ({ kind: 'spell', text, out: spellMessages(text) })),
+  ...['해요체', '합니다체', '간결체', '보고서체', '반말체'].map((style) => ({ kind: 'style', text: '글', style, out: styleMessages('글', style) })),
+  ...drafts.map((d) => ({ kind: 'draft', ...d, out: draftMessages(d) })),
+  { kind: 'body', out: chatBody([{ role: 'user', content: 'x' }], { maxTokens: 80 }) },
+  { kind: 'bodySchema', out: chatBody([], { maxTokens: 60, temperature: 0, schema: { type: 'object' }, stream: true }) },
+  ...['# 제목\n\n본문\n', '# 제목\n\n#회의\n', '#회의  ', '', '본문 #안\n\n\n', '# 제목\n\n#회의 #업무 #일정\n\n', '  #a #B\t#c  \n끝\n#b #d'].flatMap((body) => [
+    { kind: 'append', text: body, names: ['업무', '1', '회의'], out: appendTags(body, ['업무', '1', '회의']) },
+    { kind: 'append', text: body, names: [], out: appendTags(body, []) },
+    { kind: 'remove', text: body, names: ['회의', 'b', '업무'], out: removeTags(body, ['회의', 'b', '업무']) },
+  ]),
+]);
+const answers = ['{"tags":["회의","#일정 관리","메모","프로잭트","캡쳐","x",5,null,"회의록","업무","가족"]}', '{"tags":[]}', 'not json', '{"tags":"회의"}', '{"tags":["미팅","장보기","여행계획","스크린샷"]}'];
+write('ai_tags', tagSets.flatMap(([set, memos]) => tagTargets.slice(0, 14).map(([body, id]) => {
+  const req = aiTagRequest(body, memos, { excludeId: id ?? undefined });
+  return { set, body, id, messages: req.messages, schema: req.schema, existing: req.existing, grounded: [...req.grounded], results: answers.map((a) => aiTagResult(a, req.existing, body, req.grounded)) };
+})));

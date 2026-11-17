@@ -5,10 +5,12 @@ use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter, Webview};
 
-// async: Windows 에서는 동기 명령 안에서 창을 만들면(메모 창 열기) 멈춘다 — 비동기 명령은 다른 스레드에서 돈다
+// async: Windows 에서는 동기 명령 안에서 창을 만들면(메모 창 열기) 멈춘다 — 비동기 명령은 다른 스레드에서 돈다.
+//   몇 분 걸리는 채널(AI 답 · 모델 받기)이 비동기 일꾼을 붙잡지 않게 막아도 되는 스레드에서
 #[tauri::command]
 pub async fn ipc(app: AppHandle, webview: Webview, channel: String, args: Vec<Value>) -> Result<Value, String> {
-    dispatch(&app, webview.label(), &channel, args)
+    let label = webview.label().to_string();
+    tauri::async_runtime::spawn_blocking(move || dispatch(&app, &label, &channel, args)).await.map_err(|e| e.to_string())?
 }
 
 /// memoking --smoke : 앱 안 점검 (smoke.js)

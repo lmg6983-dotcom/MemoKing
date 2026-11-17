@@ -102,8 +102,14 @@ fn main() {
             os::start(app, &list);
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("메모킹을 켜지 못했어요");
+        .build(tauri::generate_context!())
+        .expect("메모킹을 켜지 못했어요")
+        .run(|_, e| {
+            // AI 엔진은 따로 도는 프로세스라 메모킹을 꺼도 남는다
+            if let tauri::RunEvent::Exit = e {
+                ai::stop();
+            }
+        });
 }
 
 

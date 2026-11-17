@@ -281,3 +281,64 @@ fn tag_suggest() {
     report("tag_match", fails, cases.len());
 }
 
+#[test]
+fn ai_text() {
+    use memoking_core::ai::*;
+    let cases = fixtures("ai_text");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let s = |k: &str| c[k].as_str().unwrap_or_default();
+            let got = match s("kind") {
+                "noThink" => json!(no_think(s("text"))),
+                "sse" => json!(sse_text(s("text")).unwrap()),
+                "engine" => json!(engine_error(s("text"), s("code"))),
+                "clean" => json!(clean_write_output(s("text"))),
+                "fix" => json!(plausible_fix(s("text"), s("after"))),
+                "spell" => spell_messages(s("text")),
+                "style" => style_messages(s("text"), s("style")),
+                "draft" => draft_messages(s("title"), s("body"), s("request"), s("selection")),
+                "append" | "remove" => {
+                    use memoking_core::tag_suggest::{append_tags, remove_tags};
+                    let names: Vec<String> = c["names"].as_array().unwrap().iter().map(|n| n.as_str().unwrap().to_string()).collect();
+                    json!(if s("kind") == "append" { append_tags(s("text"), &names) } else { remove_tags(s("text"), &names) })
+                }
+                "body" => chat_body(&json!([{ "role": "user", "content": "x" }]), 80, 0.3, None, false),
+                _ => chat_body(&json!([]), 60, 0.0, Some(&json!({ "type": "object" })), true),
+            };
+            (got != c["out"]).then(|| format!("{} {:?}\n  JS  : {}\n  Rust: {got}", s("kind"), s("text"), c["out"]))
+        })
+        .collect();
+    report("ai_text", fails, cases.len());
+}
+
+#[test]
+fn ai_tags() {
+    use memoking_core::ai::*;
+    let sets: std::collections::HashMap<String, Vec<(String, String)>> = fixtures("tag_sets")
+        .iter()
+        .map(|s| (s["name"].as_str().unwrap().to_string(), s["memos"].as_array().unwrap().iter().map(|m| (m["id"].as_str().unwrap().to_string(), m["body"].as_str().unwrap().to_string())).collect()))
+        .collect();
+    let answers = [r##"{"tags":["회의","#일정 관리","메모","프로잭트","캡쳐","x",5,null,"회의록","업무","가족"]}"##, r##"{"tags":[]}"##, "not json", r##"{"tags":"회의"}"##, r##"{"tags":["미팅","장보기","여행계획","스크린샷"]}"##];
+    let cases = fixtures("ai_tags");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let (memos, body) = (&sets[c["set"].as_str().unwrap()], c["body"].as_str().unwrap());
+            let req = ai_tag_request(body, memos, c["id"].as_str());
+            let mut grounded: Vec<&String> = req.grounded.iter().collect();
+            grounded.sort();
+            let mut want: Vec<&str> = c["grounded"].as_array().unwrap().iter().map(|g| g.as_str().unwrap()).collect();
+            want.sort();
+            let got = json!({
+                "messages": req.messages,
+                "schema": req.schema,
+                "existing": req.existing.iter().map(|e| json!({ "name": e.name, "count": e.count })).collect::<Vec<_>>(),
+                "results": answers.map(|a| ai_tag_result(a, &req.existing, body, &req.grounded)),
+            });
+            let diff: Vec<String> = got.as_object().unwrap().iter().filter(|(k, v)| c[k.as_str()] != **v).map(|(k, v)| format!("  {k}\n    JS  : {}\n    Rust: {v}", c[k.as_str()])).collect();
+            (!diff.is_empty() || grounded != want).then(|| format!("{} {body:?}\n{}", c["set"], diff.join("\n")))
+        })
+        .collect();
+    report("ai_tags", fails, cases.len());
+}

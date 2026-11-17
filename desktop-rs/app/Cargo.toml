@@ -20,3 +20,7 @@ serde_json = "1"
 base64 = "0.23"
 fancy-regex = "0.20"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# 로컬 AI: 엔진(llama-server)과 말하기 · 기본 모델 받기 (시스템 프록시 · 인증서)
+ureq = { version = "3", features = ["platform-verifier", "win-system-proxy"] }
+sha2 = "0.10"
+getrandom = "0.3"

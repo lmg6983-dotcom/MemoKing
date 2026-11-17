@@ -422,6 +422,38 @@ pub fn suggest_tags_for(body: &str, memos: &[(String, String)], limit: usize, ex
         .collect()
 }
 
+static TAG_LINE: LazyLock<Regex> = LazyLock::new(|| re(r"^(\s*#[^\s#]+)+\s*$"));
+
+/// 본문 끝에 태그 줄을 붙인 새 본문 (끝 줄이 이미 태그만 있는 줄이면 그 줄에 이어서)
+pub fn append_tags(body: &str, names: &[String]) -> String {
+    let tags: Vec<String> = names.iter().filter(|n| is_valid_tag(n)).map(|n| format!("#{n}")).collect();
+    if tags.is_empty() {
+        return body.to_string();
+    }
+    let text = js::trim_end(body);
+    let (head, last) = text.rsplit_once('\n').map_or(("", text), |(h, l)| (h, l));
+    if TAG_LINE.is_match(last).unwrap_or(false) && !extract_tags(last).is_empty() {
+        let sep = if text.contains('\n') { "\n" } else { "" };
+        return format!("{head}{sep}{} {}\n", js::trim_end(last), tags.join(" "));
+    }
+    format!("{text}\n\n{}\n", tags.join(" "))
+}
+
+/// 태그만 있는 줄(append_tags 가 붙인 줄)에서 그 태그들을 뺀 새 본문 — 빈 줄이 되면 그 줄도 (AI 태그 모두 지우기)
+pub fn remove_tags(body: &str, names: &[String]) -> String {
+    let drop: HashSet<String> = names.iter().map(|n| n.to_lowercase()).collect();
+    let lines: Vec<String> = body
+        .split('\n')
+        .map(|line| {
+            if !TAG_LINE.is_match(line).unwrap_or(false) {
+                return line.to_string();
+            }
+            js::trim(line).split(js::is_space).filter(|t| !t.is_empty() && !drop.contains(&t.chars().skip(1).collect::<String>().to_lowercase())).collect::<Vec<_>>().join(" ")
+        })
+        .collect();
+    format!("{}\n", js::trim_end(&lines.join("\n")))
+}
+
 // ---------- auto-tags.js ----------
 
 /// 밖에서 들어온 메모(화면 캡처 · 링크 · 음성 · 공유)에 저절로 달 태그 (본문에 이미 있는 것은 빼고)
