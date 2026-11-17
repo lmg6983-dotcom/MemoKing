@@ -877,3 +877,31 @@ fn update() {
         .collect();
     report("update", fails, cases.len());
 }
+
+#[test]
+fn date_detect() {
+    use memoking_core::date_detect::*;
+    let nows = ["2026-10-10T10:00:00+09:00", "2026-11-17T08:30:00+09:00", "2026-11-22T21:00:00+09:00", "2026-12-31T23:50:00+09:00", "2027-01-31T12:00:00+09:00"];
+    let cases = fixtures("date_detect");
+    let mut fails = vec![];
+    for c in &cases {
+        let text = c["text"].as_str().unwrap();
+        let u16 = |b: usize| text[..b].encode_utf16().count();
+        for (i, iso) in nows.iter().enumerate() {
+            let now = memoking_core::time::parse_js_date(iso).unwrap().with_timezone(&chrono::Local);
+            let got: Vec<Value> = find_dates(text, now)
+                .iter()
+                .map(|d| {
+                    json!({
+                        "from": u16(d.from), "to": u16(d.to), "text": d.text, "at": d.at.timestamp_millis(), "hasTime": d.has_time,
+                        "end": d.end.map(|e| e.timestamp_millis()), "repeat": d.repeat, "title": guess_title(text, d.from, d.to),
+                    })
+                })
+                .collect();
+            if json!(got) != c["out"][i] {
+                fails.push(format!("{text:?} @ {iso}\n  JS  : {}\n  Rust: {}", c["out"][i], json!(got)));
+            }
+        }
+    }
+    report("date_detect", fails, cases.len() * nows.len());
+}
