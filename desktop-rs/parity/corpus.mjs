@@ -83,6 +83,13 @@ export function corpus() {
     '---\nid: x\n---\n깨진 머리말이 본문에 남은 경우',
     '***\n구분선 뒤 제목',
     'a'.repeat(200),
+    '#태그 #업무 #1 #_ #a-b- #c__ (#괄호) "#따옴표" **#굵게** a#낱말 https://a.com/#x `#코드` <span style="color: #e03131">빨강</span> \\#이스케이프 #Tag #tag',
+    '    #들여쓴코드\n\t#탭코드\n~~~\n#울타리\n~~~\n#밖 ①#동그라미 ١٢#숫자',
+    '- [ ] 하나\n* [x] 둘\n+ [X] 셋\n1. [ ] 넷\n2) [x] 다섯\n-[ ] 아님\n- [ ]아님\n```\n- [ ] 코드\n~~~\n- [ ] 아직 코드\n```\n- [x] 밖',
+    '# 비밀\n\n🔒 잠긴 메모예요. 메모킹에서 비밀번호를 넣으면 열려요.\n\n<!-- memoking-lock v1 n=310000 s=AAAA i=BBBB c=CCCC== -->\n',
+    '<!-- memoking-lock v1 n=310000 s=AAAA i=BBBB c=CCCC== -->',
+    '앞에 글\n<!-- memoking-lock v1 n=310000 s=AAAA i=BBBB c=CCCC== -->',
+    '![a](attachments/%ED%95%9C.png) ![b](attachments/%E0%A4%A.png) ![c]( <attachments/sp ace.jpg> ) ![d](attachments/q.webm "x") ![동영상](attachments/v.webm) ![t](attachments/t.png "pdf attachments/doc.pdf") [x](memo.md) [y](attachments/f.zip)',
   ];
   return [...files, ...bodies, ...lines];
 }

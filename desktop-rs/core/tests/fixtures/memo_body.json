@@ -41,7 +41,17 @@
     "title": ""
    }
   ],
-  "blank": false
+  "blank": false,
+  "tags": [
+   "태그",
+   "업무",
+   "해시"
+  ],
+  "tasks": {
+   "total": 3,
+   "done": 1
+  },
+  "locked": false
  },
  {
   "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
@@ -85,7 +95,17 @@
     "title": ""
    }
   ],
-  "blank": false
+  "blank": false,
+  "tags": [
+   "태그",
+   "업무",
+   "해시"
+  ],
+  "tasks": {
+   "total": 3,
+   "done": 1
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -95,7 +115,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -105,7 +131,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -115,7 +147,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -125,7 +163,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -135,7 +179,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -145,7 +195,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -155,7 +211,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -165,7 +227,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -175,7 +243,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -185,7 +259,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -195,7 +275,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문",
@@ -205,7 +291,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "---\nid: [broken\n---\n# 깨진 머리말",
@@ -216,7 +308,13 @@
   "title": "깨진 머리말",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "---\n- just\n- a list\n---\n목록 머리말",
@@ -228,7 +326,13 @@
   "title": "목록 머리말",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "---\n---\n빈 머리말",
@@ -238,7 +342,13 @@
   "title": "빈 머리말",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "---\n\n위는 구분선으로 시작한 글\n\n---\n아래",
@@ -249,7 +359,13 @@
   "title": "위는 구분선으로 시작한 글",
   "preview": "아래",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "BOM 이 붙은 파일",
@@ -259,7 +375,13 @@
   "title": "BOM 이 붙은 파일",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "줄 끝이 CRLF\r\n둘째 줄\r\n",
@@ -270,7 +392,13 @@
   "title": "줄 끝이 CRLF",
   "preview": "둘째 줄",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "머리말 없는 글\n\n둘째 문단",
@@ -281,7 +409,13 @@
   "title": "머리말 없는 글",
   "preview": "둘째 문단",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "",
@@ -289,7 +423,13 @@
   "title": "제목 없음",
   "preview": "",
   "media": [],
-  "blank": true
+  "blank": true,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "   \n\n",
@@ -297,7 +437,13 @@
   "title": "제목 없음",
   "preview": "",
   "media": [],
-  "blank": true
+  "blank": true,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "---\nid: dup\nid: dup2\n---\n같은 키 두 번",
@@ -309,7 +455,13 @@
   "title": "같은 키 두 번",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문 앞 빈칸",
@@ -319,7 +471,13 @@
   "title": "본문 앞 빈칸",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "",
@@ -327,7 +485,13 @@
   "title": "제목 없음",
   "preview": "",
   "media": [],
-  "blank": true
+  "blank": true,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "본문\n\n\n",
@@ -337,7 +501,13 @@
   "title": "본문",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "# 제목\n\n본문 첫 줄\n출처: 어딘가\n$x^2$ 수식",
@@ -350,7 +520,13 @@
   "title": "제목",
   "preview": "본문 첫 줄 x^2 수식",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "```\n코드만\n```\n\n뒤 글",
@@ -361,7 +537,13 @@
   "title": "코드만",
   "preview": "뒤 글",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "<!-- 숨은 주석 -->\n보이는 글",
@@ -371,7 +553,13 @@
   "title": "보이는 글",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "- [ ] \n- [x] 끝냄\n  - [ ] 하위",
@@ -382,7 +570,13 @@
   "title": "끝냄",
   "preview": "하위",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 3,
+   "done": 1
+  },
+  "locked": false
  },
  {
   "body": "| a | b |\n| --- | --- |\n| 1 | 2 |",
@@ -393,7 +587,13 @@
   "title": "a, b",
   "preview": "1, 2",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "![](attachments/x.mp4)\n![소리](attachments/y.m4a)\n[문서](attachments/z.pdf)\n![사진](attachments/p.PNG \"album page\")\n![](https://e.com/a.png)\n[웹](https://e.com)",
@@ -429,7 +629,13 @@
     "title": "album page"
    }
   ],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "github_pat_ABC_def snake_case _강조_ __굵게__ *별* **굵은별** ~~취소~~",
@@ -439,7 +645,13 @@
   "title": "github_pat_ABC_def snake_case 강조 굵게 별 굵은별 취소",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "줄 끝 역슬래시\\\n다음",
@@ -450,7 +662,13 @@
   "title": "줄 끝 역슬래시",
   "preview": "다음",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "&#x20;&nbsp;앞 띄움 &amp; &lt;b&gt;",
@@ -460,7 +678,13 @@
   "title": "앞 띄움 & <b>",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "<https://naver.com> 와 <a@b.com>",
@@ -470,7 +694,13 @@
   "title": "https://naver.com 와 a@b.com",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "깨진 머리말이 본문에 남은 경우",
@@ -480,7 +710,13 @@
   "title": "깨진 머리말이 본문에 남은 경우",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "***\n구분선 뒤 제목",
@@ -490,7 +726,13 @@
   "title": "구분선 뒤 제목",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -500,7 +742,191 @@
   "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
+ },
+ {
+  "body": "#태그 #업무 #1 #_ #a-b- #c__ (#괄호) \"#따옴표\" **#굵게** a#낱말 https://a.com/#x `#코드` <span style=\"color: #e03131\">빨강</span> \\#이스케이프 #Tag #tag",
+  "plainLines": [
+   "#태그 #업무 #1 #_ #a-b- #c__ (#괄호) \"#따옴표\" #굵게 a#낱말 https://a.com/#x #코드 빨강 #이스케이프 #Tag #tag"
+  ],
+  "title": "#태그 #업무 #1 #_ #a-b- #c__ (#괄호) \"#따옴표\" #굵게 a#낱말 https://a.com/#x #코드 빨강 #이스케이프 #T",
+  "preview": "",
+  "media": [],
+  "blank": false,
+  "tags": [
+   "태그",
+   "업무",
+   "a-b",
+   "c",
+   "괄호",
+   "따옴표",
+   "굵게",
+   "이스케이프",
+   "Tag"
+  ],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
+ },
+ {
+  "body": "    #들여쓴코드\n\t#탭코드\n~~~\n#울타리\n~~~\n#밖 ①#동그라미 ١٢#숫자",
+  "plainLines": [
+   "#들여쓴코드",
+   "#탭코드",
+   "#울타리",
+   "#밖 ①#동그라미 ١٢#숫자"
+  ],
+  "title": "#들여쓴코드",
+  "preview": "#탭코드 #울타리 #밖 ①#동그라미 ١٢#숫자",
+  "media": [],
+  "blank": false,
+  "tags": [
+   "밖"
+  ],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
+ },
+ {
+  "body": "- [ ] 하나\n* [x] 둘\n+ [X] 셋\n1. [ ] 넷\n2) [x] 다섯\n-[ ] 아님\n- [ ]아님\n```\n- [ ] 코드\n~~~\n- [ ] 아직 코드\n```\n- [x] 밖",
+  "plainLines": [
+   "하나",
+   "둘",
+   "셋",
+   "넷",
+   "다섯",
+   "-[ ] 아님",
+   "[ ]아님",
+   "- [ ] 코드",
+   "아직 코드",
+   "- [x] 밖"
+  ],
+  "title": "하나",
+  "preview": "둘 셋 넷 다섯 -[ ] 아님 [ ]아님 - [ ] 코드 아직 코드 - [x] 밖",
+  "media": [],
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 6,
+   "done": 4
+  },
+  "locked": false
+ },
+ {
+  "body": "# 비밀\n\n🔒 잠긴 메모예요. 메모킹에서 비밀번호를 넣으면 열려요.\n\n<!-- memoking-lock v1 n=310000 s=AAAA i=BBBB c=CCCC== -->\n",
+  "plainLines": [
+   "비밀",
+   "🔒 잠긴 메모예요. 메모킹에서 비밀번호를 넣으면 열려요."
+  ],
+  "title": "비밀",
+  "preview": "🔒 잠긴 메모예요. 메모킹에서 비밀번호를 넣으면 열려요.",
+  "media": [],
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": true
+ },
+ {
+  "body": "<!-- memoking-lock v1 n=310000 s=AAAA i=BBBB c=CCCC== -->",
+  "plainLines": [],
+  "title": "제목 없음",
+  "preview": "",
+  "media": [],
+  "blank": true,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": true
+ },
+ {
+  "body": "앞에 글\n<!-- memoking-lock v1 n=310000 s=AAAA i=BBBB c=CCCC== -->",
+  "plainLines": [
+   "앞에 글"
+  ],
+  "title": "앞에 글",
+  "preview": "",
+  "media": [],
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
+ },
+ {
+  "body": "![a](attachments/%ED%95%9C.png) ![b](attachments/%E0%A4%A.png) ![c]( <attachments/sp ace.jpg> ) ![d](attachments/q.webm \"x\") ![동영상](attachments/v.webm) ![t](attachments/t.png \"pdf attachments/doc.pdf\") [x](memo.md) [y](attachments/f.zip)",
+  "plainLines": [
+   "x y"
+  ],
+  "title": "x y",
+  "preview": "",
+  "media": [
+   {
+    "src": "attachments/한.png",
+    "alt": "a",
+    "kind": "image",
+    "title": ""
+   },
+   {
+    "src": "attachments/%E0%A4%A.png",
+    "alt": "b",
+    "kind": "image",
+    "title": ""
+   },
+   {
+    "src": "attachments/q.webm",
+    "alt": "d",
+    "kind": "audio",
+    "title": "x"
+   },
+   {
+    "src": "attachments/v.webm",
+    "alt": "동영상",
+    "kind": "video",
+    "title": ""
+   },
+   {
+    "src": "attachments/t.png",
+    "alt": "t",
+    "kind": "image",
+    "title": "pdf attachments/doc.pdf"
+   },
+   {
+    "src": "attachments/doc.pdf",
+    "alt": "t",
+    "kind": "file",
+    "title": ""
+   },
+   {
+    "src": "attachments/f.zip",
+    "alt": "y",
+    "kind": "file",
+    "title": ""
+   }
+  ],
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "# 왕 테스트",
@@ -510,7 +936,13 @@
   "title": "왕 테스트",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>",
@@ -520,7 +952,13 @@
   "title": "일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "- 점 하나",
@@ -530,7 +968,13 @@
   "title": "점 하나",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "  - 하위 점",
@@ -540,7 +984,13 @@
   "title": "하위 점",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "    - 하위의 하위",
@@ -550,7 +1000,13 @@
   "title": "하위의 하위",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "- 점 둘",
@@ -560,7 +1016,13 @@
   "title": "점 둘",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "- [ ] 할 일",
@@ -570,7 +1032,13 @@
   "title": "할 일",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 1,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "- [x] 끝낸 일",
@@ -580,7 +1048,13 @@
   "title": "끝낸 일",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 1,
+   "done": 1
+  },
+  "locked": false
  },
  {
   "body": "- [ ]",
@@ -588,7 +1062,13 @@
   "title": "제목 없음",
   "preview": "",
   "media": [],
-  "blank": true
+  "blank": true,
+  "tags": [],
+  "tasks": {
+   "total": 1,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "1. 첫째",
@@ -598,7 +1078,13 @@
   "title": "첫째",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "2. 둘째",
@@ -608,7 +1094,13 @@
   "title": "둘째",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "   1. 둘째의 하위",
@@ -618,7 +1110,13 @@
   "title": "둘째의 하위",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "> 인용 문장",
@@ -628,7 +1126,13 @@
   "title": "인용 문장",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "> 두 번째 줄",
@@ -638,7 +1142,13 @@
   "title": "두 번째 줄",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "| 품목 | 가격 |",
@@ -648,7 +1158,13 @@
   "title": "품목, 가격",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "| --- | ---: |",
@@ -656,7 +1172,13 @@
   "title": "제목 없음",
   "preview": "",
   "media": [],
-  "blank": true
+  "blank": true,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "| 사과 | 1,000원 |",
@@ -666,7 +1188,13 @@
   "title": "사과, 1,000원",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "| 배 | 2,000원 |",
@@ -676,7 +1204,13 @@
   "title": "배, 2,000원",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "수식 $x^2 + y^2$ 그리고 블록:",
@@ -686,7 +1220,13 @@
   "title": "수식 $x^2 + y^2$ 그리고 블록:",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "$$",
@@ -696,7 +1236,13 @@
   "title": "$$",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "\\int_0^1 x\\,dx",
@@ -706,7 +1252,13 @@
   "title": "\\int_0^1 x\\,dx",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "$$",
@@ -716,7 +1268,13 @@
   "title": "$$",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "```js",
@@ -724,7 +1282,13 @@
   "title": "제목 없음",
   "preview": "",
   "media": [],
-  "blank": true
+  "blank": true,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "const a = 1; // 코드 # 태그 아님",
@@ -734,7 +1298,13 @@
   "title": "const a = 1; // 코드 # 태그 아님",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "```",
@@ -742,7 +1312,13 @@
   "title": "제목 없음",
   "preview": "",
   "media": [],
-  "blank": true
+  "blank": true,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "[링크 글자](https://example.com) 그리고 https://naver.com 맨주소",
@@ -752,7 +1328,13 @@
   "title": "링크 글자 그리고 https://naver.com 맨주소",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "![그림](attachments/a.png)",
@@ -767,7 +1349,13 @@
     "title": ""
    }
   ],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "줄바꿈\\",
@@ -777,7 +1365,13 @@
   "title": "줄바꿈",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "다음 줄",
@@ -787,7 +1381,13 @@
   "title": "다음 줄",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]",
@@ -797,7 +1397,13 @@
   "title": "이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "#태그 #업무 문장 속 #해시 그리고 C# 언어",
@@ -807,7 +1413,17 @@
   "title": "#태그 #업무 문장 속 #해시 그리고 C# 언어",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [
+   "태그",
+   "업무",
+   "해시"
+  ],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "---",
@@ -815,7 +1431,13 @@
   "title": "제목 없음",
   "preview": "",
   "media": [],
-  "blank": true
+  "blank": true,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호",
@@ -825,7 +1447,13 @@
   "title": "이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  },
  {
   "body": "끝 문단 ,,, 말줄임 ..",
@@ -835,6 +1463,12 @@
   "title": "끝 문단 ,,, 말줄임 ..",
   "preview": "",
   "media": [],
-  "blank": false
+  "blank": false,
+  "tags": [],
+  "tasks": {
+   "total": 0,
+   "done": 0
+  },
+  "locked": false
  }
 ]

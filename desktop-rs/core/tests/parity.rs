@@ -57,3 +57,29 @@ fn memo_file() {
         .collect();
     report("memo_file", fails, cases.len());
 }
+
+#[test]
+fn memo_body() {
+    use memoking_core::body::*;
+    let cases = fixtures("memo_body");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let body = c["body"].as_str().unwrap();
+            let got = json!({
+                "body": body,
+                "plainLines": plain_lines(body, usize::MAX),
+                "title": extract_title(body),
+                "preview": extract_preview(body, 1200),
+                "media": extract_media(body),
+                "blank": is_blank_body(body),
+                "tags": extract_tags(body),
+                "tasks": task_progress(body),
+                "locked": is_locked_body(body),
+            });
+            let diff: Vec<String> = got.as_object().unwrap().iter().filter(|(k, v)| c[k.as_str()] != **v).map(|(k, v)| format!("  {k}\n    JS  : {}\n    Rust: {v}", c[k.as_str()])).collect();
+            (!diff.is_empty()).then(|| format!("{:?}\n{}", body.chars().take(60).collect::<String>(), diff.join("\n")))
+        })
+        .collect();
+    report("memo_body", fails, cases.len());
+}

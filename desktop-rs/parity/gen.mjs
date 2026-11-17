@@ -5,6 +5,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { stringify } from '../../app/vendor/yaml.js';
 import * as mf from '../../app/js/core/memo-file.js';
+import { extractTags } from '../../app/js/core/tags.js';
+import { taskProgress } from '../../app/js/core/tasks.js';
+import { isLockedBody } from '../../app/js/core/memo-lock.js';
 import { corpus, yamlStrings } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -41,5 +44,8 @@ write('memo_body', corpus().map((text) => {
     preview: mf.extractPreview(body, 1200),
     media: mf.extractMedia(body),
     blank: mf.isBlankBody(body),
+    tags: extractTags(body),
+    tasks: taskProgress(body),
+    locked: isLockedBody(body),
   };
 }));
