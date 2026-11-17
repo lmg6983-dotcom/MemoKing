@@ -16,6 +16,8 @@ import { hotkeyCopyText } from '../../app/js/core/memo-hotkeys.js';
 import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, pendingAlerts, fallbackAlert } from '../../app/js/core/reminders.js';
 import { indexOutput, tokenize, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { NOUNS } from '../../app/js/core/korean-nouns.js';
+import { suggestTagsFor, matchExisting } from '../../app/js/core/tag-suggest.js';
+import { autoTagsFor } from '../../app/js/core/auto-tags.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -181,3 +183,41 @@ const shareBodies = [...corpus().map((t) => mf.parseMemoFile(t).body),
   '<u>밑줄</u><mark>형광</mark><span style="color:red">빨강</span><br>다음',
 ];
 write('share_text', shareBodies.map((body) => ({ body, share: shareText(body), copy: hotkeyCopyText(body) })));
+
+// 태그 추천 · 저절로 다는 태그: 메모 묶음 × 새 메모 (본문 · id)
+const tagSets = [
+  ['work', [
+    { id: 'a', body: '# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의' },
+    { id: 'b', body: '# 기획 회의록\n\n출시 일정과 디자인 검토 회의 #업무 #회의' },
+    { id: 'c', body: '# 장보기\n\n우유 계란 대파 두부 #장보기 #집' },
+    { id: 'd', body: '# 마트\n\n두부 우유 사과 #장보기' },
+    { id: 'e', body: '# 예전 화면\n\n오류 화면 #스크린샷' },
+    { id: 'f', body: '# MemoKing 개발\n\n코딩 버그 수정 배포 #MemoKing #개발 #업무' },
+    { id: 'g', body: '# 프로젝트 회고\n\n일정 지연 원인 #프로잭트 #업무' },
+    { id: 'h', body: '# 제주 여행\n\n숙소 예약 렌터카 #여행 #가족' },
+  ]],
+  ['corpus', corpus().map((text, i) => ({ id: `c${i}`, body: mf.parseMemoFile(text).body }))],
+  ['none', []],
+];
+const tagTargets = [
+  ['# 내일 회의\n\n디자인 검토 회의 준비할 것', null], ['# 저녁거리\n\n우유 두부 계란 사오기', null], ['짧음', null],
+  ['# 회의 준비\n\n안건 회의 정리 #회의', null], ['# 여행 계획\n\n제주도 여행 숙소 예약 여행 일정', null],
+  ['# 거래처 미팅\n\n다음 분기 계획 미팅 메모', null], ['![화면 캡처](attachments/a.png)', null], ['오류 화면 #스크린샷', null],
+  ['# 요리\n\n김치찌개 끓이는 법 정리해 둔 것', null], ['# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의', 'a'],
+  ['https://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리', null], ['폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년', null],
+  ['# memoking 버그\n\n배포 전에 코딩 다시 확인하기 #개발', 'f'],
+  ...corpus().slice(0, 40).map((t, i) => [mf.parseMemoFile(t).body, `c${i}`]),
+];
+write('tag_sets', tagSets.map(([name, memos]) => ({ name, memos })));
+const SOURCES = ['capture', 'link', 'audio', 'share', null];
+write('tag_suggest', tagSets.flatMap(([set, memos]) => tagTargets.map(([body, id]) => ({
+  set, body, id,
+  suggest: suggestTagsFor(body, memos, { excludeId: id ?? undefined }),
+  auto: SOURCES.map((source) => autoTagsFor(body, memos, { source: source ?? undefined, excludeId: id ?? undefined })),
+}))));
+const existingTags = [{ name: 'MemoKing', count: 3 }, { name: '회의', count: 5 }, { name: '장보기', count: 2 }, { name: '프로젝트', count: 2 }, { name: '업무', count: 1 }, { name: '스크린샷', count: 1 }];
+write('tag_match', ['memoking', '미팅', '회의록', '쇼핑', '프로잭트', '여행', '', 'Work', '캡쳐', '회'].map((word) => {
+  const m = matchExisting(word, existingTags);
+  return { word, name: m ? m.name : null, rank: m ? m.rank : null };
+}));
+

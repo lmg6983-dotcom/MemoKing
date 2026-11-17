@@ -24,6 +24,9 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
     if let Some(r) = crate::clipboard::handle(app, label, channel, &args) {
         return r;
     }
+    if let Some(r) = crate::ai::handle(app, label, channel, &args) {
+        return r;
+    }
     if let Some(r) = crate::settings::handle(app, label, channel, &args) {
         return r;
     }

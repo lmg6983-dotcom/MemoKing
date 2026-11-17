@@ -250,3 +250,34 @@ fn share_text() {
         .collect();
     report("share_text", fails, cases.len());
 }
+
+#[test]
+fn tag_suggest() {
+    use memoking_core::tag_suggest::*;
+    let sets: std::collections::HashMap<String, Vec<(String, String)>> = fixtures("tag_sets")
+        .iter()
+        .map(|s| (s["name"].as_str().unwrap().to_string(), s["memos"].as_array().unwrap().iter().map(|m| (m["id"].as_str().unwrap().to_string(), m["body"].as_str().unwrap().to_string())).collect()))
+        .collect();
+    let cases = fixtures("tag_suggest");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let (memos, body, id) = (&sets[c["set"].as_str().unwrap()], c["body"].as_str().unwrap(), c["id"].as_str());
+            let suggest = json!(suggest_tags_for(body, memos, 3, id));
+            let auto = json!(["capture", "link", "audio", "share", ""].map(|s| auto_tags_for(body, memos, s, id)));
+            (suggest != c["suggest"] || auto != c["auto"]).then(|| format!("{} {body:?}\n  JS  : {} {}\n  Rust: {suggest} {auto}", c["set"], c["suggest"], c["auto"]))
+        })
+        .collect();
+    report("tag_suggest", fails, cases.len());
+    let cases = fixtures("tag_match");
+    let tags: Vec<Existing> = [("MemoKing", 3), ("회의", 5), ("장보기", 2), ("프로젝트", 2), ("업무", 1), ("스크린샷", 1)].map(|(n, c)| Existing { name: n.into(), count: c }).into();
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = match_existing(c["word"].as_str().unwrap(), &tags).map_or(json!({ "name": null, "rank": null }), |(m, r)| json!({ "name": m.name, "rank": r }));
+            (got["name"] != c["name"] || got["rank"] != c["rank"]).then(|| format!("{c} → {got}"))
+        })
+        .collect();
+    report("tag_match", fails, cases.len());
+}
+

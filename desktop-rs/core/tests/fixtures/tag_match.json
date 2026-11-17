@@ -1,0 +1,52 @@
+[
+ {
+  "word": "memoking",
+  "name": "MemoKing",
+  "rank": 4
+ },
+ {
+  "word": "미팅",
+  "name": "회의",
+  "rank": 3
+ },
+ {
+  "word": "회의록",
+  "name": "회의",
+  "rank": 3
+ },
+ {
+  "word": "쇼핑",
+  "name": "장보기",
+  "rank": 3
+ },
+ {
+  "word": "프로잭트",
+  "name": "프로젝트",
+  "rank": 1
+ },
+ {
+  "word": "여행",
+  "name": null,
+  "rank": null
+ },
+ {
+  "word": "",
+  "name": null,
+  "rank": null
+ },
+ {
+  "word": "Work",
+  "name": "업무",
+  "rank": 3
+ },
+ {
+  "word": "캡쳐",
+  "name": "스크린샷",
+  "rank": 3
+ },
+ {
+  "word": "회",
+  "name": null,
+  "rank": null
+ }
+]

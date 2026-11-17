@@ -8,6 +8,7 @@ pub mod memo_file;
 pub mod reminders;
 pub mod search;
 pub mod share_text;
+pub mod tag_suggest;
 pub mod tables;
 pub mod time;
 pub mod vault;
