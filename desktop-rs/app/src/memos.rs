@@ -110,15 +110,17 @@ fn list_memos(app: &AppHandle) -> Value {
 
 fn with_open_flag(app: &AppHandle, list: Vec<Value>) -> Value {
     let st = state(app);
-    let open: Vec<String> = st.note_labels.lock().unwrap().keys().cloned().collect();
+    let flags = crate::windows::card_flags(app);
     let views = st.setting("viewCounts");
     Value::Array(
         list.into_iter()
             .map(|mut m| {
                 let id = m["id"].as_str().unwrap_or_default().to_string();
                 let o = m.as_object_mut().unwrap();
-                o.insert("open".into(), open.contains(&id).into());
-                o.insert("stack".into(), 0.into());
+                let [open, stack, taped] = flags(&id);
+                o.insert("open".into(), open);
+                o.insert("stack".into(), stack);
+                o.insert("taped".into(), taped);
                 o.insert("hotkey".into(), Value::Null);
                 o.insert("views".into(), views.get(&id).cloned().unwrap_or(0.into()));
                 m
@@ -168,6 +170,7 @@ fn app_settings(app: &AppHandle) -> Value {
 pub fn push_list(app: &AppHandle) {
     crate::index::mark(); // 메모가 바뀌면 목록에 알릴 때마다 — 색인도 다시
     let _ = app.emit_to("list", "memos:changed", [list_memos(app)]);
+    crate::windows::push_all_stacks(app);
 }
 
 // 창 이름에 쓸 수 있는 글자만 — 메모 id 는 다른 앱이 쓴 아무 글자일 수 있다
@@ -177,26 +180,45 @@ fn query_escape(s: &str) -> String {
     s.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect()
 }
 
-/// 메모 창 열기 (이미 열려 있으면 앞으로)
+/// 메모 창 열기 (이미 열려 있으면 앞으로, 스택의 탭이면 그 탭을 보인다)
 pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
     let st = state(app);
     if !with_vault(app, |v| Ok(v.entry(id).is_some()))? {
         return Ok(false);
     }
-    if let Some(label) = st.note_labels.lock().unwrap().get(id) {
-        if let Some(w) = app.get_webview_window(label) {
-            let _ = w.unminimize();
-            let _ = w.show();
-            let _ = w.set_focus();
-            return Ok(true);
-        }
+    if crate::windows::in_stack(app, id) {
+        return Ok(crate::windows::show_tab(app, id, None, true));
     }
+    let label = st.note_labels.lock().unwrap().get(id).cloned();
+    if let Some(w) = label.and_then(|l| app.get_webview_window(&l)) {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+        crate::windows::shown(app, id, &w);
+        return Ok(true);
+    }
+    let win = create_note_window(app, id, None, true)?;
+    crate::windows::shown(app, id, &win);
+    Ok(true)
+}
+
+/// 메모 창 만들기 — bounds 가 없으면 기억한 자리, show 가 false 면 숨겨서 (스택 탭: windows.rs 가 다 그린 뒤 보인다)
+// shortcut: 예비 창은 아직 — 기억한 자리(noteBounds)가 없으면 기본 크기로 화면 가운데쯤
+pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, show: bool) -> Result<tauri::WebviewWindow, String> {
+    let st = state(app);
     let label = format!("note-{}", NEXT_NOTE.fetch_add(1, Ordering::Relaxed));
     let title = with_vault(app, |v| Ok(v.get(id).and_then(|m| m["title"].as_str().map(str::to_string)).unwrap_or_default()))?;
-    // shortcut: 예비 창 · 스택 탭 · 왕관 · 테이프는 2단계 — 기억한 자리(noteBounds)가 없으면 기본 크기로 화면 가운데쯤
-    let win = crate::os::place_note(app, id, crate::window(app, &label, &format!("note.html?id={}", query_escape(id))).title(title).inner_size(340.0, 380.0).min_inner_size(240.0, 200.0))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let b = crate::window(app, &label, &format!("note.html?id={}", query_escape(id)))
+        .title(title)
+        .inner_size(340.0, 380.0)
+        .min_inner_size(240.0, 200.0)
+        .visible(show)
+        .always_on_top(st.setting("onTop")[id] == true);
+    let b = match bounds {
+        Some([x, y, w, h]) => b.position(x, y).inner_size(w, h),
+        None => crate::os::place_note(app, id, b),
+    };
+    let win = b.build().map_err(|e| e.to_string())?;
     st.note_labels.lock().unwrap().insert(id.to_string(), label);
     let (app2, id2) = (app.clone(), id.to_string());
     win.on_window_event(move |e| {
@@ -205,8 +227,9 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
         }
     });
     crate::os::track_note(app, id, &win);
+    crate::windows::track(app, id, &win);
     push_list(app);
-    Ok(true)
+    Ok(win)
 }
 
 // 메모 창이 닫혔다: 빈 메모는 치우고 제목에 맞춰 파일 이름을
@@ -227,6 +250,7 @@ fn create_memo(app: &AppHandle, opts: &Value) -> Result<Value, String> {
 
 // 메모 창의 지우기: 휴지통으로 옮기고 창을 닫는다 — 목록이 되돌리기 띠를 띄운다
 fn remove_memo(app: &AppHandle, id: &str) -> Result<Value, String> {
+    crate::windows::remove_from_stack(app, id, "none");
     let title = with_vault(app, |v| Ok(v.get(id).map(|m| m["title"].clone()).unwrap_or_default()))?;
     let label = state(app).note_labels.lock().unwrap().remove(id);
     let r = with_vault(app, |v| v.trash(id).map_err(|e| e.to_string()));
@@ -467,26 +491,37 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         "memos:list" => Ok(list_memos(app)),
         "memos:folders" => with_vault(app, |v| Ok(json!(v.folders()))),
-        "memo:get" => with_vault(app, |v| {
-            let Some(mut m) = v.get(&arg_str(args, 0)) else { return Ok(Value::Null) };
-            // shortcut: 왕관 · 테이프 · 알림 · 캡처 · 스택은 2단계 — 화면이 읽는 모양만 기본값으로
-            let o = m.as_object_mut().unwrap();
-            let insert = st.inserts.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
-            o.insert("insert".into(), insert);
-            let command = st.commands.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
-            o.insert("command".into(), command);
-            for (k, val) in [("top", json!(false)), ("bottom", json!(false)), ("canTape", json!(false)), ("onTop", json!(false)), ("alarm", Value::Null), ("capture", Value::Null)] {
-                o.insert(k.into(), val);
-            }
-            let stack = json!({ "members": [], "active": o["id"] });
-            o.insert("stack".into(), stack);
-            m["linkPreviews"] = (st.setting("linkPreviews") != false).into();
-            m["workLife"] = (st.setting("workLife") == true).into();
-            Ok(m)
-        }),
+        "memo:get" => {
+            // 층 · 탭 줄은 메모 폴더를 잡기 전에 (windows.rs 가 메모 폴더를 따로 잡는다)
+            let (layer, stack) = (crate::windows::layer_state(app, &arg_str(args, 0)), crate::windows::stack_state(app, &arg_str(args, 0)));
+            with_vault(app, |v| {
+                let Some(mut m) = v.get(&arg_str(args, 0)) else { return Ok(Value::Null) };
+                // shortcut: 알림 · 캡처는 2단계 — 화면이 읽는 모양만 기본값으로
+                let o = m.as_object_mut().unwrap();
+                let insert = st.inserts.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
+                o.insert("insert".into(), insert);
+                let command = st.commands.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
+                o.insert("command".into(), command);
+                for (k, val) in [("alarm", Value::Null), ("capture", Value::Null)] {
+                    o.insert(k.into(), val);
+                }
+                for k in ["top", "bottom", "canTape"] {
+                    o.insert(k.into(), layer[k].clone());
+                }
+                o.insert("onTop".into(), layer["top"].clone());
+                o.insert("stack".into(), stack);
+                m["linkPreviews"] = (st.setting("linkPreviews") != false).into();
+                m["workLife"] = (st.setting("workLife") == true).into();
+                Ok(m)
+            })
+        }
         "memo:open" => {
             // 목록에서 찾던 말: 그 말로 찾아 첫 자리로 (note.js runCommand)
             let find: String = args.get(1).and_then(|o| o["find"].as_str()).unwrap_or_default().trim().chars().take(200).collect();
+            // 목록에서 고른 테이프 메모: 테이프를 떼고 앞으로
+            if label == "list" {
+                crate::windows::untape_from_list(app, &arg_str(args, 0));
+            }
             if find.is_empty() { open_note(app, &arg_str(args, 0)).map(Value::from) } else { note_command(app, &arg_str(args, 0), json!({ "find": find })) }
         }
         // 목록 카드 메뉴: 메모 창에서 하는 일
@@ -714,7 +749,10 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         // 예비 창은 아직 — 메모 창은 늘 주소의 id 로 연다
         "win:spare" => Ok(Value::Null),
-        "win:painted" => Ok(Value::Null),
+        "win:painted" => {
+            crate::windows::painted(app, label);
+            Ok(Value::Null)
+        }
         _ => return None,
     })
 }

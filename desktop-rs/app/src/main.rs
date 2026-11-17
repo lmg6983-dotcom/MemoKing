@@ -8,6 +8,7 @@ mod memos;
 mod os;
 mod settings;
 mod state;
+mod windows;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
