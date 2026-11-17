@@ -449,9 +449,9 @@ fn write(app: &AppHandle, label: &str, job: &Value, cancel: &AtomicBool) -> Resu
     Ok(json!({ "text": clean_write_output(&raw) }))
 }
 
-/// AI 검색: 찾은 메모만 근거로 답 (물러서면 찾은 문장 그대로) → { text, sources, quoted }
+/// 찾기: 잠긴 메모 빼고 모든 메모의 조각에서, 질문을 넓혀(모델) 낱말 · 두 글자 조각 · 그래프로 → (고른 메모, 넓힌 낱말)
 // shortcut: 찾기 색인을 물을 때마다 새로 만든다 (메모 수천 개에 수백 ms), 느리다는 말이 나오면 ai-tasks.js 처럼 바뀐 메모만 다시
-fn ask(app: &AppHandle, label: &str, id: &Value, question: &str, cancel: &AtomicBool) -> Result<Value, String> {
+fn find(app: &AppHandle, question: &str, limit: usize, now: chrono::DateTime<chrono::Local>, cancel: &AtomicBool) -> Result<(Vec<memoking_core::rag::Picked>, Vec<String>), String> {
     use memoking_core::rag::*;
     let (messages, schema) = expand_messages(question);
     // 넓히지 못해도(모델 오류 · 엉뚱한 답) 질문 낱말만으로 찾는다
@@ -485,9 +485,19 @@ fn ask(app: &AppHandle, label: &str, id: &Value, question: &str, cancel: &Atomic
             .collect();
         (chunks, graph)
     };
+    Ok((retrieve(question, &build_index(chunks), &words, &|id| graph.get(id).cloned().unwrap_or_default(), limit, now), words))
+}
+
+fn sources_of(picked: &[memoking_core::rag::Picked]) -> Vec<Value> {
+    picked.iter().map(|m| json!({ "id": m.id, "title": m.title, "via": m.via })).collect()
+}
+
+/// AI 검색: 찾은 메모만 근거로 답 (물러서면 찾은 문장 그대로) → { text, sources, quoted }
+fn ask(app: &AppHandle, label: &str, id: &Value, question: &str, cancel: &AtomicBool) -> Result<Value, String> {
+    use memoking_core::rag::*;
     let now = chrono::Local::now();
-    let picked = retrieve(question, &build_index(chunks), &words, &|id| graph.get(id).cloned().unwrap_or_default(), 4, now);
-    let sources: Vec<Value> = picked.iter().map(|m| json!({ "id": m.id, "title": m.title, "via": m.via })).collect();
+    let (picked, words) = find(app, question, 4, now, cancel)?;
+    let sources = sources_of(&picked);
     if picked.is_empty() {
         return Ok(json!({ "text": NOT_FOUND, "sources": sources, "quoted": false }));
     }
@@ -497,6 +507,176 @@ fn ask(app: &AppHandle, label: &str, id: &Value, question: &str, cancel: &Atomic
     let raw = chat(app, &rag_messages(question, &picked, now), 400, 0.2, None, cancel, Some(&token))?;
     let (text, quoted) = finish_answer(&raw, question, &picked, &words);
     Ok(json!({ "text": text, "sources": sources, "quoted": quoted }))
+}
+
+/// 매직 에이전트 (ai-tasks.js agent): 질문이면 답, 할 일이면 확인 카드 (바꾸는 일은 사용자 확인 뒤 ai:agent-run 이 한다)
+///   → { kind: 'answer', text, sources } | { kind: 'summary', topic, text, sources } | { kind: 'confirm', action, … }
+fn agent(app: &AppHandle, label: &str, id: &Value, text: &str, cancel: &AtomicBool) -> Result<Value, String> {
+    use memoking_core::agent::*;
+    let now = chrono::Local::now();
+    let mut intent = detect_intent(text, now);
+    // "내일 일정 알려줘" 처럼 시각 없이 일정을 물으면 넣기가 아니라 일정 답 ("내일 3시 치과 알려줘" 는 넣기)
+    let sq = schedule_query(text, now);
+    let asks_schedule = || memoking_core::js::re(r"일정|약속|스케줄|계획|뭐\s*있|할\s*일").is_match(text).unwrap_or(false);
+    if sq.is_some() && intent["action"] == "event" && intent["when"]["hasTime"] != true && intent["when"]["repeat"].is_null() && asks_schedule() {
+        intent = json!({ "action": "answer" });
+    }
+    if intent["unsure"] == true {
+        let (messages, schema) = plan_messages(text);
+        let keep = intent;
+        intent = chat(app, &messages, 200, 0.0, Some(&schema), cancel, None).map_or_else(|_| keep.clone(), |a| plan_result(&a, text, now));
+        if intent["action"] == "answer" && keep["action"] == "event" {
+            intent = keep; // 날짜가 든 짧은 명령은 일정으로 (확인 카드에서 고칠 수 있다)
+        }
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Err("멈췄어요".into());
+    }
+    let token = |text: &str| {
+        let _ = app.emit_to(label, "ai:token", [json!({ "id": id, "text": text })]);
+    };
+    match intent["action"].as_str() {
+        Some("event") => return Ok(json!({ "kind": "confirm", "action": { "type": "event", "title": intent["title"], "when": intent["when"] } })),
+        Some("memo") => {
+            // 내용 없이 "출시 준비 체크리스트 만들어줘" 면 모델이 초안 항목을 (확인 카드에서 고친다)
+            let empty = if intent["list"] == true { intent["items"].as_array().is_none_or(Vec::is_empty) } else { intent["text"].as_str().is_none_or(str::is_empty) };
+            if empty {
+                let (messages, schema) = memo_draft_messages(text, &intent);
+                if let Ok(a) = chat(app, &messages, 400, 0.3, Some(&schema), cancel, None) {
+                    intent = memo_draft_result(&a, &intent);
+                }
+            }
+            return Ok(json!({ "kind": "confirm", "action": { "type": "memo", "body": memo_body(&intent) }, "drafted": intent["drafted"] == true }));
+        }
+        Some("append") => {
+            let memos: Vec<(String, String, Option<String>)> = {
+                let st = app.state::<State>();
+                let guard = st.vault.lock().unwrap();
+                let mut list: Vec<_> = guard.as_ref().map(|v| v.files().map(|e| (e.file.clone(), e.id.clone(), e.body.clone(), e.meta.updated.clone())).collect()).unwrap_or_default();
+                list.sort_by(|a, b| a.0.cmp(&b.0));
+                list.into_iter().map(|(_, id, body, updated)| (id, body, updated)).collect()
+            };
+            let target = intent["target"].as_str().unwrap_or_default();
+            let targets = append_targets(target, &memos);
+            let Some(first) = targets.first() else {
+                return Ok(json!({ "kind": "answer", "text": format!("\"{target}\" 메모를 찾지 못했어요. 덧붙일 메모의 제목으로 다시 말해 주세요."), "sources": [] }));
+            };
+            return Ok(json!({ "kind": "confirm", "action": { "type": "append", "id": first["id"], "text": append_text(intent["content"].as_str().unwrap_or_default()) }, "targets": targets }));
+        }
+        Some("summary") => {
+            let topic = intent["topic"].as_str().unwrap_or_default();
+            let picked: Vec<_> = find(app, topic, 6, now, cancel)?.0.into_iter().filter(|m| m.via != "graph").collect();
+            if picked.is_empty() {
+                return Ok(json!({ "kind": "answer", "text": memoking_core::rag::NOT_FOUND, "sources": [] }));
+            }
+            let raw = chat(app, &summary_messages(topic, &picked), 500, 0.2, None, cancel, Some(&token))?;
+            // 없는 번호([9])는 지운다
+            let body = memoking_core::js::re(r"\[(\d+)\]")
+                .replace_all(memoking_core::js::trim(&raw), |c: &fancy_regex::Captures<str>| if c[1].parse::<usize>().is_ok_and(|n| (1..=picked.len()).contains(&n)) { c[0].to_string() } else { String::new() })
+                .into_owned();
+            let text = if body.is_empty() { memoking_core::rag::NOT_FOUND.to_string() } else { body };
+            return Ok(json!({ "kind": "summary", "topic": topic, "text": text, "sources": sources_of(&picked) }));
+        }
+        _ => {}
+    }
+    // 일정을 물으면 ("내일 뭐 있어?") 일정 탭에서 바로 — 모델 없이, 틀릴 일 없이
+    if let Some(sq) = sq {
+        let all = app.state::<State>().vault.lock().unwrap().as_ref().map(|v| v.all_reminders()).unwrap_or_default();
+        let events = events_in(&all, &sq);
+        if !events.is_empty() || sq.words.is_empty() {
+            let (text, ids) = schedule_text(&sq, &events);
+            let sources: Vec<Value> = ids.iter().map(|id| json!({ "id": id, "title": events.iter().find(|e| e.memo_id == *id).map(|e| e.title.clone()), "via": "event" })).collect();
+            return Ok(json!({ "kind": "answer", "text": text, "sources": sources }));
+        }
+    }
+    let mut answer = ask(app, label, id, text, cancel)?;
+    answer["kind"] = "answer".into();
+    Ok(answer)
+}
+
+/// 매직 에이전트가 사용자 확인을 받은 일 — 화면이 보낸 값이므로 여기서 다시 거른다 (종류 · 길이 · 날짜 · 잠금) → { ok, id?, message }
+fn run_agent_action(app: &AppHandle, a: &Value) -> Value {
+    use crate::reminders::{MEMO_PICK_AGAIN, SAVED_ELSEWHERE};
+    use memoking_core::js::{is_space, slice16, string};
+    let st = app.state::<State>();
+    let fail = |m: &str| json!({ "ok": false, "message": m });
+    if st.vault.lock().unwrap().is_none() || !a.is_object() {
+        return fail(MEMO_PICK_AGAIN);
+    }
+    let s = |v: &Value, max: usize| slice16(&if v.is_null() { String::new() } else { string(v) }, max);
+    let clean = |v: &Value, max: usize| s(v, max).split(is_space).filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
+    let now = chrono::Local::now();
+    match a["type"].as_str() {
+        Some("event") => {
+            let title = Some(clean(&a["title"], 80)).filter(|t| !t.is_empty()).unwrap_or_else(|| "일정".into());
+            let when = &a["when"];
+            let end = s(&when["end"], 40);
+            let d = json!({ "at": s(&when["at"], 40), "hasTime": when["hasTime"], "repeat": if when["repeat"].is_object() { when["repeat"].clone() } else { Value::Null }, "end": (!end.is_empty()).then_some(end), "title": title });
+            let Some(r) = memoking_core::reminders::event_from_date(&d, now) else { return fail("날짜를 알아보지 못했어요") };
+            let done = st.vault.lock().unwrap().as_mut().map(|v| -> Result<(String, Vec<Value>), String> {
+                let id = v.import(&format!("# {title}\n"), None).map_err(|e| e.to_string())?.ok_or(SAVED_ELSEWHERE)?;
+                let saved = v.set_reminders(&id, vec![r]).map_err(|e| e.to_string())?.ok_or(SAVED_ELSEWHERE)?;
+                Ok((id, saved))
+            });
+            let (id, saved) = match done {
+                Some(Ok(done)) => done,
+                Some(Err(e)) => return fail(&e),
+                None => return fail(MEMO_PICK_AGAIN),
+            };
+            let message = format!("일정을 넣었어요 · {}", memoking_core::reminders::describe_reminder(&saved[0], now));
+            crate::reminders::changed(app, &id, saved);
+            tagger_add(app, vec![id.clone()]);
+            json!({ "ok": true, "id": id, "message": message })
+        }
+        Some(kind @ ("memo" | "summary")) => {
+            let body = if kind == "summary" {
+                let titles: Vec<String> = a["sources"].as_array().into_iter().flatten().take(10).map(|x| clean(&x["title"], 80)).collect();
+                memoking_core::agent::summary_body(&clean(&a["topic"], 60), &s(&a["text"], 8000), &titles)
+            } else {
+                s(&a["body"], 20000)
+            };
+            if memoking_core::js::trim(&body).is_empty() || memoking_core::body::is_locked_body(&body) {
+                return fail("쓸 내용이 없어요");
+            }
+            let body = if body.ends_with('\n') { body } else { format!("{body}\n") };
+            let id = match st.vault.lock().unwrap().as_mut().map(|v| v.import(&body, None)) {
+                Some(Ok(Some(id))) => id,
+                Some(Err(e)) => return fail(&e.to_string()),
+                _ => return fail(SAVED_ELSEWHERE),
+            };
+            crate::memos::push_list(app);
+            tagger_add(app, vec![id.clone()]);
+            json!({ "ok": true, "id": id, "message": if kind == "summary" { "요약을 새 메모로 저장했어요" } else { "메모를 만들었어요" } })
+        }
+        Some("append") => {
+            let id = s(&a["id"], usize::MAX);
+            let Some(m) = memo(app, &id) else { return fail("덧붙일 메모를 찾지 못했어요") };
+            let old = m["body"].as_str().unwrap_or_default();
+            if m["locked"] == true || memoking_core::body::is_locked_body(old) {
+                return fail("잠긴 메모에는 덧붙일 수 없어요");
+            }
+            let text = s(&a["text"], 8000);
+            if memoking_core::js::re(r"<!--\s*memoking-lock").is_match(&text).unwrap_or(false) {
+                return fail("잠금 정보가 든 글은 덧붙일 수 없어요");
+            }
+            let Some(body) = memoking_core::agent::append_to_body(old, &text) else { return fail("덧붙일 내용이 없어요") };
+            let saved = st.vault.lock().unwrap().as_mut().map(|v| v.save(&id, &body));
+            match saved {
+                Some(Ok((card, changed))) if card["refused"] != true => {
+                    if changed {
+                        crate::memos::push_list(app);
+                    }
+                }
+                Some(Err(e)) => return fail(&e.to_string()),
+                _ => return fail(SAVED_ELSEWHERE),
+            }
+            // 열린 메모 창도 덧붙인 글로
+            crate::reminders::send_to_note(app, &id, "memo:external", memo(app, &id).unwrap_or_default());
+            let title = m["title"].as_str().filter(|t| !t.is_empty()).unwrap_or("제목 없음");
+            json!({ "ok": true, "id": id, "message": format!("'{}'에 덧붙였어요", slice16(title, 20)) })
+        }
+        _ => fail("할 수 없는 일이에요"),
+    }
 }
 
 // ---------- AI 태그 뒤처리 (ai-tagger.js) — 닫은 메모 · 설정의 "모든 메모" 를 하나씩 차례로 (모델이 하나라서) ----------
@@ -709,6 +889,12 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         "ai:write" => job(label, &arg["id"], |cancel| write(app, label, &arg, cancel)),
         "ai:ask" => job(label, &arg["id"], |cancel| ask(app, label, &arg["id"], &memoking_core::js::string(&arg["question"]), cancel)),
+        // 매직 에이전트 (목록 검색창 ✦ · 매직키 AI 줄): 답이나 확인 카드 → 확인하면 agent-run 으로 실행
+        "ai:agent" => {
+            let text = if arg["text"].is_null() { String::new() } else { memoking_core::js::slice16(&memoking_core::js::string(&arg["text"]), 2000) };
+            job(label, &arg["id"], |cancel| agent(app, label, &arg["id"], &text, cancel))
+        }
+        "ai:agent-run" => Ok(run_agent_action(app, &arg)),
         "ai:cancel" => {
             if let Some(c) = JOBS.lock().unwrap().get(&format!("{label}:{}", memoking_core::js::string(&arg))) {
                 c.store(true, Ordering::Relaxed);

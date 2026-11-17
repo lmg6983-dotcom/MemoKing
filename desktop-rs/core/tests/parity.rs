@@ -905,3 +905,92 @@ fn date_detect() {
     }
     report("date_detect", fails, cases.len() * nows.len());
 }
+
+#[test]
+fn agent() {
+    use memoking_core::agent::*;
+    use memoking_core::reminders::{event_from_date, occurrences_between};
+    let local = |iso: &str| memoking_core::time::parse_js_date(iso).unwrap().with_timezone(&chrono::Local);
+    let plan_answers = [
+        r#"{"action":"event","title":"치과 검진"}"#, r#"{"action":"event"}"#, r#"{"action":"memo","title":"할 일","content":"견적서 보내기"}"#, r#"{"action":"memo","title":" 장보기 ","content":"우유, 계란이랑 빵"}"#,
+        r#"{"action":"memo","content":5}"#, r#"{"action":"append","target":"회의록","content":" 발표  자료 "}"#, r#"{"action":"append","target":"","content":"x"}"#, r#"{"action":"summary"}"#, r#"{"action":"answer"}"#,
+        r#"{"action":"뭐"}"#, "엉뚱한 답", "[]",
+    ];
+    let draft_answers = [r#"{"title":"다른 이름","items":["QA","공지"]}"#, r#"{"title":"새 이름","items":[" a  b ",null,"",3]}"#, r#"{"title":"x","items":[]}"#, r#"{"title":"초안","body":"  첫 줄\n둘째 줄  "}"#, r#"{"title":"t","body":""}"#, r#"{"body":7}"#, "엉뚱", "null", r#""글""#];
+    let cases = fixtures("agent");
+    let no_id = |r: Option<Value>| r.map(|mut r| {
+        r.as_object_mut().unwrap().shift_remove("id");
+        r
+    });
+    // 일정 묻기에 쓰는 일정들: 'event' 의 글 속 날짜를 그때 그대로 넣은 것 (JS agEvents 와 같은 차례)
+    let all_for = |now: &str| -> Vec<Value> {
+        cases.iter().filter(|c| c["kind"] == "event" && c["now"] == now).enumerate().filter_map(|(i, c)| {
+            let r = event_from_date(&c["w"], local(now))?;
+            Some(json!({ "memoId": format!("m{}", i % 3), "title": if i == 3 { String::new() } else { format!("메모{i}") }, "locked": i == 5, "reminder": r }))
+        }).collect()
+    };
+    let mut fails = vec![];
+    let mut check = |what: String, js: &Value, rust: Value| {
+        if *js != rust {
+            fails.push(format!("{what}\n  JS  : {js}\n  Rust: {rust}"));
+        }
+    };
+    for c in &cases {
+        match c["kind"].as_str().unwrap() {
+            "text" => {
+                let (text, iso) = (c["text"].as_str().unwrap(), c["now"].as_str().unwrap());
+                let now = local(iso);
+                let intent = detect_intent(text, now);
+                check(format!("intent {text:?} @ {iso}"), &c["intent"], intent.clone());
+                if !c["split"].is_null() {
+                    check(format!("split {text:?}"), &c["split"], json!(split_items(text)));
+                    check(format!("appendText {text:?}"), &c["appendText"], json!(append_text(text)));
+                }
+                check(format!("memoBody {text:?}"), &c["memoBody"], if intent["action"] == "memo" { json!(memo_body(&intent)) } else { Value::Null });
+                let q = schedule_query(text, now);
+                check(format!("query {text:?} @ {iso}"), &c["query"], q.as_ref().map_or(Value::Null, |q| json!({ "from": q.from.timestamp_millis(), "to": q.to.timestamp_millis(), "label": q.label, "words": q.words })));
+                if let Some(q) = q {
+                    let events = events_in(&all_for(iso), &q);
+                    let got: Vec<Value> = events.iter().map(|e| json!({ "at": e.at.timestamp_millis(), "title": e.title, "memoId": e.memo_id, "allDay": e.all_day })).collect();
+                    check(format!("events {text:?} @ {iso}"), &c["events"], json!(got));
+                    check(format!("scheduleText {text:?} @ {iso}"), &c["scheduleText"], json!(schedule_text(&q, &events).0));
+                }
+                if !c["plans"].is_null() {
+                    check(format!("plans {text:?}"), &c["plans"], json!(plan_answers.map(|a| plan_result(a, text, now))));
+                }
+            }
+            "targets" => {
+                let memos: Vec<(String, String, Option<String>)> = c["memos"].as_array().unwrap().iter().map(|m| (m["id"].as_str().unwrap().into(), m["body"].as_str().unwrap().into(), m["updated"].as_str().map(str::to_string))).collect();
+                check(format!("targets {}", c["target"]), &c["out"], json!(append_targets(c["target"].as_str().unwrap(), &memos)));
+            }
+            "draft" => {
+                let (m, s) = memo_draft_messages("부탁", &c["intent"]);
+                check(format!("draft messages {}", c["intent"]), &c["messages"], json!({ "messages": m, "schema": s }));
+                check(format!("draft {}", c["intent"]), &c["out"], json!(draft_answers.map(|a| memo_draft_result(a, &c["intent"]))));
+                check(format!("draft body {}", c["intent"]), &c["bodies"], json!(draft_answers.map(|a| memo_body(&memo_draft_result(a, &c["intent"])))));
+            }
+            "plan" => {
+                let (m, s) = plan_messages("x");
+                check("plan messages".into(), &c["messages"], json!({ "messages": m, "schema": s }));
+            }
+            "summary" => {
+                let picked: Vec<memoking_core::rag::Picked> = c["picked"].as_array().unwrap().iter().map(|p| memoking_core::rag::Picked {
+                    id: p["id"].as_str().unwrap().into(), title: p["title"].as_str().unwrap().into(), score: 0.0, via: "match",
+                    texts: p["texts"].as_array().unwrap().iter().map(|t| t.as_str().unwrap().to_string()).collect(),
+                }).collect();
+                check("summary messages".into(), &c["messages"], summary_messages("회의", &picked));
+                let titles: Vec<String> = picked.iter().map(|p| p.title.clone()).collect();
+                check("summary body".into(), &c["body"], json!(summary_body(&" 이번 주  회의 ".repeat(picked.len() + 1), "- 출시 확정 [1]\n- 담당 [2] [12]  ", &titles)));
+            }
+            "event" => check(format!("event {} @ {}", c["w"], c["now"]), &c["out"], json!(no_id(event_from_date(&c["w"], local(c["now"].as_str().unwrap()))))),
+            "occ" => {
+                let ranges = [("2026-10-20T00:00:00+09:00", "2026-10-27T00:00:00+09:00"), ("2026-10-26T00:00:00+09:00", "2026-10-26T23:00:00+09:00"), ("2026-10-01T00:00:00+09:00", "2027-03-01T00:00:00+09:00")];
+                let got: Vec<Vec<i64>> = ranges.iter().map(|(f, t)| occurrences_between(&c["r"], local(f), local(t)).iter().map(|d| d.timestamp_millis()).collect()).collect();
+                check(format!("occ {}", c["r"]), &c["out"], json!(got));
+            }
+            "append" => check(format!("append {:?}", c["body"]), &c["out"], json!(append_to_body(c["body"].as_str().unwrap(), c["text"].as_str().unwrap()))),
+            k => panic!("{k}"),
+        }
+    }
+    report("agent", fails, cases.len());
+}

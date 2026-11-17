@@ -416,6 +416,95 @@ fn occurrence_end(start: Time, all_day: bool, end: Option<Time>) -> Time {
     }
 }
 
+/// from ~ to 사이의 회차들 (일정 탭 · 에이전트의 일정 답) — 만든 날보다 앞의 회차는 없다
+pub fn occurrences_between(r: &Value, from: Time, to: Time) -> Vec<Time> {
+    if !is_event(r) && r["task"] != true {
+        return vec![];
+    }
+    if r["kind"] == "at" {
+        return date_of(&r["at"]).filter(|t| *t < to && (*t >= from || occurrence_end(*t, r["allDay"] == true, date_of(&r["end"])) > from)).into_iter().collect();
+    }
+    let begin = date_of(&r["created"]).map_or(from, |c| from.max(time::js_local(c.year().into(), c.month0().into(), c.day().into(), 0, 0)));
+    let mut cursor = begin - Duration::milliseconds(1);
+    let mut out = vec![];
+    for _ in 0..100 {
+        match next_occurrence(r, cursor) {
+            Some(next) if next < to => {
+                out.push(next);
+                cursor = next;
+            }
+            _ => break,
+        }
+    }
+    out
+}
+
+/// 글 속 날짜(date-detect) → 일정 하나 (기본 미리 알림 중 아직 오지 않은 것). d: { at, hasTime, repeat, end, title }
+pub fn event_from_date(d: &Value, now: Time) -> Option<Value> {
+    let start = date_of(&d["at"])?;
+    let repeat = d["repeat"].as_object();
+    let all_day = !js_truthy(&d["hasTime"]) && repeat.is_none();
+    let fallback = fallback_alert(all_day);
+    let default = if all_day { -540 } else { 10 };
+    // 지난 미리 알림은 빼고, 모두 지났으면 정시(하루 종일은 당일 오전 9시)에
+    let future = |o: i64| alert_time(start, o, all_day) > now;
+    let alerts = if repeat.is_some() || future(default) {
+        vec![default]
+    } else if future(fallback) {
+        vec![fallback]
+    } else {
+        vec![]
+    };
+    let mut base = json!({ "action": "notify", "enabled": true, "created": time::to_local_iso(now), "alerts": alerts });
+    if js_truthy(&d["title"]) {
+        base["title"] = js::slice16(&js::string(&d["title"]), 80).into();
+    }
+    let now_iso = time::to_local_iso(now);
+    if let Some(rep) = repeat {
+        let get = |k: &str| rep.get(k).cloned().unwrap_or(Value::Null);
+        let mut r = json!({ "every": get("every"), "time": get("time") });
+        match rep.get("every").and_then(Value::as_str) {
+            Some("week") => {
+                r["weekdays"] = get("weekdays");
+                if js_truthy(&get("interval")) {
+                    r["interval"] = get("interval");
+                    r["from"] = get("from");
+                }
+            }
+            Some(every @ ("month" | "year")) => {
+                r["day"] = get("day");
+                if every == "year" {
+                    r["month"] = get("month");
+                }
+            }
+            _ => {}
+        }
+        base["kind"] = "repeat".into();
+        base["repeat"] = r;
+        return normalize_reminder(&base, &now_iso);
+    }
+    let at = if all_day { time::js_local(start.year().into(), start.month0().into(), start.day().into(), 0, 0) } else { start };
+    base["kind"] = "at".into();
+    base["at"] = time::to_local_iso(at).into();
+    if all_day {
+        base["allDay"] = true.into();
+        if let Some(end) = date_of(&d["end"]).filter(|e| *e > at) {
+            base["end"] = time::to_local_iso(end).into();
+        }
+    }
+    normalize_reminder(&base, &now_iso)
+}
+
+fn js_truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().is_some_and(|f| f != 0.0),
+        Value::String(s) => !s.is_empty(),
+        _ => true,
+    }
+}
+
 /// 한 번짜리 일정이 이미 지났는가
 pub fn is_past_event(r: &Value, now: Time) -> bool {
     r["kind"] == "at" && date_of(&r["at"]).is_some_and(|t| occurrence_end(t, r["allDay"] == true, date_of(&r["end"])) <= now)

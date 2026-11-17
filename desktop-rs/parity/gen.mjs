@@ -536,3 +536,63 @@ write('date_detect', [...ddTexts].map((text) => ({
     from: d.from, to: d.to, text: d.text, at: d.at.getTime(), hasTime: d.hasTime, end: d.end?.getTime() ?? null, repeat: d.repeat ?? null, title: dd.guessTitle(text, d.from, d.to),
   }))),
 })));
+
+// 매직 에이전트 (agent.js) — 말 가르기 · 모델 답 읽기 · 덧붙일 메모 · 본문 · 일정 묻기, 그리고 쓰는 reminders.js eventFromDate · occurrencesBetween
+const ag = await import('../../app/js/core/agent.js');
+const { eventFromDate, occurrencesBetween } = await import('../../app/js/core/reminders.js');
+const { appendToBody } = await import('../../app/js/core/memo-text.js');
+const agNows = ['2026-10-25T10:00:00+09:00', '2026-11-17T08:30:00+09:00'];
+const agOwn = ['매주 월요일 9시 주간회의 알림', '3시에 깨워줘', '장보기 목록 만들어줘: 우유, 계란, 빵', '출시 준비 체크리스트 만들어줘', '우유, 계란 할 일로 만들어줘',
+  '회의록에 다음 주 발표 추가해줘', '장보기 메모에 대파랑 두부 추가', '금요일 2시에 치과 예약 추가해줘', '이번 주 회의 메모 요약해줘', '프로젝트 관련 내용 정리해 줘', '요약', '메모해줘 내일 할 일',
+  '우유 계란 사야 하는 거 메모해줘', '내일 뭐 있어?', '이번 주 회의 언제야', '다음 주 일정 알려줘', '다음 달 약속 있나', '이번 달 마감 뭐 있어?', '모레 일정 있어?', '10월 30일 일정 뭐야?',
+  '다가오는 일정 알려줘', '내일 일정 알려줘', '내일 3시 치과 알려줘', '금요일 3시 치과', '치과 가야 해', '오늘 저녁 7시 동창회 잡아줘', '할 일 목록 만들어줘 청소하고 빨래, 설거지',
+  '노트 새로 써줘', '기록해줘', '출시일 언제야?', '김 부장 전화번호 알려줘', '좀 해줘', '   ', ''];
+const agTexts = [...new Set([...ddTexts, ...agOwn])];
+const agMemos = [
+  { id: '1', body: '# 회의록 모음\n\n…', updated: '2026-10-01T09:00:00+09:00' },
+  { id: '2', body: '# 회의록\n\n- 10월', updated: '2026-09-01T09:00:00+09:00' },
+  { id: '3', body: await lockBody('# 회의록\n\n비밀', '사과1234', { iterations: 1000 }) },
+  { id: '4', body: '# 장보기 목록\n\n- [ ] 우유', updated: '2026-10-20T09:00:00+09:00' },
+  { id: '5', body: '# 주간 회의록\n\n출시', updated: '2026-10-21T09:00:00+09:00' },
+  { id: '6', body: '본문만 있는 메모', updated: 'nope' },
+  { id: '7', body: '# 장 보기\n\n두부' },
+  { id: '8', body: '# Meeting Notes\n\nx', updated: '2026-10-22T09:00:00+09:00' },
+];
+const agTargets = ['회의록', '회의록 메모', '장보기', 'ㅈㅂㄱ', 'ㅎㅇㄹ', '회의', 'meeting', 'MEETING NOTES', '주간 회의록', '없는 메모', '제목 없음', '장 보기', ''];
+const planAnswers = ['{"action":"event","title":"치과 검진"}', '{"action":"event"}', '{"action":"memo","title":"할 일","content":"견적서 보내기"}', '{"action":"memo","title":" 장보기 ","content":"우유, 계란이랑 빵"}',
+  '{"action":"memo","content":5}', '{"action":"append","target":"회의록","content":" 발표  자료 "}', '{"action":"append","target":"","content":"x"}', '{"action":"summary"}', '{"action":"answer"}', '{"action":"뭐"}', '엉뚱한 답', '[]'];
+const draftAnswers = ['{"title":"다른 이름","items":["QA","공지"]}', '{"title":"새 이름","items":[" a  b ",null,"",3]}', '{"title":"x","items":[]}', '{"title":"초안","body":"  첫 줄\\n둘째 줄  "}', '{"title":"t","body":""}', '{"body":7}', '엉뚱', 'null', '"글"'];
+const agAt = (d, h) => new Date(2026, 9, d, h).toISOString();
+const agWhen = [
+  { at: agAt(26, 15), hasTime: true, title: '거래처 미팅' }, { at: agAt(26, 9), hasTime: true, repeat: { every: 'week', weekdays: [1], time: '09:00' }, title: '주간 회의' },
+  { at: agAt(27, 0), hasTime: false, title: '휴가', end: agAt(29, 0) }, { at: agAt(25, 10), hasTime: true, title: '곧' }, { at: agAt(25, 9), hasTime: false, title: '오늘 하루' },
+  { at: agAt(24, 9), hasTime: false, title: '어제' }, { at: agAt(30, 14), hasTime: true, repeat: { every: 'week', weekdays: [5], time: '14:00', interval: 2, from: '2026-10-30' }, title: '격주' },
+  { at: agAt(31, 9), hasTime: true, repeat: { every: 'month', day: 31, time: '09:00' }, title: '월말' }, { at: agAt(29, 9), hasTime: true, repeat: { every: 'year', month: 2, day: 29, time: '09:00' } },
+  { at: agAt(26, 8), hasTime: true, repeat: { every: 'day', time: '08:00' }, title: 'x'.repeat(90) }, { at: 'nope', hasTime: true }, { at: agAt(28, 9), hasTime: false, title: '', end: agAt(27, 0) },
+];
+const noId = (r) => r && Object.fromEntries(Object.entries(r).filter(([k]) => k !== 'id'));
+const agEvents = agNows.map((iso) => agWhen.map((w, i) => ({ memoId: `m${i % 3}`, title: i === 3 ? '' : `메모${i}`, locked: i === 5, reminder: eventFromDate(w, new Date(iso)) })).filter((e) => e.reminder));
+const agPicked = [{ id: 'a', title: '주간 회의', via: 'match', texts: ['출시일은 11월 3일', '담당 김'] }, { id: 'b', title: '', via: 'graph', texts: ['가'.repeat(2500)] }, { id: 'c', title: '끝', via: 'match', texts: ['남은 것'] }];
+const sq = (q) => q && { from: q.from.getTime(), to: q.to.getTime(), label: q.label, words: q.words };
+write('agent', [
+  ...agTexts.flatMap((text) => agNows.map((iso, n) => {
+    const now = new Date(iso);
+    const intent = ag.detectIntent(text, { now });
+    const q = ag.scheduleQuery(text, now);
+    const events = q ? ag.eventsIn(agEvents[n].map((e) => ({ ...e, reminder: e.reminder })), q, occurrencesBetween) : [];
+    return {
+      kind: 'text', text, now: iso, intent, split: n === 0 ? ag.splitItems(text) : null, appendText: n === 0 ? ag.appendText(text) : null, memoBody: intent.action === 'memo' ? ag.memoBody(intent) : null,
+      query: sq(q), events: events.map((e) => ({ at: e.at.getTime(), title: e.title, memoId: e.memoId, allDay: e.allDay })), scheduleText: q ? ag.scheduleText(q, events, now) : null,
+      plans: n === 0 && agOwn.includes(text) ? planAnswers.map((a) => ag.planResult(a, text, { now })) : null,
+    };
+  })),
+  ...agTargets.map((target) => ({ kind: 'targets', target, memos: agMemos, out: ag.appendTargets(target, agMemos) })),
+  ...[{ action: 'memo', title: '출시 준비', list: true, items: [], text: '' }, { action: 'memo', title: '', list: false, items: [], text: '' }, { action: 'memo', title: '회의', list: false, items: [], text: '' }]
+    .map((intent) => ({ kind: 'draft', intent, messages: ag.memoDraftMessages('부탁', intent), out: draftAnswers.map((a) => ag.memoDraftResult(a, intent)), bodies: draftAnswers.map((a) => ag.memoBody(ag.memoDraftResult(a, intent))) })),
+  { kind: 'plan', messages: ag.planMessages('x') },
+  ...[[], agPicked, agPicked.slice(0, 1)].map((picked) => ({ kind: 'summary', picked, messages: ag.summaryMessages('회의', picked),
+    body: ag.summaryBody(' 이번 주  회의 '.repeat(picked.length + 1), '- 출시 확정 [1]\n- 담당 [2] [12]  ', picked.map((p) => ({ title: p.title }))) })),
+  ...agNows.flatMap((iso) => agWhen.map((w) => ({ kind: 'event', now: iso, w, out: noId(eventFromDate(w, new Date(iso))) }))),
+  ...agEvents.flat().map((e) => ({ kind: 'occ', r: e.reminder, out: [[agAt(20, 0), agAt(27, 0)], [agAt(26, 0), agAt(26, 23)], [agAt(1, 0), '2027-03-01T00:00:00+09:00']].map(([f, t]) => occurrencesBetween(e.reminder, new Date(f), new Date(t)).map((d) => d.getTime())) })),
+  ...[['# 회의\n\n본문  \n\n', '\r\n\n  덧붙일 글\r\n둘째  \n'], ['', '글'], ['본문', '  \n '], ['   ', '\n\n가']].map(([body, text]) => ({ kind: 'append', body, text, out: appendToBody(body, text) })),
+]);

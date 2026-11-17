@@ -11,8 +11,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
-const SAVED_ELSEWHERE: &str = "그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요";
-const MEMO_PICK_AGAIN: &str = "메모를 찾지 못했어요. 목록에서 다시 골라 주세요";
+pub(crate) const SAVED_ELSEWHERE: &str = "그사이 이 메모가 다른 기기에서 바뀌어 저장하지 못했어요. 다시 해 주세요";
+pub(crate) const MEMO_PICK_AGAIN: &str = "메모를 찾지 못했어요. 목록에서 다시 골라 주세요";
 
 fn state(app: &AppHandle) -> tauri::State<'_, State> {
     app.state::<State>()
@@ -23,14 +23,14 @@ fn vault<T>(app: &AppHandle, f: impl FnOnce(&mut Vault) -> T) -> Option<T> {
     state(app).vault.lock().unwrap().as_mut().map(f)
 }
 
-fn send_to_note(app: &AppHandle, id: &str, event: &str, payload: Value) {
+pub(crate) fn send_to_note(app: &AppHandle, id: &str, event: &str, payload: Value) {
     if let Some(label) = state(app).note_labels.lock().unwrap().get(id) {
         let _ = app.emit_to(label.as_str(), event, [payload]);
     }
 }
 
 /// 알림을 바꿨다: 열린 메모 창 · 목록(일정 탭 · 카드 숫자)에 알리고 바로 한 번 살핀다
-fn changed(app: &AppHandle, id: &str, saved: Vec<Value>) {
+pub(crate) fn changed(app: &AppHandle, id: &str, saved: Vec<Value>) {
     send_to_note(app, id, "memo:reminders", saved.into());
     crate::memos::push_list(app);
     let _ = app.emit_to("list", "reminders:changed", [Value::Null; 0]);
