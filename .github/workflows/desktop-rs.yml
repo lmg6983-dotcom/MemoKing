@@ -1,0 +1,80 @@
+# PC Rust 판 점검 (desktop-rs/) — 옮기는 동안 Windows(WebView2)에서 빌드하고 앱 안 점검(--smoke)을 돌린다.
+#   화면 사진(desktop-rs-screen)과 실행 파일(desktop-rs-exe)을 남겨 사람이 눈으로도 본다.
+name: PC Rust 점검
+
+on:
+  push:
+    paths: ['desktop-rs/**', 'app/**', 'android/web/dev/roundtrip-sample.md', 'desktop/preload.cjs', '.github/workflows/desktop-rs.yml']
+  pull_request:
+    paths: ['desktop-rs/**', 'app/**', 'android/web/dev/roundtrip-sample.md', 'desktop/preload.cjs', '.github/workflows/desktop-rs.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-rs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # JS 규칙(app/js/core)과 Rust core 가 같은 답인지 — JS 가 바뀌어 fixtures 가 달라졌으면 Rust 도 고쳐야 한다
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Seoul
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JS 의 답 다시 만들기 (바뀌면 실패 — node desktop-rs/parity/gen.mjs 로 만들어 커밋하고 Rust 를 맞춘다)
+        run: node desktop-rs/parity/gen.mjs && git diff --exit-code desktop-rs/core/tests/fixtures
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-rs
+      - run: cargo test -p memoking-core
+        working-directory: desktop-rs
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: desktop-rs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-rs
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      # JS 비교(parity)는 시간대를 서울로 고정한 parity 잡에서 — Windows 는 TZ 를 따르지 않아 단위 테스트만
+      - run: cargo test --workspace --lib --bins
+      - run: cargo build
+      # 점검하는 동안(목록 · 메모 창 · 왕관 스티커) 화면 사진을 찍는다 — 점검이 끝나도 6초 더 떠 있다 (ipc.rs smoke:done)
+      - name: 앱 안 점검 (--smoke) · 화면 사진
+        shell: pwsh
+        run: |
+          $p = Start-Process target/debug/memoking.exe -ArgumentList '--smoke' -RedirectStandardOutput smoke.txt -PassThru
+          Start-Sleep 6
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $img = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($img).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $img.Save("$PWD/screen.png")
+          if (-not $p.WaitForExit(60000)) { Stop-Process $p; throw '점검이 60초 안에 끝나지 않았어요' }
+          Get-Content smoke.txt -Encoding utf8
+          exit $p.ExitCode
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-rs-screen
+          path: desktop-rs/screen.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-rs-exe
+          path: desktop-rs/target/debug/memoking.exe

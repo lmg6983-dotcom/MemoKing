@@ -1,0 +1,74 @@
+[
+ {
+  "name": "a.exe",
+  "program": true
+ },
+ {
+  "name": "A.EXE",
+  "program": true
+ },
+ {
+  "name": "setup.msi",
+  "program": true
+ },
+ {
+  "name": "x.lnk",
+  "program": true
+ },
+ {
+  "name": "run.ps1",
+  "program": true
+ },
+ {
+  "name": "doc.pdf",
+  "program": false
+ },
+ {
+  "name": "photo.png",
+  "program": false
+ },
+ {
+  "name": "noext",
+  "program": false
+ },
+ {
+  "name": ".exe",
+  "program": false
+ },
+ {
+  "name": "archive.tar.gz",
+  "program": false
+ },
+ {
+  "name": "dir/evil.bat",
+  "program": true
+ },
+ {
+  "name": "dir\\evil.CMD",
+  "program": true
+ },
+ {
+  "name": "q.url?x",
+  "program": true
+ },
+ {
+  "name": "page.html#a.exe",
+  "program": false
+ },
+ {
+  "name": "x.settingcontent-ms",
+  "program": true
+ },
+ {
+  "name": "x.appref-ms",
+  "program": true
+ },
+ {
+  "name": "x.js",
+  "program": true
+ },
+ {
+  "name": "x.json",
+  "program": false
+ }
+]

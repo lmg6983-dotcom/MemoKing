@@ -1,0 +1,22 @@
+[workspace]
+members = ["core", "app"]
+resolver = "2"
+
+[workspace.package]
+version = "0.88.0"
+edition = "2021"
+license = "MIT"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+
+# 잠금 메모의 열쇠 만들기(PBKDF2 31만 번)는 최적화하지 않으면 몇 초씩 걸린다 — 개발 빌드에서도 암호 크레이트는 최적화
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.pbkdf2]
+opt-level = 3
+[profile.dev.package.aes-gcm]
+opt-level = 3
