@@ -1081,7 +1081,8 @@ impl Vault {
         if body != known {
             self.keep_version(id, &known, false);
         }
-        let wrote = self.write(&mut e, &known, true);
+        // 다른 기기가 고친 글이 디스크에 있으면 쓰지 않는다 — 사본을 만들면 옛 글이 진짜 메모로 남는다. 다시 읽은 뒤 다음에 태그
+        let wrote = self.write(&mut e, &known, false);
         let ok = matches!(wrote, Ok(Wrote::Yes));
         if !ok {
             e.meta = prev;
@@ -1595,6 +1596,38 @@ mod tests {
         assert_eq!((m["reminders"][0]["id"].clone(), m["aiEvents"].clone(), m["updated"].clone()), (json!("r1"), json!(["내일 3시 치과"]), updated));
         let text = fs::read_to_string(root.join("메모.md")).unwrap();
         assert!(text.contains("aiEvents:") && text.contains("id: r1"), "{text}");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn ai_tags_write_body_and_meta_but_never_over_another_device() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let id = v.create(None, None, "");
+        v.save(&id, "# 메모\n치과 예약").unwrap();
+        let updated = v.get(&id).unwrap()["updated"].clone();
+        let m = v.set_ai_tags(&id, "# 메모\n치과 예약\n\n#병원", &["병원".into()]).unwrap().unwrap();
+        assert_eq!((m["aiTags"].clone(), m["updated"].clone()), (json!(["병원"]), updated));
+        let path = root.join("메모.md");
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("aiTags:") && text.contains("#병원"), "{text}");
+        assert!(!v.versions(&id).is_empty(), "태그 달기 전 글을 버전으로");
+        // 휴대폰에서 고친 글이 내려왔는데 아직 다시 읽기 전 — 사본을 만들지 않고 쓰지 않는다
+        let theirs = text.replace("치과 예약", "휴대폰에서 고침");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(&path, &theirs).unwrap();
+        assert!(v.set_ai_tags(&id, "# 메모\n치과 예약\n\n#병원 #예약", &["병원".into(), "예약".into()]).unwrap().is_none());
+        assert_eq!(fs::read_to_string(&path).unwrap(), theirs);
+        assert_eq!(v.list().len(), 1, "사본 메모 없음");
+        assert_eq!(v.get(&id).unwrap()["aiTags"], json!(["병원"]), "되돌림");
+        // 잠긴 메모는 손대지 않는다
+        let locked = "---\nid: lk\ncolor: yellow\n---\n# 비밀\n\n<!-- memoking-lock v1 n=310000 s=AAAA i=BBBB c=CCCC== -->\n";
+        fs::write(root.join("비밀.md"), locked).unwrap();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        assert!(v.set_ai_tags("lk", "# 비밀\n\n#태그", &["태그".into()]).unwrap().is_none());
+        assert_eq!(fs::read_to_string(root.join("비밀.md")).unwrap(), locked);
         fs::remove_dir_all(root).unwrap();
     }
 
