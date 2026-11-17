@@ -2136,6 +2136,7 @@ dependencies = [
 name = "memoking"
 version = "0.88.0"
 dependencies = [
+ "base64 0.23.1",
  "memoking-core",
  "serde",
  "serde_json",

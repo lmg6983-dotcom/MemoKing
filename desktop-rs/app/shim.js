@@ -3,7 +3,15 @@
 (() => {
   const tauri = () => window.__TAURI_INTERNALS__;
   const asError = (e) => (e instanceof Error ? e : new Error(String(e)));
-  const call = (channel, args) => tauri().invoke('ipc', { channel, args }).catch((e) => { throw asError(e); });
+  // 바이트(그림 · 파일)는 JSON 으로 보내면 {"0":…} 꼴로 몇 배 커진다 — { $bytes: base64 } 로 감싸 주고받는다 (Rust ipc.rs bytes)
+  const toB64 = (u8) => {
+    let s = '';
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
+  const wrap = (a) => (a instanceof ArrayBuffer ? { $bytes: toB64(new Uint8Array(a)) } : ArrayBuffer.isView(a) ? { $bytes: toB64(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)) } : a);
+  const unwrap = (v) => (v && typeof v === 'object' && typeof v.$bytes === 'string' ? Uint8Array.from(atob(v.$bytes), (c) => c.charCodeAt(0)) : v);
+  const call = (channel, args) => tauri().invoke('ipc', { channel, args: args.map(wrap) }).then(unwrap, (e) => { throw asError(e); });
   // Windows(WebView2)는 사용자 프로토콜을 http://<이름>.localhost 로 바꿔 부른다
   const scheme = (name) => (navigator.userAgent.includes('Windows') ? `http://${name}.localhost/` : `${name}://localhost/`);
   const unlisten = new Map(); // handler → Promise<끄기>

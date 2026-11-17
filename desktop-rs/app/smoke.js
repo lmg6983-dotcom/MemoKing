@@ -90,6 +90,16 @@ window.addEventListener('load', () => setTimeout(async () => {
   });
   await check('짧은 비밀번호는 거절', async () => /4자/.test((await mk.memo.lock(id, '12'))?.error ?? '') || (await mk.memo.get(id)).locked);
   await check('풀기', async () => (await mk.memo.unlock(id)).locked === false);
+  // 첨부: 바이트가 그대로 오가는지 (0~255 모두)
+  const bytes = Uint8Array.from({ length: 256 }, (_, i) => i);
+  let rel = '';
+  await check('첨부 넣기', async () => /^attachments\/\d{8}-\d{6}-[0-9a-f]{4}\.bin$/.test((rel = await mk.attachments.save(bytes, 'bin'))));
+  await check('첨부 읽기 (바이트 그대로)', async () => {
+    const back = await mk.attachments.read(rel);
+    return back instanceof Uint8Array && back.length === 256 && back.every((b, i) => b === i);
+  });
+  await check('첨부 정보', async () => (await mk.attachments.info(rel)).size === 256);
+  await check('다른 이름으로 저장', async () => (await mk.attachments.saveAs({ name: '내/보내기:파일.bin', rel })).name === '보내기 파일.bin'); // Electron safeName 처럼 경로 앞은 뗀다
   await check('CSS app-region 읽힘 (창 끌기)', () => dragRegion('.bar'));
   done();
 }, 1500));

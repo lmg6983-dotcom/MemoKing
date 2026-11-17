@@ -142,3 +142,10 @@ fn lock() {
     let fails = refs.iter().filter(|c| lock_ref_key(c["src"].as_str().unwrap(), c["salt"].as_str().unwrap()) != c["key"]).map(|c| c.to_string()).collect();
     report("lock_ref", fails, refs.len());
 }
+
+#[test]
+fn program_files() {
+    let cases = fixtures("program_files");
+    let fails = cases.iter().filter(|c| memoking_core::vault::is_program_file(c["name"].as_str().unwrap()) != c["program"]).map(|c| c.to_string()).collect();
+    report("program_files", fails, cases.len());
+}

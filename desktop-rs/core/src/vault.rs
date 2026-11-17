@@ -1308,6 +1308,32 @@ impl Vault {
     }
 }
 
+// ---------- 첨부 ----------
+impl Vault {
+    /// 첨부 저장 → "attachments/20261117-153000-ab12.png"
+    pub fn save_attachment(&self, bytes: &[u8], ext: &str) -> io::Result<String> {
+        let ext: String = ext.to_lowercase().chars().filter(|c| c.is_ascii_alphanumeric()).take(8).collect();
+        let ext = if ext.is_empty() { "bin".into() } else { ext };
+        let name = format!("{}-{}.{ext}", file_stamp(chrono::Local::now()), &uuid::Uuid::new_v4().simple().to_string()[..4]);
+        write_atomic(&self.root.join(ATTACH_DIR).join(&name), bytes)?;
+        Ok(format!("{ATTACH_DIR}/{name}"))
+    }
+}
+
+/// 실행하면 프로그램이 도는 파일 (열기 전에 묻는다) — file-kinds.js isProgramFile
+pub fn is_program_file(name: &str) -> bool {
+    const PROGRAM_EXT: [&str; 33] = [
+        "exe", "msi", "msix", "appx", "appxbundle", "bat", "cmd", "com", "scr", "pif", "cpl", "msc", "ps1", "psm1", "vbs", "vbe", "js", "jse", "wsf", "wsh", "hta", "lnk", "url", "reg", "jar",
+        "application", "appref-ms", "inf", "sct", "chm", "gadget", "ws", "settingcontent-ms",
+    ];
+    let base = name.rsplit(['/', '\\']).next().unwrap_or("").split(['?', '#']).next().unwrap_or("");
+    let ext = match base.rfind('.') {
+        Some(i) if i > 0 => base[i + 1..].to_lowercase(),
+        _ => return false,
+    };
+    PROGRAM_EXT.contains(&ext.as_str())
+}
+
 /// 지운 때: 휴지통 파일 이름 "제목 (20260930-153000).md" 의 시각 (현지)
 fn trashed_at(name: &str) -> Option<i64> {
     use chrono::TimeZone;

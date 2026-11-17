@@ -10,6 +10,7 @@ import { taskProgress } from '../../app/js/core/tasks.js';
 import { isLockedBody, lockBody, lockRefKey } from '../../app/js/core/memo-lock.js';
 import { cleanFolderName } from '../../app/js/core/folders.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
+import { isProgramFile } from '../../app/js/core/file-kinds.js';
 import { corpus, yamlStrings } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -75,3 +76,7 @@ if (!fs.existsSync(lockFile)) {
   write('lock', cases);
 }
 write('lock_ref', ['attachments/a.png', 'attachments/한글 사진.jpg'].map((src) => ({ src, salt: 'c2FsdHNhbHQ=', key: lockRefKey(src, 'c2FsdHNhbHQ=') })));
+
+// 열기 전에 물을 프로그램 파일
+const fileNames = ['a.exe', 'A.EXE', 'setup.msi', 'x.lnk', 'run.ps1', 'doc.pdf', 'photo.png', 'noext', '.exe', 'archive.tar.gz', 'dir/evil.bat', 'dir\\evil.CMD', 'q.url?x', 'page.html#a.exe', 'x.settingcontent-ms', 'x.appref-ms', 'x.js', 'x.json'];
+write('program_files', fileNames.map((name) => ({ name, program: isProgramFile(name) })));

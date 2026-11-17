@@ -231,6 +231,99 @@ fn open_locked(app: &AppHandle, id: &str, password: &str) -> Result<Value, Strin
     })
 }
 
+/// { $bytes: base64 } → 바이트 (shim.js 가 감싼 Uint8Array)
+fn arg_bytes(args: &[Value], i: usize) -> Option<Vec<u8>> {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.decode(args.get(i)?["$bytes"].as_str()?).ok()
+}
+
+fn bytes_value(b: &[u8]) -> Value {
+    use base64::Engine;
+    json!({ "$bytes": base64::engine::general_purpose::STANDARD.encode(b) })
+}
+
+const NOT_FOUND: &str = "파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 삭제됐는지 확인해 주세요";
+
+/// 메모 폴더 attachments/ 안의 파일 (화면이 이미 풀어 보낸 경로)
+fn attachment_file(app: &AppHandle, rel: &str) -> Result<PathBuf, String> {
+    let file = with_vault(app, |v| Ok(rel.starts_with("attachments/").then(|| v.resolve(rel)).flatten()))?;
+    file.filter(|f| f.is_file()).ok_or_else(|| NOT_FOUND.into())
+}
+
+fn read_attachment(app: &AppHandle, rel: &str) -> Result<Value, String> {
+    let file = with_vault(app, |v| Ok(v.resolve(rel)))?.filter(|f| f.is_file()).ok_or("파일을 찾지 못했어요. 메모 폴더에서 삭제됐거나 옮겨졌는지 확인해 주세요")?;
+    if std::fs::metadata(&file).map_or(0, |m| m.len()) > 500 * 1024 * 1024 {
+        return Err("파일이 너무 커요 (500MB 넘음). 더 작은 파일로 해 주세요".into());
+    }
+    std::fs::read(&file).map(|b| bytes_value(&b)).map_err(|e| e.to_string())
+}
+
+/// 첨부를 그 파일의 프로그램으로 연다 → "" (열림) · "cancelled" · 까닭
+fn open_attachment(app: &AppHandle, rel: &str) -> Result<Value, String> {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+    use tauri_plugin_opener::OpenerExt;
+    let rel = memoking_core::js::decode_uri(rel).unwrap_or_else(|| rel.to_string());
+    let Some(file) = with_vault(app, |v| Ok(v.resolve(&rel)))?.filter(|f| f.is_file()) else { return Ok(format!("{NOT_FOUND}.").into()) };
+    let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    // 다른 기기와 함께 쓰는 폴더라 — 프로그램 파일은 실행하기 전에 묻는다
+    if memoking_core::vault::is_program_file(&name) {
+        let ok = app
+            .dialog()
+            .message(format!("\"{name}\"은(는) 프로그램 파일이에요. 실행할까요?\n\n다른 기기와 함께 쓰는 폴더예요. 직접 넣은 파일이 맞는지 확인해 주세요."))
+            .title("메모킹")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom("실행".into(), "취소".into()))
+            .blocking_show();
+        if !ok {
+            return Ok("cancelled".into());
+        }
+    }
+    Ok(match app.opener().open_path(file.to_string_lossy(), None::<&str>) {
+        Ok(()) => "".into(),
+        Err(_) => "파일을 열지 못했어요. 이 파일을 열 수 있는 프로그램이 있는지 확인해 주세요.".into(),
+    })
+}
+
+/// 내용 저장(저장 단추): { name, mime, rel? | base64? } → { name } | { cancelled } | { error }
+fn save_attachment_as(app: &AppHandle, f: &Value) -> Result<Value, String> {
+    use base64::Engine;
+    use tauri::Manager;
+    use tauri_plugin_dialog::DialogExt;
+    let raw = f["name"].as_str().unwrap_or("메모 내용");
+    let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
+    let name: String = base.split(|c| "\\/:*?\"<>|".contains(c)).filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" ").trim().to_string();
+    let name = if name.is_empty() { "메모 내용".to_string() } else { name };
+    let source = match (f["rel"].as_str(), f["base64"].as_str()) {
+        (Some(rel), _) if !rel.is_empty() => match attachment_file(app, rel) {
+            Ok(p) => Ok(p),
+            Err(e) => return Ok(json!({ "error": e })),
+        },
+        (_, Some(b)) => Err(base64::engine::general_purpose::STANDARD.decode(b).map_err(|e| e.to_string())?),
+        _ => return Ok(json!({ "error": "저장할 내용이 없어요" })),
+    };
+    let ext = name.rsplit_once('.').map(|(_, e)| e.to_string()).unwrap_or_default();
+    let image = f["mime"].as_str().is_some_and(|m| m.starts_with("image/")) || ["png", "jpg", "jpeg", "gif", "webp", "bmp"].contains(&ext.to_lowercase().as_str());
+    let dir = if image { app.path().picture_dir() } else { app.path().download_dir() }.unwrap_or_else(|_| std::env::temp_dir());
+    let target = if crate::ipc::smoke() {
+        Some(std::env::temp_dir().join(format!("memoking-smoke-save-{name}")))
+    } else {
+        let mut d = app.dialog().file().set_title("저장").set_directory(dir).set_file_name(&name);
+        if !ext.is_empty() {
+            d = d.add_filter(format!("{} 파일", ext.to_uppercase()), &[ext.as_str()]).add_filter("모든 파일", &["*"]);
+        }
+        d.blocking_save_file().and_then(|p| p.into_path().ok())
+    };
+    let Some(target) = target else { return Ok(json!({ "cancelled": true })) };
+    let r = match source {
+        Ok(file) => std::fs::copy(file, &target).map(|_| ()),
+        Err(bytes) => std::fs::write(&target, bytes),
+    };
+    Ok(match r {
+        Ok(()) => json!({ "name": if crate::ipc::smoke() { name } else { target.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or(name) } }),
+        Err(_) => json!({ "error": "저장하지 못했어요. 다른 폴더를 골라 주세요" }),
+    })
+}
+
 /// 메모 채널 — 이 파일이 맡지 않는 채널이면 None
 pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let st = state(app);
@@ -322,6 +415,19 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             push_list(app);
             r
         }
+        "attachment:save" => {
+            let Some(bytes) = arg_bytes(args, 0) else { return Some(Err("넣으려는 파일을 읽지 못했어요. 파일을 다시 골라 주세요".into())) };
+            with_vault(app, |v| v.save_attachment(&bytes, &arg_str(args, 1)).map(Value::from).map_err(|e| e.to_string()))
+        }
+        "attachment:read" => read_attachment(app, &arg_str(args, 0)),
+        "attachment:info" => {
+            let rel = arg_str(args, 0);
+            let rel = memoking_core::js::decode_uri(&rel).unwrap_or(rel);
+            let size = with_vault(app, |v| Ok(v.resolve(&rel).and_then(|f| std::fs::metadata(f).ok()).filter(|m| m.is_file()).map(|m| m.len())));
+            Ok(size.ok().flatten().map_or(json!({ "exists": false, "size": 0 }), |n| json!({ "exists": true, "size": n })))
+        }
+        "attachment:open" => open_attachment(app, &arg_str(args, 0)),
+        "attachment:save-as" => save_attachment_as(app, args.first().unwrap_or(&Value::Null)),
         "memos:search" => {
             let exclude = args.get(1).and_then(Value::as_str).map(str::to_string);
             let found = with_vault(app, |v| Ok(v.search(&arg_str(args, 0), exclude.as_deref())));
