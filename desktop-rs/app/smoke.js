@@ -87,6 +87,7 @@ window.addEventListener('load', () => setTimeout(async () => {
       const f = await mk.memo.shareFile(seed.id);
       return f.name === '시험 메모.txt' && atob(f.base64).length > 0;
     });
+    await check('목록 카드 메뉴 → 메모 창에서 하기', async () => (await mk.memo.cardCommand(seed.id, 'versions')) === true && (await mk.memo.cardCommand(seed.id, 'nope')) === false);
     await check('따로 남긴 글 수', async () => (await mk.recovered.count()) === 0);
     await check('이어 쓰기 안내 없음 (모두 이 PC 에서 고침)', async () => (await mk.memo.handoff()) === null);
     // 앱 화면 밖으로 넘어가지 않는다 (넘어가면 이 점검이 끝나지 않아 실패로 보인다)

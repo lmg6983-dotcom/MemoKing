@@ -438,6 +438,21 @@ fn recovered_files(app: &AppHandle) -> Vec<PathBuf> {
     std::fs::read_dir(dir).map_or(vec![], |rd| rd.flatten().map(|d| d.path()).filter(|p| p.extension().is_some_and(|e| e == "md")).collect())
 }
 
+/// 메모 창에 할 일을 보낸다 — 열려 있으면 바로, 아니면 열면서 (memo:get 의 command)
+fn note_command(app: &AppHandle, id: &str, command: Value) -> Result<Value, String> {
+    let open = state(app).note_labels.lock().unwrap().contains_key(id);
+    if !open {
+        state(app).commands.lock().unwrap().insert(id.to_string(), command.clone());
+    }
+    let shown = open_note(app, id)?;
+    if !shown {
+        state(app).commands.lock().unwrap().remove(id); // 없는 메모 — 남겨 두지 않는다
+    } else if open {
+        send_to_note(app, id, "memo:command", [command]);
+    }
+    Ok(shown.into())
+}
+
 /// 메모 채널 — 이 파일이 맡지 않는 채널이면 None
 pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let st = state(app);
@@ -458,7 +473,9 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             let o = m.as_object_mut().unwrap();
             let insert = st.inserts.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
             o.insert("insert".into(), insert);
-            for (k, val) in [("top", json!(false)), ("bottom", json!(false)), ("canTape", json!(false)), ("onTop", json!(false)), ("alarm", Value::Null), ("capture", Value::Null), ("command", Value::Null)] {
+            let command = st.commands.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
+            o.insert("command".into(), command);
+            for (k, val) in [("top", json!(false)), ("bottom", json!(false)), ("canTape", json!(false)), ("onTop", json!(false)), ("alarm", Value::Null), ("capture", Value::Null)] {
                 o.insert(k.into(), val);
             }
             let stack = json!({ "members": [], "active": o["id"] });
@@ -467,7 +484,16 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             m["workLife"] = (st.setting("workLife") == true).into();
             Ok(m)
         }),
-        "memo:open" => open_note(app, &arg_str(args, 0)).map(Value::from),
+        "memo:open" => {
+            // 목록에서 찾던 말: 그 말로 찾아 첫 자리로 (note.js runCommand)
+            let find: String = args.get(1).and_then(|o| o["find"].as_str()).unwrap_or_default().trim().chars().take(200).collect();
+            if find.is_empty() { open_note(app, &arg_str(args, 0)).map(Value::from) } else { note_command(app, &arg_str(args, 0), json!({ "find": find })) }
+        }
+        // 목록 카드 메뉴: 메모 창에서 하는 일
+        "card:command" => match arg_str(args, 1).as_str() {
+            c @ ("lock" | "unlock" | "versions") => note_command(app, &arg_str(args, 0), c.into()),
+            _ => Ok(false.into()),
+        },
         "memo:create" => create_memo(app, args.first().unwrap_or(&Value::Null)),
         "memo:save" => {
             let id = arg_str(args, 0);

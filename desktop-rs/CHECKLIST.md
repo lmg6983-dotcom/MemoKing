@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **66 / 187**
-- 이벤트 (Rust → 화면): **11 / 61**
+- 채널 (화면 → Rust): **67 / 187**
+- 이벤트 (Rust → 화면): **12 / 61**
 
 ## 채널
 
@@ -52,7 +52,7 @@
 | ⬜ | `calendars:set-feeds` |
 | ⬜ | `capture:cancel` |
 | ⬜ | `capture:done` |
-| ⬜ | `card:command` |
+| ✅ | `card:command` |
 | ✅ | `card:copy` |
 | ✅ | `card:share-file` |
 | ✅ | `clipboard:write-rich` |
@@ -227,7 +227,7 @@
 | ⬜ | `list:on-top` |
 | ⬜ | `list:tab` |
 | ⬜ | `memo:alarm` |
-| ⬜ | `memo:command` |
+| ✅ | `memo:command` |
 | ✅ | `memo:external` |
 | ✅ | `memo:handoff` |
 | ⬜ | `memo:highlight` |

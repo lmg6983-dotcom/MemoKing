@@ -19,6 +19,8 @@ pub struct State {
     pub handoff: Mutex<(std::collections::HashSet<String>, Option<Value>)>,
     /// 메모 창이 열리며 넣을 문서 첨부 (memo:import → memo:get insert)
     pub inserts: Mutex<HashMap<String, Value>>,
+    /// 메모 창이 열리면 할 일 (목록 카드 메뉴의 잠그기 · 버전, 찾던 말) — memo:get command
+    pub commands: Mutex<HashMap<String, Value>>,
 }
 
 /// 설정 폴더: Electron 과 같은 %APPDATA%\MemoKing (MagicKey · MagicSystem 이 여기서 읽는다).
@@ -67,6 +69,7 @@ impl State {
             note_labels: Mutex::new(HashMap::new()),
             handoff: Default::default(),
             inserts: Default::default(),
+            commands: Default::default(),
         }
     }
 
