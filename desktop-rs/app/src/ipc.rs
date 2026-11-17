@@ -54,6 +54,9 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
     if let Some(r) = crate::services::handle(app, label, channel, &args) {
         return r;
     }
+    if let Some(r) = crate::stt::handle(app, label, channel, &args) {
+        return r;
+    }
     match channel {
         "smoke:emit" if smoke() => app.emit_to(label, args[0].as_str().unwrap_or_default(), [42]).map(|_| Value::Null).map_err(|e| e.to_string()),
         "smoke:done" if smoke() => {

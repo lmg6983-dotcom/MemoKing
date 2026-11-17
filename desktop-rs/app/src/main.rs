@@ -15,6 +15,7 @@ mod services;
 mod settings;
 mod shortcuts;
 mod state;
+mod stt;
 mod windows;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};

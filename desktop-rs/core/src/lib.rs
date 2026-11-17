@@ -21,6 +21,7 @@ pub mod stacks;
 pub mod tables;
 pub mod tag_suggest;
 pub mod time;
+pub mod transcript;
 pub mod tutorial;
 pub mod update;
 pub mod vault;
