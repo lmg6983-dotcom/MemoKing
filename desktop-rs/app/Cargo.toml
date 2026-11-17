@@ -1,0 +1,15 @@
+[package]
+name = "memoking"
+description = "메모킹 — 바탕화면에 붙여 쓰는 스티커 메모 (Rust + Tauri)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+memoking-core = { path = "../core" }
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

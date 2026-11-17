@@ -1,0 +1,59 @@
+# PC Rust 판 점검 (desktop-rs/) — 옮기는 동안 Windows(WebView2)에서 빌드하고 앱 안 점검(--smoke)을 돌린다.
+#   화면 사진(desktop-rs-screen)과 실행 파일(desktop-rs-exe)을 남겨 사람이 눈으로도 본다.
+name: PC Rust 점검
+
+on:
+  push:
+    paths: ['desktop-rs/**', 'app/**', 'desktop/preload.cjs', '.github/workflows/desktop-rs.yml']
+  pull_request:
+    paths: ['desktop-rs/**', 'app/**', 'desktop/preload.cjs', '.github/workflows/desktop-rs.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-rs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: desktop-rs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-rs
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: cargo build
+      - name: 앱 안 점검 (--smoke)
+        run: target/debug/memoking.exe --smoke | Out-Host; if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: 화면 사진
+        if: always()
+        shell: pwsh
+        run: |
+          $p = Start-Process target/debug/memoking.exe -PassThru
+          Start-Sleep 8
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $img = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($img).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $img.Save("$PWD/screen.png")
+          Stop-Process $p
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-rs-screen
+          path: desktop-rs/screen.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-rs-exe
+          path: desktop-rs/target/debug/memoking.exe

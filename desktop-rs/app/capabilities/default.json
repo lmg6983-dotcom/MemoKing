@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "모든 메모킹 창: 화면은 window.memoking(ipc 하나)과 창 끌기만 쓴다",
+  "windows": ["*"],
+  "permissions": ["core:default", "core:window:allow-start-dragging", "core:window:allow-toggle-maximize", "core:window:allow-minimize", "core:window:allow-close"]
+}
