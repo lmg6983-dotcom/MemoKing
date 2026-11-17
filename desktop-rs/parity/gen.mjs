@@ -16,6 +16,9 @@ import { hotkeyCopyText } from '../../app/js/core/memo-hotkeys.js';
 import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, pendingAlerts, fallbackAlert } from '../../app/js/core/reminders.js';
 import { indexOutput, tokenize, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { NOUNS } from '../../app/js/core/korean-nouns.js';
+import { parseLinkPreview, detectCharset, hostOf, youtubeOEmbedUrl, parseYoutubeOEmbed, staleYoutubeEntry } from '../../app/js/core/link-preview.js';
+import { imageExtFromType, imageExtFromUrl } from '../../app/js/core/remote-images.js';
+import { versionTitles } from '../../app/js/core/release-notes.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -181,3 +184,44 @@ const shareBodies = [...corpus().map((t) => mf.parseMemoFile(t).body),
   '<u>밑줄</u><mark>형광</mark><span style="color:red">빨강</span><br>다음',
 ];
 write('share_text', shareBodies.map((body) => ({ body, share: shareText(body), copy: hotkeyCopyText(body) })));
+
+// 링크 미리보기: 웹페이지 앞부분 → 제목 · 설명 · 사진 · 아이콘 (메타 차례 · 상대 주소 · <base> · 글자 참조 · 아이콘 크기 고르기)
+const pages = [
+  ['<html><head><title> 그냥 &amp; 제목 </title></head>', 'https://www.example.com/a/b.html'],
+  ['<meta property="og:title" content="OG 제목"><meta name="twitter:title" content="트위터"><title>태그</title><meta property="og:title" content="둘째">', 'https://example.com/'],
+  ['<META NAME="Description" CONTENT=\'설명 &#39;따옴표&#39; &#x1F600;\'><meta property="og:description" content="">', 'http://example.com/x?y=1'],
+  ['<meta property="og:image" content="/img/a.png"><meta property="og:image:secure_url" content="https://cdn.example.com/s.png"><meta property="og:site_name" content="사이트">', 'https://example.com/p/'],
+  ['<base href="https://other.example/dir/"><meta property="og:image" content="pic.jpg"><link rel="icon" href="fav.png">', 'https://example.com/'],
+  ['<link rel="icon" sizes="16x16" href="/16.png"><link rel="apple-touch-icon" href="/apple.png"><link rel="shortcut icon" sizes="48x48" href="/48.png"><link rel="icon" sizes="256x256" href="/256.png">', 'https://example.com/'],
+  ['<link rel="icon" sizes="any" href="javascript:alert(1)"><link rel="ICON" href="data:image/png;base64,AA"><meta name=twitter:image content=//cdn.example.com/t.gif>', 'https://example.com/'],
+  [`<title>${'가'.repeat(250)}</title><meta name="description" content="${'a b  '.repeat(100)}">`, 'https://example.com/'],
+  ['<meta itemprop="name" content="아이템"><meta property="og:title"><title>\n여러\n줄\n</title>', 'https://example.com/'],
+  ['', 'https://example.com/'],
+  ['<link rel="icon" href="/f.ico">', 'not a url'],
+];
+const youtubeUrls = ['https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1', 'https://youtu.be/dQw4w9WgXcQ', 'https://m.youtube.com/shorts/dQw4w9WgXcQ', 'https://music.youtube.com/watch?v=short',
+  'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ', 'https://YouTube.com/live/dQw4w9WgXcQ?x', 'https://example.com/watch?v=dQw4w9WgXcQ', 'https://www.youtube.com/channel/abc', 'nope'];
+const oembeds = ['{"title":" 제목\\n줄 ","author_name":"채널"}', '{"title":5}', 'null', '', `{"title":"${'x'.repeat(210)}"}`];
+write('link_preview', [
+  ...pages.map(([html, url]) => ({ html, url, preview: parseLinkPreview(html, url) })),
+  ...youtubeUrls.map((url) => ({ url, host: hostOf(url), oembedUrl: youtubeOEmbedUrl(url), stale: staleYoutubeEntry(url, { title: 'x' }), fresh: staleYoutubeEntry(url, { kind: 'page' }),
+    oembeds: oembeds.map((j) => parseYoutubeOEmbed(j, url)) })),
+  ...[['text/html; charset=EUC-KR', ''], ['text/html', '<meta charset="Shift_JIS">'], ['text/html', '<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">'], ['', ''], ['', 'x']]
+    .map(([type, head]) => ({ type, head, charset: detectCharset(type, head) })),
+  ...['image/PNG; x=1', 'image/jpeg', 'image/x-icon', 'text/html', '', ' image/svg+xml '].map((type) => ({ type, ext: imageExtFromType(type) })),
+  ...['https://e.com/a.JPEG', 'https://e.com/a.png?x=1', 'https://e.com/a.tiff', 'https://e.com/a', 'https://e.com/a.ico', 'nope'].map((imageUrl) => ({ imageUrl, ext: imageExtFromUrl(imageUrl) })),
+]);
+
+// 업데이트 뒤 "개선된 점" (README 이력 표 꼴 — 진짜 README 는 릴리스마다 바뀌어 고정한 표로)
+const readme = [
+  '| 태그 | 날짜 | 단계 | 내용 |', '|---|---|---|---|',
+  '| `v0.88.0` | 2026-11-17 | 정식 | **새 기능 (PC 0.88.0)** 설명. 더 |',
+  '| `v0.87.1` | 2026-11-10 | 정식 | **고침** (휴대폰 0.47.0) |\r',
+  '| `v0.87.0` | 2026-11-01 | 정식 | 제목 없는 옛 행 |',
+  '| `v0.9.0` | 2025-01-01 | 정식 | **옛 버전** |',
+  '| `v0.10.0` | 2025-02-01 | 정식 | **열 번째** |',
+  '| `v0.86.0` | 2026-10-01 | 정식 | **여섯** |', '| `v0.85.0` | 2026-09-01 | 정식 | **다섯** |', '| `v0.84.0` | 2026-08-01 | 정식 | **넷** |',
+  '| `v1.0.0` | 2027-01-01 | 정식 | **미래** |', '| v0.83.0 | 2026-07-01 | 정식 | **틀린 꼴** |',
+].join('\n');
+write('release_notes', [[null, '0.88.0'], ['0.85.0', '0.88.0'], ['0.88.0', '0.88.0'], ['0.9.0', '0.20.0'], [null, '9.9.9']]
+  .map(([from, to]) => ({ readme, from, to, titles: versionTitles(readme, from, to) })));

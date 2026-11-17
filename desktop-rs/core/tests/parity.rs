@@ -250,3 +250,42 @@ fn share_text() {
         .collect();
     report("share_text", fails, cases.len());
 }
+
+#[test]
+fn link_preview() {
+    use memoking_core::link_preview::*;
+    let cases = fixtures("link_preview");
+    let oembeds = ["{\"title\":\" 제목\\n줄 \",\"author_name\":\"채널\"}", "{\"title\":5}", "null", "", &format!("{{\"title\":\"{}\"}}", "x".repeat(210))];
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = if let Some(html) = c["html"].as_str() {
+                json!({ "html": html, "url": c["url"], "preview": parse_link_preview(html, c["url"].as_str().unwrap()) })
+            } else if let Some(url) = c["url"].as_str() {
+                let parsed: Vec<Value> = oembeds.iter().map(|j| parse_youtube_oembed(j, url)).collect();
+                json!({ "url": url, "host": host_of(url), "oembedUrl": youtube_oembed_url(url), "stale": stale_youtube_entry(url, &json!({ "title": "x" })), "fresh": stale_youtube_entry(url, &json!({ "kind": "page" })), "oembeds": parsed })
+            } else if let Some(head) = c["head"].as_str() {
+                json!({ "type": c["type"], "head": head, "charset": detect_charset(c["type"].as_str().unwrap(), head) })
+            } else if let Some(t) = c["type"].as_str() {
+                json!({ "type": t, "ext": image_ext_from_type(t) })
+            } else {
+                json!({ "imageUrl": c["imageUrl"], "ext": image_ext_from_url(c["imageUrl"].as_str().unwrap()) })
+            };
+            (&got != c).then(|| format!("  JS  : {c}\n  Rust: {got}"))
+        })
+        .collect();
+    report("link_preview", fails, cases.len());
+}
+
+#[test]
+fn release_notes() {
+    let cases = fixtures("release_notes");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = json!(memoking_core::release_notes::version_titles(c["readme"].as_str().unwrap(), c["from"].as_str(), c["to"].as_str().unwrap(), 5));
+            (got != c["titles"]).then(|| format!("{} → {}\n  JS  : {}\n  Rust: {got}", c["from"], c["to"], c["titles"]))
+        })
+        .collect();
+    report("release_notes", fails, cases.len());
+}

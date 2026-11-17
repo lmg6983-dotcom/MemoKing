@@ -20,3 +20,5 @@ aes-gcm = "0.10"
 base64 = "0.23"
 unicode-normalization = "0.1"
 getrandom = "0.3"
+# 링크 미리보기의 주소 읽기 (JS new URL 과 같은 WHATWG 규칙)
+url = "2"

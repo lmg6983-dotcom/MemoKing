@@ -2280,6 +2280,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "unicode-normalization",
+ "url",
  "uuid",
  "yaml-rust2",
 ]
