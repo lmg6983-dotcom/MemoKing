@@ -1,7 +1,7 @@
 // 메모 채널 — 메모 폴더 · 목록 · 메모 창 열고 닫기 · 저장. Electron 의 ipc-handlers.js · window-manager.js 의 그 부분.
 use crate::state::State;
 use serde_json::{json, Value};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
@@ -34,14 +34,19 @@ fn with_vault<T>(app: &AppHandle, f: impl FnOnce(&mut memoking_core::vault::Vaul
 pub fn start(app: &AppHandle) {
     let st = state(app);
     if let Some(dir) = st.setting("vaultPath").as_str().filter(|d| !d.is_empty()) {
-        st.open_vault(PathBuf::from(dir));
+        // 쓰던 폴더가 없어졌으면 빈 폴더를 새로 만들지 않는다 — 동기화가 "모두 지웠다" 로 읽어 Drive · 휴대폰에서도 지우므로
+        if Path::new(dir).exists() {
+            st.open_vault(app, PathBuf::from(dir));
+        } else {
+            *st.vault_missing.lock().unwrap() = Some(dir.to_string());
+        }
     } else if crate::ipc::smoke() {
         // 점검용 메모 폴더: 그림이 든 메모 하나 (smoke.js 가 목록 · 그림 · 새 메모 · 저장을 본다)
         let dir = State::suggested_vault(app);
         let _ = std::fs::create_dir_all(dir.join("attachments"));
         let _ = std::fs::write(dir.join("시험 메모.md"), "---\nid: smoke-seed\ncolor: green\n---\n# 시험 메모\n\n#점검 ![점](attachments/dot.png)\n");
         let _ = std::fs::write(dir.join("attachments/dot.png"), DOT_PNG);
-        st.open_vault(dir);
+        st.open_vault(app, dir);
     }
     // 앱을 켤 때: 가장 최근에 고친 5개 중 다른 기기에서 방금 고친 것
     let recent: Vec<String> = st.vault.lock().unwrap().as_ref().map(|v| v.list()).unwrap_or_default().iter().take(5).filter_map(|m| m["id"].as_str().map(str::to_string)).collect();
@@ -489,7 +494,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "vault:use" => {
             let dir = arg_str(args, 0);
             let dir = if dir.is_empty() { State::suggested_vault(app) } else { PathBuf::from(dir) };
-            st.open_vault(dir);
+            st.open_vault(app, dir);
             push_list(app);
             Ok(st.vault_info(app))
         }
@@ -733,7 +738,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             let start = with_vault(app, |v| Ok(v.root.clone())).unwrap_or_else(|_| State::suggested_vault(app));
             let picked = app.dialog().file().set_title("메모를 저장할 폴더 선택").set_directory(start).blocking_pick_folder();
             if let Some(dir) = picked.and_then(|p| p.into_path().ok()) {
-                st.open_vault(dir);
+                st.open_vault(app, dir);
                 crate::shortcuts::refresh(app); // 다른 폴더의 메모 단축키
                 push_list(app);
                 if st.setting("tutorialDone") != true && !crate::ipc::smoke() {

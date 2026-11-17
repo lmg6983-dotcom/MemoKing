@@ -596,10 +596,17 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         }
         "list:on-top" | "list:crown-docked" => Ok(list_on_top(app).into()),
         "list:toggle-top" => Ok(set_list_on_top(app, !list_on_top(app)).into()),
-        // 찾지 못한 메모 폴더(missingPath)는 Rust 판에 아직 없다 — 다시 찾을 것도 없다
+        // 찾지 못한 메모 폴더를 다시 찾아본다 (외장 드라이브를 다시 꽂음 등) — 있으면 열고, 없으면 그대로
         "vault:retry" => {
-            let mut info = state(app).vault_info(app);
-            info["stillMissing"] = false.into();
+            let st = state(app);
+            let missing = st.vault_missing.lock().unwrap().clone();
+            if let Some(dir) = missing.as_ref().filter(|d| Path::new(d).exists()) {
+                st.open_vault(app, PathBuf::from(dir));
+                crate::memos::push_list(app);
+                return Some(Ok(st.vault_info(app)));
+            }
+            let mut info = st.vault_info(app);
+            info["stillMissing"] = missing.is_some().into();
             Ok(info)
         }
         "vault:reveal" => Ok(match vault_root(app) {

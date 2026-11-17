@@ -873,7 +873,7 @@ fn switch_folder(app: &AppHandle, folder_id: &str, folder_name: &str) -> Value {
     }
     st.set_setting("drive", json!({ "folderId": folder_id, "folderName": folder_name }));
     if moving {
-        st.open_vault(root);
+        st.open_vault(app, root);
         crate::memos::push_list(app);
     }
     configure(app);
