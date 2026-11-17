@@ -155,15 +155,7 @@ pub fn normalize_reminder(raw: &Value, now_iso: &str) -> Option<Value> {
 }
 
 fn random_id() -> String {
-    format!("r{}", &uuid_hex()[..6])
-}
-
-fn uuid_hex() -> String {
-    use std::collections::hash_map::RandomState;
-    use std::hash::{BuildHasher, Hasher};
-    let mut h = RandomState::new().build_hasher();
-    h.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos());
-    format!("{:016x}", h.finish())
+    format!("r{}", &uuid::Uuid::new_v4().simple().to_string()[..6])
 }
 
 /// 파일에 쓸 모양 (기본값은 생략해 짧게)

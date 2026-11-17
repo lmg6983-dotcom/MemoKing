@@ -16,35 +16,61 @@ fn init_script() -> String {
     s
 }
 
+/// 앱 화면의 주소인가 (Windows: http://tauri.localhost, 그 밖: tauri://localhost)
+fn is_app_url(url: &tauri::Url) -> bool {
+    url.scheme() == "tauri" || (matches!(url.scheme(), "http" | "https") && url.host_str() == Some("tauri.localhost"))
+}
+
+/// memoking 주소를 부른 곳이 앱 화면인가 — 아니면(끌어 놓은 웹 페이지 등) 메모를 읽고 쓰지 못하게
+fn is_app_origin(origin: &str) -> bool {
+    tauri::Url::parse(origin).is_ok_and(|u| is_app_url(&u))
+}
+
 /// 메모킹 창의 공통 바탕: 테두리 없음 · window.memoking · 화면이 직접 받는 끌어 놓기
+///   앱 화면 밖으로는 넘어가지 않는다 — 웹 주소는 브라우저로 (Electron guardWindow 와 같게)
 pub fn window<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
+    let opener = app.clone();
     WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.into()))
         .decorations(false)
         .initialization_script(init_script())
         // 사진 · 파일 끌어 넣기를 Tauri 가 가로채지 않게 (화면의 drop 이벤트가 받는다)
         .disable_drag_drop_handler()
+        .on_navigation(move |url| {
+            if is_app_url(url) || url.as_str() == "about:blank" {
+                return true;
+            }
+            if matches!(url.scheme(), "http" | "https") {
+                use tauri_plugin_opener::OpenerExt;
+                let _ = opener.opener().open_url(url.as_str(), None::<&str>);
+            }
+            false
+        })
 }
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![ipc::ipc])
-        // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
-        //   sync/<채널>: 동기 호출 (shim.js sendSync). 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
         //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상
         .register_uri_scheme_protocol("memoking", |ctx, req| {
             let path = req.uri().path().to_string();
-            let not_found = || http::Response::builder().status(404).body(Vec::new()).unwrap();
+            let status = |code| http::Response::builder().status(code).body(Vec::new()).unwrap();
+            // 앱 화면만 (출처 없는 <img> 는 그림만 보일 뿐 읽지 못한다 — 동기 호출은 늘 출처가 있다)
+            let origin = req.headers().get("origin").and_then(|o| o.to_str().ok()).map(str::to_string);
+            if origin.as_deref().is_some_and(|o| !is_app_origin(o)) {
+                return status(403);
+            }
+            let allow = origin.clone().unwrap_or_default();
             if let Some(rel) = path.strip_prefix("/vault/") {
-                let origin = req.headers().get("origin").and_then(|o| o.to_str().ok());
-                return match memos::serve_vault(ctx.app_handle(), rel, origin) {
-                    Some((bytes, mime, allow)) => http::Response::builder().header("Content-Type", mime).header("Access-Control-Allow-Origin", allow).body(bytes).unwrap(),
-                    None => not_found(),
+                return match memos::serve_vault(ctx.app_handle(), rel) {
+                    Some((bytes, mime)) => http::Response::builder().header("Content-Type", mime).header("Access-Control-Allow-Origin", allow).body(bytes).unwrap(),
+                    None => status(404),
                 };
             }
             // 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
-            let Some(channel) = path.strip_prefix("/sync/") else { return not_found() };
+            let (Some(channel), Some(_)) = (path.strip_prefix("/sync/"), &origin) else { return status(404) };
             let label = ctx.webview_label().to_string();
             let args = serde_json::from_slice(req.body()).unwrap_or_default();
             let body = match ipc::dispatch(ctx.app_handle(), &label, channel, args) {
@@ -53,7 +79,7 @@ fn main() {
             };
             http::Response::builder()
                 .header("Content-Type", "application/json")
-                .header("Access-Control-Allow-Origin", "*")
+                .header("Access-Control-Allow-Origin", allow)
                 .body(body.to_string().into_bytes())
                 .unwrap()
         })
@@ -88,4 +114,17 @@ pub fn percent_decode(s: &str) -> String {
         }
     }
     String::from_utf8_lossy(&out).into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_app_origin;
+
+    #[test]
+    fn only_app_pages_reach_memos() {
+        assert!(is_app_origin("http://tauri.localhost") && is_app_origin("tauri://localhost") && is_app_origin("https://tauri.localhost"));
+        for bad in ["null", "https://evil.example", "http://tauri.localhost.evil.example", "http://memoking.localhost", "file://"] {
+            assert!(!is_app_origin(bad), "{bad}");
+        }
+    }
 }

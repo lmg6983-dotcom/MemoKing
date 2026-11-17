@@ -54,7 +54,7 @@ pub fn start(app: &AppHandle) {
 
 fn rescan(app: &AppHandle) {
     let st = state(app);
-    let (changed, external, removed) = {
+    let (external, removed) = {
         let mut guard = st.vault.lock().unwrap();
         let Some(v) = guard.as_mut() else { return };
         let c = v.scan();
@@ -62,9 +62,8 @@ fn rescan(app: &AppHandle) {
             return;
         }
         let ext: Vec<(String, Value)> = c.external.iter().filter(|id| !c.removed.contains(id)).map(|id| (id.clone(), v.get(id).unwrap_or(Value::Null))).collect();
-        (c.ids, ext, c.removed)
+        (ext, c.removed)
     };
-    let _ = changed;
     for (id, memo) in external {
         send_to_note(app, &id, "memo:external", [memo]);
     }
@@ -430,8 +429,8 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
     })
 }
 
-/// memoking://localhost/vault/<경로> — 메모 폴더 안 파일만 (그림 · 소리 · 영상). 화면이 캔버스로 읽게 CORS 허락
-pub fn serve_vault(app: &AppHandle, rel: &str, origin: Option<&str>) -> Option<(Vec<u8>, &'static str, String)> {
+/// memoking://localhost/vault/<경로> — 메모 폴더 안 파일만 (그림 · 소리 · 영상). 앱 화면만 읽게 (main.rs)
+pub fn serve_vault(app: &AppHandle, rel: &str) -> Option<(Vec<u8>, &'static str)> {
     let rel = crate::percent_decode(rel);
     let file = state(app).vault.lock().unwrap().as_ref()?.resolve(&rel)?;
     let bytes = std::fs::read(&file).ok()?;
@@ -455,5 +454,5 @@ pub fn serve_vault(app: &AppHandle, rel: &str, origin: Option<&str>) -> Option<(
         "json" => "application/json",
         _ => "application/octet-stream",
     };
-    Some((bytes, mime, origin.unwrap_or("*").to_string()))
+    Some((bytes, mime))
 }

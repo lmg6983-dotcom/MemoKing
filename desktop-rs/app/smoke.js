@@ -66,6 +66,13 @@ window.addEventListener('load', () => setTimeout(async () => {
     await check('지우기 → 휴지통 · 되돌리기 띠', async () => (await mk.memo.remove(fresh.id)) === true && (await until(() => trashed)).title === '새 메모');
     await check('휴지통 되살리기', async () => (await mk.trash.restore(trashed.name)) === fresh.id && (await mk.trash.list()).length === 0);
     await check('설정 읽기', async () => /^\d+\.\d+\.\d+$/.test((await mk.settings.get()).version));
+    // 앱 화면 밖으로 넘어가지 않는다 (넘어가면 이 점검이 끝나지 않아 실패로 보인다)
+    await check('다른 주소로 넘어가지 않음', async () => {
+      const here = location.href;
+      location.href = 'file:///memoking-smoke-nowhere.html';
+      await new Promise((r) => setTimeout(r, 800));
+      return location.href === here && Boolean(document.querySelector('.titlebar'));
+    });
     return done();
   }
 

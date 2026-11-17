@@ -39,11 +39,13 @@ pub struct Changed {
     /// 다른 기기 · 탐색기에서 바뀐 메모
     pub external: Vec<String>,
     pub removed: Vec<String>,
+    /// 메모는 그대로여도 폴더가 생기거나 없어졌다 (목록이 폴더 목록을 다시 읽게)
+    pub folders: bool,
 }
 
 impl Changed {
     pub fn is_empty(&self) -> bool {
-        self.ids.is_empty()
+        self.ids.is_empty() && !self.folders
     }
 }
 
@@ -73,6 +75,21 @@ pub struct Vault {
     seen_dirs: Option<String>,
     /// 연 잠긴 메모의 열쇠 (메모를 닫으면 잊는다)
     locks: HashMap<String, lock::Session>,
+    /// 본문에서 뽑은 것 — 본문이 같으면 다시 뽑지 않는다 (JS bodyParts: 메모 2,000개를 저장마다 다 읽으면 1초 넘게 걸렸다)
+    parts: std::sync::Mutex<HashMap<String, (u64, std::sync::Arc<Parts>)>>,
+}
+
+/// 목록 카드 · 찾기가 본문에서 쓰는 것
+pub struct Parts {
+    title: String,
+    preview: String,
+    media: Vec<body::Media>,
+    tags: Vec<String>,
+    tasks: Tasks,
+    locked: bool,
+    web_link: bool,
+    /// 찾기용 글 (서식 뺀 줄)
+    text: String,
 }
 
 fn stamp_of(path: &Path) -> io::Result<(SystemTime, u64)> {
@@ -124,6 +141,7 @@ impl Vault {
             own_files: HashSet::new(),
             seen_dirs: None,
             locks: HashMap::new(),
+            parts: Default::default(),
         }
     }
 
@@ -176,34 +194,36 @@ impl Vault {
         if self.list_files(&self.root.clone(), "", &mut files).is_err() {
             return Changed::default();
         }
-        let prev_by_file: HashMap<String, Entry> = self.entries.values().filter_map(|e| Some((e.file.clone()?, e.clone()))).collect();
+        // 지금 것을 꺼내 바뀌지 않은 메모는 그대로 옮긴다 (2초마다 모든 본문을 복사하지 않게)
+        let mut old = std::mem::take(&mut self.entries);
+        let prev_by_file: HashMap<String, String> = old.values().filter_map(|e| Some((e.file.clone()?, e.id.clone()))).collect();
         // 아직 파일이 없는 새 메모는 그대로
-        let mut next: HashMap<String, Entry> = self.entries.iter().filter(|(_, e)| e.file.is_none()).map(|(k, e)| (k.clone(), e.clone())).collect();
+        let new_ids: Vec<String> = old.values().filter(|e| e.file.is_none()).map(|e| e.id.clone()).collect();
+        let mut next: HashMap<String, Entry> = new_ids.into_iter().filter_map(|id| Some((id.clone(), old.remove(&id)?))).collect();
         let mut changed: Vec<String> = vec![];
         let mut external = vec![];
         let mut locked_now: Vec<String> = vec![];
         for file in files {
             let path = self.abs(&file);
             let Ok(stamp) = stamp_of(&path) else { continue };
-            let prev = prev_by_file.get(&file);
-            if let Some(p) = prev.filter(|p| p.stamp == Some(stamp) && !next.contains_key(&p.id)) {
-                next.insert(p.id.clone(), p.clone());
-                continue;
-            }
-            let Ok(text) = fs::read_to_string(&path) else {
-                // 백신 · OneDrive 가 잠깐 붙잡아 못 읽었다 — 아는 내용 그대로
-                if let Some(p) = prev.filter(|p| !next.contains_key(&p.id)) {
-                    next.insert(p.id.clone(), p.clone());
+            let prev = prev_by_file.get(&file).and_then(|id| old.get(id)).filter(|p| p.file.as_deref() == Some(file.as_str()));
+            let keep = prev.is_some_and(|p| p.stamp == Some(stamp) && !next.contains_key(&p.id));
+            let text = if keep { None } else { fs::read_to_string(&path).ok() };
+            let Some(text) = text else {
+                // 그대로이거나, 백신 · OneDrive 가 잠깐 붙잡아 못 읽었다 — 아는 내용 그대로
+                if let Some(p) = prev.filter(|p| !next.contains_key(&p.id)).map(|p| p.id.clone()).and_then(|id| old.remove(&id)) {
+                    next.insert(p.id.clone(), p);
                 }
                 continue;
             };
+            let prev_unsaved = prev.filter(|p| !p.id_saved).map(|p| p.id.clone());
             let (mut meta, body) = memo_file::parse_memo_file(&text);
             // id 가 없는 파일(직접 만든 것)이나 id 가 겹치는 사본은 임시 id
             // shortcut: 폴더를 옮긴 사이 옛 자리가 되살아난 같은 id 두 파일(resolveMovedTwin)은 아직 사본처럼 다룬다 — 폴더 옮기기를 옮길 때
             let mut id = meta.id.clone();
             let mut id_saved = id.is_some();
             if id.as_ref().is_none_or(|i| next.contains_key(i)) {
-                id = Some(prev.filter(|p| !p.id_saved).map_or_else(|| uuid::Uuid::new_v4().to_string(), |p| p.id.clone()));
+                id = Some(prev_unsaved.unwrap_or_else(|| uuid::Uuid::new_v4().to_string()));
                 id_saved = false;
             }
             let id = id.unwrap();
@@ -216,28 +236,30 @@ impl Vault {
                 let born = fs::metadata(&path).and_then(|m| m.created()).unwrap_or(stamp.0);
                 meta.created = Some(local(born));
             }
-            let old_body = self.entries.get(&id).map(|e| e.body.clone());
+            let old_body = old.get(&id).map(|e| e.body.as_str());
             // 다른 기기에서 잠갔거나 비밀번호를 바꾼 메모: 이 기기에 남은 풀린 버전 · 예전 비밀번호 버전을 지운다 (아래에서)
             let salt = |b: &str| lock::parse_locked(b).map(|p| p.salt);
-            if body::is_locked_body(&body) && old_body.as_deref().is_some_and(|o| salt(o) != salt(&body)) {
+            if body::is_locked_body(&body) && old_body.is_some_and(|o| salt(o) != salt(&body)) {
                 locked_now.push(id.clone());
             }
-            if old_body.as_deref() != Some(&body) && !self.own_files.contains(&file) {
+            if old_body != Some(body.as_str()) && !self.own_files.contains(&file) {
                 external.push(id.clone());
             }
             next.insert(id.clone(), Entry { id: id.clone(), file: Some(file), folder: String::new(), meta, body, stamp: Some(stamp), id_saved });
             changed.push(id);
         }
-        let removed: Vec<String> = self.entries.keys().filter(|id| !next.contains_key(*id)).cloned().collect();
+        let removed: Vec<String> = old.keys().filter(|id| !next.contains_key(*id)).cloned().collect();
         let now = SystemTime::now();
         self.removed_meta.retain(|_, (_, at)| now.duration_since(*at).is_ok_and(|d| d.as_millis() < 10 * 60_000));
         for id in &removed {
-            if let Some(e) = self.entries.get(id) {
-                self.removed_meta.insert(id.clone(), (e.meta.clone(), now));
+            if let Some(e) = old.remove(id) {
+                self.removed_meta.insert(id.clone(), (e.meta, now));
             }
             changed.push(id.clone());
         }
         self.entries = next;
+        // 분석해 둔 것 중 없어진 메모 것은 버린다 (쌓이지 않게)
+        self.parts.lock().unwrap().retain(|id, _| self.entries.contains_key(id));
         for id in &locked_now {
             self.drop_unsafe_versions(id);
         }
@@ -245,10 +267,7 @@ impl Vault {
         let dirs = self.folders().join("\n");
         let dirs_changed = self.seen_dirs.as_ref().is_some_and(|d| *d != dirs);
         self.seen_dirs = Some(dirs);
-        if dirs_changed && changed.is_empty() {
-            return Changed { ids: vec![], external: vec![], removed: vec![] };
-        }
-        Changed { ids: changed, external, removed }
+        Changed { ids: changed, external, removed, folders: dirs_changed }
     }
 
     /// 메모 폴더 맨 위의 메모킹 폴더 (빈 폴더도)
@@ -266,8 +285,35 @@ impl Vault {
 
     // ---------- 조회 ----------
 
+    fn parts(&self, e: &Entry) -> std::sync::Arc<Parts> {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        e.body.hash(&mut h);
+        let key = h.finish();
+        let mut cache = self.parts.lock().unwrap();
+        if let Some((k, p)) = cache.get(&e.id) {
+            if *k == key {
+                return p.clone();
+            }
+        }
+        let lines = body::plain_lines(&e.body, usize::MAX);
+        let p = std::sync::Arc::new(Parts {
+            title: body::extract_title(&e.body),
+            preview: body::extract_preview(&e.body, 1200),
+            media: body::extract_media(&e.body),
+            tags: body::extract_tags(&e.body),
+            tasks: body::task_progress(&e.body),
+            locked: body::is_locked_body(&e.body),
+            web_link: has_web_link(&e.body),
+            text: lines.join("\n"),
+        });
+        cache.insert(e.id.clone(), (key, p.clone()));
+        p
+    }
+
     pub fn summary(&self, e: &Entry) -> Value {
-        let media = body::extract_media(&e.body);
+        let p = self.parts(e);
+        let media = &p.media;
         let has = |k: &str| media.iter().any(|m| m.kind == k);
         let images: Vec<&str> = media
             .iter()
@@ -276,12 +322,11 @@ impl Vault {
             .map(|m| m.src.as_str())
             .collect();
         let live_reminders = e.meta.reminders.iter().filter(|r| is_live_cached(r)).count();
-        let tasks: Tasks = body::task_progress(&e.body);
         json!({
             "id": e.id,
             "file": e.file,
-            "title": body::extract_title(&e.body),
-            "preview": body::extract_preview(&e.body, 1200),
+            "title": p.title,
+            "preview": p.preview,
             "color": e.meta.color,
             "pinned": e.meta.pinned,
             "created": e.meta.created,
@@ -292,16 +337,16 @@ impl Vault {
             "day": e.meta.day,
             "mode": e.meta.mode,
             "folder": e.file.as_deref().map_or(e.folder.as_str(), memo_file::folder_of),
-            "tags": body::extract_tags(&e.body),
+            "tags": p.tags,
             "hasImage": has("image"),
-            "hasWebLink": has_web_link(&e.body),
+            "hasWebLink": p.web_link,
             "hasAudio": has("audio"),
             "hasVideo": has("video"),
             "hasFile": has("file"),
             "reminderCount": live_reminders,
             "linkCount": e.meta.links.iter().filter(|id| self.entries.contains_key(*id)).count(),
-            "tasks": tasks,
-            "locked": body::is_locked_body(&e.body),
+            "tasks": p.tasks,
+            "locked": p.locked,
         })
     }
 
@@ -875,12 +920,12 @@ impl Vault {
     /// 찾기 — 제목 · 본문 글(서식 뺀 줄)에서
     pub fn search(&self, query: &str, exclude: Option<&str>) -> Vec<Value> {
         let matches = crate::search::matcher(query);
-        let texts: HashMap<&str, String> = self.entries.values().filter(|e| e.file.is_some()).map(|e| (e.id.as_str(), body::plain_lines(&e.body, usize::MAX).join("\n"))).collect();
+        let texts: HashMap<&str, std::sync::Arc<Parts>> = self.entries.values().filter(|e| e.file.is_some()).map(|e| (e.id.as_str(), self.parts(e))).collect();
         self.list()
             .into_iter()
             .filter(|m| {
                 let id = m["id"].as_str().unwrap_or_default();
-                Some(id) != exclude && matches(&[m["title"].as_str().unwrap_or_default(), texts.get(id).map_or("", String::as_str)])
+                Some(id) != exclude && matches(&[m["title"].as_str().unwrap_or_default(), texts.get(id).map_or("", |p| p.text.as_str())])
             })
             .collect()
     }
@@ -1506,6 +1551,19 @@ mod tests {
         assert!(body::is_locked_body(&memo_file::parse_memo_file(&fs::read_to_string(&file).unwrap()).1), "잠근 파일은 그대로");
         v.scan();
         assert!(v.list().iter().any(|m| v.get(m["id"].as_str().unwrap()).unwrap()["body"] == "# 메모\n이 기기 글"), "우리 글은 사본으로");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn folder_only_change_is_reported() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        assert!(v.scan().is_empty());
+        fs::create_dir(root.join("휴대폰에서 만든 폴더")).unwrap();
+        let c = v.scan();
+        assert!(c.folders && !c.is_empty() && c.ids.is_empty());
+        assert!(v.scan().is_empty(), "한 번 알린 뒤로는 조용히");
         fs::remove_dir_all(root).unwrap();
     }
 }
