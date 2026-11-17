@@ -1,0 +1,494 @@
+[
+ {
+  "index": -1,
+  "advance": {
+   "memo-created": -1,
+   "typed": -1,
+   "styled": -1,
+   "tasked": -1,
+   "add-opened": -1,
+   "ink-done": -1,
+   "annotate-done": -1,
+   "tagged": -1,
+   "crown-on": -1,
+   "content-tools": -1,
+   "note-closed": -1,
+   "layout-changed": -1,
+   "tag-filtered": -1,
+   "mode-moved": -1,
+   "list-zoomed": -1,
+   "mode-switched": -1,
+   "list-crown-on": -1,
+   "quick-memo": -1,
+   "capture-done": -1,
+   "note-zoomed": -1,
+   "next": -1,
+   "skip": -1,
+   "nope": -1
+  },
+  "on": null,
+  "off": null,
+  "chapter": null,
+  "jumps": []
+ },
+ {
+  "index": 0,
+  "advance": {
+   "memo-created": 0,
+   "typed": 0,
+   "styled": 0,
+   "tasked": 0,
+   "add-opened": 0,
+   "ink-done": 0,
+   "annotate-done": 0,
+   "tagged": 0,
+   "crown-on": 0,
+   "content-tools": 0,
+   "note-closed": 0,
+   "layout-changed": 0,
+   "tag-filtered": 0,
+   "mode-moved": 0,
+   "list-zoomed": 0,
+   "mode-switched": 0,
+   "list-crown-on": 0,
+   "quick-memo": 0,
+   "capture-done": 0,
+   "note-zoomed": 0,
+   "next": 1,
+   "skip": -1,
+   "nope": 0
+  },
+  "on": {
+   "id": "welcome",
+   "chapter": "시작",
+   "win": "list",
+   "target": [],
+   "emoji": "👑",
+   "title": "반가워요! 메모킹이에요",
+   "text": "다른 메모 앱에 없는 메모킹만의 기능을 직접 눌러 봐요. 첫 번째는 어디서든 글을 담는 매직 카피예요. 내 메모는 그대로, 예시 메모가 든 연습 공간에서 해요.",
+   "next": "매직 카피부터 해 볼게요",
+   "skip": "나중에 볼게요"
+  },
+  "off": {
+   "id": "welcome",
+   "chapter": "시작",
+   "win": "list",
+   "target": [],
+   "emoji": "👑",
+   "title": "반가워요! 메모킹이에요",
+   "text": "다른 메모 앱에 없는 메모킹만의 기능을 직접 눌러 봐요. 첫 번째는 어디서든 글을 담는 매직 카피예요. 내 메모는 그대로, 예시 메모가 든 연습 공간에서 해요.",
+   "next": "매직 카피부터 해 볼게요",
+   "skip": "나중에 볼게요"
+  },
+  "chapter": {
+   "name": "시작",
+   "at": 1,
+   "of": 1
+  },
+  "jumps": []
+ },
+ {
+  "index": 1,
+  "advance": {
+   "memo-created": 1,
+   "typed": 1,
+   "styled": 1,
+   "tasked": 1,
+   "add-opened": 1,
+   "ink-done": 1,
+   "annotate-done": 1,
+   "tagged": 1,
+   "crown-on": 1,
+   "content-tools": 1,
+   "note-closed": 1,
+   "layout-changed": 1,
+   "tag-filtered": 1,
+   "mode-moved": 1,
+   "list-zoomed": 1,
+   "mode-switched": 1,
+   "list-crown-on": 1,
+   "quick-memo": 2,
+   "capture-done": 1,
+   "note-zoomed": 1,
+   "next": 2,
+   "skip": -1,
+   "nope": 1
+  },
+  "on": {
+   "id": "quick",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [],
+   "needs": "quickMemo",
+   "advance": "quick-memo",
+   "emoji": "⚡",
+   "title": "매직 카피 (Ctrl+Alt+C)",
+   "text": "웹 페이지나 문서에서 글을 고르고 Ctrl+Alt+C, 곧바로 메모가 돼요. 파일이나 그림을 고르고 눌러도 돼요.",
+   "try": "웹 브라우저나 메모장에서 글을 조금 끌어 고르고 Ctrl+Alt+C를 눌러 보세요",
+   "offText": "설정에서 매직 카피 키를 켜면, 다른 앱에서 글이나 파일을 고르고 Ctrl+Alt+C를 눌러 바로 메모로 담아요.",
+   "next": "다음에 해 볼게요"
+  },
+  "off": {
+   "id": "quick",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [],
+   "needs": "quickMemo",
+   "emoji": "⚡",
+   "title": "매직 카피 (Ctrl+Alt+C)",
+   "text": "설정에서 매직 카피 키를 켜면, 다른 앱에서 글이나 파일을 고르고 Ctrl+Alt+C를 눌러 바로 메모로 담아요.",
+   "next": "다음"
+  },
+  "chapter": {
+   "name": "메모킹만의 기능",
+   "at": 1,
+   "of": 5
+  },
+  "jumps": []
+ },
+ {
+  "index": 2,
+  "advance": {
+   "memo-created": 2,
+   "typed": 2,
+   "styled": 2,
+   "tasked": 2,
+   "add-opened": 2,
+   "ink-done": 2,
+   "annotate-done": 2,
+   "tagged": 2,
+   "crown-on": 2,
+   "content-tools": 2,
+   "note-closed": 2,
+   "layout-changed": 2,
+   "tag-filtered": 2,
+   "mode-moved": 2,
+   "list-zoomed": 2,
+   "mode-switched": 2,
+   "list-crown-on": 2,
+   "quick-memo": 2,
+   "capture-done": 3,
+   "note-zoomed": 2,
+   "next": 3,
+   "skip": -1,
+   "nope": 2
+  },
+  "on": {
+   "id": "capture",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [],
+   "needs": "quickMemo",
+   "advance": "capture-done",
+   "emoji": "✂️",
+   "title": "매직 카피 두 번: 화면 잘라 메모",
+   "text": "Ctrl+Alt+C를 빠르게 두 번! 화면이 멈추면 담고 싶은 곳을 끌어서 잘라요. 자른 그림이 바로 메모가 돼요.",
+   "try": "Ctrl+Alt+C를 빠르게 두 번 누르고, 아무 곳이나 네모로 끌어 보세요",
+   "offText": "설정에서 매직 카피 키를 켜면 Ctrl+Alt+C를 빠르게 두 번 눌러 화면의 원하는 곳을 잘라 메모로 담아요.",
+   "next": "다음에 해 볼게요"
+  },
+  "off": {
+   "id": "capture",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [],
+   "needs": "quickMemo",
+   "emoji": "✂️",
+   "title": "매직 카피 두 번: 화면 잘라 메모",
+   "text": "설정에서 매직 카피 키를 켜면 Ctrl+Alt+C를 빠르게 두 번 눌러 화면의 원하는 곳을 잘라 메모로 담아요.",
+   "next": "다음"
+  },
+  "chapter": {
+   "name": "메모킹만의 기능",
+   "at": 2,
+   "of": 5
+  },
+  "jumps": []
+ },
+ {
+  "index": 3,
+  "advance": {
+   "memo-created": 3,
+   "typed": 3,
+   "styled": 3,
+   "tasked": 3,
+   "add-opened": 3,
+   "ink-done": 3,
+   "annotate-done": 3,
+   "tagged": 3,
+   "crown-on": 3,
+   "content-tools": 3,
+   "note-closed": 3,
+   "layout-changed": 3,
+   "tag-filtered": 3,
+   "mode-moved": 3,
+   "list-zoomed": 3,
+   "mode-switched": 3,
+   "list-crown-on": 4,
+   "quick-memo": 3,
+   "capture-done": 3,
+   "note-zoomed": 3,
+   "next": 4,
+   "skip": -1,
+   "nope": 3
+  },
+  "on": {
+   "id": "list-crown",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [
+    "#list-top-btn"
+   ],
+   "advance": "list-crown-on",
+   "emoji": "👑",
+   "title": "창을 스티커처럼 늘 위에",
+   "text": "왕관을 누르면 다른 창에 가려지지 않아요. 메모 창도 똑같고, 테이프로 바탕화면에 붙여 둘 수도 있어요. 창 위에 왕관 스티커가 붙고, 창이 좁거나 화면 끝이면 작아져서 이 자리에 들어가요. 스티커나 작은 왕관을 누르면 떼어져요.",
+   "try": "오른쪽 위 왕관을 눌러 보세요",
+   "next": "다음에 해 볼게요"
+  },
+  "off": {
+   "id": "list-crown",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [
+    "#list-top-btn"
+   ],
+   "advance": "list-crown-on",
+   "emoji": "👑",
+   "title": "창을 스티커처럼 늘 위에",
+   "text": "왕관을 누르면 다른 창에 가려지지 않아요. 메모 창도 똑같고, 테이프로 바탕화면에 붙여 둘 수도 있어요. 창 위에 왕관 스티커가 붙고, 창이 좁거나 화면 끝이면 작아져서 이 자리에 들어가요. 스티커나 작은 왕관을 누르면 떼어져요.",
+   "try": "오른쪽 위 왕관을 눌러 보세요",
+   "next": "다음에 해 볼게요"
+  },
+  "chapter": {
+   "name": "메모킹만의 기능",
+   "at": 3,
+   "of": 5
+  },
+  "jumps": []
+ },
+ {
+  "index": 4,
+  "advance": {
+   "memo-created": 4,
+   "typed": 4,
+   "styled": 4,
+   "tasked": 4,
+   "add-opened": 4,
+   "ink-done": 4,
+   "annotate-done": 4,
+   "tagged": 4,
+   "crown-on": 4,
+   "content-tools": 4,
+   "note-closed": 4,
+   "layout-changed": 4,
+   "tag-filtered": 4,
+   "mode-moved": 4,
+   "list-zoomed": 4,
+   "mode-switched": 4,
+   "list-crown-on": 4,
+   "quick-memo": 4,
+   "capture-done": 4,
+   "note-zoomed": 4,
+   "next": 5,
+   "skip": -1,
+   "nope": 4
+  },
+  "on": {
+   "id": "history",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [
+    "[data-tab=\"history\"]"
+   ],
+   "needs": "history",
+   "emoji": "📥",
+   "title": "놓친 알림도 다시 보기 (알림 보관함)",
+   "text": "카카오톡처럼 금방 사라지는 Windows 알림을 모아 두고 다시 찾아봐요. 이 PC에만 저장하고, 앱마다 모으지 않게 고를 수 있어요.",
+   "offText": "카카오톡처럼 금방 사라지는 Windows 알림을 모아 두고 다시 찾아봐요. 다른 앱 알림을 읽는 기능이라 처음엔 꺼져 있어요. 켜도 이 PC에만 저장해요.",
+   "next": "다음"
+  },
+  "off": {
+   "id": "history",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [
+    "[data-tab=\"history\"]"
+   ],
+   "needs": "history",
+   "emoji": "📥",
+   "title": "놓친 알림도 다시 보기 (알림 보관함)",
+   "text": "카카오톡처럼 금방 사라지는 Windows 알림을 모아 두고 다시 찾아봐요. 다른 앱 알림을 읽는 기능이라 처음엔 꺼져 있어요. 켜도 이 PC에만 저장해요.",
+   "next": "다음",
+   "enable": {
+    "need": "history",
+    "label": "알림 모으기 켜기"
+   }
+  },
+  "chapter": {
+   "name": "메모킹만의 기능",
+   "at": 4,
+   "of": 5
+  },
+  "jumps": []
+ },
+ {
+  "index": 5,
+  "advance": {
+   "memo-created": 5,
+   "typed": 5,
+   "styled": 5,
+   "tasked": 5,
+   "add-opened": 5,
+   "ink-done": 5,
+   "annotate-done": 5,
+   "tagged": 5,
+   "crown-on": 5,
+   "content-tools": 5,
+   "note-closed": 5,
+   "layout-changed": 5,
+   "tag-filtered": 5,
+   "mode-moved": 5,
+   "list-zoomed": 5,
+   "mode-switched": 6,
+   "list-crown-on": 5,
+   "quick-memo": 5,
+   "capture-done": 5,
+   "note-zoomed": 5,
+   "next": 6,
+   "skip": -1,
+   "nope": 5
+  },
+  "on": {
+   "id": "mode",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [
+    "#mode-switch:not([hidden])"
+   ],
+   "keep": [
+    "#mode-switch"
+   ],
+   "needs": "workLife",
+   "advance": "mode-switched",
+   "emoji": "🌗",
+   "title": "일할 때는 Work, 쉴 때는 Life",
+   "text": "왼쪽 위 해와 달 스위치로 일할 때 쓰는 메모(Work)와 일상 메모(Life)를 나눠 봐요. 메모마다 Work · Life 태그가 붙고, 지금 모드는 작업 표시줄 아이콘의 작은 표시로 보여요. 새 메모도 지금 모드로 들어가요.",
+   "try": "스위치를 눌러 Work로 바꿔 보고, 다시 눌러 Life로 돌아와 보세요",
+   "offText": "\"Work / Life 나누기\"를 켜면 왼쪽 위에 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 보고, 업무 시간에 저절로 Work로 바꿀 수도 있어요.",
+   "next": "다음에 해 볼게요"
+  },
+  "off": {
+   "id": "mode",
+   "chapter": "메모킹만의 기능",
+   "win": "list",
+   "target": [
+    "#mode-switch:not([hidden])"
+   ],
+   "keep": [
+    "#mode-switch"
+   ],
+   "needs": "workLife",
+   "emoji": "🌗",
+   "title": "일할 때는 Work, 쉴 때는 Life",
+   "text": "\"Work / Life 나누기\"를 켜면 왼쪽 위에 해와 달 스위치가 생겨요. 일할 때 메모(Work)와 일상 메모(Life)를 나눠 보고, 업무 시간에 저절로 Work로 바꿀 수도 있어요.",
+   "next": "다음",
+   "enable": {
+    "need": "workLife",
+    "label": "Work / Life 나누기 켜기"
+   }
+  },
+  "chapter": {
+   "name": "메모킹만의 기능",
+   "at": 5,
+   "of": 5
+  },
+  "jumps": []
+ },
+ {
+  "index": 6,
+  "advance": {
+   "memo-created": 6,
+   "typed": 6,
+   "styled": 6,
+   "tasked": 6,
+   "add-opened": 6,
+   "ink-done": 6,
+   "annotate-done": 6,
+   "tagged": 6,
+   "crown-on": 6,
+   "content-tools": 6,
+   "note-closed": 6,
+   "layout-changed": 6,
+   "tag-filtered": 6,
+   "mode-moved": 6,
+   "list-zoomed": 6,
+   "mode-switched": 6,
+   "list-crown-on": 6,
+   "quick-memo": 6,
+   "capture-done": 6,
+   "note-zoomed": 6,
+   "next": -1,
+   "skip": -1,
+   "nope": 6
+  },
+  "on": {
+   "id": "done",
+   "chapter": "마무리",
+   "win": "list",
+   "target": [],
+   "emoji": "🎉",
+   "title": "준비 끝!",
+   "text": "연습 공간은 치우고 내 메모로 돌아갈게요. 창을 닫아도 메모킹은 작업 표시줄 오른쪽 아래(^)에서 기다려요. 이 안내는 설정의 사용법 둘러보기에서 다시 볼 수 있어요.",
+   "next": "메모 쓰러 가기 ✏️"
+  },
+  "off": {
+   "id": "done",
+   "chapter": "마무리",
+   "win": "list",
+   "target": [],
+   "emoji": "🎉",
+   "title": "준비 끝!",
+   "text": "연습 공간은 치우고 내 메모로 돌아갈게요. 창을 닫아도 메모킹은 작업 표시줄 오른쪽 아래(^)에서 기다려요. 이 안내는 설정의 사용법 둘러보기에서 다시 볼 수 있어요.",
+   "next": "메모 쓰러 가기 ✏️"
+  },
+  "chapter": {
+   "name": "마무리",
+   "at": 1,
+   "of": 1
+  },
+  "jumps": []
+ },
+ {
+  "index": 7,
+  "advance": {
+   "memo-created": -1,
+   "typed": -1,
+   "styled": -1,
+   "tasked": -1,
+   "add-opened": -1,
+   "ink-done": -1,
+   "annotate-done": -1,
+   "tagged": -1,
+   "crown-on": -1,
+   "content-tools": -1,
+   "note-closed": -1,
+   "layout-changed": -1,
+   "tag-filtered": -1,
+   "mode-moved": -1,
+   "list-zoomed": -1,
+   "mode-switched": -1,
+   "list-crown-on": -1,
+   "quick-memo": -1,
+   "capture-done": -1,
+   "note-zoomed": -1,
+   "next": -1,
+   "skip": -1,
+   "nope": -1
+  },
+  "on": null,
+  "off": null,
+  "chapter": null,
+  "jumps": []
+ }
+]

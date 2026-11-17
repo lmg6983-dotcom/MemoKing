@@ -250,3 +250,76 @@ fn share_text() {
         .collect();
     report("share_text", fails, cases.len());
 }
+
+#[test]
+fn accelerators() {
+    use memoking_core::accelerators::{combo_from_accelerator, display_accelerator, is_valid_accelerator, normalize_shortcuts, with_shortcuts};
+    let cases = fixtures("accelerators");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let acc = &c["acc"];
+            // 글자가 아닌 값은 쓸 만한지만 (보이는 글자 · 메모 창 키는 늘 글자로 부른다)
+            let s = acc.as_str();
+            let got = json!({ "valid": is_valid_accelerator(acc), "display": s.map(display_accelerator), "combo": s.map(combo_from_accelerator) });
+            let want = json!({ "valid": c["valid"], "display": s.map(|_| c["display"].clone()), "combo": s.map(|_| c["combo"].clone()) });
+            (got != want).then(|| format!("{acc}\n  JS  : {want}\n  Rust: {got}"))
+        })
+        .collect();
+    report("accelerators", fails, cases.len());
+    let sets = fixtures("shortcuts");
+    let guide = "글을 고르고 Ctrl+Alt+C, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Ctrl+Alt+CC Ctrl+Alt+`Ctrl+Alt+C";
+    let fails = sets
+        .iter()
+        .filter_map(|c| {
+            let [q, m, l] = normalize_shortcuts(&c["value"]);
+            let got = json!({ "normalized": { "quickMemo": q, "magic": m, "list": l }, "text": with_shortcuts(guide, &c["value"]) });
+            let want = json!({ "normalized": c["normalized"], "text": c["text"] });
+            (got != want).then(|| format!("{}\n  JS  : {want}\n  Rust: {got}", c["value"]))
+        })
+        .collect();
+    report("shortcuts", fails, sets.len());
+}
+
+#[test]
+fn memo_hotkeys() {
+    use memoking_core::accelerators::{assign_hotkey, normalize_hotkeys};
+    let cases = fixtures("memo_hotkeys");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let assigned = match assign_hotkey(&c["raw"], c["id"].as_str().unwrap(), c["slot"].as_str(), c["copy"] != false, c["show"] == true) {
+                Ok(m) => Value::Object(m),
+                Err(e) => json!({ "error": e }),
+            };
+            let got = json!({ "normalized": normalize_hotkeys(&c["raw"]), "assigned": assigned });
+            let want = json!({ "normalized": c["normalized"], "assigned": c["assigned"] });
+            (got != want).then(|| format!("{c}\n  Rust: {got}"))
+        })
+        .collect();
+    report("memo_hotkeys", fails, cases.len());
+}
+
+#[test]
+fn tutorial() {
+    use memoking_core::tutorial::{advance, chapter, jumps, step_for, steps};
+    let cases = fixtures("tutorial");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let index = c["index"].as_i64().unwrap();
+            let step = usize::try_from(index).ok().and_then(|i| steps().get(i));
+            let adv: serde_json::Map<String, Value> = c["advance"].as_object().unwrap().keys().map(|e| (e.clone(), advance(index, e).into())).collect();
+            let got = json!({
+                "advance": adv,
+                "on": step.map(|s| step_for(s, |_| true)),
+                "off": step.map(|s| step_for(s, |_| false)),
+                "chapter": chapter(index),
+                "jumps": jumps(),
+            });
+            let want = json!({ "advance": c["advance"], "on": c["on"], "off": c["off"], "chapter": c["chapter"], "jumps": c["jumps"] });
+            (got != want).then(|| format!("{index}\n  JS  : {want}\n  Rust: {got}"))
+        })
+        .collect();
+    report("tutorial", fails, cases.len());
+}
