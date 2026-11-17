@@ -87,7 +87,9 @@ fn pack(name: &str) -> Option<(&'static [Part], &'static str)> {
 }
 
 // 모델 받기 (받아쓰기 · AI): Electron net.fetch 처럼 시스템 프록시 · 인증서를 따른다
-pub(crate) static WEB: LazyLock<ureq::Agent> = LazyLock::new(|| crate::files::web_config().http_status_as_error(false).build().into());
+//   ureq 는 기본으로 시간 제한이 없어 연결이 멈추면 멈추기도 다음 받기도 안 되므로 연결 · 읽기마다 제한을 둔다
+pub(crate) static WEB: LazyLock<ureq::Agent> =
+    LazyLock::new(|| crate::files::web_config().http_status_as_error(false).timeout_connect(Some(Duration::from_secs(20))).timeout_per_read(Some(Duration::from_secs(60))).build().into());
 static DOWNLOADS: LazyLock<Mutex<HashMap<String, (f64, String)>>> = LazyLock::new(Default::default); // 묶음 → (진행 0~1, 오류)
 
 fn dir(app: &AppHandle) -> PathBuf {
