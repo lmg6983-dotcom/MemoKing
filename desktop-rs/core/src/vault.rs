@@ -376,6 +376,11 @@ impl Vault {
         self.entries.get(id)
     }
 
+    /// 파일이 있는 메모들 (색인 · 내보내기)
+    pub fn files(&self) -> impl Iterator<Item = &Entry> {
+        self.entries.values().filter(|e| e.file.is_some())
+    }
+
     /// 이 메모의 본문 (잠겼으면 열쇠로 푼 글, 못 풀면 None)
     fn plain_of(&self, e: &Entry) -> Option<String> {
         if !body::is_locked_body(&e.body) {

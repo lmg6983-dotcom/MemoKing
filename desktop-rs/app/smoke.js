@@ -75,6 +75,13 @@ window.addEventListener('load', () => setTimeout(async () => {
       const copy = await mk.memo.keepCopy(seed.id, '# 남긴 사본\n글', null);
       return copy && copy !== seed.id && (await mk.memo.get(copy)).body.includes('남긴 사본');
     });
+    // 색인(index.json) · 안내(README): 2초마다의 다시 읽기가 쓴다
+    const text = async (rel) => new TextDecoder().decode(await mk.attachments.read(rel).catch(() => new Uint8Array()));
+    await check('색인 파일 (AI 비서용)', () => until(async () => {
+      const idx = JSON.parse((await text('_memoking/index.json')) || '{}');
+      return idx.schema === 'memoking.index/v1' && idx.memos?.some((m) => m.title === '가져온 글');
+    }, 8000));
+    await check('안내 파일', async () => (await text('_memoking/README.md')).startsWith('# 메모킹 폴더 안내'));
     await check('따로 남긴 글 수', async () => (await mk.recovered.count()) === 0);
     await check('이어 쓰기 안내 없음 (모두 이 PC 에서 고침)', async () => (await mk.memo.handoff()) === null);
     // 앱 화면 밖으로 넘어가지 않는다 (넘어가면 이 점검이 끝나지 않아 실패로 보인다)

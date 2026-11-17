@@ -1,6 +1,7 @@
 // 메모킹 데스크탑 (Rust + Tauri 2) — Electron 의 desktop/ 을 옮기는 중. 화면은 ../../app 그대로.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod index;
 mod ipc;
 mod memos;
 mod os;

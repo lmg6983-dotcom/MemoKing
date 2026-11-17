@@ -52,6 +52,7 @@ pub fn start(app: &AppHandle) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(2));
         rescan(&app);
+        crate::index::tick(&app);
     });
 }
 
@@ -165,6 +166,7 @@ fn app_settings(app: &AppHandle) -> Value {
 }
 
 pub fn push_list(app: &AppHandle) {
+    crate::index::mark(); // 메모가 바뀌면 목록에 알릴 때마다 — 색인도 다시
     let _ = app.emit_to("list", "memos:changed", [list_memos(app)]);
 }
 

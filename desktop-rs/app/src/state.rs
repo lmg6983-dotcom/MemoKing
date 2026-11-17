@@ -104,6 +104,7 @@ impl State {
         v.default_mode = mode.into();
         match v.open() {
             Ok(()) => {
+                crate::index::opened(&dir);
                 *self.vault.lock().unwrap() = Some(v);
                 *self.vault_error.lock().unwrap() = None;
                 self.set_setting("vaultPath", dir.to_string_lossy().into_owned().into());
