@@ -71,7 +71,6 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        // 업데이트 서명의 공개 열쇠(pubkey)는 배포판만 release-rs.yml 이 넣는다. 개발 빌드는 비어 있어 업데이트를 확인하지 못한다
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![ipc::ipc])
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리

@@ -48,17 +48,15 @@ jobs:
           mkdir -p app/binaries
           cp target/release/memoking-mcp.exe app/binaries/memoking-mcp-x86_64-pc-windows-msvc.exe
 
-      # 배포판에만 쓰는 설정: 이름(Electron 판과 바로가기, 설치 폴더가 겹치지 않게), 함께 넣을 파일, 업데이트 주소, 서명 공개 열쇠
-      #   서명 열쇠(비밀값)가 없으면 업데이트 파일 없이 설치 파일만 만든다
+      # 배포판에만 쓰는 설정: 이름(Electron 판과 바로가기, 설치 폴더가 겹치지 않게), 함께 넣을 파일, 업데이트 파일 만들기
+      #   서명 공개 열쇠와 업데이트 주소는 tauri.conf.json 에 있다. 개인 열쇠(비밀값)가 없으면 업데이트 파일 없이 설치 파일만 만든다
       - name: 배포 설정 만들기
-        env:
-          PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
         run: |
-          if [ "$HAS_SIGNING_KEY" != "true" ] || [ -z "$PUBKEY" ]; then
-            echo "::warning::TAURI_SIGNING_PRIVATE_KEY(비밀값) 이나 TAURI_UPDATER_PUBKEY(변수) 가 없어 자동 업데이트 없이 설치 파일만 만들어요 (guides/RELEASE.md)"
+          if [ "$HAS_SIGNING_KEY" != "true" ]; then
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY(비밀값) 가 없어 자동 업데이트 없이 설치 파일만 만들어요 (guides/RELEASE.md)"
           fi
           node -e '
-            const signed = process.env.HAS_SIGNING_KEY === "true" && Boolean(process.env.PUBKEY);
+            const signed = process.env.HAS_SIGNING_KEY === "true";
             const conf = {
               productName: "MemoKing Beta",
               bundle: {
@@ -66,7 +64,6 @@ jobs:
                 externalBin: ["binaries/memoking-mcp"],
                 createUpdaterArtifacts: signed,
               },
-              plugins: { updater: { pubkey: process.env.PUBKEY || "", endpoints: ["https://github.com/lmg6983-dotcom/MemoKing/releases/download/desktop-rs/latest-tauri.json"] } },
             };
             require("fs").writeFileSync("desktop-rs/app/tauri.release.json", JSON.stringify(conf, null, 2));
           '

@@ -43,13 +43,11 @@ Actions › Release (PC Rust 베타) › Run workflow   (.github/workflows/relea
 - 이름이 **MemoKing Beta** 라 Electron 판과 설치 폴더, 시작 메뉴 바로가기가 겹치지 않아요. 메모 폴더와 설정(`%APPDATA%\MemoKing`)은 같이 써서, 시험할 때는 Electron 판을 끄고 켜요 (둘 다 켜면 알림이 두 번 울려요).
 - 설치 파일에 AI 엔진(`llama\llama-server.exe`)과 MCP 서버(`memoking-mcp.exe`)가 함께 들어가요. 받아쓰기 엔진은 실행 파일 안에 있어요.
 
-**처음 한 번 준비 (자동 업데이트 서명)**
+**자동 업데이트 서명**
 
-1. 내 PC 에서 서명 열쇠를 만들어요: `npx @tauri-apps/cli@2.12.5 signer generate -w ~/.tauri/memoking.key` (비밀번호는 비워 두거나 정해요)
-2. 저장소 Settings › Secrets and variables › Actions
-   - **Secrets**: `TAURI_SIGNING_PRIVATE_KEY` 에 `~/.tauri/memoking.key` 파일 내용, 비밀번호를 정했으면 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
-   - **Variables**: `TAURI_UPDATER_PUBKEY` 에 `~/.tauri/memoking.key.pub` 파일 내용
-3. 열쇠 파일은 잃어버리지 않게 따로 보관해요. 열쇠가 바뀌면 이미 설치한 베타는 새 버전을 설치하지 못해 한 번 직접 다시 설치해야 해요.
+- 공개 열쇠는 `desktop-rs/app/tauri.conf.json` 의 `plugins.updater.pubkey` 에 있어요. 앱은 이 열쇠로 서명이 맞는 설치 파일만 설치해요.
+- 개인 열쇠는 저장소 Settings › Secrets and variables › Actions › **Secrets** 의 `TAURI_SIGNING_PRIVATE_KEY` 에 넣어요 (비밀번호 없음). 열쇠 파일은 저장소 밖에 따로 보관해요.
+- 열쇠를 바꾸려면 `npx @tauri-apps/cli@2.12.5 signer generate -w memoking.key` 로 새로 만들고 공개 열쇠와 Secret 을 함께 바꿔요. 이미 설치한 베타는 새 열쇠로 서명한 버전을 설치하지 못해 한 번 직접 다시 설치해야 해요.
 
 서명 열쇠가 없어도 워크플로는 돌아요. 그때는 설치 파일만 올라가고 `latest-tauri.json` 은 없어서 자동 업데이트가 되지 않아요.
 
