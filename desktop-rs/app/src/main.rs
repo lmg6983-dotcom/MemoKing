@@ -6,6 +6,7 @@ mod index;
 mod ipc;
 mod memos;
 mod os;
+mod reminders;
 mod settings;
 mod state;
 
@@ -99,6 +100,7 @@ fn main() {
             memos::start(app);
             let list = os::place_list(app, window(app, "list", "index.html").title("메모킹").inner_size(440.0, 680.0).min_inner_size(440.0, 380.0)).build()?;
             os::start(app, &list);
+            reminders::start(app);
             Ok(())
         })
         .run(tauri::generate_context!())
