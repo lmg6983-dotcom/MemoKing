@@ -31,7 +31,7 @@ fn init_script() -> String {
 
 /// 앱 화면의 주소인가 (Windows: http://tauri.localhost, 그 밖: tauri://localhost)
 fn is_app_url(url: &tauri::Url) -> bool {
-    url.scheme() == "tauri" || (matches!(url.scheme(), "http" | "https") && url.host_str() == Some("tauri.localhost"))
+    url.port().is_none() && (url.scheme() == "tauri" || (url.scheme() == "http" && url.host_str() == Some("tauri.localhost")))
 }
 
 /// memoking 주소를 부른 곳이 앱 화면인가 — 아니면(끌어 놓은 웹 페이지 등) 메모를 읽고 쓰지 못하게
@@ -195,8 +195,8 @@ mod tests {
 
     #[test]
     fn only_app_pages_reach_memos() {
-        assert!(is_app_origin("http://tauri.localhost") && is_app_origin("tauri://localhost") && is_app_origin("https://tauri.localhost"));
-        for bad in ["null", "https://evil.example", "http://tauri.localhost.evil.example", "http://memoking.localhost", "file://"] {
+        assert!(is_app_origin("http://tauri.localhost") && is_app_origin("tauri://localhost"));
+        for bad in ["null", "https://tauri.localhost", "http://tauri.localhost:8080", "tauri://localhost:1", "https://evil.example", "http://tauri.localhost.evil.example", "http://memoking.localhost", "file://"] {
             assert!(!is_app_origin(bad), "{bad}");
         }
     }
