@@ -20,5 +20,5 @@ aes-gcm = "0.10"
 base64 = "0.23"
 unicode-normalization = "0.1"
 getrandom = "0.3"
-# 캘린더 주소 정리 · CalDAV 의 상대 주소 (Tauri 가 이미 쓰는 것)
+# 캘린더 · 링크 미리보기의 주소 읽기 (JS new URL 과 같은 WHATWG 규칙)
 url = "2"

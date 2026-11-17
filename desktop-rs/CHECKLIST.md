@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **67 / 187**
-- 이벤트 (Rust → 화면): **12 / 61**
+- 채널 (화면 → Rust): **104 / 187**
+- 이벤트 (Rust → 화면): **23 / 61**
 
 ## 채널
 
@@ -24,32 +24,32 @@
 | ⬜ | `ai:try` |
 | ⬜ | `ai:write` |
 | ✅ | `app:info` |
-| ⬜ | `app:report-problem` |
+| ✅ | `app:report-problem` |
 | ✅ | `app:set-ai-phone` |
 | ✅ | `app:set-auto-events` |
-| ⬜ | `app:set-auto-start` |
+| ✅ | `app:set-auto-start` |
 | ✅ | `app:set-auto-tags` |
 | ✅ | `app:set-fit-tables` |
 | ✅ | `app:set-link-previews` |
 | ✅ | `app:set-magic-polish` |
-| ⬜ | `app:set-quick-memo` |
+| ✅ | `app:set-quick-memo` |
 | ✅ | `app:set-trash-days` |
 | ✅ | `app:settings` |
-| ⬜ | `app:whats-new` |
-| ⬜ | `attachment:copy` |
-| ⬜ | `attachment:copy-many` |
+| ✅ | `app:whats-new` |
+| ✅ | `attachment:copy` |
+| ✅ | `attachment:copy-many` |
 | ⬜ | `attachment:drag-out` |
-| ⬜ | `attachment:fetch` |
+| ✅ | `attachment:fetch` |
 | ✅ | `attachment:info` |
 | ✅ | `attachment:open` |
 | ✅ | `attachment:read` |
 | ✅ | `attachment:save` |
 | ✅ | `attachment:save-as` |
-| ⬜ | `attachment:share` |
+| ✅ | `attachment:share` |
 | ⬜ | `attachment:to-pdf` |
-| ⬜ | `calendars:feeds` |
-| ⬜ | `calendars:fetch` |
-| ⬜ | `calendars:set-feeds` |
+| ✅ | `calendars:feeds` |
+| ✅ | `calendars:fetch` |
+| ✅ | `calendars:set-feeds` |
 | ⬜ | `capture:cancel` |
 | ⬜ | `capture:done` |
 | ✅ | `card:command` |
@@ -72,7 +72,7 @@
 | ⬜ | `drive:status` |
 | ⬜ | `drive:sync` |
 | ⬜ | `drive:use` |
-| ⬜ | `edit:run` |
+| ✅ | `edit:run` |
 | ✅ | `folders:create` |
 | ✅ | `folders:delete` |
 | ✅ | `folders:rename` |
@@ -84,20 +84,20 @@
 | ⬜ | `history:set-enabled` |
 | ⬜ | `history:to-memo` |
 | ⬜ | `history:unblock` |
-| ⬜ | `hotkey:set` |
-| ⬜ | `hotkey:state` |
-| ⬜ | `image:copy` |
-| ⬜ | `image:save` |
+| ✅ | `hotkey:set` |
+| ✅ | `hotkey:state` |
+| ✅ | `image:copy` |
+| ✅ | `image:save` |
 | ✅ | `keymap:get` |
-| ⬜ | `keymap:open-window` |
+| ✅ | `keymap:open-window` |
 | ✅ | `keymap:reset` |
 | ✅ | `keymap:set` |
-| ⬜ | `link:open` |
-| ⬜ | `link:preview` |
-| ⬜ | `list:crown-docked` |
-| ⬜ | `list:on-top` |
-| ⬜ | `list:show` |
-| ⬜ | `list:toggle-top` |
+| ✅ | `link:open` |
+| ✅ | `link:preview` |
+| ✅ | `list:crown-docked` |
+| ✅ | `list:on-top` |
+| ✅ | `list:show` |
+| ✅ | `list:toggle-top` |
 | ⬜ | `mcp:connect` |
 | ⬜ | `mcp:copy` |
 | ⬜ | `mcp:set-write` |
@@ -124,7 +124,7 @@
 | ✅ | `memos:folders` |
 | ✅ | `memos:list` |
 | ✅ | `memos:search` |
-| ⬜ | `menu:choose` |
+| ✅ | `menu:choose` |
 | ✅ | `mode:hours` |
 | ✅ | `mode:set` |
 | ✅ | `mode:work-life` |
@@ -133,12 +133,12 @@
 | ⬜ | `pdf:save` |
 | ✅ | `recovered:count` |
 | ✅ | `recovered:restore` |
-| ⬜ | `reminders:add` |
-| ⬜ | `reminders:all` |
-| ⬜ | `reminders:set` |
-| ⬜ | `share:targets` |
-| ⬜ | `shortcuts:pause` |
-| ⬜ | `shortcuts:set` |
+| ✅ | `reminders:add` |
+| ✅ | `reminders:all` |
+| ✅ | `reminders:set` |
+| ✅ | `share:targets` |
+| ✅ | `shortcuts:pause` |
+| ✅ | `shortcuts:set` |
 | ⬜ | `stack:activate` |
 | ⬜ | `stack:cycle` |
 | ⬜ | `stack:detach` |
@@ -173,19 +173,19 @@
 | ✅ | `trash:list` |
 | ✅ | `trash:preview` |
 | ✅ | `trash:restore` |
-| ⬜ | `tutorial:action` |
-| ⬜ | `tutorial:current` |
-| ⬜ | `tutorial:event` |
-| ⬜ | `tutorial:start` |
+| ✅ | `tutorial:action` |
+| ✅ | `tutorial:current` |
+| ✅ | `tutorial:event` |
+| ✅ | `tutorial:start` |
 | ⬜ | `update:check` |
 | ⬜ | `update:download` |
 | ⬜ | `update:install` |
 | ⬜ | `update:later` |
 | ⬜ | `update:state` |
 | ✅ | `vault:choose` |
-| ⬜ | `vault:retry` |
-| ⬜ | `vault:reveal` |
-| ⬜ | `vault:reveal-index` |
+| ✅ | `vault:retry` |
+| ✅ | `vault:reveal` |
+| ✅ | `vault:reveal-index` |
 | ✅ | `vault:use` |
 | ✅ | `win:close` |
 | ⬜ | `win:dim-titlebar` |
@@ -214,7 +214,7 @@
 | ⬜ | `drag:state` |
 | ⬜ | `drive:status` |
 | ⬜ | `edit:clear-format` |
-| ⬜ | `edit:paste-plain` |
+| ✅ | `edit:paste-plain` |
 | ⬜ | `ghost:data` |
 | ⬜ | `ghost:drop` |
 | ⬜ | `ghost:mode` |
@@ -223,25 +223,25 @@
 | ⬜ | `hud:hide` |
 | ⬜ | `hud:show` |
 | ✅ | `keymap:changed` |
-| ⬜ | `list:crown-docked` |
-| ⬜ | `list:on-top` |
-| ⬜ | `list:tab` |
-| ⬜ | `memo:alarm` |
+| ✅ | `list:crown-docked` |
+| ✅ | `list:on-top` |
+| ✅ | `list:tab` |
+| ✅ | `memo:alarm` |
 | ✅ | `memo:command` |
 | ✅ | `memo:external` |
 | ✅ | `memo:handoff` |
-| ⬜ | `memo:highlight` |
+| ✅ | `memo:highlight` |
 | ⬜ | `memo:layer` |
 | ✅ | `memo:links-changed` |
 | ✅ | `memo:meta` |
-| ⬜ | `memo:reminders` |
+| ✅ | `memo:reminders` |
 | ✅ | `memo:removed` |
 | ✅ | `memo:trashed` |
 | ✅ | `memos:changed` |
 | ✅ | `mode:changed` |
-| ⬜ | `reminders:changed` |
+| ✅ | `reminders:changed` |
 | ✅ | `settings:link-previews` |
-| ⬜ | `shortcuts:changed` |
+| ✅ | `shortcuts:changed` |
 | ⬜ | `stack:activating` |
 | ⬜ | `stack:hover` |
 | ⬜ | `stack:leaving` |
@@ -255,8 +255,8 @@
 | ⬜ | `stt:speakers` |
 | ⬜ | `stt:speaking` |
 | ⬜ | `stt:status` |
-| ⬜ | `tutorial:finished` |
-| ⬜ | `tutorial:step` |
+| ✅ | `tutorial:finished` |
+| ✅ | `tutorial:step` |
 | ⬜ | `update:available` |
 | ⬜ | `update:ready` |
 | ⬜ | `update:state` |

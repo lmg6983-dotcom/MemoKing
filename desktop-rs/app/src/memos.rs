@@ -271,7 +271,7 @@ fn bytes_value(b: &[u8]) -> Value {
 const NOT_FOUND: &str = "파일을 찾지 못했어요. 메모 폴더에서 옮겨졌거나 삭제됐는지 확인해 주세요";
 
 /// 메모 폴더 attachments/ 안의 파일 (화면이 이미 풀어 보낸 경로)
-fn attachment_file(app: &AppHandle, rel: &str) -> Result<PathBuf, String> {
+pub(crate) fn attachment_file(app: &AppHandle, rel: &str) -> Result<PathBuf, String> {
     let file = with_vault(app, |v| Ok(rel.starts_with("attachments/").then(|| v.resolve(rel)).flatten()))?;
     file.filter(|f| f.is_file()).ok_or_else(|| NOT_FOUND.into())
 }

@@ -10,7 +10,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 memoking-core = { path = "../core" }
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
@@ -21,8 +21,14 @@ serde_json = "1"
 base64 = "0.23"
 fancy-regex = "0.20"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-# 다른 캘린더(.ics · CalDAV) 받기 — 화면에서 받으면 CORS 에 막힌다
-ureq = { version = "3", default-features = false, features = ["rustls"] }
+# 링크 미리보기 · 인터넷 그림 받기 (Electron net.fetch 자리) — TLS · 인증서 · 프록시는 운영체제 것 (Windows: SChannel)
+ureq = { version = "3", default-features = false, features = ["native-tls-no-default", "gzip", "win-system-proxy"] }
+# 웹페이지 글자 인코딩 (TextDecoder 와 같은 이름표 규칙)
+encoding_rs = "0.8"
+# 미리보기 그림 파일 이름 = 주소 SHA-1 앞 16자 (Electron 과 같은 이름)
+sha1 = "0.10"
+# 첨부를 파일 그대로 클립보드에 (clipboard-manager 가 이미 쓰는 것 — 파일 목록은 그 플러그인에 없다)
+arboard = { version = "3", default-features = false }
 
 # 알림 창 (누르면 그 메모를 연다)
 [target.'cfg(windows)'.dependencies]
