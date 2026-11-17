@@ -153,12 +153,12 @@ fn fire(app: &AppHandle, id: &str, r: &Value, due: Option<(Alert, bool)>, now: c
         state(app).alarms.lock().unwrap().remove(id); // 창을 열 수 없으면 알림 창으로라도
     }
     let preview = if memo["locked"] == true { String::new() } else { body::extract_preview(memo["body"].as_str().unwrap_or_default(), 120) };
-    toast(app, id, &title, &label, &preview);
+    toast(app, id, &title, &label, &preview, None);
 }
 
-/// Windows 알림 창 — 누르면 그 메모를 연다
+/// Windows 알림 창 — 누르면 그 메모를 연다 (notice: AI 가 한 일이면 열린 메모 창 아래 막대에도 — ai:notice)
 #[cfg(windows)]
-fn toast(app: &AppHandle, id: &str, title: &str, label: &str, preview: &str) {
+pub(crate) fn toast(app: &AppHandle, id: &str, title: &str, label: &str, preview: &str, notice: Option<Value>) {
     use tauri_winrt_notification::Toast;
     // 설치판은 설치기가 이 이름(identifier)으로 바로가기를 만든다 — 개발 중에는 Windows 가 모르는 이름이라 PowerShell 이름으로
     let app_id = if cfg!(debug_assertions) { Toast::POWERSHELL_APP_ID.to_string() } else { app.config().identifier.clone() };
@@ -169,6 +169,9 @@ fn toast(app: &AppHandle, id: &str, title: &str, label: &str, preview: &str) {
         .text2(preview)
         .on_activated(move |_| {
             let _ = crate::memos::open_note(&app, &id);
+            if let Some(n) = &notice {
+                send_to_note(&app, &id, "ai:notice", n.clone());
+            }
             Ok(())
         })
         .show();
@@ -179,7 +182,7 @@ fn toast(app: &AppHandle, id: &str, title: &str, label: &str, preview: &str) {
 
 // shortcut: 메모킹은 Windows 판만 내므로 다른 OS 는 알림 창 없이 적기만 — 다른 OS 판을 낼 때 그 OS 알림으로
 #[cfg(not(windows))]
-fn toast(_app: &AppHandle, _id: &str, title: &str, label: &str, preview: &str) {
+pub(crate) fn toast(_app: &AppHandle, _id: &str, title: &str, label: &str, preview: &str, _notice: Option<Value>) {
     eprintln!("[알림] {title} · {label} · {preview}");
 }
 

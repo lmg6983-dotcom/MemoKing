@@ -551,7 +551,7 @@ const agTexts = [...new Set([...ddTexts, ...agOwn])];
 const agMemos = [
   { id: '1', body: '# 회의록 모음\n\n…', updated: '2026-10-01T09:00:00+09:00' },
   { id: '2', body: '# 회의록\n\n- 10월', updated: '2026-09-01T09:00:00+09:00' },
-  { id: '3', body: await lockBody('# 회의록\n\n비밀', '사과1234', { iterations: 1000 }) },
+  { id: '3', body: JSON.parse(fs.readFileSync(lockFile, 'utf8'))[0].locked }, // 잠긴 메모 (암호문이 돌릴 때마다 달라 lock.json 의 것)
   { id: '4', body: '# 장보기 목록\n\n- [ ] 우유', updated: '2026-10-20T09:00:00+09:00' },
   { id: '5', body: '# 주간 회의록\n\n출시', updated: '2026-10-21T09:00:00+09:00' },
   { id: '6', body: '본문만 있는 메모', updated: 'nope' },
@@ -593,6 +593,33 @@ write('agent', [
   ...[[], agPicked, agPicked.slice(0, 1)].map((picked) => ({ kind: 'summary', picked, messages: ag.summaryMessages('회의', picked),
     body: ag.summaryBody(' 이번 주  회의 '.repeat(picked.length + 1), '- 출시 확정 [1]\n- 담당 [2] [12]  ', picked.map((p) => ({ title: p.title }))) })),
   ...agNows.flatMap((iso) => agWhen.map((w) => ({ kind: 'event', now: iso, w, out: noId(eventFromDate(w, new Date(iso))) }))),
-  ...agEvents.flat().map((e) => ({ kind: 'occ', r: e.reminder, out: [[agAt(20, 0), agAt(27, 0)], [agAt(26, 0), agAt(26, 23)], [agAt(1, 0), '2027-03-01T00:00:00+09:00']].map(([f, t]) => occurrencesBetween(e.reminder, new Date(f), new Date(t)).map((d) => d.getTime())) })),
+  ...agEvents.flat().map((e) => ({ kind: 'occ', r: noId(e.reminder), out: [[agAt(20, 0), agAt(27, 0)], [agAt(26, 0), agAt(26, 23)], [agAt(1, 0), '2027-03-01T00:00:00+09:00']].map(([f, t]) => occurrencesBetween(e.reminder, new Date(f), new Date(t)).map((d) => d.getTime())) })),
   ...[['# 회의\n\n본문  \n\n', '\r\n\n  덧붙일 글\r\n둘째  \n'], ['', '글'], ['본문', '  \n '], ['   ', '\n\n가']].map(([body, text]) => ({ kind: 'append', body, text, out: appendToBody(body, text) })),
 ]);
+
+// 글 속 일정 자동 등록 (ai-events.js) — 후보 줄 · 모델에 묻는 글 · 모델 답 → 일정 · 본 줄
+const ae = await import('../../app/js/core/ai-events.js');
+const aeBodies = [
+  '# 메모\n\n내일 오후 3시 김 부장 견적 미팅\n어제 3시 회의는 잘 끝남\n내일 비 온대\n그냥 글',
+  '내일 오후 3시 견적 미팅\n내일 비 온대\n매주 월요일 10시 주간 회의',
+  '내일 오후 3시 치과\n내일 오후 3시 치과\n- [ ] 금요일까지 보고서 제출\n> 11월 20일~22일 학회 (부산)\n| 다음 주 화요일 | 회식 |',
+  `${'아주 긴 줄 '.repeat(20)} 내일 3시 마감`, '    내일 오후 2시 들여 쓴 줄', '😀 모레 10시 🎉 파티 準備', '```\n내일 9시 코드\n```\n격주 금요일 4시 스터디', '', '날짜 없는 메모',
+];
+const aeAnswers = [
+  JSON.stringify({ events: [{ n: 1, title: '견적 미팅' }, { n: 1, title: '또' }, { n: 3, title: '' }, { n: 9, title: '없는 줄' }] }),
+  JSON.stringify({ events: [{ n: 2, title: '準備 파티' }, { n: '1', title: 5 }, { n: 1.5 }, { n: true, title: '참' }, null, 3, { n: 4, title: '漢字' }, { n: 5 }] }),
+  '{"events":"x"}', '{"events":[]}', '엉뚱한 답', '[]',
+];
+const aeNows = ['2026-10-24T10:00:00+09:00', '2026-10-25T16:00:00+09:00'];
+const aeKey = (c) => ({ key: c.key, line: c.line, from: c.date.from, to: c.date.to, at: c.date.at.getTime() });
+write('ai_events', aeBodies.flatMap((body) => aeNows.map((iso) => {
+  const now = new Date(iso);
+  const c = ae.eventCandidates(body, [], now);
+  const seen = ae.nextSeen(Array.from({ length: 299 }, (_, i) => `줄${i}`), c.slice(0, 2));
+  const results = aeAnswers.map((a) => ae.aiEventResult(a, c, [], now).map(noId));
+  const first = ae.aiEventResult(aeAnswers[0], c, [], now);
+  return {
+    body, now: iso, cands: c.map(aeKey), again: ae.eventCandidates(body, ae.nextSeen([], c.slice(0, 1)), now).map(aeKey), request: ae.aiEventRequest(c),
+    results, existing: ae.aiEventResult(aeAnswers[0], c, first.slice(0, 1), now).map(noId), later: ae.aiEventResult(aeAnswers[0], c, [], new Date(now.getTime() + 2 * 86_400_000)).map(noId), seen,
+  };
+})));

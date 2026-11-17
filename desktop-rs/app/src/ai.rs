@@ -679,8 +679,12 @@ fn run_agent_action(app: &AppHandle, a: &Value) -> Value {
     }
 }
 
-// ---------- AI 태그 뒤처리 (ai-tagger.js) — 닫은 메모 · 설정의 "모든 메모" 를 하나씩 차례로 (모델이 하나라서) ----------
-// shortcut: 글 속 일정 자동 등록(ai-events.js · aiEvents)은 아직 — 태그만. date-detect.js 를 옮길 때 tag_one 앞에
+// ---------- AI 뒤처리 (ai-tagger.js) — 닫은 메모 · 휴대폰에서 들어온 메모 · 설정의 "모든 메모" 를 하나씩 차례로 (모델이 하나라서) ----------
+//   ① 일정: 새로 쓴 줄의 앞으로의 날짜를 AI 가 골라 일정으로 (본 줄은 머리말 aiEvents — 지운 일정은 되살리지 않음)
+//   ② 태그: 메모마다 한 번, AI 가 고른 태그를 사용자 태그와 합쳐 3개까지 (본 메모는 머리말 aiTags)
+const SETTLE: Duration = Duration::from_secs(60); // 휴대폰에서 쓰는 중인 메모는 1분 조용해진 뒤에
+// 이보다 오래된 메모를 처음 볼 때는 일정을 넣지 않고 본 줄로만 ("내일" 이 쓴 날이 아니라 오늘 기준으로 계산되므로)
+const FRESH_MS: i64 = 24 * 60 * 60_000;
 
 #[derive(Default)]
 struct Tagger {
@@ -717,8 +721,39 @@ fn tagger_add(app: &AppHandle, ids: Vec<String>) {
     });
 }
 
+fn tags_on(app: &AppHandle) -> bool {
+    app.state::<State>().setting("autoTags") != false
+}
+
+fn events_on(app: &AppHandle) -> bool {
+    app.state::<State>().setting("autoEvents") != false
+}
+
+/// 휴대폰에서 들어온 메모: 이어서 쓰는 중일 수 있어 1분 조용해진 뒤에 (aiPhone — PC 가 여러 대면 저마다 고쳐 써서 Drive 충돌 사본이 생기므로 정한 한 대만)
+pub fn later(app: &AppHandle, ids: Vec<String>) {
+    static WAITING: LazyLock<Mutex<HashMap<String, Instant>>> = LazyLock::new(Default::default); // id → 이때까지 조용하면
+    if ids.is_empty() {
+        return;
+    }
+    let due = Instant::now() + SETTLE;
+    WAITING.lock().unwrap().extend(ids.into_iter().map(|id| (id, due)));
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(SETTLE);
+        let ready: Vec<String> = {
+            let mut w = WAITING.lock().unwrap();
+            let ready: Vec<String> = w.iter().filter(|(_, t)| **t <= Instant::now()).map(|(id, _)| id.clone()).collect();
+            w.retain(|id, _| !ready.contains(id));
+            ready
+        };
+        if !ready.is_empty() {
+            tagger_add(&app, ready);
+        }
+    });
+}
+
 fn tagger_run(app: &AppHandle) {
-    let enabled = || app.state::<State>().setting("autoTags") != false;
+    let enabled = || tags_on(app) || events_on(app);
     loop {
         let ready = model(app).is_file();
         let id = {
@@ -761,10 +796,51 @@ fn memo(app: &AppHandle, id: &str) -> Option<Value> {
     app.state::<State>().vault.lock().unwrap().as_ref().and_then(|v| v.get(id))
 }
 
+/// 글 속 일정 (ai-tasks.js autoEvents): 아직 보지 않은 줄 중 앞으로의 날짜가 있는 줄을 AI 가 고르고 이름 → (넣을 일정, 본 줄).
+///   fresh 가 아니면(오래된 메모를 처음 볼 때 — "내일" 이 쓴 날이 아니라 오늘 기준이 되므로) 묻지 않고 본 줄로만.
+///   written: 글을 쓴 때 — "내일" 은 이때 기준 (휴대폰에서 밤 11시 반에 쓴 메모를 PC 가 자정 넘어 봐도 하루 밀리지 않게)
+fn auto_events(app: &AppHandle, body: &str, seen: &[String], existing: &[Value], fresh: bool, written: chrono::DateTime<chrono::Local>) -> Result<(Vec<Value>, Vec<String>), String> {
+    use memoking_core::ai_events::*;
+    let cands = event_candidates(body, seen, written);
+    if cands.is_empty() || !fresh {
+        return Ok((vec![], next_seen(seen, &cands)));
+    }
+    let (messages, schema) = ai_event_request(&cands);
+    let answer = chat(app, &messages, 60 + cands.len() * 40, 0.0, Some(&schema), &AtomicBool::new(false), None)?;
+    Ok((ai_event_result(&answer, &cands, existing, chrono::Local::now()), next_seen(seen, &cands)))
+}
+
 fn tag_one(app: &AppHandle, id: &str) -> Result<(), String> {
-    let Some(m) = memo(app, id) else { return Ok(()) };
+    let Some(mut m) = memo(app, id) else { return Ok(()) };
     let body = m["body"].as_str().unwrap_or_default().to_string();
-    if m["locked"] == true || is_open(app, id) || memoking_core::body::is_blank_body(&body) || m["aiTags"].is_array() {
+    if m["locked"] == true || is_open(app, id) || memoking_core::body::is_blank_body(&body) {
+        return Ok(());
+    }
+    // 그사이 고쳤거나 열었으면 건드리지 않는다 (다음에 닫을 때 다시)
+    let changed = || memo(app, id).is_none_or(|now| now["body"] != body.as_str()) || is_open(app, id);
+    if events_on(app) {
+        let ms = |k: &str| m[k].as_str().and_then(memoking_core::time::parse_js_date).map(|t| t.with_timezone(&chrono::Local));
+        let now = chrono::Local::now();
+        let fresh = !m["aiEvents"].is_null() || ms("created").is_some_and(|c| now - c < chrono::Duration::milliseconds(FRESH_MS));
+        let seen: Vec<String> = m["aiEvents"].as_array().into_iter().flatten().map(memoking_core::js::string).collect();
+        let existing = m["reminders"].as_array().cloned().unwrap_or_default();
+        let (events, seen) = auto_events(app, &body, &seen, &existing, fresh, ms("updated").unwrap_or(now))?;
+        if changed() {
+            return Ok(());
+        }
+        if !events.is_empty() || json!(seen) != m["aiEvents"] {
+            let saved = app.state::<State>().vault.lock().unwrap().as_mut().map(|v| v.add_ai_events(id, &events, &seen));
+            match saved {
+                Some(Ok(Some(_))) if events.is_empty() => crate::memos::push_list(app),
+                Some(Ok(Some(after))) => on_events(app, id, &events, after["reminders"].as_array().cloned().unwrap_or_default()),
+                Some(Err(e)) => eprintln!("AI 일정을 적지 못했어요: {e}"),
+                _ => {}
+            }
+        }
+        let Some(after) = memo(app, id) else { return Ok(()) };
+        m = after;
+    }
+    if !tags_on(app) || m["aiTags"].is_array() {
         return Ok(());
     }
     let room = MAX_TAGS.saturating_sub(memoking_core::body::extract_tags(&body).len());
@@ -774,8 +850,7 @@ fn tag_one(app: &AppHandle, id: &str) -> Result<(), String> {
         return Ok(());
     }
     let names: Vec<String> = pick_tags(app, &body, Some(id))?.into_iter().take(room).filter_map(|t| t["name"].as_str().map(str::to_string)).collect();
-    // 그사이 고쳤거나 열었으면 건드리지 않는다 (다음에 닫을 때 다시)
-    if memo(app, id).is_none_or(|now| now["body"] != body.as_str()) || is_open(app, id) {
+    if changed() {
         return Ok(());
     }
     let saved = app.state::<State>().vault.lock().unwrap().as_mut().map(|v| v.set_ai_tags(id, &append_tags(&body, &names), &names));
@@ -830,6 +905,72 @@ fn tag_clear(app: &AppHandle) -> usize {
         crate::memos::push_list(app);
     }
     n
+}
+
+// ---------- AI 가 뒤에서 한 일 (main.js showAiNotice): Windows 알림을 누르면 메모가 열리고, 메모 창 아래 막대에서 되돌린다 ----------
+//   알림을 누르는 습관은 "열기"라 알림 자체로는 되돌리지 않는다. 메모마다 차례로 쌓고 막대는 마지막 것부터
+// shortcut: 일정 자동 등록의 알림만 — 매직키 다듬기(polish)의 알림은 다듬기를 옮길 때 되돌리기와 함께
+
+struct Notice {
+    text: String,
+    reminders: Vec<String>, // AI 가 넣은 일정 id — 되돌리면 이것만 뺀다
+}
+
+const MAX_AI_NOTICES: usize = 30; // 열어 보지 않은 메모가 이보다 많으면 오래된 것부터 버린다
+static NOTICES: Mutex<Vec<(String, Vec<Notice>)>> = Mutex::new(Vec::new()); // (메모 id, 알림들) — 오래된 메모부터
+
+/// 글에서 찾은 일정을 넣었다: 일정 탭 · 알림을 새로 하고 알린다 (본 줄은 그대로 — 다시 넣지 않음). all: 그 메모의 일정 전부
+fn on_events(app: &AppHandle, id: &str, events: &[Value], all: Vec<Value>) {
+    crate::reminders::changed(app, id, all);
+    let now = chrono::Local::now();
+    let list: Vec<String> = events
+        .iter()
+        .map(|r| format!("{}{}", memoking_core::reminders::describe_reminder(r, now), r["title"].as_str().filter(|t| !t.is_empty()).map_or(String::new(), |t| format!(" {t}"))))
+        .collect();
+    let text = format!("AI가 일정을 넣었어요: {}", list.join(", "));
+    {
+        let mut all = NOTICES.lock().unwrap();
+        let mut mine = all.iter().position(|n| n.0 == id).map_or_else(Vec::new, |i| all.remove(i).1);
+        mine.push(Notice { text: text.clone(), reminders: events.iter().filter_map(|r| r["id"].as_str().map(str::to_string)).collect() });
+        all.push((id.to_string(), mine)); // 맨 뒤(새것)로
+        if all.len() > MAX_AI_NOTICES {
+            all.remove(0);
+        }
+    }
+    crate::reminders::toast(app, id, &format!("일정 {}개를 넣었어요", events.len()), &list.join("\n"), "눌러서 열기 · 메모에서 되돌릴 수 있어요", Some(json!({ "text": text })));
+}
+
+/// 그 메모의 마지막 알림 { text } | null
+fn last_notice(id: &str) -> Value {
+    NOTICES.lock().unwrap().iter().find(|n| n.0 == id).and_then(|n| n.1.last()).map_or(Value::Null, |n| json!({ "text": n.text }))
+}
+
+fn drop_notice(id: &str) -> Option<Notice> {
+    let mut all = NOTICES.lock().unwrap();
+    let i = all.iter().position(|n| n.0 == id)?;
+    let last = all[i].1.pop();
+    if all[i].1.is_empty() {
+        all.remove(i);
+    }
+    last
+}
+
+/// AI 가 넣은 일정만 뺀다 → { ok, message }
+fn undo_events(app: &AppHandle, id: &str, ids: &[String]) -> Value {
+    let list = memo(app, id).and_then(|m| m["reminders"].as_array().cloned()).unwrap_or_default();
+    let ours = |r: &Value| r["id"].as_str().is_some_and(|x| ids.iter().any(|i| i == x));
+    if !list.iter().any(ours) {
+        return json!({ "ok": false, "message": "넣은 일정이 이미 없어요" });
+    }
+    let keep = list.iter().filter(|r| !ours(r)).cloned().collect();
+    let saved = app.state::<State>().vault.lock().unwrap().as_mut().map(|v| v.set_reminders(id, keep));
+    match saved {
+        Some(Ok(Some(saved))) => {
+            crate::reminders::changed(app, id, saved);
+            json!({ "ok": true, "message": "AI가 넣은 일정을 뺐어요" })
+        }
+        _ => json!({ "ok": false, "message": "일정을 빼지 못했어요. 일정 탭에서 지워 주세요" }),
+    }
 }
 
 // ---------- 채널 ----------
@@ -895,6 +1036,19 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             job(label, &arg["id"], |cancel| agent(app, label, &arg["id"], &text, cancel))
         }
         "ai:agent-run" => Ok(run_agent_action(app, &arg)),
+        // AI 가 뒤에서 한 일: 메모 창 아래 막대 — 마지막 것부터 보이고, 되돌리거나 닫으면 그 앞의 것
+        "ai:notice" => Ok(last_notice(&memoking_core::js::string(&arg))),
+        "ai:notice-undo" => {
+            let id = memoking_core::js::string(&arg);
+            let mut r = drop_notice(&id).map_or_else(|| json!({ "ok": false, "message": "되돌릴 것이 없어요" }), |n| undo_events(app, &id, &n.reminders));
+            r["next"] = last_notice(&id);
+            Ok(r)
+        }
+        "ai:notice-dismiss" => {
+            let id = memoking_core::js::string(&arg);
+            drop_notice(&id);
+            Ok(last_notice(&id))
+        }
         "ai:cancel" => {
             if let Some(c) = JOBS.lock().unwrap().get(&format!("{label}:{}", memoking_core::js::string(&arg))) {
                 c.store(true, Ordering::Relaxed);

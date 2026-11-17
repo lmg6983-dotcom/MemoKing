@@ -1092,6 +1092,26 @@ impl Vault {
         Ok(if ok { self.get(id) } else { None })
     }
 
+    /// AI 가 글에서 찾아 넣은 일정과 본 줄 aiEvents (vault-locks.js addAiEvents) — 고친 시각은 그대로. 쓰지 못했으면 되돌리고 None
+    pub fn add_ai_events(&mut self, id: &str, events: &[Value], seen: &[String]) -> io::Result<Option<Value>> {
+        let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
+        if e.file.is_none() || body::is_locked_body(&e.body) {
+            self.entries.insert(id.into(), e);
+            return Ok(None);
+        }
+        let (prev, known) = (e.meta.clone(), e.body.clone());
+        e.meta.reminders.extend_from_slice(events);
+        e.meta.extra.insert("aiEvents".into(), json!(seen));
+        let wrote = self.write(&mut e, &known, true);
+        let ok = matches!(wrote, Ok(Wrote::Yes));
+        if !ok {
+            e.meta = prev;
+        }
+        self.entries.insert(id.into(), e);
+        wrote?;
+        Ok(if ok { self.get(id) } else { None })
+    }
+
     /// 연결한 메모 · 나를 연결한 메모
     pub fn links(&self, id: &str) -> Value {
         let Some(e) = self.entries.get(id) else { return json!({ "links": [], "backlinks": [], "suggestions": [] }) };
@@ -1558,6 +1578,23 @@ mod tests {
         let name = v2.trash(&id).unwrap().unwrap();
         assert!(name.starts_with("주간 회의 (") && root.join("_memoking/trash").join(&name).exists());
         assert!(v2.list().is_empty());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn ai_events_add_reminders_and_seen_lines() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let id = v.create(None, None, "");
+        assert!(v.add_ai_events(&id, &[], &[]).unwrap().is_none(), "파일이 없는 메모는 아니다");
+        v.save(&id, "# 메모\n내일 3시 치과").unwrap();
+        let updated = v.get(&id).unwrap()["updated"].clone();
+        let r = json!({ "id": "r1", "kind": "at", "action": "notify", "enabled": true, "created": "2026-10-24T10:00:00+09:00", "at": "2026-10-25T15:00:00+09:00", "alerts": [10] });
+        let m = v.add_ai_events(&id, std::slice::from_ref(&r), &["내일 3시 치과".into()]).unwrap().unwrap();
+        assert_eq!((m["reminders"][0]["id"].clone(), m["aiEvents"].clone(), m["updated"].clone()), (json!("r1"), json!(["내일 3시 치과"]), updated));
+        let text = fs::read_to_string(root.join("메모.md")).unwrap();
+        assert!(text.contains("aiEvents:") && text.contains("id: r1"), "{text}");
         fs::remove_dir_all(root).unwrap();
     }
 

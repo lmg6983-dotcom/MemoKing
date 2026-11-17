@@ -994,3 +994,44 @@ fn agent() {
     }
     report("agent", fails, cases.len());
 }
+
+#[test]
+fn ai_events() {
+    use memoking_core::ai_events::*;
+    let answers = [
+        r#"{"events":[{"n":1,"title":"견적 미팅"},{"n":1,"title":"또"},{"n":3,"title":""},{"n":9,"title":"없는 줄"}]}"#,
+        r#"{"events":[{"n":2,"title":"準備 파티"},{"n":"1","title":5},{"n":1.5},{"n":true,"title":"참"},null,3,{"n":4,"title":"漢字"},{"n":5}]}"#,
+        r#"{"events":"x"}"#, r#"{"events":[]}"#, "엉뚱한 답", "[]",
+    ];
+    let no_id = |list: Vec<Value>| -> Value {
+        json!(list.into_iter().map(|mut r| {
+            r.as_object_mut().unwrap().shift_remove("id");
+            r
+        }).collect::<Vec<_>>())
+    };
+    let key = |c: &Candidate| json!({ "key": c.key, "line": c.key, "from": c.line[..c.date.from].encode_utf16().count(), "to": c.line[..c.date.to].encode_utf16().count(), "at": c.date.at.timestamp_millis() });
+    let cases = fixtures("ai_events");
+    let mut fails = vec![];
+    for c in &cases {
+        let body = c["body"].as_str().unwrap();
+        let now = memoking_core::time::parse_js_date(c["now"].as_str().unwrap()).unwrap().with_timezone(&chrono::Local);
+        let cands = event_candidates(body, &[], now);
+        let first = ai_event_result(answers[0], &cands, &[], now);
+        let (messages, schema) = ai_event_request(&cands);
+        let old: Vec<String> = (0..299).map(|i| format!("줄{i}")).collect();
+        let got = json!({
+            "cands": cands.iter().map(key).collect::<Vec<_>>(),
+            "again": event_candidates(body, &next_seen(&[], &cands[..cands.len().min(1)]), now).iter().map(key).collect::<Vec<_>>(),
+            "request": { "messages": messages, "schema": schema },
+            "results": answers.iter().map(|a| no_id(ai_event_result(a, &cands, &[], now))).collect::<Vec<_>>(),
+            "existing": no_id(ai_event_result(answers[0], &cands, &first[..first.len().min(1)], now)),
+            "later": no_id(ai_event_result(answers[0], &cands, &[], now + chrono::Duration::days(2))),
+            "seen": next_seen(&old, &cands[..cands.len().min(2)]),
+        });
+        let diff: Vec<String> = got.as_object().unwrap().iter().filter(|(k, v)| c[k.as_str()] != **v).map(|(k, v)| format!("  {k}\n    JS  : {}\n    Rust: {v}", c[k.as_str()])).collect();
+        if !diff.is_empty() {
+            fails.push(format!("{body:?} @ {}\n{}", c["now"], diff.join("\n")));
+        }
+    }
+    report("ai_events", fails, cases.len());
+}
