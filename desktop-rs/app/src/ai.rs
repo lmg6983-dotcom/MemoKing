@@ -693,10 +693,7 @@ fn tagger_add(app: &AppHandle, ids: Vec<String>) {
     }
     t.running = true;
     let app = app.clone();
-    std::thread::spawn(move || {
-        tagger_run(&app);
-        TAGGER.lock().unwrap().running = false;
-    });
+    std::thread::spawn(move || tagger_run(&app));
 }
 
 fn tags_on(app: &AppHandle) -> bool {
@@ -736,7 +733,9 @@ fn tagger_run(app: &AppHandle) {
         let ready = model(app).is_file();
         let id = {
             let mut t = TAGGER.lock().unwrap();
+            // 빈 것을 본 그 잠금 안에서 끈다 (풀고 끄면 그사이 넣은 메모는 아무도 돌리지 않는다)
             if t.queue.is_empty() || !enabled() || !ready {
+                t.running = false;
                 return;
             }
             t.queue.remove(0)
@@ -747,6 +746,7 @@ fn tagger_run(app: &AppHandle) {
             let mut t = TAGGER.lock().unwrap();
             let had = t.batch.take().is_some();
             t.queue.clear();
+            t.running = false;
             drop(t);
             if had {
                 tagging(app, json!({ "error": format!("AI 태그를 달지 못했어요: {err}") }));
