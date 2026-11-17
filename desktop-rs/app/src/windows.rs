@@ -1166,6 +1166,19 @@ fn parse_top_line(line: &str) -> Option<TopEvent> {
     })
 }
 
+/// 메모킹을 끌 때: 왕관 도우미(PowerShell)는 따로 도는 프로세스라 남는다
+pub fn stop() {
+    let c = {
+        let mut g = wm();
+        g.top.gen += 1; // 도우미가 끝나서 3초 뒤 다시 띄우는 것도 막는다
+        g.top.child.take()
+    };
+    if let Some(mut c) = c {
+        let _ = c.kill();
+        let _ = c.wait();
+    }
+}
+
 /// 왕관 창을 지키는 도우미를 지금 왕관 창들로 (다시) 띄운다 — 없으면 멈춘다
 // 1) Windows 가 늘 위를 몰래 풀면(lost) 다시 켜고, 2) 다른 "늘 위" 앱 창이 앞으로 오는 순간 메모킹 왕관 창을 다시 맨 위로
 fn refresh_top_watch(app: &AppHandle) {

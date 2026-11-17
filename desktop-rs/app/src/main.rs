@@ -100,6 +100,7 @@ fn main() {
             // AI 엔진은 따로 도는 프로세스라 메모킹을 꺼도 남는다
             if let tauri::RunEvent::Exit = e {
                 ai::stop();
+                windows::stop();
             }
         });
 }
