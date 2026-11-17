@@ -218,7 +218,14 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
 /// 메모 창 만들기 — bounds 가 없으면 기억한 자리, show 가 false 면 숨겨서 (스택 탭: windows.rs 가 다 그린 뒤 보인다)
 // shortcut: 예비 창은 아직 — 기억한 자리(noteBounds)가 없으면 기본 크기로 화면 가운데쯤
 pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, show: bool) -> Result<tauri::WebviewWindow, String> {
+    // memo:open 이 둘 겹치면(채널은 spawn_blocking) 둘 다 창이 없다고 보고 하나씩 만든다 — 확인부터 note_labels 넣기까지 한 번에 하나만
+    static CREATING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let one = CREATING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let st = state(app);
+    let open = st.note_labels.lock().unwrap().get(id).cloned();
+    if let Some(w) = open.and_then(|l| app.get_webview_window(&l)) {
+        return Ok(w);
+    }
     let label = format!("note-{}", NEXT_NOTE.fetch_add(1, Ordering::Relaxed));
     let title = with_vault(app, |v| Ok(v.get(id).and_then(|m| m["title"].as_str().map(str::to_string)).unwrap_or_default()))?;
     let b = crate::window(app, &label, &format!("note.html?id={}", query_escape(id)))
@@ -233,6 +240,7 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
     };
     let win = b.build().map_err(|e| e.to_string())?;
     st.note_labels.lock().unwrap().insert(id.to_string(), label);
+    drop(one);
     let (app2, id2) = (app.clone(), id.to_string());
     win.on_window_event(move |e| {
         if let WindowEvent::Destroyed = e {
