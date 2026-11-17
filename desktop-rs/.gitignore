@@ -1,2 +1,4 @@
 target/
 app/gen/
+app/binaries/
+app/tauri.release.json

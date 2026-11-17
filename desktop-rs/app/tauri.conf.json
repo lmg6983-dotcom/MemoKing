@@ -36,9 +36,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI5QzZCQUJGNUVEMDM2ODQKUldTRU50QmV2N3JHdVM1Ny85eFFHanFSL2NadS84NzJPaEt4MitkRzBDSkNMakk5aG9nVS90RjMK",
       "endpoints": [
-        "https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/latest-tauri.json"
+        "https://github.com/lmg6983-dotcom/MemoKing/releases/download/desktop-rs/latest-tauri.json"
       ]
     }
   }
