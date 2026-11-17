@@ -5,7 +5,8 @@ use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter, Webview};
 
-// async: Windows 에서는 동기 명령 안에서 창을 만들면(메모 창 열기) 멈춘다 — 비동기 명령은 다른 스레드에서 돈다
+// async: Windows 에서는 동기 명령 안에서 창을 만들면(메모 창 열기) 멈춘다 — 비동기 명령은 다른 스레드에서 돈다.
+//   몇 분 걸리는 채널(AI 답 · 모델 받기)이 비동기 일꾼을 붙잡지 않게 막아도 되는 스레드에서
 #[tauri::command]
 pub async fn ipc(app: AppHandle, webview: Webview, channel: String, args: Vec<Value>) -> Result<Value, String> {
     // 막혀도 되는 스레드에서 — 링크 미리보기 · 그림 받기(몇 초)가 비동기 일꾼(코어 수만큼)을 다 붙잡아 다른 채널까지 멈추지 않게
@@ -24,6 +25,9 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
         return r;
     }
     if let Some(r) = crate::clipboard::handle(app, label, channel, &args) {
+        return r;
+    }
+    if let Some(r) = crate::ai::handle(app, label, channel, &args) {
         return r;
     }
     if let Some(r) = crate::settings::handle(app, label, channel, &args) {

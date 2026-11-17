@@ -1,6 +1,7 @@
 // 메모킹 데스크탑 (Rust + Tauri 2) — Electron 의 desktop/ 을 옮기는 중. 화면은 ../../app 그대로.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod ai;
 mod clipboard;
 mod files;
 mod drive;
@@ -109,8 +110,14 @@ fn main() {
             shortcuts::start(app);
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("메모킹을 켜지 못했어요");
+        .build(tauri::generate_context!())
+        .expect("메모킹을 켜지 못했어요")
+        .run(|_, e| {
+            // AI 엔진은 따로 도는 프로세스라 메모킹을 꺼도 남는다
+            if let tauri::RunEvent::Exit = e {
+                ai::stop();
+            }
+        });
 }
 
 

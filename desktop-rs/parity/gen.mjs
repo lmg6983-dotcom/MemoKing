@@ -23,6 +23,12 @@ import { NOUNS } from '../../app/js/core/korean-nouns.js';
 import { parseLinkPreview, detectCharset, hostOf, youtubeOEmbedUrl, parseYoutubeOEmbed, staleYoutubeEntry } from '../../app/js/core/link-preview.js';
 import { imageExtFromType, imageExtFromUrl } from '../../app/js/core/remote-images.js';
 import { versionTitles } from '../../app/js/core/release-notes.js';
+import { suggestTagsFor, matchExisting, appendTags, removeTags } from '../../app/js/core/tag-suggest.js';
+import { autoTagsFor } from '../../app/js/core/auto-tags.js';
+import { noThink, sseText, engineError, chatBody } from '../../app/js/core/llama-client.js';
+import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibleFix } from '../../app/js/core/ai-write.js';
+import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
+import { chunkMemo, askedPeriod, buildIndex as ragBuildIndex, retrieve as ragRetrieve, expandMessages, expandResult, ragMessages, finishAnswer } from '../../app/js/core/rag.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 import { driveCases } from './drive.mjs';
 
@@ -270,5 +276,109 @@ const readme = [
 ].join('\n');
 write('release_notes', [[null, '0.88.0'], ['0.85.0', '0.88.0'], ['0.88.0', '0.88.0'], ['0.9.0', '0.20.0'], [null, '9.9.9']]
   .map(([from, to]) => ({ readme, from, to, titles: versionTitles(readme, from, to) })));
+// 태그 추천 · 저절로 다는 태그: 메모 묶음 × 새 메모 (본문 · id)
+const tagSets = [
+  ['work', [
+    { id: 'a', body: '# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의' },
+    { id: 'b', body: '# 기획 회의록\n\n출시 일정과 디자인 검토 회의 #업무 #회의' },
+    { id: 'c', body: '# 장보기\n\n우유 계란 대파 두부 #장보기 #집' },
+    { id: 'd', body: '# 마트\n\n두부 우유 사과 #장보기' },
+    { id: 'e', body: '# 예전 화면\n\n오류 화면 #스크린샷' },
+    { id: 'f', body: '# MemoKing 개발\n\n코딩 버그 수정 배포 #MemoKing #개발 #업무' },
+    { id: 'g', body: '# 프로젝트 회고\n\n일정 지연 원인 #프로잭트 #업무' },
+    { id: 'h', body: '# 제주 여행\n\n숙소 예약 렌터카 #여행 #가족' },
+  ]],
+  ['corpus', corpus().map((text, i) => ({ id: `c${i}`, body: mf.parseMemoFile(text).body }))],
+  ['none', []],
+];
+const tagTargets = [
+  ['# 내일 회의\n\n디자인 검토 회의 준비할 것', null], ['# 저녁거리\n\n우유 두부 계란 사오기', null], ['짧음', null],
+  ['# 회의 준비\n\n안건 회의 정리 #회의', null], ['# 여행 계획\n\n제주도 여행 숙소 예약 여행 일정', null],
+  ['# 거래처 미팅\n\n다음 분기 계획 미팅 메모', null], ['![화면 캡처](attachments/a.png)', null], ['오류 화면 #스크린샷', null],
+  ['# 요리\n\n김치찌개 끓이는 법 정리해 둔 것', null], ['# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의', 'a'],
+  ['https://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리', null], ['폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년', null],
+  ['# memoking 버그\n\n배포 전에 코딩 다시 확인하기 #개발', 'f'],
+  ...corpus().slice(0, 40).map((t, i) => [mf.parseMemoFile(t).body, `c${i}`]),
+];
+write('tag_sets', tagSets.map(([name, memos]) => ({ name, memos })));
+const SOURCES = ['capture', 'link', 'audio', 'share', null];
+write('tag_suggest', tagSets.flatMap(([set, memos]) => tagTargets.map(([body, id]) => ({
+  set, body, id,
+  suggest: suggestTagsFor(body, memos, { excludeId: id ?? undefined }),
+  auto: SOURCES.map((source) => autoTagsFor(body, memos, { source: source ?? undefined, excludeId: id ?? undefined })),
+}))));
+const existingTags = [{ name: 'MemoKing', count: 3 }, { name: '회의', count: 5 }, { name: '장보기', count: 2 }, { name: '프로젝트', count: 2 }, { name: '업무', count: 1 }, { name: '스크린샷', count: 1 }];
+write('tag_match', ['memoking', '미팅', '회의록', '쇼핑', '프로잭트', '여행', '', 'Work', '캡쳐', '회'].map((word) => {
+  const m = matchExisting(word, existingTags);
+  return { word, name: m ? m.name : null, rank: m ? m.rank : null };
+}));
+
+// 로컬 AI 에 묻는 말 · 답 거르기 (llama-client · ai-write · ai-tags)
+const thinks = ['답', '  <think>생각\n중</think>\n답 ', '<think>아직 생각 중', '앞 <think>a</think> 가운데 <think>b</think> 끝', ''];
+const sse = ['data: {"choices":[{"delta":{"content":"안녕"}}]}', 'data: [DONE]', '', ': ping', 'data: {"choices":[{"delta":{}}]}', 'data:   {"choices":[]}  '];
+const logs = [["llama_model_load: error: unknown model architecture: 'gemma9'", 1], ['CUDA error: out of memory', 3221225477], ['ggml: failed to allocate buffer', -1], ['something else', 1]];
+const writeTexts = ['', '오늘 회의 했는데 됬어요.', '되니 ?', '#업무 https://a.com/x 회의록 정리 해야됨', '   ', '긴 글 '.repeat(400)];
+const fixes = [['오늘 회의 했는데 됬어요.', '오늘 회의했는데 됐어요.'], ['되니 ?', '네, 잘 돼요'], ['되니 ?', '되니?'], ['#업무 회의', '업무 회의'], ['회의록', '會議錄'], ['abc', ''],
+  ['https://a.com/x 링크', 'https://a.com/x 링크.'], ['짧은 글', '아주 아주 길게 늘어난 다른 글'], ['한자 漢字 그대로', '한자 漢字 그대로.'], ['맞춤법 검사 할 글 입니다', '맞춤법 검사할 글입니다']];
+const outs = ['  네, 요청하신 대로 정리했습니다:\n\n## 결과\n- 하나', '```markdown\n## 제목\n본문\n```', '```\n코드\n```', '다음은 요약입니다：\n내용', '그대로', '알겠습니다. 아래는 표예요:\n\n| a |'];
+const drafts = [
+  { title: '회의', body: '', request: '', selection: '' },
+  { title: '', body: '오늘 회의 내용\n- 일정 확정', request: '요약해 줘', selection: '' },
+  { title: '장보기', body: '우유', request: '이어서 써 줘', selection: '' },
+  { title: '장보기', body: '우유', request: '이어서 목록으로 정리', selection: '' },
+  { title: 't', body: '본문', request: '영어로', selection: '  고른 글  ' },
+  { title: '긴 글', body: '가'.repeat(2000), request: '짧게', selection: '' },
+  { title: '', body: '   ', request: '  ', selection: '' },
+];
+write('ai_text', [
+  ...thinks.map((text) => ({ kind: 'noThink', text, out: noThink(text) })),
+  ...sse.map((text) => ({ kind: 'sse', text, out: sseText(text) })),
+  ...logs.map(([text, code]) => ({ kind: 'engine', text, code: String(code), out: engineError(text, code) })),
+  ...outs.map((text) => ({ kind: 'clean', text, out: cleanWriteOutput(text) })),
+  ...fixes.map(([before, after]) => ({ kind: 'fix', text: before, after, out: plausibleFix(before, after) })),
+  ...writeTexts.map((text) => ({ kind: 'spell', text, out: spellMessages(text) })),
+  ...['해요체', '합니다체', '간결체', '보고서체', '반말체'].map((style) => ({ kind: 'style', text: '글', style, out: styleMessages('글', style) })),
+  ...drafts.map((d) => ({ kind: 'draft', ...d, out: draftMessages(d) })),
+  { kind: 'body', out: chatBody([{ role: 'user', content: 'x' }], { maxTokens: 80 }) },
+  { kind: 'bodySchema', out: chatBody([], { maxTokens: 60, temperature: 0, schema: { type: 'object' }, stream: true }) },
+  ...['# 제목\n\n본문\n', '# 제목\n\n#회의\n', '#회의  ', '', '본문 #안\n\n\n', '# 제목\n\n#회의 #업무 #일정\n\n', '  #a #B\t#c  \n끝\n#b #d'].flatMap((body) => [
+    { kind: 'append', text: body, names: ['업무', '1', '회의'], out: appendTags(body, ['업무', '1', '회의']) },
+    { kind: 'append', text: body, names: [], out: appendTags(body, []) },
+    { kind: 'remove', text: body, names: ['회의', 'b', '업무'], out: removeTags(body, ['회의', 'b', '업무']) },
+  ]),
+]);
+const answers = ['{"tags":["회의","#일정 관리","메모","프로잭트","캡쳐","x",5,null,"회의록","업무","가족"]}', '{"tags":[]}', 'not json', '{"tags":"회의"}', '{"tags":["미팅","장보기","여행계획","스크린샷"]}'];
+write('ai_tags', tagSets.flatMap(([set, memos]) => tagTargets.slice(0, 14).map(([body, id]) => {
+  const req = aiTagRequest(body, memos, { excludeId: id ?? undefined });
+  return { set, body, id, messages: req.messages, schema: req.schema, existing: req.existing, grounded: [...req.grounded], results: answers.map((a) => aiTagResult(a, req.existing, body, req.grounded)) };
+})));
+
+// AI 검색: 조각 나누기 · 물은 때 · 찾기 · 답 묻는 말 · 답 다듬기 ("지금" 은 정해 둔 시각)
+const RAG_NOW = new Date('2026-11-18T15:00:00+09:00');
+const ragMemos = [
+  { id: 'w', body: '# 와이파이\n\n집 공유기 비밀번호는 abc12345 이다.\n손님용은 guest2026.', updated: '2026-11-17T10:00:00+09:00' },
+  { id: 'r', body: '# 출시 회의\n\n신제품 출시일은 12월 3일로 정했다. 담당자는 김대리.\n마케팅 예산 3천만 원.', updated: '2026-11-12T09:00:00+09:00' },
+  { id: 'm', body: '# 월세\n\n매달 25일 월세 80만 원 이체. 계좌는 국민 123-45.', updated: '2026-10-20T09:00:00+09:00' },
+  { id: 'c', body: `# 긴 메모\n\n${Array.from({ length: 30 }, (_, i) => `${i}번째 줄 회의 내용과 일정 정리 문장입니다.`).join('\n')}`, updated: '2026-11-18T08:00:00+09:00' },
+  { id: 't', body: '# 제주 여행\n\n숙소는 호텔, 비행기는 오전 9시. 렌터카 예약 완료!', updated: '2026-01-05T09:00:00+09:00' },
+  { id: 'e', body: '', updated: '2026-11-18T08:00:00+09:00' },
+  ...corpus().slice(0, 30).map((t, i) => ({ id: `c${i}`, body: mf.parseMemoFile(t).body, updated: '2026-11-11T09:00:00+09:00' })),
+];
+const ragChunks = ragMemos.flatMap((m) => chunkMemo(m.body).map((text) => ({ id: m.id, title: mf.extractTitle(m.body), text, updated: m.updated })));
+const ragIndex = ragBuildIndex(ragChunks.map((c) => ({ ...c })));
+const ragRelated = { w: [{ id: 'm', score: 0.8 }, { id: 'zz', score: 1 }, { id: 'r', score: 0.5 }], r: [{ id: 't', score: 0.4 }], m: [{ id: 'w', score: 0.9 }] };
+const ragQuestions = ['인터넷 암호 뭐였지', '출시일 언제야', '월세 얼마야', '지난주 회의 내용', '오늘 회의', '차 정비', '이번 달 일정', '올해 여행', '어제 뭐 했지', '그저께', '이번주 일정', '저번 달 월세', '없는말없는말', '뭐야', ''];
+const ragWords = [[], ['비번', '공유기'], ['  ', 7, null]];
+const ragAnswers = ['비밀번호는 abc12345예요 [1]', '메모에서 찾지 못했어요.', '답만 있어요', '[9] 없는 번호 [2]', '', '없어요', '첫째 [1][3] 둘째'];
+write('rag_chunks', ragMemos.map((m) => ({ id: m.id, updated: m.updated, body: m.body, chunks: chunkMemo(m.body) })));
+write('rag', ragQuestions.flatMap((q) => ragWords.map((words) => {
+  const w = expandResult(JSON.stringify({ words }));
+  const picked = ragRetrieve(q, ragIndex, { words: w, related: (id) => ragRelated[id] ?? [], limit: 4, now: RAG_NOW });
+  const p = askedPeriod(q, RAG_NOW);
+  return {
+    q, words, expanded: w, period: p && [p.from.getTime(), p.to.getTime()], picked,
+    messages: ragMessages(q, picked, RAG_NOW), finished: ragAnswers.map((a) => finishAnswer(a, q, picked, w)),
+  };
+})).concat([{ q: 'expand', expand: ['{"words":["a"," b ",1,null,"","c","d","e","f","g"]}', '{"words":"x"}', 'nope'].map(expandResult), messages: expandMessages('질문') }]));
 // Google Drive 동기화 (desktop/drive/sync-engine.js) — 장면은 drive.mjs
 write('drive_sync', await driveCases());

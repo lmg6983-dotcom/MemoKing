@@ -597,3 +597,159 @@ mod drive {
         super::report("drive_sync", fails, cases.len());
     }
 }
+
+#[test]
+fn tag_suggest() {
+    use memoking_core::tag_suggest::*;
+    let sets: std::collections::HashMap<String, Vec<(String, String)>> = fixtures("tag_sets")
+        .iter()
+        .map(|s| (s["name"].as_str().unwrap().to_string(), s["memos"].as_array().unwrap().iter().map(|m| (m["id"].as_str().unwrap().to_string(), m["body"].as_str().unwrap().to_string())).collect()))
+        .collect();
+    let cases = fixtures("tag_suggest");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let (memos, body, id) = (&sets[c["set"].as_str().unwrap()], c["body"].as_str().unwrap(), c["id"].as_str());
+            let suggest = json!(suggest_tags_for(body, memos, 3, id));
+            let auto = json!(["capture", "link", "audio", "share", ""].map(|s| auto_tags_for(body, memos, s, id)));
+            (suggest != c["suggest"] || auto != c["auto"]).then(|| format!("{} {body:?}\n  JS  : {} {}\n  Rust: {suggest} {auto}", c["set"], c["suggest"], c["auto"]))
+        })
+        .collect();
+    report("tag_suggest", fails, cases.len());
+    let cases = fixtures("tag_match");
+    let tags: Vec<Existing> = [("MemoKing", 3), ("회의", 5), ("장보기", 2), ("프로젝트", 2), ("업무", 1), ("스크린샷", 1)].map(|(n, c)| Existing { name: n.into(), count: c }).into();
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = match_existing(c["word"].as_str().unwrap(), &tags).map_or(json!({ "name": null, "rank": null }), |(m, r)| json!({ "name": m.name, "rank": r }));
+            (got["name"] != c["name"] || got["rank"] != c["rank"]).then(|| format!("{c} → {got}"))
+        })
+        .collect();
+    report("tag_match", fails, cases.len());
+}
+
+#[test]
+fn ai_text() {
+    use memoking_core::ai::*;
+    let cases = fixtures("ai_text");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let s = |k: &str| c[k].as_str().unwrap_or_default();
+            let got = match s("kind") {
+                "noThink" => json!(no_think(s("text"))),
+                "sse" => json!(sse_text(s("text")).unwrap()),
+                "engine" => json!(engine_error(s("text"), s("code"))),
+                "clean" => json!(clean_write_output(s("text"))),
+                "fix" => json!(plausible_fix(s("text"), s("after"))),
+                "spell" => spell_messages(s("text")),
+                "style" => style_messages(s("text"), s("style")),
+                "draft" => draft_messages(s("title"), s("body"), s("request"), s("selection")),
+                "append" | "remove" => {
+                    use memoking_core::tag_suggest::{append_tags, remove_tags};
+                    let names: Vec<String> = c["names"].as_array().unwrap().iter().map(|n| n.as_str().unwrap().to_string()).collect();
+                    json!(if s("kind") == "append" { append_tags(s("text"), &names) } else { remove_tags(s("text"), &names) })
+                }
+                "body" => chat_body(&json!([{ "role": "user", "content": "x" }]), 80, 0.3, None, false),
+                _ => chat_body(&json!([]), 60, 0.0, Some(&json!({ "type": "object" })), true),
+            };
+            (got != c["out"]).then(|| format!("{} {:?}\n  JS  : {}\n  Rust: {got}", s("kind"), s("text"), c["out"]))
+        })
+        .collect();
+    report("ai_text", fails, cases.len());
+}
+
+#[test]
+fn ai_tags() {
+    use memoking_core::ai::*;
+    let sets: std::collections::HashMap<String, Vec<(String, String)>> = fixtures("tag_sets")
+        .iter()
+        .map(|s| (s["name"].as_str().unwrap().to_string(), s["memos"].as_array().unwrap().iter().map(|m| (m["id"].as_str().unwrap().to_string(), m["body"].as_str().unwrap().to_string())).collect()))
+        .collect();
+    let answers = [r##"{"tags":["회의","#일정 관리","메모","프로잭트","캡쳐","x",5,null,"회의록","업무","가족"]}"##, r##"{"tags":[]}"##, "not json", r##"{"tags":"회의"}"##, r##"{"tags":["미팅","장보기","여행계획","스크린샷"]}"##];
+    let cases = fixtures("ai_tags");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let (memos, body) = (&sets[c["set"].as_str().unwrap()], c["body"].as_str().unwrap());
+            let req = ai_tag_request(body, memos, c["id"].as_str());
+            let mut grounded: Vec<&String> = req.grounded.iter().collect();
+            grounded.sort();
+            let mut want: Vec<&str> = c["grounded"].as_array().unwrap().iter().map(|g| g.as_str().unwrap()).collect();
+            want.sort();
+            let got = json!({
+                "messages": req.messages,
+                "schema": req.schema,
+                "existing": req.existing.iter().map(|e| json!({ "name": e.name, "count": e.count })).collect::<Vec<_>>(),
+                "results": answers.map(|a| ai_tag_result(a, &req.existing, body, &req.grounded)),
+            });
+            let diff: Vec<String> = got.as_object().unwrap().iter().filter(|(k, v)| c[k.as_str()] != **v).map(|(k, v)| format!("  {k}\n    JS  : {}\n    Rust: {v}", c[k.as_str()])).collect();
+            (!diff.is_empty() || grounded != want).then(|| format!("{} {body:?}\n{}", c["set"], diff.join("\n")))
+        })
+        .collect();
+    report("ai_tags", fails, cases.len());
+}
+
+#[test]
+fn rag() {
+    use memoking_core::rag::*;
+    let now = memoking_core::time::parse_js_date("2026-11-18T15:00:00+09:00").unwrap().with_timezone(&chrono::Local);
+    let memos = fixtures("rag_chunks");
+    let mut fails: Vec<String> = memos.iter().filter(|m| json!(chunk_memo(m["body"].as_str().unwrap())) != m["chunks"]).map(|m| format!("조각 {}", m["id"])).collect();
+    let chunks: Vec<Chunk> = memos
+        .iter()
+        .flat_map(|m| {
+            let title = memoking_core::body::extract_title(m["body"].as_str().unwrap());
+            chunk_memo(m["body"].as_str().unwrap()).into_iter().map(move |text| Chunk { id: m["id"].as_str().unwrap().into(), title: title.clone(), text, updated: m["updated"].as_str().map(str::to_string) })
+        })
+        .collect();
+    let index = build_index(chunks);
+    let related = |id: &str| -> Vec<(String, f64)> {
+        match id {
+            "w" => vec![("m".into(), 0.8), ("zz".into(), 1.0), ("r".into(), 0.5)],
+            "r" => vec![("t".into(), 0.4)],
+            "m" => vec![("w".into(), 0.9)],
+            _ => vec![],
+        }
+    };
+    let answers = ["비밀번호는 abc12345예요 [1]", "메모에서 찾지 못했어요.", "답만 있어요", "[9] 없는 번호 [2]", "", "없어요", "첫째 [1][3] 둘째"];
+    let cases = fixtures("rag");
+    for c in &cases {
+        let q = c["q"].as_str().unwrap();
+        if q == "expand" {
+            let got = json!(["{\"words\":[\"a\",\" b \",1,null,\"\",\"c\",\"d\",\"e\",\"f\",\"g\"]}", "{\"words\":\"x\"}", "nope"].map(expand_result));
+            let (m, s) = expand_messages("질문");
+            if got != c["expand"] || json!({ "messages": m, "schema": s }) != c["messages"] {
+                fails.push(format!("expand {got}"));
+            }
+            continue;
+        }
+        let words = expand_result(&json!({ "words": c["words"] }).to_string());
+        let picked = retrieve(q, &index, &words, &related, 4, now);
+        let period = asked_period(q, now).map(|(f, t)| json!([f.timestamp_millis(), t.timestamp_millis()]));
+        let got = json!({
+            "expanded": words,
+            "period": period,
+            "picked": picked.iter().map(Picked::to_json).collect::<Vec<_>>(),
+            "messages": rag_messages(q, &picked, now),
+            "finished": answers.map(|a| {
+                let (text, quoted) = finish_answer(a, q, &picked, &words);
+                json!({ "text": text, "quoted": quoted })
+            }),
+        });
+        // 점수는 끝자리만 다를 수 있다 (V8 Math.log 와 Rust ln 의 마지막 비트)
+        let round = |v: &Value| {
+            let mut v = v.clone();
+            for p in v.as_array_mut().into_iter().flatten() {
+                p["score"] = json!((p["score"].as_f64().unwrap() * 1e12).round());
+            }
+            v
+        };
+        let same = |k: &str, v: &Value| if k == "picked" { round(&c[k]) == round(v) } else { c[k] == *v };
+        let diff: Vec<String> = got.as_object().unwrap().iter().filter(|(k, v)| !same(k, v)).map(|(k, v)| format!("  {k}\n    JS  : {}\n    Rust: {v}", c[k.as_str()])).collect();
+        if !diff.is_empty() {
+            fails.push(format!("{q:?} {}\n{}", c["words"], diff.join("\n")));
+        }
+    }
+    report("rag", fails, cases.len());
+}

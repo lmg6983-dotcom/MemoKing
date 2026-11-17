@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **111 / 184**
-- 이벤트 (Rust → 화면): **23 / 58**
+- 채널 (화면 → Rust): **128 / 184**
+- 이벤트 (Rust → 화면): **27 / 58**
 
 ## 채널
 
@@ -11,18 +11,18 @@
 |---|---|
 | ⬜ | `ai:agent` |
 | ⬜ | `ai:agent-run` |
-| ⬜ | `ai:ask` |
-| ⬜ | `ai:cancel` |
-| ⬜ | `ai:cancel-download` |
-| ⬜ | `ai:download-default` |
-| ⬜ | `ai:import` |
+| ✅ | `ai:ask` |
+| ✅ | `ai:cancel` |
+| ✅ | `ai:cancel-download` |
+| ✅ | `ai:download-default` |
+| ✅ | `ai:import` |
 | ⬜ | `ai:notice` |
 | ⬜ | `ai:notice-dismiss` |
 | ⬜ | `ai:notice-undo` |
-| ⬜ | `ai:remove` |
-| ⬜ | `ai:status` |
-| ⬜ | `ai:try` |
-| ⬜ | `ai:write` |
+| ✅ | `ai:remove` |
+| ✅ | `ai:status` |
+| ✅ | `ai:try` |
+| ✅ | `ai:write` |
 | ✅ | `app:info` |
 | ✅ | `app:report-problem` |
 | ✅ | `app:set-ai-phone` |
@@ -158,15 +158,15 @@
 | ⬜ | `stt:start` |
 | ⬜ | `stt:status` |
 | ⬜ | `stt:stop` |
-| ⬜ | `tags:ai` |
-| ⬜ | `tags:ai-all` |
-| ⬜ | `tags:ai-auto` |
-| ⬜ | `tags:ai-clear` |
-| ⬜ | `tags:ai-status` |
-| ⬜ | `tags:ai-stop` |
-| ⬜ | `tags:auto` |
+| ✅ | `tags:ai` |
+| ✅ | `tags:ai-all` |
+| ✅ | `tags:ai-auto` |
+| ✅ | `tags:ai-clear` |
+| ✅ | `tags:ai-status` |
+| ✅ | `tags:ai-stop` |
+| ✅ | `tags:auto` |
 | ✅ | `tags:list` |
-| ⬜ | `tags:suggest` |
+| ✅ | `tags:suggest` |
 | ✅ | `trash:delete` |
 | ✅ | `trash:empty` |
 | ✅ | `trash:list` |
@@ -199,10 +199,10 @@
 | | 이름 |
 |---|---|
 | ⬜ | `ai:notice` |
-| ⬜ | `ai:progress` |
-| ⬜ | `ai:status` |
-| ⬜ | `ai:tagging` |
-| ⬜ | `ai:token` |
+| ✅ | `ai:progress` |
+| ✅ | `ai:status` |
+| ✅ | `ai:tagging` |
+| ✅ | `ai:token` |
 | ⬜ | `bubble:hide` |
 | ⬜ | `bubble:show` |
 | ⬜ | `capture:image` |

@@ -1,0 +1,4154 @@
+[
+ {
+  "set": "work",
+  "body": "# 내일 회의\n\n디자인 검토 회의 준비할 것",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: 회의, 업무\n\n메모:\n내일 회의\n디자인 검토 회의 준비할 것"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [
+   "회의",
+   "업무"
+  ],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "업무",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "회의",
+     "existing": true,
+     "sure": false,
+     "why": "\"미팅\" 대신 이미 쓰는 #회의"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 저녁거리\n\n우유 두부 계란 사오기",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: 장보기, 집\n\n메모:\n저녁거리\n우유 두부 계란 사오기"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [
+   "장보기",
+   "집"
+  ],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "장보기",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "짧음",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n짧음"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 회의 준비\n\n안건 회의 정리 #회의",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: 업무\n\n메모:\n회의 준비\n안건 회의 정리 #회의"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [
+   "업무"
+  ],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "업무",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 여행 계획\n\n제주도 여행 숙소 예약 여행 일정",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: 여행, 가족\n\n메모:\n여행 계획\n제주도 여행 숙소 예약 여행 일정"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [
+   "여행",
+   "가족"
+  ],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "가족",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "여행",
+     "existing": true,
+     "sure": false,
+     "why": "\"여행계획\" 대신 이미 쓰는 #여행"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 거래처 미팅\n\n다음 분기 계획 미팅 메모",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: 회의, 업무\n\n메모:\n거래처 미팅\n다음 분기 계획 미팅 메모"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [
+   "회의",
+   "업무"
+  ],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "업무",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "회의",
+     "existing": true,
+     "sure": false,
+     "why": "\"미팅\" 대신 이미 쓰는 #회의"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "![화면 캡처](attachments/a.png)",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "오류 화면 #스크린샷",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n오류 화면 #스크린샷"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 요리\n\n김치찌개 끓이는 법 정리해 둔 것",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n요리\n김치찌개 끓이는 법 정리해 둔 것"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의",
+  "id": "a",
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: 프로잭트\n\n메모:\n주간 회의\n프로젝트 일정 회의 안건 정리 #업무 #회의"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 3
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "회의",
+    "count": 1
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [
+   "프로잭트"
+  ],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "https://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\nhttps://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "회의",
+     "existing": true,
+     "sure": false,
+     "why": "\"미팅\" 대신 이미 쓰는 #회의"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: 프로잭트\n\n메모:\n폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [
+   "프로잭트"
+  ],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": true,
+     "sure": false,
+     "why": "AI가 고른 기존 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# memoking 버그\n\n배포 전에 코딩 다시 확인하기 #개발",
+  "id": "f",
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\nmemoking 버그\n배포 전에 코딩 다시 확인하기 #개발"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 3
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
+  "id": "c0",
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n왕 테스트\n일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n점 하나\n하위 점\n하위의 하위\n점 둘\n할 일\n끝낸 일\n첫째\n둘째\n둘째의 하위\n인용 문장\n두 번째 줄\n품목, 가격\n사과, 1,000원\n배, 2,000원\n수식 $x^2 + y^2$ 그리고 블록:\n$$\n\\int_0^1 x\\,dx\n$$\nconst a = 1; // 코드 # 태그 아님\n링크 글자 그리고 https://naver.com 맨주소\n줄바꿈\n다음 줄\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n끝 문단 ,,, 말줄임 .."
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "회의",
+    "count": 2
+   },
+   {
+    "name": "장보기",
+    "count": 2
+   },
+   {
+    "name": "집",
+    "count": 1
+   },
+   {
+    "name": "스크린샷",
+    "count": 1
+   },
+   {
+    "name": "MemoKing",
+    "count": 1
+   },
+   {
+    "name": "개발",
+    "count": 1
+   },
+   {
+    "name": "프로잭트",
+    "count": 1
+   },
+   {
+    "name": "여행",
+    "count": 1
+   },
+   {
+    "name": "가족",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 내일 회의\n\n디자인 검토 회의 준비할 것",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n내일 회의\n디자인 검토 회의 준비할 것"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 저녁거리\n\n우유 두부 계란 사오기",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n저녁거리\n우유 두부 계란 사오기"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "짧음",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n짧음"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 회의 준비\n\n안건 회의 정리 #회의",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n회의 준비\n안건 회의 정리 #회의"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "캡쳐",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 여행 계획\n\n제주도 여행 숙소 예약 여행 일정",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n여행 계획\n제주도 여행 숙소 예약 여행 일정"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 거래처 미팅\n\n다음 분기 계획 미팅 메모",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n거래처 미팅\n다음 분기 계획 미팅 메모"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "![화면 캡처](attachments/a.png)",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "오류 화면 #스크린샷",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n오류 화면 #스크린샷"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 요리\n\n김치찌개 끓이는 법 정리해 둔 것",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n요리\n김치찌개 끓이는 법 정리해 둔 것"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의",
+  "id": "a",
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n주간 회의\n프로젝트 일정 회의 안건 정리 #업무 #회의"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "캡쳐",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "https://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\nhttps://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# memoking 버그\n\n배포 전에 코딩 다시 확인하기 #개발",
+  "id": "f",
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\nmemoking 버그\n배포 전에 코딩 다시 확인하기 #개발"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 4
+   },
+   {
+    "name": "업무",
+    "count": 4
+   },
+   {
+    "name": "해시",
+    "count": 3
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
+  "id": "c0",
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: 괄호, 굵게, 이스케이프, 따옴표, a-b, c\n\n메모:\n왕 테스트\n일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n점 하나\n하위 점\n하위의 하위\n점 둘\n할 일\n끝낸 일\n첫째\n둘째\n둘째의 하위\n인용 문장\n두 번째 줄\n품목, 가격\n사과, 1,000원\n배, 2,000원\n수식 $x^2 + y^2$ 그리고 블록:\n$$\n\\int_0^1 x\\,dx\n$$\nconst a = 1; // 코드 # 태그 아님\n링크 글자 그리고 https://naver.com 맨주소\n줄바꿈\n다음 줄\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n끝 문단 ,,, 말줄임 .."
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [
+   {
+    "name": "태그",
+    "count": 3
+   },
+   {
+    "name": "업무",
+    "count": 3
+   },
+   {
+    "name": "해시",
+    "count": 2
+   },
+   {
+    "name": "a-b",
+    "count": 1
+   },
+   {
+    "name": "c",
+    "count": 1
+   },
+   {
+    "name": "괄호",
+    "count": 1
+   },
+   {
+    "name": "따옴표",
+    "count": 1
+   },
+   {
+    "name": "굵게",
+    "count": 1
+   },
+   {
+    "name": "이스케이프",
+    "count": 1
+   },
+   {
+    "name": "Tag",
+    "count": 1
+   },
+   {
+    "name": "밖",
+    "count": 1
+   }
+  ],
+  "grounded": [
+   "괄호",
+   "굵게",
+   "이스케이프",
+   "따옴표",
+   "a-b",
+   "c"
+  ],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 내일 회의\n\n디자인 검토 회의 준비할 것",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n내일 회의\n디자인 검토 회의 준비할 것"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 저녁거리\n\n우유 두부 계란 사오기",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n저녁거리\n우유 두부 계란 사오기"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "짧음",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n짧음"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 회의 준비\n\n안건 회의 정리 #회의",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n회의 준비\n안건 회의 정리 #회의"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "캡쳐",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 여행 계획\n\n제주도 여행 숙소 예약 여행 일정",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n여행 계획\n제주도 여행 숙소 예약 여행 일정"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 거래처 미팅\n\n다음 분기 계획 미팅 메모",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n거래처 미팅\n다음 분기 계획 미팅 메모"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "![화면 캡처](attachments/a.png)",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "오류 화면 #스크린샷",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n오류 화면 #스크린샷"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 요리\n\n김치찌개 끓이는 법 정리해 둔 것",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n요리\n김치찌개 끓이는 법 정리해 둔 것"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의",
+  "id": "a",
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n주간 회의\n프로젝트 일정 회의 안건 정리 #업무 #회의"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "캡쳐",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "https://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\nhttps://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년",
+  "id": null,
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# memoking 버그\n\n배포 전에 코딩 다시 확인하기 #개발",
+  "id": "f",
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\nmemoking 버그\n배포 전에 코딩 다시 확인하기 #개발"
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
+  "id": "c0",
+  "messages": [
+   {
+    "role": "system",
+    "content": "너는 메모에 태그를 다는 도우미다. 메모 내용의 주제를 나타내는 태그를 0~3개 짓는다. 태그는 띄어쓰기 없는 짧은 한국어 명사(2~8자)다. 메모에 실제로 나오는 주제만 쓰고, 인사나 짧은 대답처럼 주제가 없으면 빈 배열로 둔다. 아래 \"이미 쓰는 태그\"와 뜻이 같으면 그 이름을 그대로 쓴다."
+   },
+   {
+    "role": "user",
+    "content": "이미 쓰는 태그: (없음)\n\n메모:\n왕 테스트\n일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n점 하나\n하위 점\n하위의 하위\n점 둘\n할 일\n끝낸 일\n첫째\n둘째\n둘째의 하위\n인용 문장\n두 번째 줄\n품목, 가격\n사과, 1,000원\n배, 2,000원\n수식 $x^2 + y^2$ 그리고 블록:\n$$\n\\int_0^1 x\\,dx\n$$\nconst a = 1; // 코드 # 태그 아님\n링크 글자 그리고 https://naver.com 맨주소\n줄바꿈\n다음 줄\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n끝 문단 ,,, 말줄임 .."
+   }
+  ],
+  "schema": {
+   "type": "object",
+   "properties": {
+    "tags": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "maxItems": 3
+    }
+   },
+   "required": [
+    "tags"
+   ]
+  },
+  "existing": [],
+  "grounded": [],
+  "results": [
+   [
+    {
+     "name": "회의",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "일정관리",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "프로잭트",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ],
+   [],
+   [],
+   [],
+   [
+    {
+     "name": "미팅",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "장보기",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    },
+    {
+     "name": "여행계획",
+     "existing": false,
+     "sure": false,
+     "why": "AI가 내용에서 지은 태그"
+    }
+   ]
+  ]
+ }
+]

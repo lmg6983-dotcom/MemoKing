@@ -49,7 +49,7 @@ static TAIL_NOUN_SET: LazyLock<HashSet<&str>> = LazyLock::new(|| TAIL_NOUN.split
 static NOUN_SET: LazyLock<HashSet<&str>> = LazyLock::new(|| [TAIL_ANY, TAIL_NOUN, NOUNS].iter().flat_map(|t| t.split_whitespace()).collect());
 
 /// JS 의 s.length (UTF-16 단위)
-fn len16(s: &str) -> usize {
+pub fn len16(s: &str) -> usize {
     s.encode_utf16().count()
 }
 
@@ -115,9 +115,9 @@ fn summary_of(plain: &[String]) -> String {
 }
 
 // 낱말 → 무게 (넣은 차례대로 — JS Map 처럼, 더하는 차례가 같아야 소수 끝자리까지 같다)
-type Vector = Vec<(String, f64)>;
+pub type Vector = Vec<(String, f64)>;
 
-fn tfidf_vectors(docs: Vec<Vec<String>>) -> Vec<Vector> {
+pub fn tfidf_vectors(docs: Vec<Vec<String>>) -> Vec<Vector> {
     let mut df: HashMap<String, f64> = HashMap::new();
     let tfs: Vec<Vector> = docs
         .into_iter()

@@ -1,0 +1,4699 @@
+[
+ {
+  "set": "work",
+  "body": "# 내일 회의\n\n디자인 검토 회의 준비할 것",
+  "id": null,
+  "suggest": [
+   {
+    "name": "회의",
+    "score": 1,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   },
+   {
+    "name": "업무",
+    "score": 0.76,
+    "reason": "similar",
+    "existing": true,
+    "sure": true,
+    "why": "내용이 닮은 메모 2개에 달린 태그"
+   },
+   {
+    "name": "검토",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "회의",
+    "업무",
+    "스크린샷"
+   ],
+   [
+    "회의",
+    "업무"
+   ],
+   [
+    "회의",
+    "업무"
+   ],
+   [
+    "회의",
+    "업무"
+   ],
+   [
+    "회의",
+    "업무"
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 저녁거리\n\n우유 두부 계란 사오기",
+  "id": null,
+  "suggest": [
+   {
+    "name": "장보기",
+    "score": 0.75,
+    "reason": "similar",
+    "existing": true,
+    "sure": true,
+    "why": "내용이 닮은 메모 2개에 달린 태그"
+   },
+   {
+    "name": "집",
+    "score": 0.51,
+    "reason": "similar",
+    "existing": true,
+    "sure": false,
+    "why": "내용이 닮은 메모 1개에 달린 태그"
+   },
+   {
+    "name": "저녁거리",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "장보기",
+    "스크린샷"
+   ],
+   [
+    "장보기"
+   ],
+   [
+    "장보기"
+   ],
+   [
+    "장보기"
+   ],
+   [
+    "장보기"
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "짧음",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 회의 준비\n\n안건 회의 정리 #회의",
+  "id": null,
+  "suggest": [
+   {
+    "name": "업무",
+    "score": 0.77,
+    "reason": "similar",
+    "existing": true,
+    "sure": true,
+    "why": "내용이 닮은 메모 2개에 달린 태그"
+   },
+   {
+    "name": "준비",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "안건",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "업무",
+    "스크린샷"
+   ],
+   [
+    "업무"
+   ],
+   [
+    "업무"
+   ],
+   [
+    "업무"
+   ],
+   [
+    "업무"
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 여행 계획\n\n제주도 여행 숙소 예약 여행 일정",
+  "id": null,
+  "suggest": [
+   {
+    "name": "여행",
+    "score": 1,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   },
+   {
+    "name": "가족",
+    "score": 0.85,
+    "reason": "similar",
+    "existing": true,
+    "sure": false,
+    "why": "내용이 닮은 메모 1개에 달린 태그"
+   },
+   {
+    "name": "계획",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "여행",
+    "스크린샷"
+   ],
+   [
+    "여행"
+   ],
+   [
+    "여행"
+   ],
+   [
+    "여행"
+   ],
+   [
+    "여행"
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 거래처 미팅\n\n다음 분기 계획 미팅 메모",
+  "id": null,
+  "suggest": [
+   {
+    "name": "회의",
+    "score": 0.6,
+    "reason": "consistent",
+    "existing": true,
+    "sure": true,
+    "why": "본문의 \"미팅\", 같은 뜻으로 이미 쓰는 태그"
+   },
+   {
+    "name": "업무",
+    "score": 0.36,
+    "reason": "related",
+    "existing": true,
+    "sure": false,
+    "why": "#회의와 자주 같이 다는 태그"
+   },
+   {
+    "name": "거래처",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "회의",
+    "스크린샷"
+   ],
+   [
+    "회의"
+   ],
+   [
+    "회의"
+   ],
+   [
+    "회의"
+   ],
+   [
+    "회의"
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "![화면 캡처](attachments/a.png)",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "오류 화면 #스크린샷",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 요리\n\n김치찌개 끓이는 법 정리해 둔 것",
+  "id": null,
+  "suggest": [
+   {
+    "name": "요리",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "김치찌개",
+    "score": 0.11,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "정리해",
+    "score": 0.11,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의",
+  "id": "a",
+  "suggest": [
+   {
+    "name": "프로잭트",
+    "score": 0.34,
+    "reason": "similar",
+    "existing": true,
+    "sure": false,
+    "why": "내용이 닮은 메모 1개에 달린 태그"
+   },
+   {
+    "name": "안건",
+    "score": 0.09,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "일정",
+    "score": 0.05,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "프로잭트",
+    "스크린샷"
+   ],
+   [
+    "프로잭트"
+   ],
+   [
+    "프로잭트"
+   ],
+   [
+    "프로잭트"
+   ],
+   [
+    "프로잭트"
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "https://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년",
+  "id": null,
+  "suggest": [
+   {
+    "name": "프로잭트",
+    "score": 0.73,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   },
+   {
+    "name": "메모킹",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "배포",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "프로잭트",
+    "스크린샷"
+   ],
+   [
+    "프로잭트"
+   ],
+   [
+    "프로잭트"
+   ],
+   [
+    "프로잭트"
+   ],
+   [
+    "프로잭트"
+   ]
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# memoking 버그\n\n배포 전에 코딩 다시 확인하기 #개발",
+  "id": "f",
+  "suggest": [
+   {
+    "name": "memoking",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "버그",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "다시",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
+  "id": "c0",
+  "suggest": [
+   {
+    "name": "테스트",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "하위",
+    "score": 0.09,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "둘째",
+    "score": 0.06,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
+  "id": "c1",
+  "suggest": [
+   {
+    "name": "테스트",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "하위",
+    "score": 0.09,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "둘째",
+    "score": 0.06,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c2",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c3",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c4",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c5",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c6",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c7",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c8",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c9",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c10",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c11",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c12",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문",
+  "id": "c13",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "---\nid: [broken\n---\n# 깨진 머리말",
+  "id": "c14",
+  "suggest": [
+   {
+    "name": "깨진",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "머리말",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "broken",
+    "score": 0.09,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "---\n- just\n- a list\n---\n목록 머리말",
+  "id": "c15",
+  "suggest": [
+   {
+    "name": "머리말",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "목록",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "just",
+    "score": 0.09,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "---\n---\n빈 머리말",
+  "id": "c16",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "---\n\n위는 구분선으로 시작한 글\n\n---\n아래",
+  "id": "c17",
+  "suggest": [
+   {
+    "name": "구분선",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "시작한",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "위는",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "BOM 이 붙은 파일",
+  "id": "c18",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "줄 끝이 CRLF\r\n둘째 줄\r\n",
+  "id": "c19",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "머리말 없는 글\n\n둘째 문단",
+  "id": "c20",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "",
+  "id": "c21",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "   \n\n",
+  "id": "c22",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "---\nid: dup\nid: dup2\n---\n같은 키 두 번",
+  "id": "c23",
+  "suggest": [
+   {
+    "name": "id",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "dup",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문 앞 빈칸",
+  "id": "c24",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "",
+  "id": "c25",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "본문\n\n\n",
+  "id": "c26",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "# 제목\n\n본문 첫 줄\n출처: 어딘가\n$x^2$ 수식",
+  "id": "c27",
+  "suggest": [
+   {
+    "name": "제목",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "본문",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "수식",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "```\n코드만\n```\n\n뒤 글",
+  "id": "c28",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "<!-- 숨은 주석 -->\n보이는 글",
+  "id": "c29",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "- [ ] \n- [x] 끝냄\n  - [ ] 하위",
+  "id": "c30",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "| a | b |\n| --- | --- |\n| 1 | 2 |",
+  "id": "c31",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "![](attachments/x.mp4)\n![소리](attachments/y.m4a)\n[문서](attachments/z.pdf)\n![사진](attachments/p.PNG \"album page\")\n![](https://e.com/a.png)\n[웹](https://e.com)",
+  "id": "c32",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "github_pat_ABC_def snake_case _강조_ __굵게__ *별* **굵은별** ~~취소~~",
+  "id": "c33",
+  "suggest": [
+   {
+    "name": "abc",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "case",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "def",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "줄 끝 역슬래시\\\n다음",
+  "id": "c34",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "&#x20;&nbsp;앞 띄움 &amp; &lt;b&gt;",
+  "id": "c35",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "<https://naver.com> 와 <a@b.com>",
+  "id": "c36",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "깨진 머리말이 본문에 남은 경우",
+  "id": "c37",
+  "suggest": [
+   {
+    "name": "깨진",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "머리말",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "본문",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "***\n구분선 뒤 제목",
+  "id": "c38",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "work",
+  "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "id": "c39",
+  "suggest": [],
+  "auto": [
+   [
+    "스크린샷"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 내일 회의\n\n디자인 검토 회의 준비할 것",
+  "id": null,
+  "suggest": [
+   {
+    "name": "회의",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "검토",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "디자인",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 저녁거리\n\n우유 두부 계란 사오기",
+  "id": null,
+  "suggest": [
+   {
+    "name": "저녁거리",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "계란",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "두부",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "짧음",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 회의 준비\n\n안건 회의 정리 #회의",
+  "id": null,
+  "suggest": [
+   {
+    "name": "준비",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "안건",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 여행 계획\n\n제주도 여행 숙소 예약 여행 일정",
+  "id": null,
+  "suggest": [
+   {
+    "name": "여행",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "계획",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "숙소",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 거래처 미팅\n\n다음 분기 계획 미팅 메모",
+  "id": null,
+  "suggest": [
+   {
+    "name": "미팅",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "거래처",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "계획",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "![화면 캡처](attachments/a.png)",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "오류 화면 #스크린샷",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 요리\n\n김치찌개 끓이는 법 정리해 둔 것",
+  "id": null,
+  "suggest": [
+   {
+    "name": "요리",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "김치찌개",
+    "score": 0.11,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "정리해",
+    "score": 0.11,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의",
+  "id": "a",
+  "suggest": [
+   {
+    "name": "안건",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "일정",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "프로젝트",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "https://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년",
+  "id": null,
+  "suggest": [
+   {
+    "name": "배포",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "프로잭트",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "메모킹",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# memoking 버그\n\n배포 전에 코딩 다시 확인하기 #개발",
+  "id": "f",
+  "suggest": [
+   {
+    "name": "memoking",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "버그",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "다시",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
+  "id": "c0",
+  "suggest": [
+   {
+    "name": "괄호",
+    "score": 0.91,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   },
+   {
+    "name": "굵게",
+    "score": 0.91,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   },
+   {
+    "name": "이스케이프",
+    "score": 0.91,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   }
+  ],
+  "auto": [
+   [
+    "괄호",
+    "굵게",
+    "캡처"
+   ],
+   [
+    "괄호",
+    "굵게"
+   ],
+   [
+    "괄호",
+    "굵게"
+   ],
+   [
+    "괄호",
+    "굵게"
+   ],
+   [
+    "괄호",
+    "굵게"
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
+  "id": "c1",
+  "suggest": [
+   {
+    "name": "괄호",
+    "score": 0.91,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   },
+   {
+    "name": "굵게",
+    "score": 0.91,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   },
+   {
+    "name": "이스케이프",
+    "score": 0.91,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   }
+  ],
+  "auto": [
+   [
+    "괄호",
+    "굵게",
+    "캡처"
+   ],
+   [
+    "괄호",
+    "굵게"
+   ],
+   [
+    "괄호",
+    "굵게"
+   ],
+   [
+    "괄호",
+    "굵게"
+   ],
+   [
+    "괄호",
+    "굵게"
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c2",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c3",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c4",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c5",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c6",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c7",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c8",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c9",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c10",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c11",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c12",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문",
+  "id": "c13",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "---\nid: [broken\n---\n# 깨진 머리말",
+  "id": "c14",
+  "suggest": [
+   {
+    "name": "깨진",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "머리말",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "broken",
+    "score": 0.12,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "---\n- just\n- a list\n---\n목록 머리말",
+  "id": "c15",
+  "suggest": [
+   {
+    "name": "목록",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "머리말",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "just",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "---\n---\n빈 머리말",
+  "id": "c16",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "---\n\n위는 구분선으로 시작한 글\n\n---\n아래",
+  "id": "c17",
+  "suggest": [
+   {
+    "name": "시작한",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "위는",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "구분선",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "BOM 이 붙은 파일",
+  "id": "c18",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "줄 끝이 CRLF\r\n둘째 줄\r\n",
+  "id": "c19",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "머리말 없는 글\n\n둘째 문단",
+  "id": "c20",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "",
+  "id": "c21",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "   \n\n",
+  "id": "c22",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "---\nid: dup\nid: dup2\n---\n같은 키 두 번",
+  "id": "c23",
+  "suggest": [
+   {
+    "name": "id",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "dup",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문 앞 빈칸",
+  "id": "c24",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "",
+  "id": "c25",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "본문\n\n\n",
+  "id": "c26",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "# 제목\n\n본문 첫 줄\n출처: 어딘가\n$x^2$ 수식",
+  "id": "c27",
+  "suggest": [
+   {
+    "name": "제목",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "어딘",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "출처",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "```\n코드만\n```\n\n뒤 글",
+  "id": "c28",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "<!-- 숨은 주석 -->\n보이는 글",
+  "id": "c29",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "- [ ] \n- [x] 끝냄\n  - [ ] 하위",
+  "id": "c30",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "| a | b |\n| --- | --- |\n| 1 | 2 |",
+  "id": "c31",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "![](attachments/x.mp4)\n![소리](attachments/y.m4a)\n[문서](attachments/z.pdf)\n![사진](attachments/p.PNG \"album page\")\n![](https://e.com/a.png)\n[웹](https://e.com)",
+  "id": "c32",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "github_pat_ABC_def snake_case _강조_ __굵게__ *별* **굵은별** ~~취소~~",
+  "id": "c33",
+  "suggest": [
+   {
+    "name": "굵게",
+    "score": 0.72,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   },
+   {
+    "name": "a-b",
+    "score": 0.72,
+    "reason": "mention",
+    "existing": true,
+    "sure": true,
+    "why": "본문에 나오는 기존 태그"
+   },
+   {
+    "name": "abc",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "굵게",
+    "a-b",
+    "캡처"
+   ],
+   [
+    "굵게",
+    "a-b"
+   ],
+   [
+    "굵게",
+    "a-b"
+   ],
+   [
+    "굵게",
+    "a-b"
+   ],
+   [
+    "굵게",
+    "a-b"
+   ]
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "줄 끝 역슬래시\\\n다음",
+  "id": "c34",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "&#x20;&nbsp;앞 띄움 &amp; &lt;b&gt;",
+  "id": "c35",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "<https://naver.com> 와 <a@b.com>",
+  "id": "c36",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "깨진 머리말이 본문에 남은 경우",
+  "id": "c37",
+  "suggest": [
+   {
+    "name": "깨진",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "머리말",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "본문",
+    "score": 0.14,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "***\n구분선 뒤 제목",
+  "id": "c38",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "corpus",
+  "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "id": "c39",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 내일 회의\n\n디자인 검토 회의 준비할 것",
+  "id": null,
+  "suggest": [
+   {
+    "name": "회의",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "검토",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "디자인",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 저녁거리\n\n우유 두부 계란 사오기",
+  "id": null,
+  "suggest": [
+   {
+    "name": "저녁거리",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "계란",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "두부",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "짧음",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 회의 준비\n\n안건 회의 정리 #회의",
+  "id": null,
+  "suggest": [
+   {
+    "name": "준비",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "안건",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 여행 계획\n\n제주도 여행 숙소 예약 여행 일정",
+  "id": null,
+  "suggest": [
+   {
+    "name": "여행",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "계획",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "숙소",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 거래처 미팅\n\n다음 분기 계획 미팅 메모",
+  "id": null,
+  "suggest": [
+   {
+    "name": "미팅",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "거래처",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "계획",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "![화면 캡처](attachments/a.png)",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "오류 화면 #스크린샷",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 요리\n\n김치찌개 끓이는 법 정리해 둔 것",
+  "id": null,
+  "suggest": [
+   {
+    "name": "요리",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "김치찌개",
+    "score": 0.11,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "정리해",
+    "score": 0.11,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 주간 회의\n\n프로젝트 일정 회의 안건 정리 #업무 #회의",
+  "id": "a",
+  "suggest": [
+   {
+    "name": "안건",
+    "score": 0.07,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "일정",
+    "score": 0.07,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "프로젝트",
+    "score": 0.07,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "https://example.com/page 회의자료.txt 링크 모음 www.naver.com 정리",
+  "id": null,
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "폰에서도 PC에서고침 메모킹 프로잭트 배포했어요 2026년",
+  "id": null,
+  "suggest": [
+   {
+    "name": "메모킹",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "배포",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "프로잭트",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# memoking 버그\n\n배포 전에 코딩 다시 확인하기 #개발",
+  "id": "f",
+  "suggest": [
+   {
+    "name": "memoking",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "버그",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "다시",
+    "score": 0.08,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
+  "id": "c0",
+  "suggest": [
+   {
+    "name": "테스트",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "하위",
+    "score": 0.09,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "둘째",
+    "score": 0.06,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
+  "id": "c1",
+  "suggest": [
+   {
+    "name": "테스트",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "하위",
+    "score": 0.09,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "둘째",
+    "score": 0.06,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c2",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c3",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c4",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c5",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c6",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c7",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c8",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c9",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c10",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c11",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c12",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문",
+  "id": "c13",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "---\nid: [broken\n---\n# 깨진 머리말",
+  "id": "c14",
+  "suggest": [
+   {
+    "name": "깨진",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "머리말",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "broken",
+    "score": 0.09,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "---\n- just\n- a list\n---\n목록 머리말",
+  "id": "c15",
+  "suggest": [
+   {
+    "name": "머리말",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "목록",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "just",
+    "score": 0.09,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "---\n---\n빈 머리말",
+  "id": "c16",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "---\n\n위는 구분선으로 시작한 글\n\n---\n아래",
+  "id": "c17",
+  "suggest": [
+   {
+    "name": "구분선",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "시작한",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "위는",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "BOM 이 붙은 파일",
+  "id": "c18",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "줄 끝이 CRLF\r\n둘째 줄\r\n",
+  "id": "c19",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "머리말 없는 글\n\n둘째 문단",
+  "id": "c20",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "",
+  "id": "c21",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "   \n\n",
+  "id": "c22",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "---\nid: dup\nid: dup2\n---\n같은 키 두 번",
+  "id": "c23",
+  "suggest": [
+   {
+    "name": "id",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "dup",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문 앞 빈칸",
+  "id": "c24",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "",
+  "id": "c25",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "본문\n\n\n",
+  "id": "c26",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "# 제목\n\n본문 첫 줄\n출처: 어딘가\n$x^2$ 수식",
+  "id": "c27",
+  "suggest": [
+   {
+    "name": "제목",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "본문",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "수식",
+    "score": 0.1,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "```\n코드만\n```\n\n뒤 글",
+  "id": "c28",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "<!-- 숨은 주석 -->\n보이는 글",
+  "id": "c29",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "- [ ] \n- [x] 끝냄\n  - [ ] 하위",
+  "id": "c30",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "| a | b |\n| --- | --- |\n| 1 | 2 |",
+  "id": "c31",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "![](attachments/x.mp4)\n![소리](attachments/y.m4a)\n[문서](attachments/z.pdf)\n![사진](attachments/p.PNG \"album page\")\n![](https://e.com/a.png)\n[웹](https://e.com)",
+  "id": "c32",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "github_pat_ABC_def snake_case _강조_ __굵게__ *별* **굵은별** ~~취소~~",
+  "id": "c33",
+  "suggest": [
+   {
+    "name": "abc",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "case",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "def",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "줄 끝 역슬래시\\\n다음",
+  "id": "c34",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "&#x20;&nbsp;앞 띄움 &amp; &lt;b&gt;",
+  "id": "c35",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "<https://naver.com> 와 <a@b.com>",
+  "id": "c36",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "깨진 머리말이 본문에 남은 경우",
+  "id": "c37",
+  "suggest": [
+   {
+    "name": "깨진",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "머리말",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   },
+   {
+    "name": "본문",
+    "score": 0.15,
+    "reason": "keyword",
+    "existing": false,
+    "sure": false,
+    "why": "이 메모의 핵심어 (새 태그)"
+   }
+  ],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "***\n구분선 뒤 제목",
+  "id": "c38",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ },
+ {
+  "set": "none",
+  "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "id": "c39",
+  "suggest": [],
+  "auto": [
+   [
+    "캡처"
+   ],
+   [
+    "링크"
+   ],
+   [
+    "음성"
+   ],
+   [
+    "공유"
+   ],
+   []
+  ]
+ }
+]

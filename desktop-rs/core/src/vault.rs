@@ -1067,6 +1067,31 @@ impl Vault {
         Ok(ok.then_some(saved))
     }
 
+    /// AI 가 단 태그: 본문과 머리말 aiTags (vault-locks.js setAiTags) — 고친 시각 · 기기는 그대로
+    ///   (모든 메모를 한 번에 태그해도 목록 순서가 바뀌거나 휴대폰에 "방금 고친 메모" 가 뜨지 않게). 쓰지 못했으면 되돌리고 None
+    pub fn set_ai_tags(&mut self, id: &str, body: &str, names: &[String]) -> io::Result<Option<Value>> {
+        let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
+        if e.file.is_none() || body::is_locked_body(&e.body) {
+            self.entries.insert(id.into(), e);
+            return Ok(None);
+        }
+        let (prev, known) = (e.meta.clone(), e.body.clone());
+        e.body = body.into();
+        e.meta.extra.insert("aiTags".into(), json!(names));
+        if body != known {
+            self.keep_version(id, &known, false);
+        }
+        let wrote = self.write(&mut e, &known, true);
+        let ok = matches!(wrote, Ok(Wrote::Yes));
+        if !ok {
+            e.meta = prev;
+            e.body = known;
+        }
+        self.entries.insert(id.into(), e);
+        wrote?;
+        Ok(if ok { self.get(id) } else { None })
+    }
+
     /// 연결한 메모 · 나를 연결한 메모
     pub fn links(&self, id: &str) -> Value {
         let Some(e) = self.entries.get(id) else { return json!({ "links": [], "backlinks": [], "suggestions": [] }) };
