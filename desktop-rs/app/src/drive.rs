@@ -729,7 +729,12 @@ fn run_once(app: &AppHandle, full: bool) {
         }
     };
     let now = now_ms;
-    let opts = drive_sync::Options { full, local_clean: false, conflict_tag: "PC 충돌", now: &now, on_progress: &on_progress, concurrency: drive_sync::CONCURRENCY };
+    let st = app.state::<State>();
+    let locked = |f: &mut dyn FnMut()| {
+        let _vault = st.vault.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        f();
+    };
+    let opts = drive_sync::Options { full, local_clean: false, conflict_tag: "PC 충돌", now: &now, on_progress: &on_progress, concurrency: drive_sync::CONCURRENCY, locked: &locked };
     // shortcut: 메모 폴더 지켜보기(fs.watch)가 없어 차례마다 이 PC 폴더를 훑는다 (local_clean 늘 false) — 파일이 수천 개라 느리면 notify 로 지켜본다
     let result = std::fs::create_dir_all(&root).and_then(|()| drive_sync::run(&root, &Api, &folder_id, &mut state, &opts));
     // 끝내지 못했어도 끝낸 파일들의 기준은 남긴다 (다음 차례는 남은 것만)

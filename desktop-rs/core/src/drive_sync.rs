@@ -251,6 +251,9 @@ pub struct Options<'a> {
     /// 어디까지 했는지 (scan: Drive 폴더 살펴보는 중, transfer: 맞출 파일 total 개 중 done 개)
     pub on_progress: &'a (dyn Fn(&str, usize, usize) + Sync),
     pub concurrency: usize,
+    /// 메모 파일을 바꿔치기 · 옮기기 · 지우는 순간을 앱의 메모 잠금 안에서 돌린다 —
+    ///   다른 스레드의 저장이 확인과 바꿔치기 사이에 끼어들어 사라지지 않게 (잠금이 없으면 그냥 부른다)
+    pub locked: &'a (dyn Fn(&mut dyn FnMut()) + Sync),
 }
 
 struct Engine<'a> {
@@ -540,10 +543,13 @@ impl Engine<'_> {
         let tmp = dest.with_file_name(format!(".{}.{}.tmp", base_name(rel), hex6()));
         let swapped = (|| {
             self.remote.download(&item.id, &tmp)?;
-            if !untouched() {
-                return Ok(false); // 받는 사이 이 PC 에서 고쳤다 — 덮어쓰지 않고 다음 차례에
-            }
-            fs::rename(&tmp, &dest).map(|()| true)
+            let mut swapped = Ok(false); // 받는 사이 이 PC 에서 고쳤다 — 덮어쓰지 않고 다음 차례에
+            (self.opts.locked)(&mut || {
+                if untouched() {
+                    swapped = fs::rename(&tmp, &dest).map(|()| true);
+                }
+            });
+            swapped
         })();
         let _ = fs::remove_file(&tmp);
         if !swapped? {
@@ -587,7 +593,9 @@ impl Engine<'_> {
             return self.upload(rel, Some(&item.id));
         }
         let copy = self.conflict_name(rel);
-        fs::rename(self.abs(rel), self.abs(&copy))?;
+        let mut moved = Ok(());
+        (self.opts.locked)(&mut || moved = fs::rename(self.abs(rel), self.abs(&copy)));
+        moved?;
         self.result.lock().unwrap().conflicts.push(copy.clone());
         self.download(rel, item, None)?;
         self.upload(&copy, None)
@@ -612,14 +620,20 @@ impl Engine<'_> {
                     self.conflict(rel, r)
                 }
             }
-            (Some(_), None) => {
+            (Some(l), None) => {
                 if b.is_none() || local_changed || keep_missing {
                     self.upload(rel, None) // 새 파일, 또는 Drive 에서 지웠지만 이 PC 에서 고침 → 되살림
                 } else {
-                    // 다른 기기에서 지움 → 이 PC 에서도
-                    match fs::remove_file(self.abs(rel)) {
-                        Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e),
-                        _ => {}
+                    // 다른 기기에서 지움 → 이 PC 에서도. 둘러본 뒤 이 PC 에서 고쳤으면 지우지 않는다 (다음 차례에 되살림)
+                    let mut removed = Ok(false);
+                    (self.opts.locked)(&mut || {
+                        removed = match self.stat(rel) {
+                            Some(now) if now.mtime != l.mtime || now.size != l.size => Ok(false),
+                            _ => fs::remove_file(self.abs(rel)).or_else(|e| if e.kind() == io::ErrorKind::NotFound { Ok(()) } else { Err(e) }).map(|()| true),
+                        }
+                    });
+                    if !removed? {
+                        return Ok(());
                     }
                     self.result.lock().unwrap().deleted_local += 1;
                     self.files.lock().unwrap().remove(rel);

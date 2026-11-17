@@ -573,6 +573,7 @@ mod drive {
                     now: &move || now,
                     on_progress: &|_, _, _| {},
                     concurrency: drive_sync::CONCURRENCY,
+                    locked: &|f| f(),
                 };
                 let result = match drive_sync::run(&root, &remote, "root0", &mut state, &opts) {
                     Ok(mut r) => {
