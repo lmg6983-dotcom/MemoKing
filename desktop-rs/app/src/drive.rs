@@ -276,10 +276,7 @@ impl Drive {
 fn agent() -> &'static ureq::Agent {
     static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
     AGENT.get_or_init(|| {
-        use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
-        // 링크 미리보기(files.rs)와 같은 운영체제 TLS · 인증서 · 시스템 프록시
-        let config = ureq::Agent::config_builder()
-            .tls_config(TlsConfig::builder().provider(TlsProvider::NativeTls).root_certs(RootCerts::PlatformVerifier).build())
+        let config = crate::files::web_config()
             .http_status_as_error(false)
             .timeout_connect(Some(Duration::from_secs(20)))
             .timeout_recv_response(Some(Duration::from_secs(60)))

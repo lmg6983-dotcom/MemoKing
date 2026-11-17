@@ -46,11 +46,6 @@ static STOP_DOWNLOAD: AtomicBool = AtomicBool::new(false);
 static JOBS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> = LazyLock::new(Default::default); // "창:작업" → 멈추기
 // 이 PC 의 엔진 — 프록시를 거치지 않는다
 static LOCAL: LazyLock<ureq::Agent> = LazyLock::new(|| ureq::Agent::config_builder().proxy(None).http_status_as_error(false).build().into());
-// 모델 받기 — Electron net.fetch 처럼 시스템 프록시 · 인증서를 따른다
-static WEB: LazyLock<ureq::Agent> = LazyLock::new(|| {
-    let tls = ureq::tls::TlsConfig::builder().provider(ureq::tls::TlsProvider::NativeTls).root_certs(ureq::tls::RootCerts::PlatformVerifier).build();
-    ureq::Agent::config_builder().tls_config(tls).http_status_as_error(false).build().into()
-});
 
 fn dir(app: &AppHandle) -> PathBuf {
     app.state::<State>().settings_dir.join("ai")
@@ -192,13 +187,13 @@ fn download_default(app: &AppHandle) -> Result<Value, String> {
     STOP_DOWNLOAD.store(false, Ordering::Relaxed);
     let offline = "인터넷에 연결하지 못했어요. 인터넷이 될 때 다시 누르거나, 모델 파일을 직접 넣어 주세요";
     bring_in(app, |part| {
-        let list = WEB.get(format!("https://huggingface.co/api/models/{MODEL_REPO}?blobs=true")).call().map_err(|_| offline.to_string())?;
+        let list = crate::stt::WEB.get(format!("https://huggingface.co/api/models/{MODEL_REPO}?blobs=true")).call().map_err(|_| offline.to_string())?;
         if !list.status().is_success() {
             return Err(format!("모델 목록을 받지 못했어요 ({}). 인터넷을 확인하고 다시 눌러 주세요", list.status().as_u16()));
         }
         let info: Value = list.into_body().read_to_string().ok().and_then(|t| serde_json::from_str(&t).ok()).ok_or(offline)?;
         let (name, url, size, sha) = pick_model_file(&info)?;
-        let res = WEB.get(url).call().map_err(|_| offline.to_string())?;
+        let res = crate::stt::WEB.get(url).call().map_err(|_| offline.to_string())?;
         if !res.status().is_success() {
             return Err(format!("받지 못했어요 ({}). 인터넷을 확인하고 다시 눌러 주세요", res.status().as_u16()));
         }
@@ -231,7 +226,7 @@ fn download_default(app: &AppHandle) -> Result<Value, String> {
             return Err("받은 파일이 맞지 않아요. 다시 받아 주세요".into());
         }
         // 라이선스 사본을 모델 옆에 (카나나 라이선스 3.1) — 못 받아도 설정의 링크로 볼 수 있어 모델은 넣는다
-        if let Some(lic) = WEB.get(LICENSE_URL).call().ok().filter(|r| r.status().is_success()) {
+        if let Some(lic) = crate::stt::WEB.get(LICENSE_URL).call().ok().filter(|r| r.status().is_success()) {
             if let Ok(text) = lic.into_body().read_to_string() {
                 let _ = std::fs::write(dir(app).join("KANANA-LICENSE.txt"), text);
             }

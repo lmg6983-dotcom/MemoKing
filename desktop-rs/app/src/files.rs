@@ -33,11 +33,13 @@ const IMAGE_ACCEPT: &str = "image/avif,image/webp,image/apng,image/*,*/*;q=0.8";
 // shortcut: 프록시는 환경 변수 · Windows 인터넷 옵션의 고정 프록시만 (PAC 자동 설정은 못 읽는다), 회사망에서 미리보기가 안 된다는 말이 나오면 WebView2 로 받기
 fn agent() -> &'static ureq::Agent {
     static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
-    AGENT.get_or_init(|| {
-        use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
-        let tls = TlsConfig::builder().provider(TlsProvider::NativeTls).root_certs(RootCerts::PlatformVerifier).build();
-        ureq::Agent::config_builder().tls_config(tls).user_agent(USER_AGENT).build().into()
-    })
+    AGENT.get_or_init(|| web_config().user_agent(USER_AGENT).build().into())
+}
+
+/// 인터넷으로 받는 모든 곳(미리보기 · 모델 · 드라이브 · 캘린더)이 같은 운영체제 TLS · 인증서 · 시스템 프록시를 쓰게
+pub(crate) fn web_config() -> ureq::config::ConfigBuilder<ureq::typestate::AgentScope> {
+    use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
+    ureq::Agent::config_builder().tls_config(TlsConfig::builder().provider(TlsProvider::NativeTls).root_certs(RootCerts::PlatformVerifier).build())
 }
 
 type Response = ureq::http::Response<ureq::Body>;

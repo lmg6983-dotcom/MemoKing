@@ -270,10 +270,7 @@ fn read_limited(res: &mut ureq::http::Response<ureq::Body>) -> Result<String, St
 fn download(feed: &Value) -> Result<String, String> {
     let url = feed["url"].as_str().unwrap_or_default();
     let agent = |redirects| -> ureq::Agent {
-        use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
-        // 링크 미리보기(files.rs)와 같은 운영체제 TLS · 인증서 (회사 프록시도)
-        ureq::Agent::config_builder()
-            .tls_config(TlsConfig::builder().provider(TlsProvider::NativeTls).root_certs(RootCerts::PlatformVerifier).build())
+        crate::files::web_config()
             .timeout_global(Some(Duration::from_secs(20)))
             .http_status_as_error(false)
             .max_redirects(redirects)

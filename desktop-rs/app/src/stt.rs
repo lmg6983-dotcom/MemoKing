@@ -86,11 +86,8 @@ fn pack(name: &str) -> Option<(&'static [Part], &'static str)> {
     }
 }
 
-// 받기 — Electron net.fetch 처럼 시스템 프록시 · 인증서를 따른다
-static WEB: LazyLock<ureq::Agent> = LazyLock::new(|| {
-    let tls = ureq::tls::TlsConfig::builder().provider(ureq::tls::TlsProvider::NativeTls).root_certs(ureq::tls::RootCerts::PlatformVerifier).build();
-    ureq::Agent::config_builder().tls_config(tls).http_status_as_error(false).build().into()
-});
+// 모델 받기 (받아쓰기 · AI): Electron net.fetch 처럼 시스템 프록시 · 인증서를 따른다
+pub(crate) static WEB: LazyLock<ureq::Agent> = LazyLock::new(|| crate::files::web_config().http_status_as_error(false).build().into());
 static DOWNLOADS: LazyLock<Mutex<HashMap<String, (f64, String)>>> = LazyLock::new(Default::default); // 묶음 → (진행 0~1, 오류)
 
 fn dir(app: &AppHandle) -> PathBuf {
