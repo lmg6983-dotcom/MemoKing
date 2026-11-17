@@ -1081,7 +1081,8 @@ impl Vault {
         if body != known {
             self.keep_version(id, &known, false);
         }
-        let wrote = self.write(&mut e, &known, true);
+        // 다른 기기가 고친 글이 디스크에 있으면 쓰지 않는다 — 사본을 만들면 옛 글이 진짜 메모로 남는다. 다시 읽은 뒤 다음에 태그
+        let wrote = self.write(&mut e, &known, false);
         let ok = matches!(wrote, Ok(Wrote::Yes));
         if !ok {
             e.meta = prev;
