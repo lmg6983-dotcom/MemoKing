@@ -170,6 +170,15 @@ pub fn trim(s: &str) -> &str {
 
 /// decodeURI — 틀린 %XX 가 있으면 None (JS 는 던진다). 예약 글자(;/?:@&=+$,#)는 풀지 않는다
 pub fn decode_uri(s: &str) -> Option<String> {
+    decode(s, true)
+}
+
+/// decodeURIComponent — 예약 글자도 푼다
+pub fn decode_uri_component(s: &str) -> Option<String> {
+    decode(s, false)
+}
+
+fn decode(s: &str, keep_reserved: bool) -> Option<String> {
     let b = s.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(b.len());
     let mut i = 0;
@@ -189,7 +198,7 @@ pub fn decode_uri(s: &str) -> Option<String> {
             _ => return None,
         };
         if len == 1 {
-            if b";/?:@&=+$,#".contains(&first) {
+            if keep_reserved && b";/?:@&=+$,#".contains(&first) {
                 out.extend_from_slice(&b[i..i + 3]);
             } else {
                 out.push(first);

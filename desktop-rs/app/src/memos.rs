@@ -307,15 +307,20 @@ fn open_attachment(app: &AppHandle, rel: &str) -> Result<Value, String> {
     })
 }
 
+/// 파일 이름으로 쓸 수 있게 (Electron safeName: 경로 앞은 떼고, 못 쓰는 글자 묶음은 빈칸, 다 지워지면 "메모 내용")
+pub fn safe_name(raw: &str) -> String {
+    let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
+    let name = base.split(|c| "\\/:*?\"<>|".contains(c)).filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" ");
+    let name = name.trim();
+    if name.is_empty() { "메모 내용".into() } else { name.into() }
+}
+
 /// 내용 저장(저장 단추): { name, mime, rel? | base64? } → { name } | { cancelled } | { error }
 fn save_attachment_as(app: &AppHandle, f: &Value) -> Result<Value, String> {
     use base64::Engine;
     use tauri::Manager;
     use tauri_plugin_dialog::DialogExt;
-    let raw = f["name"].as_str().unwrap_or("메모 내용");
-    let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
-    let name: String = base.split(|c| "\\/:*?\"<>|".contains(c)).filter(|p| !p.is_empty()).collect::<Vec<_>>().join(" ").trim().to_string();
-    let name = if name.is_empty() { "메모 내용".to_string() } else { name };
+    let name = safe_name(f["name"].as_str().unwrap_or("메모 내용"));
     let source = match (f["rel"].as_str(), f["base64"].as_str()) {
         (Some(rel), _) if !rel.is_empty() => match attachment_file(app, rel) {
             Ok(p) => Ok(p),

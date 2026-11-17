@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **61 / 187**
-- 이벤트 (Rust → 화면): **10 / 61**
+- 채널 (화면 → Rust): **66 / 187**
+- 이벤트 (Rust → 화면): **11 / 61**
 
 ## 채널
 
@@ -53,10 +53,10 @@
 | ⬜ | `capture:cancel` |
 | ⬜ | `capture:done` |
 | ⬜ | `card:command` |
-| ⬜ | `card:copy` |
-| ⬜ | `card:share-file` |
-| ⬜ | `clipboard:write-rich` |
-| ⬜ | `clipboard:write-text` |
+| ✅ | `card:copy` |
+| ✅ | `card:share-file` |
+| ✅ | `clipboard:write-rich` |
+| ✅ | `clipboard:write-text` |
 | ✅ | `conflict:get` |
 | ✅ | `conflict:resolve` |
 | ⬜ | `drag:end` |
@@ -101,7 +101,7 @@
 | ⬜ | `mcp:connect` |
 | ⬜ | `mcp:copy` |
 | ⬜ | `mcp:set-write` |
-| ⬜ | `memo:copy-text` |
+| ✅ | `memo:copy-text` |
 | ✅ | `memo:create` |
 | ✅ | `memo:get` |
 | ✅ | `memo:handoff` |
@@ -260,5 +260,5 @@
 | ⬜ | `update:available` |
 | ⬜ | `update:ready` |
 | ⬜ | `update:state` |
-| ⬜ | `vault:indexed` |
+| ✅ | `vault:indexed` |
 | ⬜ | `vault:opened` |

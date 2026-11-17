@@ -235,3 +235,18 @@ fn tokenize() {
         .collect();
     report("tokenize", fails, cases.len());
 }
+
+#[test]
+fn share_text() {
+    use memoking_core::share_text::{hotkey_copy_text, share_text};
+    let cases = fixtures("share_text");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let body = c["body"].as_str().unwrap();
+            let (share, copy) = (share_text(body), hotkey_copy_text(body));
+            (share != c["share"] || copy != c["copy"]).then(|| format!("{body:?}\n  JS  : {:?} / {:?}\n  Rust: {share:?} / {copy:?}", c["share"], c["copy"]))
+        })
+        .collect();
+    report("share_text", fails, cases.len());
+}

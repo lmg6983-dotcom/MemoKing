@@ -11,6 +11,8 @@ import { isLockedBody, lockBody, lockRefKey } from '../../app/js/core/memo-lock.
 import { cleanFolderName } from '../../app/js/core/folders.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import { isProgramFile } from '../../app/js/core/file-kinds.js';
+import { shareText } from '../../app/js/core/share-text.js';
+import { hotkeyCopyText } from '../../app/js/core/memo-hotkeys.js';
 import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, pendingAlerts, fallbackAlert } from '../../app/js/core/reminders.js';
 import { indexOutput, tokenize, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { NOUNS } from '../../app/js/core/korean-nouns.js';
@@ -164,3 +166,18 @@ const tokenTexts = [
   '', '   ', '회의.회의,회의!회의', '𠀀𠀀가 𠀀이를',
 ];
 write('tokenize', tokenTexts.map((text) => ({ text, tokens: tokenize(text) })));
+
+// 보내기 · 복사용 글 (목록 · 번호 · 체크 · 표 · 인용 · 사진 · 링크 카드 · 수식 · 들여쓰기)
+const shareBodies = [...corpus().map((t) => mf.parseMemoFile(t).body),
+  '# 장보기\n\n- 우유\n- [ ] 빵\n- [x] 계란\n  - 하위\n\n1. 하나\n2. 둘\n3) 셋\n\n5. 다섯부터\n\n- 느슨한\n\n- 목록',
+  '[미리 보기](https://e.com "미리보기") [글](https://a.com) [https://b.com](https://b.com) [파일](attachments/a.pdf) <mailto:a@b.com> <https://c.com>',
+  '![](attachments/rec%20one.m4a) ![녹음](attachments/r.m4a) ![](attachments/v.mp4) ![설명](attachments/p.png) ![](attachments/noext) ![](attachments/doc.zip)',
+  // (잘못된 %XX 이름은 JS shareText 가 URIError 를 던져 뺀다 — Rust 는 원래 이름을 쓴다)
+  '| a | b\\|c |\n|---|:---:|\n| **굵게** | `코드` |',
+  '> 인용 *기울임* __밑줄강조__ ~~취소~~\n\n---\n\n$$\nx^2\n$$\n\n$$y$$ 와 \\* 이스케이프 \\\n다음 줄',
+  '\u00a0\u00a0들여쓴 글\n    네 칸 들여쓴 문단\n\t탭',
+  'snake_case 와 _기울임_ 과 a*b*c 그리고 **굵**게',
+  '\n\n\n앞 빈 줄\n\n\n\n뒤 빈 줄\n\n',
+  '<u>밑줄</u><mark>형광</mark><span style="color:red">빨강</span><br>다음',
+];
+write('share_text', shareBodies.map((body) => ({ body, share: shareText(body), copy: hotkeyCopyText(body) })));

@@ -82,6 +82,11 @@ window.addEventListener('load', () => setTimeout(async () => {
       return idx.schema === 'memoking.index/v1' && idx.memos?.some((m) => m.title === '가져온 글');
     }, 8000));
     await check('안내 파일', async () => (await text('_memoking/README.md')).startsWith('# 메모킹 폴더 안내'));
+    await check('메모 글 복사 (제목 줄 아래만)', async () => (await mk.copyMemoText(seed.id)) === true);
+    await check('공유용 글 파일', async () => {
+      const f = await mk.memo.shareFile(seed.id);
+      return f.name === '시험 메모.txt' && atob(f.base64).length > 0;
+    });
     await check('따로 남긴 글 수', async () => (await mk.recovered.count()) === 0);
     await check('이어 쓰기 안내 없음 (모두 이 PC 에서 고침)', async () => (await mk.memo.handoff()) === null);
     // 앱 화면 밖으로 넘어가지 않는다 (넘어가면 이 점검이 끝나지 않아 실패로 보인다)
