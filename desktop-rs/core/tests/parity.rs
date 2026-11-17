@@ -250,3 +250,31 @@ fn share_text() {
         .collect();
     report("share_text", fails, cases.len());
 }
+
+#[test]
+fn notify() {
+    use memoking_core::notify::*;
+    let cases = fixtures("notify");
+    let s = |v: &Value| v.as_str().unwrap_or_default().to_string();
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let o = &c["o"];
+            let got = match c["kind"].as_str().unwrap() {
+                "toast" => json!(parse_toast_xml(&s(&c["xml"]))),
+                "app" => json!(fallback_app_name(&s(&c["id"]))),
+                "query" => json!(matches_query(&c["e"], &s(&c["q"]))),
+                "filetime" => json!(file_time_to_ms(s(&c["t"]).parse().unwrap())),
+                "popupApp" => json!(popup_app_name(c["p"].as_str())),
+                "lines" => json!(popup_to_entry(c["lines"].as_array().unwrap(), "앱")),
+                "kakao" => json!(kakao_entry(c["boxes"].as_array().unwrap(), o["width"].as_f64().unwrap_or(0.0), o["height"].as_f64().unwrap_or(0.0), &s(&o["appName"]), o["profileTop"].as_f64().unwrap_or(0.0))),
+                "repeat" => json!(find_repeat(c["recent"].as_array().unwrap(), &c["e"], c["now"].as_f64().unwrap(), 120_000.0).map_or(-1, |i| i as i64)),
+                "better" => json!(better_reading(&json!({ "via": c["a"] }), &json!({ "via": c["b"] }))),
+                "title" => json!(correct_title(&s(&c["t"]), &known_names(c["ts"].as_array().unwrap().iter().map(|t| t.as_str().unwrap())))),
+                k => panic!("{k}"),
+            };
+            (got != c["out"]).then(|| format!("{}\n  JS  : {}\n  Rust: {got}", c, c["out"]))
+        })
+        .collect();
+    report("notify", fails, cases.len());
+}

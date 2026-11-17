@@ -181,3 +181,60 @@ const shareBodies = [...corpus().map((t) => mf.parseMemoFile(t).body),
   '<u>밑줄</u><mark>형광</mark><span style="color:red">빨강</span><br>다음',
 ];
 write('share_text', shareBodies.map((body) => ({ body, share: shareText(body), copy: hotkeyCopyText(body) })));
+
+// 알림 보관함: Windows 토스트 XML · 앱 이름 · 찾기, 팝업 알림 창의 글 → 보관함 항목, 같은 알림 거르기, 이름 맞추기
+const toasts = [
+  '<toast><visual><binding template="ToastGeneric"><text>김대리</text><text>회의 자료 &amp; 일정 &lt;오늘&gt;</text><text></text><image placement="appLogoOverride" src="file:///C:/Temp/a.png"/><image src="b.png"/></binding></visual></toast>',
+  '<toast launch="x"><visual><binding><text hint-style="x"><b>굵은</b> 제목</text><text>둘\n째 &nbsp; &#x1F600; &#99999999;</text><image src="only&amp;one.jpg"/></binding></visual></toast>',
+  '<TOAST><text>  </text></TOAST>', '<tile><text>타일</text></tile>', '<toast><text>제목만</text></toast>', '',
+];
+const appIds = ['Microsoft.Teams_8wekyb3d8bbwe!MSTeams', 'com.daou.msn', 'C:\\Program Files\\App\\kakao.EXE', 'Chrome', 'a/b/c.d.e', '', '!', 'x!', 'Folder\\'];
+const entryList = [{ app: '카카오톡', title: '김대리 (영업팀)', body: '회의 자료 보냈어요' }, { app: 'Teams', title: 'Hello World', body: '' }];
+const queries2 = ['', '  ', '김대리', 'hello', 'WORLD teams', '회의 없음', '카카오톡 자료'];
+const lineSets = [['김대리', '회의 자료 보냈어요', '내일 봬요'], ['카카오톡', '', '김대리', '오후 3:12', '15:12', '3:05 pm', '회의 자료 보냈어요', '답장', '닫기'], ['  김대리 ', '안녕\t 하세요', '안녕 하세요'], ['김대리'], [], ['카카오톡', '오전 9:01'], ['가'.repeat(300), '나'.repeat(3000)], [null, 12, '앱', 'x'], ['😀'.repeat(150)]];
+const box = (text, x, y, h = 14) => ({ text, x, y, w: String(text).length * 12, h });
+const S = { width: 340, height: 110, appName: '카카오톡' };
+const P = { width: 330, height: 140, appName: '카카오톡', profileTop: 30 };
+const kakao = [
+  [[box('가족방', 70, 12), box('엄마', 70, 34), box('저녁 7시에 와', 70, 62), box('0', 290, 10), box('x', 316, 10)], S],
+  [[box('김대리', 70, 12), box('김대리', 70, 34), box('회의 자료 보냈어요', 70, 62), box('확인 부탁드려요', 70, 80)], S],
+  [[box('김대리', 70, 14), box('넵', 70, 62)], S],
+  [[box('가족방', 70, 12), box('아빠', 70, 34)], S],
+  [[box('김대리', 70, 12), box('—', 70, 40), box('ㅋㅋㅋ', 70, 62), box('답장', 250, 90), box('o', 20, 50), box('오후 3:12', 70, 96)], S],
+  [[box('프로젝트', 70, 12), box('알림', 300, 12), box('박과장', 70, 34), box('내일', 70, 62, 15), box('10시요', 120, 63, 14)], S],
+  [[], S], [[box('0', 290, 10), box('카카오톡', 70, 12)], S], [[box('김대리 ×', 70, 12)], {}],
+  [[box('우리 여보', 14, 8, 11), box('우리 여보', 64, 32, 13), box('혹시 오늘 저녁도 괜찮겠니', 64, 54, 12), box('메시지 입력', 20, 104, 12)], P],
+  [[box('우리 여부', 14, 8, 11), box('우리 여보', 64, 32, 13), box('혹시', 64, 54, 12)], P],
+  [[box('회사 동기방 ×', 14, 8, 11), box('김대리', 64, 32, 13), box('회의 자료 보냈어요', 64, 54, 12)], P],
+  [[box('Team AB', 14, 8, 11), box('김대리', 64, 32, 13)], P], [[box('우리 가족 x', 14, 8, 11), box('김대리 o', 64, 32, 13), box('사진', 64, 54)], P],
+  [[box('김대리', 70, 12), box('김대러', 70, 30), box('김대리', 70, 64), box('안녕', 70, 80)], S],
+  [[{ text: 5, x: '7', y: null }, { text: '가나', x: 'a', y: 20, h: 0 }, box('다라', 10, 22, 30)], S],
+];
+const now = 1_000_000;
+const recent = [
+  { app: '카카오톡', hwnd: 7, title: '김대리', body: '회의 자료 보냈어요', at: now - 2000, via: 'uia' },
+  { app: '카카오톡', hwnd: 9, title: '박지민', body: '혹시 오늘 저녁도 어제와 같아도 괜찮겠니', at: now - 3000, via: 'ocr' },
+  { app: 'Teams', title: '😀𠀀가', body: '', at: now - 200_000 },
+];
+const probes = [
+  { app: '카카오톡', hwnd: 7, title: '김대리 (영업팀)', body: '회의 자료 보냈어요' }, { app: '카카오톡', hwnd: 7, title: '김대리', body: '회의자료 보냈어요.' },
+  { app: '카카오톡', hwnd: 8, title: '김대리 (영업팀)', body: '회의 자료 보냈어요' }, { app: '카카오톡', hwnd: 7, title: '김대리', body: '내일 봬요' },
+  { app: '카카오톡', hwnd: 9, title: '박지민', body: '흑시 오늘 저녁도 어제와 같아도 괜찮겠나' }, { app: '카카오톡', title: '박지민', body: '내일 회의 10시로 바뀌었어요' },
+  { app: 'Teams', title: '😀𠀀가', body: '' }, { app: '카카오톡', hwnd: 0, title: '', body: '' },
+];
+const titles = [['김대리 (회사 동기방)', '박과장 (회사 동기방)', '우리 여보'], ['김대리 (회사 등기방)', '김대리 (회사 동기방)'], ['a (회사 동기방)', 'b (회사 동기방)', 'c (회사 동기방)', 'd (회사 동기방)', 'e (회사 등기방)'], ['김대리'], []];
+const probeTitles = ['김대리 (회사 등기방)', '김대리 (회사 동기방', '우리 여부', '김대 (회사 동기방)', '이부장 (볼링 동호회)', '김대리 (회사 동기방)', 'x (회사 등기방)', '  김대리  ', '김 대리 (회사동기방)', ''];
+const { parseToastXml, fallbackAppName, matchesQuery, fileTimeToMs } = await import('../../app/js/core/notifications.js');
+const pn = await import('../../app/js/core/popup-notify.js');
+write('notify', [
+  ...toasts.map((xml) => ({ kind: 'toast', xml, out: parseToastXml(xml) })),
+  ...appIds.map((id) => ({ kind: 'app', id, out: fallbackAppName(id) })),
+  ...queries2.flatMap((q) => entryList.map((e) => ({ kind: 'query', e, q, out: matchesQuery(e, q) }))),
+  ...['0', '133000000000000000', '116444736000000000'].map((t) => ({ kind: 'filetime', t, out: fileTimeToMs(t) })),
+  ...['KakaoTalk', 'Other', null].map((p) => ({ kind: 'popupApp', p, out: pn.popupAppName(p ?? undefined) })),
+  ...lineSets.map((lines) => ({ kind: 'lines', lines, out: pn.popupToEntry(lines, { appName: '앱' }) })),
+  ...kakao.map(([boxes, o]) => ({ kind: 'kakao', boxes, o, out: pn.kakaoEntry(boxes, o) })),
+  ...probes.map((e) => ({ kind: 'repeat', recent, e, now, out: recent.indexOf(pn.findRepeat(recent, e, now)) })),
+  ...[['ocr', 'uia'], ['uia', 'ocr'], ['ocr', 'ocr'], ['msaa', 'uia'], ['ocr', ''], ['ocr', null]].map(([a, b]) => ({ kind: 'better', a, b, out: pn.betterReading({ via: a }, { via: b }) })),
+  ...titles.flatMap((ts) => probeTitles.map((t) => ({ kind: 'title', ts, t, out: pn.correctTitle(t, pn.knownNames(ts)) }))),
+]);

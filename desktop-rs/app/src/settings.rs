@@ -5,7 +5,7 @@ use serde_json::{json, Map, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// JS 의 Boolean(v)
-fn truthy(v: Option<&Value>) -> bool {
+pub fn truthy(v: Option<&Value>) -> bool {
     match v {
         None | Some(Value::Null) => false,
         Some(Value::Bool(b)) => *b,

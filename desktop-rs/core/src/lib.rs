@@ -5,6 +5,7 @@ pub mod indexer;
 pub mod js;
 pub mod lock;
 pub mod memo_file;
+pub mod notify;
 pub mod reminders;
 pub mod search;
 pub mod share_text;

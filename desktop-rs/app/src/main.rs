@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod clipboard;
+mod history;
 mod index;
 mod ipc;
 mod memos;
@@ -63,7 +64,7 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![ipc::ipc])
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
-        //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상
+        //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상 · history/<이름>: 알림 보관함 그림
         .register_uri_scheme_protocol("memoking", |ctx, req| {
             let path = req.uri().path().to_string();
             let status = |code| http::Response::builder().status(code).body(Vec::new()).unwrap();
@@ -73,8 +74,13 @@ fn main() {
                 return status(403);
             }
             let allow = origin.clone().unwrap_or_default();
-            if let Some(rel) = path.strip_prefix("/vault/") {
-                return match memos::serve_vault(ctx.app_handle(), rel) {
+            let served = match (path.strip_prefix("/vault/"), path.strip_prefix("/history/")) {
+                (Some(rel), _) => Some(memos::serve_vault(ctx.app_handle(), rel)),
+                (_, Some(name)) => Some(history::serve_image(ctx.app_handle(), name)),
+                _ => None,
+            };
+            if let Some(served) = served {
+                return match served {
                     Some((bytes, mime)) => http::Response::builder().header("Content-Type", mime).header("Access-Control-Allow-Origin", allow).body(bytes).unwrap(),
                     None => status(404),
                 };
@@ -97,6 +103,7 @@ fn main() {
             let app = app.handle();
             app.manage(state::State::load(app));
             memos::start(app);
+            history::start(app);
             let list = os::place_list(app, window(app, "list", "index.html").title("메모킹").inner_size(440.0, 680.0).min_inner_size(440.0, 380.0)).build()?;
             os::start(app, &list);
             Ok(())
