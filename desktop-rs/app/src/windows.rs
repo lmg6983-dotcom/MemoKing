@@ -1166,6 +1166,19 @@ fn parse_top_line(line: &str) -> Option<TopEvent> {
     })
 }
 
+/// 메모킹을 끌 때: 왕관 도우미(PowerShell)는 따로 도는 프로세스라 남는다
+pub fn stop() {
+    let c = {
+        let mut g = wm();
+        g.top.gen += 1; // 도우미가 끝나서 3초 뒤 다시 띄우는 것도 막는다
+        g.top.child.take()
+    };
+    if let Some(mut c) = c {
+        let _ = c.kill();
+        let _ = c.wait();
+    }
+}
+
 /// 왕관 창을 지키는 도우미를 지금 왕관 창들로 (다시) 띄운다 — 없으면 멈춘다
 // 1) Windows 가 늘 위를 몰래 풀면(lost) 다시 켜고, 2) 다른 "늘 위" 앱 창이 앞으로 오는 순간 메모킹 왕관 창을 다시 맨 위로
 fn refresh_top_watch(app: &AppHandle) {
@@ -1401,7 +1414,9 @@ fn sync_sticker(app: &AppHandle, owner: &str) {
                 if let Some(s) = wm().stickers.get_mut(owner) {
                     s.win = None;
                 }
-                open_sticker_win(app, owner, false);
+                // 창 · 알림 영역 이벤트 처리 안에서 창을 만들면 Windows 에서 멈춘다 — 다른 스레드에서
+                let (app, owner) = (app.clone(), owner.to_string());
+                std::thread::spawn(move || open_sticker_win(&app, &owner, false));
             }
             _ => {}
         }
@@ -1708,14 +1723,17 @@ fn status_bubble(app: &AppHandle, owner: &str, b: &Value) -> Value {
         return false.into();
     };
     // 바탕화면 층(테이프) 메모는 앞에 나와 있을 때만 — 다른 창 뒤에 있으면 말풍선만 혼자 떠 보인다
-    if wm().pinned.contains_key(owner) && !o.is_focused().unwrap_or(false) {
+    // WM 을 놓고 창에 묻는다 — 창 묻기는 메인 스레드를 기다리고, 메인 스레드는 WM 을 기다릴 수 있다
+    let pinned = wm().pinned.contains_key(owner);
+    if pinned && !o.is_focused().unwrap_or(false) {
         return false.into();
     }
     let label = format!("bubble-{owner}");
     let (Some(w), Some(ob)) = (ensure_overlay(app, &label, "bubble.html", BUBBLE_SIZE, Some(&o)), bounds(&o)) else { return false.into() };
     // shortcut: 메모 창 확대(zoom)는 1 로 본다 — 확대한 창에서 꼬리가 어긋나면 화면이 확대율을 함께 보내게
     let anchor = ob[0] + b["x"].as_f64().unwrap_or(0.0);
-    let sticker = wm().stickers.get(owner).and_then(|s| s.win.clone()).and_then(|l| app.get_webview_window(&l)).filter(is_shown).and_then(|s| bounds(&s));
+    let sl = wm().stickers.get(owner).and_then(|s| s.win.clone());
+    let sticker = sl.and_then(|l| app.get_webview_window(&l)).filter(is_shown).and_then(|s| bounds(&s));
     let mut spot = place_bubble(ob, area_at(app, (anchor.round(), ob[1] + 4.0)), anchor, BAR_H, sticker);
     let r = &spot["bounds"];
     set_bounds(&w, [r["x"].as_f64().unwrap_or(0.0), r["y"].as_f64().unwrap_or(0.0), BUBBLE_SIZE.0, BUBBLE_SIZE.1]);

@@ -483,7 +483,7 @@ fn add_popup(app: &AppHandle, mut p: Value) {
 }
 
 /// memoking://localhost/history/<이름> — 보관함의 그림
-pub fn serve_image(app: &AppHandle, name: &str) -> Option<(Vec<u8>, &'static str)> {
+pub fn serve_image(app: &AppHandle, name: &str) -> Option<(std::path::PathBuf, &'static str)> {
     let name = crate::percent_decode(name);
     let name = Path::new(&name).file_name()?.to_string_lossy().into_owned();
     let file = app.state::<Mutex<History>>().lock().unwrap().image_dir().join(&name);
@@ -495,7 +495,7 @@ pub fn serve_image(app: &AppHandle, name: &str) -> Option<(Vec<u8>, &'static str
         "ico" => "image/x-icon",
         _ => "image/png",
     };
-    Some((std::fs::read(file).ok()?, mime))
+    Some((file, mime))
 }
 
 // 알림 → 메모. 팝업 알림은 알림 창 사진, Windows 알림은 들어 있는 그림 (작은 앱 아이콘 100px 아래는 넣지 않는다)
