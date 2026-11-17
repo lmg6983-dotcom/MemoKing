@@ -1,0 +1,2171 @@
+[
+ {
+  "name": "first",
+  "local": {
+   "a.md": "A",
+   "Work/b.md": "B",
+   ".x.tmp": "t",
+   "_memoking/index.json": "{}",
+   "desktop.ini": "x",
+   "Empty/": ""
+  },
+  "remote": {
+   "c.md": "C",
+   "Life/d.md": "D",
+   "Remote Empty/": "",
+   "g.gdoc": {
+    "gdoc": true
+   }
+  },
+  "state": {},
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "raw": null,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 2,
+    "downloaded": 2,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    ".x.tmp": "t",
+    "Empty/": "",
+    "Life/": "",
+    "Remote Empty/": "",
+    "Work/": "",
+    "_memoking/": "",
+    "a.md": "A",
+    "c.md": "C",
+    "desktop.ini": "x",
+    "Life/d.md": "D",
+    "Work/b.md": "B",
+    "_memoking/index.json": "{}"
+   },
+   "remote": {
+    "live": {
+     "c.md": "C",
+     "Life/": "",
+     "Life/d.md": "D",
+     "Remote Empty/": "",
+     "g.gdoc": "",
+     "Work/": "",
+     "Work/b.md": "B",
+     "a.md": "A",
+     "Empty/": ""
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t1",
+    "files": {
+     "Life/d.md": {
+      "id": "x:Life/d.md",
+      "md5": "f623e75af30e62bbd73d6df5b50bb7b5",
+      "lsize": 1
+     },
+     "Work/b.md": {
+      "id": "x:Work/b.md",
+      "md5": "9d5ed678fe57bcca610140957afab571",
+      "lsize": 1
+     },
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+      "lsize": 1
+     },
+     "c.md": {
+      "id": "x:c.md",
+      "md5": "0d61f8370cad1d412f80b84d143e1257",
+      "lsize": 1
+     }
+    },
+    "folders": {
+     "": "root0",
+     "Life": "d:Life",
+     "Remote Empty": "d:Remote Empty",
+     "Work": "d:Work",
+     "Empty": "d:Empty"
+    },
+    "dirs": [
+     "Empty",
+     "Life",
+     "Remote Empty",
+     "Work"
+    ],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "local-edit",
+  "local": {
+   "a.md": [
+    "A2",
+    1790000001000
+   ]
+  },
+  "remote": {
+   "a.md": "A"
+  },
+  "state": {
+   "pageToken": "t0",
+   "lastFullScan": 1794999940000,
+   "folders": {
+    "": "root0"
+   },
+   "dirs": [],
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   }
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 1,
+    "downloaded": 0,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": false
+   },
+   "local": {
+    "a.md": "A2"
+   },
+   "remote": {
+    "live": {
+     "a.md": "A2"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "c6bdf6f65f3845da9085e9ae5790b494",
+      "lsize": 2
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1794999940000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "remote-edit",
+  "local": {
+   "a.md": "A"
+  },
+  "remote": {
+   "a.md": "A3"
+  },
+  "state": {
+   "pageToken": "t0",
+   "lastFullScan": 1794999940000,
+   "folders": {
+    "": "root0"
+   },
+   "dirs": [],
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   }
+  },
+  "raw": [
+   {
+    "fileId": "x:a.md",
+    "file": {
+     "name": "a.md",
+     "mimeType": "text/markdown",
+     "md5Checksum": "6593d7b12fd418cdb35bbf438de72f66",
+     "parents": [
+      "root0"
+     ],
+     "modifiedTime": "2026-11-17T00:00:00Z",
+     "size": "2"
+    }
+   }
+  ],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 0,
+    "downloaded": 1,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    "a.md": "A3"
+   },
+   "remote": {
+    "live": {
+     "a.md": "A3"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "6593d7b12fd418cdb35bbf438de72f66",
+      "lsize": 2
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1794999940000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "both-edit",
+  "local": {
+   "Work/a.md": [
+    "mine",
+    1790000001000
+   ]
+  },
+  "remote": {
+   "Work/a.md": "theirs"
+  },
+  "state": {
+   "files": {
+    "Work/a.md": {
+     "id": "x:Work/a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   },
+   "pageToken": "t0"
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 1,
+    "downloaded": 1,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [
+     "Work/a (PC 충돌 2026-11-18 2006).md"
+    ],
+    "localChanged": true
+   },
+   "local": {
+    "Work/": "",
+    "Work/a (PC 충돌 2026-11-18 2006).md": "mine",
+    "Work/a.md": "theirs"
+   },
+   "remote": {
+    "live": {
+     "Work/": "",
+     "Work/a.md": "theirs",
+     "Work/a (PC 충돌 2026-11-18 2006).md": "mine"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "Work/a.md": {
+      "id": "x:Work/a.md",
+      "md5": "ce97a90ef59e9c768263754682f68bd6",
+      "lsize": 6
+     },
+     "Work/a (PC 충돌 2026-11-18 2006).md": {
+      "id": "x:Work/a (PC 충돌 2026-11-18 2006).md",
+      "md5": "918b81db5e91d031548b963c93845e5b",
+      "lsize": 4
+     }
+    },
+    "folders": {
+     "": "root0",
+     "Work": "d:Work"
+    },
+    "dirs": [
+     "Work"
+    ],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "both-same",
+  "local": {
+   "a.md": [
+    "same",
+    1790000001000
+   ]
+  },
+  "remote": {
+   "a.md": "same"
+  },
+  "state": {
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   },
+   "pageToken": "t0"
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 0,
+    "downloaded": 0,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": false
+   },
+   "local": {
+    "a.md": "same"
+   },
+   "remote": {
+    "live": {
+     "a.md": "same"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "51037a4a37730f52c8732586d3aaa316",
+      "lsize": 4
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "deletes",
+  "local": {
+   "keep.md": "K",
+   "gone-remote.md": "R",
+   "revive-local.md": [
+    "L2",
+    1790000001000
+   ]
+  },
+  "remote": {
+   "keep.md": "K",
+   "gone-local.md": "G",
+   "revive-remote.md": "V2"
+  },
+  "state": {
+   "files": {
+    "keep.md": {
+     "id": "x:keep.md",
+     "md5": "a5f3c6a11b03839d46af9fb43c97c188",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    },
+    "gone-remote.md": {
+     "id": "x:gone-remote.md",
+     "md5": "e1e1d3d40573127e9ee0480caf1283d6",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    },
+    "gone-local.md": {
+     "id": "x:gone-local.md",
+     "md5": "dfcf28d0734569a6a693bc8194de62bf",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    },
+    "revive-local.md": {
+     "id": "x:revive-local.md",
+     "md5": "d20caec3b48a1eef164cb4ca81ba2587",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    },
+    "revive-remote.md": {
+     "id": "x:revive-remote.md",
+     "md5": "5206560a306a2e085a437fd258eb57ce",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    },
+    "both.md": {
+     "id": "x:both.md",
+     "md5": "9d5ed678fe57bcca610140957afab571",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   },
+   "pageToken": "t0"
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 1,
+    "downloaded": 1,
+    "deletedLocal": 1,
+    "deletedRemote": 1,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    "keep.md": "K",
+    "revive-local.md": "L2",
+    "revive-remote.md": "V2"
+   },
+   "remote": {
+    "live": {
+     "keep.md": "K",
+     "revive-remote.md": "V2",
+     "revive-local.md": "L2"
+    },
+    "trashed": [
+     "gone-local.md"
+    ]
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "keep.md": {
+      "id": "x:keep.md",
+      "md5": "a5f3c6a11b03839d46af9fb43c97c188",
+      "lsize": 1
+     },
+     "revive-local.md": {
+      "id": "x:revive-local.md",
+      "md5": "7e6aa2d53f6ee2b1a34b017fa403cb76",
+      "lsize": 2
+     },
+     "revive-remote.md": {
+      "id": "x:revive-remote.md",
+      "md5": "ec765f1adc3b4253f2d3b131a4a8618f",
+      "lsize": 2
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "mass-remote-gone",
+  "local": {
+   "m00.md": "m00.md",
+   "m01.md": "m01.md",
+   "m02.md": "m02.md",
+   "m03.md": "m03.md",
+   "m04.md": "m04.md",
+   "m05.md": "m05.md",
+   "m06.md": "m06.md",
+   "m07.md": "m07.md",
+   "m08.md": "m08.md",
+   "m09.md": "m09.md",
+   "m10.md": "m10.md",
+   "m11.md": "m11.md",
+   "m12.md": "m12.md",
+   "m13.md": "m13.md",
+   "m14.md": "m14.md",
+   "m15.md": "m15.md",
+   "m16.md": "m16.md",
+   "m17.md": "m17.md",
+   "m18.md": "m18.md",
+   "m19.md": "m19.md",
+   "m20.md": "m20.md",
+   "m21.md": "m21.md",
+   "m22.md": "m22.md",
+   "m23.md": "m23.md",
+   "m24.md": "m24.md"
+  },
+  "remote": {},
+  "state": {
+   "files": {
+    "m00.md": {
+     "id": "x:m00.md",
+     "md5": "0360bd3678bc8f4aa0146be447fbabb9",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m01.md": {
+     "id": "x:m01.md",
+     "md5": "a6889ace84d818a73ea8ec0757656de5",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m02.md": {
+     "id": "x:m02.md",
+     "md5": "8b500fa435cd468876ec98b0f79d39a5",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m03.md": {
+     "id": "x:m03.md",
+     "md5": "1840f46a58c035e0728ca3c8beb339db",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m04.md": {
+     "id": "x:m04.md",
+     "md5": "39b5459f97ff4523db3eed3323bd0d25",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m05.md": {
+     "id": "x:m05.md",
+     "md5": "1ea12474d56189aa849c1b219d92c0f2",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m06.md": {
+     "id": "x:m06.md",
+     "md5": "823b56b4bc477ba323866faa808c7d86",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m07.md": {
+     "id": "x:m07.md",
+     "md5": "fe6170cee666958bb53b909231d4e38d",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m08.md": {
+     "id": "x:m08.md",
+     "md5": "1390e1decd1f21660b077334bcc53ea5",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m09.md": {
+     "id": "x:m09.md",
+     "md5": "ce58e8633995824127953dfa57ccf9ea",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m10.md": {
+     "id": "x:m10.md",
+     "md5": "cd980749a4352f201aa14614837be218",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m11.md": {
+     "id": "x:m11.md",
+     "md5": "b3c51ab658c9822f723afee882648702",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m12.md": {
+     "id": "x:m12.md",
+     "md5": "a15bd7879281ab0ea6b52cf36bb5d5ed",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m13.md": {
+     "id": "x:m13.md",
+     "md5": "1d58cd6c0e7473cf891090cc8630f42d",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m14.md": {
+     "id": "x:m14.md",
+     "md5": "3fb6e07f60eeef5837d656c82bacb6a4",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m15.md": {
+     "id": "x:m15.md",
+     "md5": "2954a723ace45bd4908fd7f81b38b400",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m16.md": {
+     "id": "x:m16.md",
+     "md5": "4ae8552991e39a80abd191a30eec35b3",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m17.md": {
+     "id": "x:m17.md",
+     "md5": "94ea0b3ea5aa96e68b28b4ff09b9a13a",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m18.md": {
+     "id": "x:m18.md",
+     "md5": "d5f6f0947456ab81372bd676f5053782",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m19.md": {
+     "id": "x:m19.md",
+     "md5": "9ef018ca1aaa82189a632fba57c2e8ec",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m20.md": {
+     "id": "x:m20.md",
+     "md5": "4486ed980b1769598e1febbdb64e94da",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m21.md": {
+     "id": "x:m21.md",
+     "md5": "798bd3d71c5ba7d4faff192c803a74b5",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m22.md": {
+     "id": "x:m22.md",
+     "md5": "6fbc13f0d35a35fbcef76002a58915a6",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m23.md": {
+     "id": "x:m23.md",
+     "md5": "2f026b282c232fd65d0305e790e7434e",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m24.md": {
+     "id": "x:m24.md",
+     "md5": "d2b09f99154d71788b768613f85e4e38",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    }
+   },
+   "pageToken": "t0"
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "error": "Google Drive 폴더에서 파일 25개가 한꺼번에 사라져서 동기화를 멈췄어요. 고른 폴더가 맞는지 확인해 주세요."
+   },
+   "local": {
+    "m00.md": "m00.md",
+    "m01.md": "m01.md",
+    "m02.md": "m02.md",
+    "m03.md": "m03.md",
+    "m04.md": "m04.md",
+    "m05.md": "m05.md",
+    "m06.md": "m06.md",
+    "m07.md": "m07.md",
+    "m08.md": "m08.md",
+    "m09.md": "m09.md",
+    "m10.md": "m10.md",
+    "m11.md": "m11.md",
+    "m12.md": "m12.md",
+    "m13.md": "m13.md",
+    "m14.md": "m14.md",
+    "m15.md": "m15.md",
+    "m16.md": "m16.md",
+    "m17.md": "m17.md",
+    "m18.md": "m18.md",
+    "m19.md": "m19.md",
+    "m20.md": "m20.md",
+    "m21.md": "m21.md",
+    "m22.md": "m22.md",
+    "m23.md": "m23.md",
+    "m24.md": "m24.md"
+   },
+   "remote": {
+    "live": {},
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t0",
+    "files": {
+     "m00.md": {
+      "id": "x:m00.md",
+      "md5": "0360bd3678bc8f4aa0146be447fbabb9",
+      "lsize": 6
+     },
+     "m01.md": {
+      "id": "x:m01.md",
+      "md5": "a6889ace84d818a73ea8ec0757656de5",
+      "lsize": 6
+     },
+     "m02.md": {
+      "id": "x:m02.md",
+      "md5": "8b500fa435cd468876ec98b0f79d39a5",
+      "lsize": 6
+     },
+     "m03.md": {
+      "id": "x:m03.md",
+      "md5": "1840f46a58c035e0728ca3c8beb339db",
+      "lsize": 6
+     },
+     "m04.md": {
+      "id": "x:m04.md",
+      "md5": "39b5459f97ff4523db3eed3323bd0d25",
+      "lsize": 6
+     },
+     "m05.md": {
+      "id": "x:m05.md",
+      "md5": "1ea12474d56189aa849c1b219d92c0f2",
+      "lsize": 6
+     },
+     "m06.md": {
+      "id": "x:m06.md",
+      "md5": "823b56b4bc477ba323866faa808c7d86",
+      "lsize": 6
+     },
+     "m07.md": {
+      "id": "x:m07.md",
+      "md5": "fe6170cee666958bb53b909231d4e38d",
+      "lsize": 6
+     },
+     "m08.md": {
+      "id": "x:m08.md",
+      "md5": "1390e1decd1f21660b077334bcc53ea5",
+      "lsize": 6
+     },
+     "m09.md": {
+      "id": "x:m09.md",
+      "md5": "ce58e8633995824127953dfa57ccf9ea",
+      "lsize": 6
+     },
+     "m10.md": {
+      "id": "x:m10.md",
+      "md5": "cd980749a4352f201aa14614837be218",
+      "lsize": 6
+     },
+     "m11.md": {
+      "id": "x:m11.md",
+      "md5": "b3c51ab658c9822f723afee882648702",
+      "lsize": 6
+     },
+     "m12.md": {
+      "id": "x:m12.md",
+      "md5": "a15bd7879281ab0ea6b52cf36bb5d5ed",
+      "lsize": 6
+     },
+     "m13.md": {
+      "id": "x:m13.md",
+      "md5": "1d58cd6c0e7473cf891090cc8630f42d",
+      "lsize": 6
+     },
+     "m14.md": {
+      "id": "x:m14.md",
+      "md5": "3fb6e07f60eeef5837d656c82bacb6a4",
+      "lsize": 6
+     },
+     "m15.md": {
+      "id": "x:m15.md",
+      "md5": "2954a723ace45bd4908fd7f81b38b400",
+      "lsize": 6
+     },
+     "m16.md": {
+      "id": "x:m16.md",
+      "md5": "4ae8552991e39a80abd191a30eec35b3",
+      "lsize": 6
+     },
+     "m17.md": {
+      "id": "x:m17.md",
+      "md5": "94ea0b3ea5aa96e68b28b4ff09b9a13a",
+      "lsize": 6
+     },
+     "m18.md": {
+      "id": "x:m18.md",
+      "md5": "d5f6f0947456ab81372bd676f5053782",
+      "lsize": 6
+     },
+     "m19.md": {
+      "id": "x:m19.md",
+      "md5": "9ef018ca1aaa82189a632fba57c2e8ec",
+      "lsize": 6
+     },
+     "m20.md": {
+      "id": "x:m20.md",
+      "md5": "4486ed980b1769598e1febbdb64e94da",
+      "lsize": 6
+     },
+     "m21.md": {
+      "id": "x:m21.md",
+      "md5": "798bd3d71c5ba7d4faff192c803a74b5",
+      "lsize": 6
+     },
+     "m22.md": {
+      "id": "x:m22.md",
+      "md5": "6fbc13f0d35a35fbcef76002a58915a6",
+      "lsize": 6
+     },
+     "m23.md": {
+      "id": "x:m23.md",
+      "md5": "2f026b282c232fd65d0305e790e7434e",
+      "lsize": 6
+     },
+     "m24.md": {
+      "id": "x:m24.md",
+      "md5": "d2b09f99154d71788b768613f85e4e38",
+      "lsize": 6
+     }
+    },
+    "folders": null,
+    "dirs": null,
+    "lastFullScan": null,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "local-empty",
+  "local": {},
+  "remote": {
+   "a.md": "A",
+   "b.md": "B"
+  },
+  "state": {
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    },
+    "b.md": {
+     "id": "x:b.md",
+     "md5": "9d5ed678fe57bcca610140957afab571",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   },
+   "pageToken": "t0"
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "error": "이 PC 메모 폴더가 비어 있거나 읽을 수 없어 동기화를 멈췄어요. 메모 폴더가 맞는지 확인해 주세요."
+   },
+   "local": {},
+   "remote": {
+    "live": {
+     "a.md": "A",
+     "b.md": "B"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t0",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+      "lsize": 1
+     },
+     "b.md": {
+      "id": "x:b.md",
+      "md5": "9d5ed678fe57bcca610140957afab571",
+      "lsize": 1
+     }
+    },
+    "folders": null,
+    "dirs": null,
+    "lastFullScan": null,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "mass-conflict",
+  "local": {
+   "m00.md": [
+    "mine m00.md",
+    1790000001000
+   ],
+   "m01.md": [
+    "mine m01.md",
+    1790000001000
+   ],
+   "m02.md": [
+    "mine m02.md",
+    1790000001000
+   ],
+   "m03.md": [
+    "mine m03.md",
+    1790000001000
+   ],
+   "m04.md": [
+    "mine m04.md",
+    1790000001000
+   ],
+   "m05.md": [
+    "mine m05.md",
+    1790000001000
+   ],
+   "m06.md": [
+    "mine m06.md",
+    1790000001000
+   ],
+   "m07.md": [
+    "mine m07.md",
+    1790000001000
+   ],
+   "m08.md": [
+    "mine m08.md",
+    1790000001000
+   ],
+   "m09.md": [
+    "mine m09.md",
+    1790000001000
+   ],
+   "m10.md": [
+    "mine m10.md",
+    1790000001000
+   ],
+   "m11.md": [
+    "mine m11.md",
+    1790000001000
+   ],
+   "m12.md": [
+    "mine m12.md",
+    1790000001000
+   ],
+   "m13.md": [
+    "mine m13.md",
+    1790000001000
+   ],
+   "m14.md": [
+    "mine m14.md",
+    1790000001000
+   ],
+   "m15.md": [
+    "mine m15.md",
+    1790000001000
+   ],
+   "m16.md": [
+    "mine m16.md",
+    1790000001000
+   ],
+   "m17.md": [
+    "mine m17.md",
+    1790000001000
+   ],
+   "m18.md": [
+    "mine m18.md",
+    1790000001000
+   ],
+   "m19.md": [
+    "mine m19.md",
+    1790000001000
+   ],
+   "m20.md": [
+    "mine m20.md",
+    1790000001000
+   ]
+  },
+  "remote": {
+   "m00.md": "theirs m00.md",
+   "m01.md": "theirs m01.md",
+   "m02.md": "theirs m02.md",
+   "m03.md": "theirs m03.md",
+   "m04.md": "theirs m04.md",
+   "m05.md": "theirs m05.md",
+   "m06.md": "theirs m06.md",
+   "m07.md": "theirs m07.md",
+   "m08.md": "theirs m08.md",
+   "m09.md": "theirs m09.md",
+   "m10.md": "theirs m10.md",
+   "m11.md": "theirs m11.md",
+   "m12.md": "theirs m12.md",
+   "m13.md": "theirs m13.md",
+   "m14.md": "theirs m14.md",
+   "m15.md": "theirs m15.md",
+   "m16.md": "theirs m16.md",
+   "m17.md": "theirs m17.md",
+   "m18.md": "theirs m18.md",
+   "m19.md": "theirs m19.md",
+   "m20.md": "theirs m20.md"
+  },
+  "state": {
+   "files": {
+    "m00.md": {
+     "id": "x:m00.md",
+     "md5": "0360bd3678bc8f4aa0146be447fbabb9",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m01.md": {
+     "id": "x:m01.md",
+     "md5": "a6889ace84d818a73ea8ec0757656de5",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m02.md": {
+     "id": "x:m02.md",
+     "md5": "8b500fa435cd468876ec98b0f79d39a5",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m03.md": {
+     "id": "x:m03.md",
+     "md5": "1840f46a58c035e0728ca3c8beb339db",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m04.md": {
+     "id": "x:m04.md",
+     "md5": "39b5459f97ff4523db3eed3323bd0d25",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m05.md": {
+     "id": "x:m05.md",
+     "md5": "1ea12474d56189aa849c1b219d92c0f2",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m06.md": {
+     "id": "x:m06.md",
+     "md5": "823b56b4bc477ba323866faa808c7d86",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m07.md": {
+     "id": "x:m07.md",
+     "md5": "fe6170cee666958bb53b909231d4e38d",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m08.md": {
+     "id": "x:m08.md",
+     "md5": "1390e1decd1f21660b077334bcc53ea5",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m09.md": {
+     "id": "x:m09.md",
+     "md5": "ce58e8633995824127953dfa57ccf9ea",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m10.md": {
+     "id": "x:m10.md",
+     "md5": "cd980749a4352f201aa14614837be218",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m11.md": {
+     "id": "x:m11.md",
+     "md5": "b3c51ab658c9822f723afee882648702",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m12.md": {
+     "id": "x:m12.md",
+     "md5": "a15bd7879281ab0ea6b52cf36bb5d5ed",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m13.md": {
+     "id": "x:m13.md",
+     "md5": "1d58cd6c0e7473cf891090cc8630f42d",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m14.md": {
+     "id": "x:m14.md",
+     "md5": "3fb6e07f60eeef5837d656c82bacb6a4",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m15.md": {
+     "id": "x:m15.md",
+     "md5": "2954a723ace45bd4908fd7f81b38b400",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m16.md": {
+     "id": "x:m16.md",
+     "md5": "4ae8552991e39a80abd191a30eec35b3",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m17.md": {
+     "id": "x:m17.md",
+     "md5": "94ea0b3ea5aa96e68b28b4ff09b9a13a",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m18.md": {
+     "id": "x:m18.md",
+     "md5": "d5f6f0947456ab81372bd676f5053782",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m19.md": {
+     "id": "x:m19.md",
+     "md5": "9ef018ca1aaa82189a632fba57c2e8ec",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    },
+    "m20.md": {
+     "id": "x:m20.md",
+     "md5": "4486ed980b1769598e1febbdb64e94da",
+     "lmtime": 1790000000000,
+     "lsize": 6
+    }
+   },
+   "pageToken": "t0"
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "error": "양쪽에서 엇갈린 메모가 20개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요."
+   },
+   "local": {
+    "m00.md": "mine m00.md",
+    "m01.md": "mine m01.md",
+    "m02.md": "mine m02.md",
+    "m03.md": "mine m03.md",
+    "m04.md": "mine m04.md",
+    "m05.md": "mine m05.md",
+    "m06.md": "mine m06.md",
+    "m07.md": "mine m07.md",
+    "m08.md": "mine m08.md",
+    "m09.md": "mine m09.md",
+    "m10.md": "mine m10.md",
+    "m11.md": "mine m11.md",
+    "m12.md": "mine m12.md",
+    "m13.md": "mine m13.md",
+    "m14.md": "mine m14.md",
+    "m15.md": "mine m15.md",
+    "m16.md": "mine m16.md",
+    "m17.md": "mine m17.md",
+    "m18.md": "mine m18.md",
+    "m19.md": "mine m19.md",
+    "m20.md": "mine m20.md"
+   },
+   "remote": {
+    "live": {
+     "m00.md": "theirs m00.md",
+     "m01.md": "theirs m01.md",
+     "m02.md": "theirs m02.md",
+     "m03.md": "theirs m03.md",
+     "m04.md": "theirs m04.md",
+     "m05.md": "theirs m05.md",
+     "m06.md": "theirs m06.md",
+     "m07.md": "theirs m07.md",
+     "m08.md": "theirs m08.md",
+     "m09.md": "theirs m09.md",
+     "m10.md": "theirs m10.md",
+     "m11.md": "theirs m11.md",
+     "m12.md": "theirs m12.md",
+     "m13.md": "theirs m13.md",
+     "m14.md": "theirs m14.md",
+     "m15.md": "theirs m15.md",
+     "m16.md": "theirs m16.md",
+     "m17.md": "theirs m17.md",
+     "m18.md": "theirs m18.md",
+     "m19.md": "theirs m19.md",
+     "m20.md": "theirs m20.md"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t0",
+    "files": {
+     "m00.md": {
+      "id": "x:m00.md",
+      "md5": "0360bd3678bc8f4aa0146be447fbabb9",
+      "lsize": 6
+     },
+     "m01.md": {
+      "id": "x:m01.md",
+      "md5": "a6889ace84d818a73ea8ec0757656de5",
+      "lsize": 6
+     },
+     "m02.md": {
+      "id": "x:m02.md",
+      "md5": "8b500fa435cd468876ec98b0f79d39a5",
+      "lsize": 6
+     },
+     "m03.md": {
+      "id": "x:m03.md",
+      "md5": "1840f46a58c035e0728ca3c8beb339db",
+      "lsize": 6
+     },
+     "m04.md": {
+      "id": "x:m04.md",
+      "md5": "39b5459f97ff4523db3eed3323bd0d25",
+      "lsize": 6
+     },
+     "m05.md": {
+      "id": "x:m05.md",
+      "md5": "1ea12474d56189aa849c1b219d92c0f2",
+      "lsize": 6
+     },
+     "m06.md": {
+      "id": "x:m06.md",
+      "md5": "823b56b4bc477ba323866faa808c7d86",
+      "lsize": 6
+     },
+     "m07.md": {
+      "id": "x:m07.md",
+      "md5": "fe6170cee666958bb53b909231d4e38d",
+      "lsize": 6
+     },
+     "m08.md": {
+      "id": "x:m08.md",
+      "md5": "1390e1decd1f21660b077334bcc53ea5",
+      "lsize": 6
+     },
+     "m09.md": {
+      "id": "x:m09.md",
+      "md5": "ce58e8633995824127953dfa57ccf9ea",
+      "lsize": 6
+     },
+     "m10.md": {
+      "id": "x:m10.md",
+      "md5": "cd980749a4352f201aa14614837be218",
+      "lsize": 6
+     },
+     "m11.md": {
+      "id": "x:m11.md",
+      "md5": "b3c51ab658c9822f723afee882648702",
+      "lsize": 6
+     },
+     "m12.md": {
+      "id": "x:m12.md",
+      "md5": "a15bd7879281ab0ea6b52cf36bb5d5ed",
+      "lsize": 6
+     },
+     "m13.md": {
+      "id": "x:m13.md",
+      "md5": "1d58cd6c0e7473cf891090cc8630f42d",
+      "lsize": 6
+     },
+     "m14.md": {
+      "id": "x:m14.md",
+      "md5": "3fb6e07f60eeef5837d656c82bacb6a4",
+      "lsize": 6
+     },
+     "m15.md": {
+      "id": "x:m15.md",
+      "md5": "2954a723ace45bd4908fd7f81b38b400",
+      "lsize": 6
+     },
+     "m16.md": {
+      "id": "x:m16.md",
+      "md5": "4ae8552991e39a80abd191a30eec35b3",
+      "lsize": 6
+     },
+     "m17.md": {
+      "id": "x:m17.md",
+      "md5": "94ea0b3ea5aa96e68b28b4ff09b9a13a",
+      "lsize": 6
+     },
+     "m18.md": {
+      "id": "x:m18.md",
+      "md5": "d5f6f0947456ab81372bd676f5053782",
+      "lsize": 6
+     },
+     "m19.md": {
+      "id": "x:m19.md",
+      "md5": "9ef018ca1aaa82189a632fba57c2e8ec",
+      "lsize": 6
+     },
+     "m20.md": {
+      "id": "x:m20.md",
+      "md5": "4486ed980b1769598e1febbdb64e94da",
+      "lsize": 6
+     }
+    },
+    "folders": null,
+    "dirs": null,
+    "lastFullScan": null,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "link-previews",
+  "local": {
+   "_memoking/link-previews.json": [
+    "{\"a\":1,\"b\":2}",
+    1790000001000
+   ]
+  },
+  "remote": {
+   "_memoking/link-previews.json": "{\"b\":3,\"c\":\"씨\"}"
+  },
+  "state": {
+   "files": {
+    "_memoking/link-previews.json": {
+     "id": "x:_memoking/link-previews.json",
+     "md5": "99914b932bd37a50b983c5e7c90ae93b",
+     "lmtime": 1790000000000,
+     "lsize": 2
+    }
+   },
+   "pageToken": "t0"
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 1,
+    "downloaded": 0,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": false
+   },
+   "local": {
+    "_memoking/": "",
+    "_memoking/link-previews.json": "{\n \"a\": 1,\n \"b\": 3,\n \"c\": \"씨\"\n}"
+   },
+   "remote": {
+    "live": {
+     "_memoking/": "",
+     "_memoking/link-previews.json": "{\n \"a\": 1,\n \"b\": 3,\n \"c\": \"씨\"\n}"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "_memoking/link-previews.json": {
+      "id": "x:_memoking/link-previews.json",
+      "md5": "8a3ee5956d6294c7ca9e0b8df56f4ed3",
+      "lsize": 33
+     }
+    },
+    "folders": {
+     "": "root0",
+     "_memoking": "d:_memoking"
+    },
+    "dirs": [],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "dirs",
+  "local": {
+   "Gone/desktop.ini": "x",
+   "New/": "",
+   "Kept/": "",
+   "a.md": "A"
+  },
+  "remote": {
+   "Kept/": "",
+   "RemoteNew/": "",
+   "Old/": "",
+   "a.md": "A"
+  },
+  "state": {
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   },
+   "pageToken": "t0",
+   "dirs": [
+    "Gone",
+    "Kept",
+    "Old"
+   ]
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 0,
+    "downloaded": 0,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    "Kept/": "",
+    "New/": "",
+    "RemoteNew/": "",
+    "a.md": "A"
+   },
+   "remote": {
+    "live": {
+     "Kept/": "",
+     "RemoteNew/": "",
+     "a.md": "A",
+     "New/": ""
+    },
+    "trashed": [
+     "Old"
+    ]
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+      "lsize": 1
+     }
+    },
+    "folders": {
+     "": "root0",
+     "Kept": "d:Kept",
+     "RemoteNew": "d:RemoteNew",
+     "New": "d:New"
+    },
+    "dirs": [
+     "Kept",
+     "New",
+     "RemoteNew"
+    ],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "peek-skip",
+  "opts": {
+   "localClean": true
+  },
+  "local": {
+   "a.md": "A"
+  },
+  "remote": {
+   "a.md": "A"
+  },
+  "state": {
+   "pageToken": "t0",
+   "lastFullScan": 1794999940000,
+   "folders": {
+    "": "root0"
+   },
+   "dirs": [],
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   }
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "out": {
+   "result": {
+    "skipped": true,
+    "uploaded": 0,
+    "downloaded": 0,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": false
+   },
+   "local": {
+    "a.md": "A"
+   },
+   "remote": {
+    "live": {
+     "a.md": "A"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+      "lsize": 1
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1794999940000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "nothing-changed",
+  "local": {
+   "a.md": "A"
+  },
+  "remote": {
+   "a.md": "A"
+  },
+  "state": {
+   "pageToken": "t0",
+   "lastFullScan": 1794999940000,
+   "folders": {
+    "": "root0"
+   },
+   "dirs": [],
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   }
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": true,
+    "uploaded": 0,
+    "downloaded": 0,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": false
+   },
+   "local": {
+    "a.md": "A"
+   },
+   "remote": {
+    "live": {
+     "a.md": "A"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+      "lsize": 1
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1794999940000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "new-folder-in-changes",
+  "local": {
+   "a.md": "A"
+  },
+  "remote": {
+   "a.md": "A",
+   "New/Deep/n.md": "N"
+  },
+  "state": {
+   "pageToken": "t0",
+   "lastFullScan": 1794999940000,
+   "folders": {
+    "": "root0"
+   },
+   "dirs": [],
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   }
+  },
+  "raw": [
+   {
+    "fileId": "x:New/Deep/n.md",
+    "file": {
+     "name": "n.md",
+     "mimeType": "text/markdown",
+     "md5Checksum": "8d9c307cb7f3c4a32822a51922d1ceaa",
+     "parents": [
+      "d:New/Deep"
+     ]
+    }
+   },
+   {
+    "fileId": "d:New/Deep",
+    "file": {
+     "name": "Deep",
+     "mimeType": "application/vnd.google-apps.folder",
+     "parents": [
+      "d:New"
+     ]
+    }
+   },
+   {
+    "fileId": "d:New",
+    "file": {
+     "name": "New",
+     "mimeType": "application/vnd.google-apps.folder",
+     "parents": [
+      "root0"
+     ]
+    }
+   },
+   {
+    "fileId": "x:elsewhere",
+    "file": {
+     "name": "z.md",
+     "mimeType": "text/markdown",
+     "md5Checksum": "21c2e59531c8710156d34a3c30ac81d5",
+     "parents": [
+      "other"
+     ]
+    }
+   }
+  ],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 0,
+    "downloaded": 1,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    "New/": "",
+    "a.md": "A",
+    "New/Deep/": "",
+    "New/Deep/n.md": "N"
+   },
+   "remote": {
+    "live": {
+     "a.md": "A",
+     "New/": "",
+     "New/Deep/": "",
+     "New/Deep/n.md": "N"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+      "lsize": 1
+     },
+     "New/Deep/n.md": {
+      "id": "x:New/Deep/n.md",
+      "md5": "8d9c307cb7f3c4a32822a51922d1ceaa",
+      "lsize": 1
+     }
+    },
+    "folders": {
+     "": "root0",
+     "New": "d:New",
+     "New/Deep": "d:New/Deep"
+    },
+    "dirs": [
+     "New"
+    ],
+    "lastFullScan": 1794999940000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "rename-full-walk",
+  "local": {
+   "a.md": "A"
+  },
+  "remote": {
+   "b.md": {
+    "text": "A",
+    "id": "x:a.md"
+   }
+  },
+  "state": {
+   "pageToken": "t0",
+   "lastFullScan": 1794999940000,
+   "folders": {
+    "": "root0"
+   },
+   "dirs": [],
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   }
+  },
+  "raw": [
+   {
+    "fileId": "x:a.md",
+    "file": {
+     "name": "b.md",
+     "mimeType": "text/markdown",
+     "md5Checksum": "7fc56270e7a70fa81a5935b72eacbe29",
+     "parents": [
+      "root0"
+     ]
+    }
+   }
+  ],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 0,
+    "downloaded": 1,
+    "deletedLocal": 1,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    "b.md": "A"
+   },
+   "remote": {
+    "live": {
+     "b.md": "A"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "b.md": {
+      "id": "x:a.md",
+      "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+      "lsize": 1
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "removed-in-changes",
+  "local": {
+   "a.md": "A",
+   "b.md": "B"
+  },
+  "remote": {
+   "b.md": "B"
+  },
+  "state": {
+   "pageToken": "t0",
+   "lastFullScan": 1794999940000,
+   "folders": {
+    "": "root0"
+   },
+   "dirs": [],
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    },
+    "b.md": {
+     "id": "x:b.md",
+     "md5": "9d5ed678fe57bcca610140957afab571",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   }
+  },
+  "raw": [
+   {
+    "fileId": "x:a.md",
+    "removed": true
+   }
+  ],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 0,
+    "downloaded": 0,
+    "deletedLocal": 1,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    "b.md": "B"
+   },
+   "remote": {
+    "live": {
+     "b.md": "B"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "b.md": {
+      "id": "x:b.md",
+      "md5": "9d5ed678fe57bcca610140957afab571",
+      "lsize": 1
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1794999940000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "trashed-folder-in-changes",
+  "local": {
+   "W/a.md": "A"
+  },
+  "remote": {},
+  "state": {
+   "pageToken": "t0",
+   "lastFullScan": 1794999940000,
+   "folders": {
+    "": "root0",
+    "W": "d:W"
+   },
+   "dirs": [],
+   "files": {
+    "W/a.md": {
+     "id": "x:W/a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   }
+  },
+  "raw": [
+   {
+    "fileId": "d:W",
+    "file": {
+     "name": "W",
+     "mimeType": "application/vnd.google-apps.folder",
+     "parents": [
+      "root0"
+     ],
+     "trashed": true
+    }
+   }
+  ],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 0,
+    "downloaded": 0,
+    "deletedLocal": 1,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    "W/": ""
+   },
+   "remote": {
+    "live": {
+     "W/": ""
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {},
+    "folders": {
+     "": "root0",
+     "W": "d:W"
+    },
+    "dirs": [
+     "W"
+    ],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "keep-missing",
+  "local": {
+   "a.md": "A"
+  },
+  "remote": {},
+  "state": {
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   },
+   "pageToken": "t0",
+   "keepMissing": true
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 1,
+    "downloaded": 0,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": false
+   },
+   "local": {
+    "a.md": "A"
+   },
+   "remote": {
+    "live": {
+     "a.md": "A"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+      "lsize": 1
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "duplicate-names",
+  "local": {},
+  "remote": {
+   "a.md": {
+    "text": "old",
+    "id": "x:a1",
+    "modified": 1
+   },
+   "a2": {
+    "text": "new",
+    "id": "x:a2",
+    "modified": 2,
+    "name": "a.md"
+   }
+  },
+  "state": {},
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "raw": null,
+  "opts": {},
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 0,
+    "downloaded": 1,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    "a.md": "new"
+   },
+   "remote": {
+    "live": {
+     "a.md": "new"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t1",
+    "files": {
+     "a.md": {
+      "id": "x:a2",
+      "md5": "22af645d1859cb5ca6da0c484f1f37ea",
+      "lsize": 3
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ },
+ {
+  "name": "full-button",
+  "opts": {
+   "full": true
+  },
+  "local": {
+   "a.md": "A"
+  },
+  "remote": {
+   "a.md": "A",
+   "b.md": "B"
+  },
+  "state": {
+   "pageToken": "t0",
+   "lastFullScan": 1794999940000,
+   "folders": {
+    "": "root0"
+   },
+   "dirs": [],
+   "files": {
+    "a.md": {
+     "id": "x:a.md",
+     "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+     "lmtime": 1790000000000,
+     "lsize": 1
+    }
+   }
+  },
+  "raw": [],
+  "now": 1795000000000,
+  "mtime": 1790000000000,
+  "out": {
+   "result": {
+    "skipped": false,
+    "uploaded": 0,
+    "downloaded": 1,
+    "deletedLocal": 0,
+    "deletedRemote": 0,
+    "conflicts": [],
+    "localChanged": true
+   },
+   "local": {
+    "a.md": "A",
+    "b.md": "B"
+   },
+   "remote": {
+    "live": {
+     "a.md": "A",
+     "b.md": "B"
+    },
+    "trashed": []
+   },
+   "state": {
+    "pageToken": "t2",
+    "files": {
+     "a.md": {
+      "id": "x:a.md",
+      "md5": "7fc56270e7a70fa81a5935b72eacbe29",
+      "lsize": 1
+     },
+     "b.md": {
+      "id": "x:b.md",
+      "md5": "9d5ed678fe57bcca610140957afab571",
+      "lsize": 1
+     }
+    },
+    "folders": {
+     "": "root0"
+    },
+    "dirs": [],
+    "lastFullScan": 1795000000000,
+    "keepMissing": null
+   }
+  }
+ }
+]

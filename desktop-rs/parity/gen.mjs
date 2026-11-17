@@ -17,6 +17,7 @@ import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStart
 import { indexOutput, tokenize, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { NOUNS } from '../../app/js/core/korean-nouns.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
+import { driveCases } from './drive.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
 fs.mkdirSync(out, { recursive: true });
@@ -181,3 +182,6 @@ const shareBodies = [...corpus().map((t) => mf.parseMemoFile(t).body),
   '<u>밑줄</u><mark>형광</mark><span style="color:red">빨강</span><br>다음',
 ];
 write('share_text', shareBodies.map((body) => ({ body, share: shareText(body), copy: hotkeyCopyText(body) })));
+
+// Google Drive 동기화 (desktop/drive/sync-engine.js) — 장면은 drive.mjs
+write('drive_sync', await driveCases());
