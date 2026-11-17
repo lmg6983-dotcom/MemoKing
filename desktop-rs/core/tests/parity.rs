@@ -149,3 +149,48 @@ fn program_files() {
     let fails = cases.iter().filter(|c| memoking_core::vault::is_program_file(c["name"].as_str().unwrap()) != c["program"]).map(|c| c.to_string()).collect();
     report("program_files", fails, cases.len());
 }
+
+#[test]
+fn reminders() {
+    use memoking_core::reminders::*;
+    let cases = fixtures("reminders");
+    let ms = |t: Option<chrono::DateTime<chrono::Local>>| t.map(|t| t.timestamp_millis());
+    let alert = |a: Option<Alert>, missed: Option<bool>| {
+        a.map(|a| {
+            let mut v = json!({ "at": a.at.timestamp_millis(), "start": a.start.timestamp_millis(), "offset": a.offset, "also": a.also.iter().map(|(s, o)| json!({ "start": s.timestamp_millis(), "offset": o })).collect::<Vec<_>>() });
+            if let Some(m) = missed {
+                v["missed"] = m.into();
+            }
+            v
+        })
+    };
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let r = &c["r"];
+            let now = memoking_core::time::parse_js_date(c["now"].as_str().unwrap()).unwrap().with_timezone(&chrono::Local);
+            let offs = alerts_of(r);
+            let all_day = r["allDay"] == true;
+            let start = r["at"].as_str().and_then(memoking_core::time::parse_js_date).map(|t| t.with_timezone(&chrono::Local)).or_else(|| next_occurrence(r, now));
+            let due = due_occurrence(r, now);
+            let got = json!({
+                "r": r,
+                "now": c["now"],
+                "next": ms(next_occurrence(r, now)),
+                "alert": alert(next_alert(r, now), None),
+                "due": alert(due.clone().map(|d| d.0), due.map(|d| d.1)),
+                "startup": due_at_startup(r, now),
+                "fired": mark_fired(r, now),
+                "live": is_live_cached(r, now),
+                "nextTime": ms(next_time(r, now)),
+                "pastEvent": is_past_event(r, now),
+                "alerts": offs,
+                "alertTimes": start.map(|s| offs.iter().map(|&o| alert_time(s, o, all_day).timestamp_millis()).collect::<Vec<_>>()),
+                "pending": start.map(|s| pending_alerts(&offs, s, r["kind"] == "repeat", now, Some(fallback_alert(all_day)), all_day)),
+            });
+            let diff: Vec<String> = got.as_object().unwrap().iter().filter(|(k, v)| c[k.as_str()] != **v).map(|(k, v)| format!("  {k}\n    JS  : {}\n    Rust: {v}", c[k.as_str()])).collect();
+            (!diff.is_empty()).then(|| format!("{} @ {}\n{}", r["id"], c["now"], diff.join("\n")))
+        })
+        .collect();
+    report("reminders", fails, cases.len());
+}
