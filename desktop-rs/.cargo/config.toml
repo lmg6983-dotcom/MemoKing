@@ -1,0 +1,4 @@
+# 받아쓰기 엔진(sherpa-onnx 정적 라이브러리)이 쓰는 Windows 이벤트 기록 · 레지스트리 함수는 advapi32 에 있다.
+# sherpa-rs 가 스스로 만드는 dll 단계에서도 링크되어야 해 여기서 모든 링크에 넣는다.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=advapi32.lib"]
