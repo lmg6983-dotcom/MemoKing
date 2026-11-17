@@ -1,6 +1,7 @@
 // 곁가지 기능 — 화면 캡처 메모 · AI 비서 연결(MCP) · PDF · 자동 업데이트.
 //   Electron 의 window-manager.js(startAreaCapture · finishAreaCapture · openCaptureMemo · openPdfWindow) · utils.js(mcpStatus · mcpConnect) · office-pdf.js · updater.js 자리.
 use crate::state::State;
+use memoking_core::time::now_ms;
 use memoking_core::vault::write_atomic;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -424,15 +425,11 @@ fn update_enabled() -> bool {
     !cfg!(debug_assertions) && !crate::ipc::smoke() // 개발 중에는 업데이트 정보가 없어 확인할 수 없다
 }
 
-fn now_ms() -> f64 {
-    chrono::Utc::now().timestamp_millis() as f64
-}
-
 /// 목록 창이 물어볼 때: 지금 상태 + 대화 상자를 띄울지 (숨겨 둔 버전이면 띄우지 않음)
 fn update_state(app: &AppHandle) -> Value {
     let mut s = updates(|u| u.state.clone());
     let offering = s["status"] == "ready" || s["status"] == "available";
-    let ask = offering && !memoking_core::update::is_snoozed(&st(app).setting("updateSnooze"), s.get("version").unwrap_or(&Value::Null), now_ms());
+    let ask = offering && !memoking_core::update::is_snoozed(&st(app).setting("updateSnooze"), s.get("version").unwrap_or(&Value::Null), now_ms() as f64);
     s.insert("ask".into(), ask.into());
     s.insert("current".into(), app.package_info().version.to_string().into());
     s.insert("enabled".into(), update_enabled().into());
@@ -492,13 +489,13 @@ fn check_update(app: &AppHandle, manual: bool) {
             let date = up.date.and_then(|d| chrono::DateTime::from_timestamp(d.unix_timestamp(), 0)).map(|d| d.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)).unwrap_or_default();
             set_update(app, json!({ "status": "available", "version": version, "notes": memoking_core::update::notes_text(up.body.as_deref().unwrap_or_default()), "date": date }));
             updates(|u| u.update = Some(up));
-            if !manual && memoking_core::update::is_snoozed(&st(app).setting("updateSnooze"), &version.clone().into(), now_ms()) {
+            if !manual && memoking_core::update::is_snoozed(&st(app).setting("updateSnooze"), &version.clone().into(), now_ms() as f64) {
                 return; // "나중에" 고른 버전 — 24시간 조용히
             }
             let fresh = updates(|u| {
-                let recent = !manual && u.announced.as_ref().is_some_and(|(v, at)| *v == version && now_ms() - at < REMIND_MS);
+                let recent = !manual && u.announced.as_ref().is_some_and(|(v, at)| *v == version && now_ms() as f64 - at < REMIND_MS);
                 if !recent {
-                    u.announced = Some((version.clone(), now_ms()));
+                    u.announced = Some((version.clone(), now_ms() as f64));
                 }
                 !recent
             });
@@ -626,7 +623,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "update:later" => {
             let s = updates(|u| u.state.clone());
             if (s["status"] == "available" || s["status"] == "ready") && s.get("version").is_some_and(|v| !v.is_null()) {
-                st(app).set_setting("updateSnooze", json!({ "version": s["version"], "until": now_ms() + memoking_core::update::SNOOZE_MS as f64 }));
+                st(app).set_setting("updateSnooze", json!({ "version": s["version"], "until": now_ms() as f64 + memoking_core::update::SNOOZE_MS as f64 }));
             }
             Ok(update_state(app))
         }

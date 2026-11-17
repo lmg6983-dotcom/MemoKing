@@ -5,6 +5,7 @@
 use crate::memos::arg_str;
 use crate::state::State;
 use memoking_core::notify;
+use memoking_core::time::now_ms;
 use memoking_core::vault::write_atomic;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -13,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
 const MAX_ENTRIES: usize = 10_000;
@@ -37,10 +38,6 @@ static WATCHER: Mutex<Option<Child>> = Mutex::new(None);
 
 fn st(app: &AppHandle) -> tauri::State<'_, State> {
     app.state::<State>()
-}
-
-fn now_ms() -> f64 {
-    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map_or(0.0, |d| d.as_millis() as f64)
 }
 
 fn iso(ms: i64) -> String {
@@ -103,7 +100,7 @@ impl History {
             "app": s("app").unwrap_or_else(|| notify::fallback_app_name(&app_id)),
             "title": s("title").unwrap_or_default(),
             "body": s("body").unwrap_or_default(),
-            "time": s("time").unwrap_or_else(|| iso(now_ms() as i64)),
+            "time": s("time").unwrap_or_else(|| iso(now_ms())),
             "image": entry["image"],
             "memoId": entry["memoId"],
         });
@@ -445,7 +442,7 @@ fn add_popup(app: &AppHandle, mut p: Value) {
                 let known = notify::known_names(h.entries.iter().filter(|e| e["app"] == app_name.as_str() && e["source"] == "popup").take(500).filter_map(|e| e["title"].as_str()));
                 entry["title"] = notify::correct_title(&title, &known).into();
             }
-            let now = now_ms();
+            let now = now_ms() as f64;
             h.recent.retain(|r| now - r["at"].as_f64().unwrap_or(0.0) <= 5.0 * 60.0 * 1000.0);
             let probe = json!({ "app": app_name, "hwnd": p["hwnd"], "title": entry["title"], "body": entry["body"] });
             // 같은 앱이 Windows 알림 센터에도 같은 알림을 남겼으면(그쪽 글이 정확하다) 알림 창 것은 넣지 않는다

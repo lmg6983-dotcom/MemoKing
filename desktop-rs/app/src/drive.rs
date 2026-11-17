@@ -7,6 +7,7 @@ use crate::memos::arg_str;
 use crate::state::State;
 use base64::Engine as _;
 use memoking_core::drive_sync::{self, inside_drive_for_desktop, Changes, RemoteItem, SyncState, FOLDER};
+use memoking_core::time::now_ms;
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
 use std::io::{self, BufRead, Write};
@@ -66,10 +67,6 @@ static DRIVE: OnceLock<Drive> = OnceLock::new();
 
 fn d() -> &'static Drive {
     DRIVE.get().expect("drive::start 먼저")
-}
-
-fn now_ms() -> i64 {
-    chrono::Local::now().timestamp_millis()
 }
 
 // AuthError (google-auth.js) — 구글이 4xx 로 거절함. 새 토큰을 받다 이러면 연결을 끊는다
