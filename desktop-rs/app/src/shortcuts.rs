@@ -210,14 +210,13 @@ fn pressed(app: &AppHandle, name: &str) {
     }
 }
 
-/// 메모 단축키: 정해 둔 메모를 클립보드로 복사 · 메모 창 띄우기
-// shortcut: 다른 앱 위에 잠깐 뜨는 "복사했어요" 알림(HUD)은 아직 — HUD 창을 옮길 때 같이
+/// 메모 단축키: 정해 둔 메모를 클립보드로 복사 · 메모 창 띄우기 (다른 앱 위에 잠깐 "복사했어요")
 fn memo_hotkey_pressed(app: &AppHandle, slot: &str) {
-    let Some(b) = hotkeys(app).get(slot).cloned() else { return };
+    let b = hotkeys(app).get(slot).cloned().unwrap_or_default();
     let id = b["id"].as_str().unwrap_or_default().to_string();
     let get = || st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(&id));
     let Some(memo) = get() else {
-        eprintln!("{}: 메모를 찾지 못했어요", acc::hotkey_label(slot));
+        crate::windows::show_hud(app, &format!("{}: 메모를 찾지 못했어요", acc::hotkey_label(slot)), "삭제했거나 다른 메모 폴더의 메모예요", "warn");
         return;
     };
     let label = st(app).note_labels.lock().unwrap().get(&id).cloned();
@@ -230,7 +229,7 @@ fn memo_hotkey_pressed(app: &AppHandle, slot: &str) {
                 std::thread::sleep(Duration::from_millis(300));
             }
         }
-        let body = get().unwrap_or(memo)["body"].as_str().unwrap_or_default().to_string();
+        let body = get().unwrap_or_else(|| memo.clone())["body"].as_str().unwrap_or_default().to_string();
         copied = app.clipboard().write_text(memoking_core::share_text::hotkey_copy_text(&body)).is_ok();
     }
     // 잠긴 메모는 비밀번호를 넣어야 하니 복사 대신 창을 띄운다
@@ -240,6 +239,20 @@ fn memo_hotkey_pressed(app: &AppHandle, slot: &str) {
         if let Some(l) = st(app).note_labels.lock().unwrap().get(&id) {
             let _ = app.emit_to(l.as_str(), "memo:highlight", [Value::Null; 0]);
         }
+    }
+    // 붙여 넣는 법은 처음 몇 번만 (매일 수십 번 쓰는 사람에게는 군더더기)
+    let tips = st(app).setting("hotkeyTips").as_u64().unwrap_or(0);
+    let tip = copied && tips < 3;
+    if tip {
+        st(app).set_setting("hotkeyTips", (tips + 1).into());
+    }
+    let title = memo["title"].as_str().filter(|t| !t.is_empty()).unwrap_or("제목 없음");
+    if copied {
+        crate::windows::show_hud(app, &format!("“{title}” 내용을 복사했어요"), if tip { "Ctrl+V로 붙여 넣으세요" } else { "" }, "ok");
+    } else if b["copy"] == true && memo["needsPassword"] == true {
+        crate::windows::show_hud(app, "잠긴 메모라 복사하지 않았어요", "비밀번호를 넣고 열어 주세요", "warn");
+    } else if b["copy"] == true {
+        crate::windows::show_hud(app, "복사하지 못했어요", "다시 눌러 주세요", "warn");
     }
 }
 

@@ -337,7 +337,10 @@ fn save_png(app: &AppHandle, id: &Value, base64: &str, file_name: Option<&str>) 
         picked.and_then(|p| p.into_path().ok())
     };
     let Some(file) = file else { return Ok(json!({ "cancelled": true })) };
-    std::fs::write(&file, bytes).map_err(|e| e.to_string())?;
+    if let Err(err) = std::fs::write(&file, bytes) {
+        crate::windows::show_hud(app, "그림을 저장하지 못했어요", "다른 위치에 저장해 보세요", "warn");
+        return Err(err.to_string());
+    }
     let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     Ok(json!({ "file": file.to_string_lossy(), "name": name }))
 }

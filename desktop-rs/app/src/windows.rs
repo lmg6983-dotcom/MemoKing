@@ -1559,7 +1559,6 @@ fn place_note(app: &AppHandle, id: &str, b: Rect) {
 // 메모 단축키로 복사했을 때처럼 다른 앱을 쓰는 중에 "복사했어요" 만 잠깐 — 마우스 가까이, 포커스를 빼앗지 않고 1.6초 뒤 사라짐
 
 /// kind: ok | warn
-#[allow(dead_code)] // 메모 단축키 · 그림 저장 실패(shortcuts.rs · files.rs)가 부른다
 pub fn show_hud(app: &AppHandle, title: &str, body: &str, kind: &str) {
     let (w, h) = (340.0, 64.0);
     if ensure_overlay(app, "hud", "hud.html", (w, h), None).is_none() {
