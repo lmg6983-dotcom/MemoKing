@@ -24,3 +24,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 sha2 = "0.10"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "ico"] }
+
+# 화면 캡처 메모 (Linux 빌드에는 pipewire 가 있어야 해 Windows 만)
+[target.'cfg(windows)'.dependencies]
+xcap = "0.9"

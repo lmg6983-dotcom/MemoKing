@@ -7,6 +7,7 @@ mod index;
 mod ipc;
 mod memos;
 mod os;
+mod services;
 mod settings;
 mod state;
 

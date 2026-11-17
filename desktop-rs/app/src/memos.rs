@@ -475,7 +475,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             o.insert("insert".into(), insert);
             let command = st.commands.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
             o.insert("command".into(), command);
-            for (k, val) in [("top", json!(false)), ("bottom", json!(false)), ("canTape", json!(false)), ("onTop", json!(false)), ("alarm", Value::Null), ("capture", Value::Null)] {
+            for (k, val) in [("top", json!(false)), ("bottom", json!(false)), ("canTape", json!(false)), ("onTop", json!(false)), ("alarm", Value::Null), ("capture", crate::services::take_capture(o["id"].as_str().unwrap_or_default()))] {
                 o.insert(k.into(), val);
             }
             let stack = json!({ "members": [], "active": o["id"] });
