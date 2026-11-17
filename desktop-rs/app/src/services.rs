@@ -239,9 +239,117 @@ fn open_pdf_window(app: &AppHandle, id: &str) -> Result<Value, String> {
     if let Some(w) = app.get_webview_window("pdf") {
         let _ = w.destroy();
     }
-    let page = format!("pdf.html?id={}", id.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect::<String>());
+    let page = format!("pdf.html?id={}", query_value(id));
     crate::window(app, "pdf", &page).title("PDF로 저장").inner_size(820.0, 600.0).min_inner_size(640.0, 480.0).center().build().map_err(|e| e.to_string())?;
     Ok(true.into())
+}
+
+fn query_value(v: &str) -> String {
+    v.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect()
+}
+
+/// pdf:save — 숨은 창에 print.html 을 그려 PDF 파일로 (Electron savePdf) → { file, pages } | { cancelled } | null
+fn save_pdf(app: &AppHandle, id: &str, o: &Value) -> Value {
+    let title = st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(id)).map(|m| m["title"].as_str().unwrap_or_default().to_string());
+    let Some(title) = title else { return Value::Null };
+    let file = if crate::ipc::smoke() {
+        Some(std::env::temp_dir().join(format!("memoking-smoke-{}.pdf", chrono::Utc::now().timestamp_millis())))
+    } else {
+        use tauri_plugin_dialog::DialogExt;
+        // 파일 이름 규칙은 그림 저장과 같다 (pdf-page.js pdfFileName)
+        let name = format!("{}.pdf", crate::files::png_name(None, &title).trim_end_matches(".png"));
+        let dir = app.path().document_dir().unwrap_or_else(|_| std::env::temp_dir());
+        let picked = app.dialog().file().set_title("PDF로 저장").set_directory(dir).set_file_name(&name).add_filter("PDF", &["pdf"]).blocking_save_file();
+        picked.and_then(|p| p.into_path().ok())
+    };
+    let Some(file) = file else { return json!({ "cancelled": true }) };
+    // JS 의 Number(x) || 기본값
+    let num = |k: &str, d: f64| o[k].as_f64().filter(|v| *v != 0.0).unwrap_or(d);
+    let (w, h) = (num("width", 210.0), num("height", 297.0));
+    let page = format!(
+        "print.html?id={}&w={w}&h={h}&m={}&bg={}&date={}&fit={}&br={}&z={}",
+        query_value(id),
+        num("margin", 0.0).max(0.0),
+        u8::from(crate::settings::truthy(Some(&o["bg"]))),
+        u8::from(crate::settings::truthy(Some(&o["date"]))),
+        u8::from(o["fit"] != false),
+        u8::from(o["breaks"] == true),
+        num("zoom", 1.0).clamp(0.5, 2.0),
+    );
+    let label = format!("print-{}", chrono::Utc::now().timestamp_millis());
+    let mm = |v: f64| (v * 96.0 / 25.4).round();
+    let Ok(win) = crate::window(app, &label, &page).visible(false).skip_taskbar(true).inner_size(mm(w), mm(h)).build() else { return Value::Null };
+    let made = print_to_pdf(&win, &file, w, h);
+    let _ = win.destroy();
+    let Some(pdf) = made.then(|| std::fs::read(&file).ok()).flatten() else {
+        eprintln!("PDF 만들기 실패: {}", file.display());
+        return Value::Null;
+    };
+    let latin1: String = pdf.iter().map(|&b| b as char).collect();
+    let pages = fancy_regex::Regex::new(r"/Type\s*/Page\b").unwrap().find_iter(&latin1).count();
+    if o["open"] == true && !crate::ipc::smoke() {
+        use tauri_plugin_opener::OpenerExt;
+        let _ = app.opener().open_path(file.to_string_lossy(), None::<&str>);
+    }
+    json!({ "file": file.to_string_lossy(), "pages": pages })
+}
+
+/// 화면이 다 그려지면(data-ready, 늦어도 15초) WebView2 PrintToPdf — 쪽 크기는 mm, 여백 없이 바탕까지
+#[cfg(windows)]
+fn print_to_pdf(win: &tauri::WebviewWindow, file: &Path, w: f64, h: f64) -> bool {
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+    use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2Environment6, ICoreWebView2_7};
+    use webview2_com::{ExecuteScriptCompletedHandler, PrintToPdfCompletedHandler};
+    use windows_core::{Interface, HSTRING};
+    let until = Instant::now() + Duration::from_secs(15);
+    while Instant::now() < until {
+        let (tx, rx) = mpsc::channel();
+        let asked = win.with_webview(move |wv| unsafe {
+            let handler = ExecuteScriptCompletedHandler::create(Box::new(move |_, r| {
+                let _ = tx.send(r == "true");
+                Ok(())
+            }));
+            if let Ok(core) = wv.controller().CoreWebView2() {
+                let _ = core.ExecuteScript(&HSTRING::from("document.documentElement.dataset.ready === 'true'"), &handler);
+            }
+        });
+        if asked.is_err() || rx.recv_timeout(Duration::from_secs(2)).unwrap_or(false) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let (tx, rx) = mpsc::channel();
+    let path = HSTRING::from(file.as_os_str());
+    let asked = win.with_webview(move |wv| unsafe {
+        let done = tx.clone();
+        let r = (|| -> windows_core::Result<()> {
+            let core = wv.controller().CoreWebView2()?.cast::<ICoreWebView2_7>()?;
+            let s = wv.environment().cast::<ICoreWebView2Environment6>()?.CreatePrintSettings()?;
+            s.SetPageWidth(w / 25.4)?;
+            s.SetPageHeight(h / 25.4)?;
+            s.SetMarginTop(0.0)?;
+            s.SetMarginBottom(0.0)?;
+            s.SetMarginLeft(0.0)?;
+            s.SetMarginRight(0.0)?;
+            s.SetShouldPrintBackgrounds(true)?;
+            s.SetShouldPrintHeaderAndFooter(false)?;
+            let handler = PrintToPdfCompletedHandler::create(Box::new(move |r, ok| {
+                let _ = done.send(r.is_ok() && ok);
+                Ok(())
+            }));
+            core.PrintToPdf(&path, &s, &handler)
+        })();
+        if r.is_err() {
+            let _ = tx.send(false);
+        }
+    });
+    asked.is_ok() && rx.recv_timeout(Duration::from_secs(120)).unwrap_or(false)
+}
+
+#[cfg(not(windows))]
+fn print_to_pdf(_: &tauri::WebviewWindow, _: &Path, _: f64, _: f64) -> bool {
+    false
 }
 
 // Word · PowerPoint 문서 → PDF (이 PC 의 Office 로). 경로는 환경 변수로 넘긴다 (명령 줄에 끼우면 따옴표 · 특수 문자가 섞인다)
@@ -493,8 +601,9 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             let m = st(app).vault.lock().unwrap().as_ref().and_then(|v| v.get(&memoking_core::js::string(args.first().unwrap_or(&Value::Null))));
             Ok(m.map_or(Value::Null, |m| json!({ "title": m["title"], "body": m["body"], "color": m["color"], "tables": m["tables"], "created": m["created"], "updated": m["updated"] })))
         }
-        // shortcut: PDF 만들기는 Electron 의 printToPDF 자리 — Tauri 에는 없어 WebView2 PrintToPdf(webview2-com)로 옮길 때까지 실패(null)로 돌려준다
-        "pdf:save" => Ok(Value::Null),
+        // shortcut: PDF 만들기는 WebView2(Windows)의 PrintToPdf 로만 — 그 밖(개발용 Linux)은 실패(null). 다른 OS 판을 낼 때 그 웹뷰의 인쇄로
+        "pdf:save" if !cfg!(windows) => Ok(Value::Null),
+        "pdf:save" => Ok(save_pdf(app, &memoking_core::js::string(args.first().unwrap_or(&Value::Null)), args.get(1).unwrap_or(&Value::Null))),
         "attachment:to-pdf" => Ok(office_to_pdf(app, args.first().and_then(Value::as_str).unwrap_or_default())),
         "update:state" => Ok(update_state(app)),
         "update:check" => {

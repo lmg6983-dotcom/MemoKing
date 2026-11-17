@@ -2833,6 +2833,8 @@ dependencies = [
  "tauri-plugin-updater",
  "tauri-winrt-notification",
  "ureq",
+ "webview2-com",
+ "windows-core",
  "windows-sys 0.61.2",
  "xcap",
 ]

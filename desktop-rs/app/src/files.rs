@@ -306,7 +306,7 @@ fn vault_file(app: &AppHandle, rel: &Value) -> Option<PathBuf> {
 }
 
 /// 그림으로 저장할 파일 이름: 화면이 준 이름(.png)이 쓸 만하면 그것, 아니면 메모 제목 (pdf-page.js pdfFileName 규칙)
-fn png_name(file_name: Option<&str>, title: &str) -> String {
+pub fn png_name(file_name: Option<&str>, title: &str) -> String {
     if let Some(n) = file_name {
         let stem = n.len().checked_sub(4).filter(|&i| n.is_char_boundary(i) && n[i..].eq_ignore_ascii_case(".png")).map(|i| &n[..i]);
         if stem.is_some_and(|s| (1..=120).contains(&s.encode_utf16().count()) && !s.contains(['\\', '/', ':', '*', '?', '"', '<', '>', '|'])) {
