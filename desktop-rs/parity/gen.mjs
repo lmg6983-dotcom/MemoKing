@@ -13,7 +13,8 @@ import { textMatcher } from '../../app/js/core/text-match.js';
 import { isProgramFile } from '../../app/js/core/file-kinds.js';
 import { shareText } from '../../app/js/core/share-text.js';
 import { hotkeyCopyText } from '../../app/js/core/memo-hotkeys.js';
-import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, pendingAlerts, fallbackAlert } from '../../app/js/core/reminders.js';
+import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, pendingAlerts, fallbackAlert, alarmText, describeReminder } from '../../app/js/core/reminders.js';
+import { normalizeFeeds } from '../../app/js/core/calendar-feed-list.js';
 import { indexOutput, tokenize, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { NOUNS } from '../../app/js/core/korean-nouns.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
@@ -116,6 +117,9 @@ const rawReminders = [
   { kind: 'startup', startup: 'daily' },
   { kind: 'startup', startup: 'daily', last: '2026-11-17T08:00:00+09:00' },
   { kind: 'startup', startup: 'once' },
+  { kind: 'timer', at: '2026-11-17T09:05:00+09:00', minutes: 120, title: '라면' },
+  { kind: 'at', at: '2026-11-17T09:30:00+09:00', end: '2026-11-18T10:00:00+09:00', alerts: [30, 90], title: '치과' },
+  { kind: 'repeat', repeat: { every: 'week', weekdays: [0, 1, 2, 3, 4, 5, 6], time: '09:00' } },
 ];
 const reminders = rawReminders.map((raw, i) => normalizeReminder({ id: `r${i}`, action: 'notify', created: C, ...raw }));
 const nows = ['2025-06-01T00:00:00+09:00', '2026-11-16T08:50:00+09:00', '2026-11-17T08:49:00+09:00', '2026-11-17T08:59:00+09:00', '2026-11-17T09:00:30+09:00',
@@ -141,6 +145,9 @@ write('reminders', reminders.flatMap((r) => nows.map((nowIso) => {
     pastEvent: isPastEvent(r, now),
     alerts: offs,
     alertTimes: start ? offs.map((o) => alertTime(start, o, Boolean(r.allDay)).getTime()) : null,
+    // 울릴 때 글 (알림 실행기: 울릴 회차가 없으면 켤 때 알림으로)
+    text: Object.values(alarmText(r, '메모 제목', dueOccurrence(r, now) ?? { startup: true }, now)),
+    describe: describeReminder(r, now),
     pending: start ? pendingAlerts(offs, start, { repeat: r.kind === 'repeat', now, fallback: fallbackAlert(Boolean(r.allDay)), allDay: Boolean(r.allDay) }) : null,
   };
 })));
@@ -181,3 +188,14 @@ const shareBodies = [...corpus().map((t) => mf.parseMemoFile(t).body),
   '<u>밑줄</u><mark>형광</mark><span style="color:red">빨강</span><br>다음',
 ];
 write('share_text', shareBodies.map((body) => ({ body, share: shareText(body), copy: hotkeyCopyText(body) })));
+
+// 다른 캘린더 구독 목록 정리 (id 가 없으면 무작위라 모두 id 를 준다)
+const feedLists = [
+  [{ id: 'g1', url: ' webcal://calendar.google.com/calendar/ical/x/basic.ics ', name: '  내   일정  ' }, { id: 'g2', url: 'WEBCALS://p01-caldav.icloud.com/a b' }],
+  [{ id: 'n1', url: 'https://caldav.calendar.naver.com/', user: '  me@naver.com ', pass: 12345, cals: { 내캘린더: { on: false, color: '#ABCDEF' }, '': {}, 회사: { color: 'red' }, 7: null } }],
+  [{ id: 'n2', url: 'https://caldav.calendar.naver.com/', user: 'a' }, { id: 'n3', url: 'https://caldav.calendar.naver.com/', user: 'b', name: 5 }, { id: 'n4', url: 'https://caldav.calendar.naver.com', user: 'a' }],
+  [{ id: 'o1', url: 'https://outlook.office365.com/owa/calendar/x.ics', color: '#123456', on: false }, { id: 'w', url: 'http://www.example.com:8080/cal?x=1#h' }, { id: 'bad', url: 'ftp://example.com/a.ics' }, { id: 'bad2', url: 'not a url' }, { id: 'x', url: 'https://me.com/c' }, 'text', 3],
+  Array.from({ length: 12 }, (_, i) => ({ id: `f${i}`, url: `https://example.com/${i}.ics`, name: '가'.repeat(i * 5) })),
+  'not a list',
+];
+write('calendar_feeds', feedLists.map((list) => ({ list, feeds: normalizeFeeds(list) })));

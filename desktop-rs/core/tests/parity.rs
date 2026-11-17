@@ -186,6 +186,8 @@ fn reminders() {
                 "pastEvent": is_past_event(r, now),
                 "alerts": offs,
                 "alertTimes": start.map(|s| offs.iter().map(|&o| alert_time(s, o, all_day).timestamp_millis()).collect::<Vec<_>>()),
+                "text": alarm_text(r, "메모 제목", due_occurrence(r, now).as_ref(), now),
+                "describe": describe_reminder(r, now),
                 "pending": start.map(|s| pending_alerts(&offs, s, r["kind"] == "repeat", now, Some(fallback_alert(all_day)), all_day)),
             });
             let diff: Vec<String> = got.as_object().unwrap().iter().filter(|(k, v)| c[k.as_str()] != **v).map(|(k, v)| format!("  {k}\n    JS  : {}\n    Rust: {v}", c[k.as_str()])).collect();
@@ -249,4 +251,17 @@ fn share_text() {
         })
         .collect();
     report("share_text", fails, cases.len());
+}
+
+#[test]
+fn calendar_feeds() {
+    let cases = fixtures("calendar_feeds");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = json!(memoking_core::calendar_feeds::normalize_feeds(&c["list"]));
+            (got != c["feeds"]).then(|| format!("{}\n  JS  : {}\n  Rust: {got}", c["list"], c["feeds"]))
+        })
+        .collect();
+    report("calendar_feeds", fails, cases.len());
 }

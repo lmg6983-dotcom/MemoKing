@@ -1032,6 +1032,41 @@ impl Vault {
         Ok(if ok { self.get(id) } else { None })
     }
 
+    /// 모든 메모의 알림 (reminders:all · 알림 실행기)
+    pub fn all_reminders(&self) -> Vec<Value> {
+        let mut out = vec![];
+        for e in self.files() {
+            for r in &e.meta.reminders {
+                out.push(json!({ "memoId": e.id, "title": body::extract_title(&e.body), "color": e.meta.color, "updated": e.meta.updated, "locked": body::is_locked_body(&e.body), "stable": e.id_saved, "reminder": r }));
+            }
+        }
+        out
+    }
+
+    /// 알림 목록 통째로 바꾸기 — 내용 수정이 아니라 updated 는 그대로. 쓰지 못했으면 되돌리고 None
+    pub fn set_reminders(&mut self, id: &str, reminders: Vec<Value>) -> io::Result<Option<Vec<Value>>> {
+        let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
+        let prev = std::mem::replace(&mut e.meta.reminders, reminders);
+        // 잠긴 메모의 일정 이름은 머리말(풀린 글)에 남기지 않는다 — 글에서 짐작한 이름이 비밀일 수 있음 (알림엔 메모 제목)
+        if body::is_locked_body(&e.body) {
+            for r in &mut e.meta.reminders {
+                if let Some(o) = r.as_object_mut() {
+                    o.shift_remove("title");
+                }
+            }
+        }
+        let known = e.body.clone();
+        let wrote = if e.file.is_some() || !body::is_blank_body(&e.body) { self.write(&mut e, &known, true) } else { Ok(Wrote::Yes) };
+        let ok = matches!(wrote, Ok(Wrote::Yes));
+        if !ok {
+            e.meta.reminders = prev; // 저장된 것처럼 보이지 않게
+        }
+        let saved = e.meta.reminders.clone();
+        self.entries.insert(id.into(), e);
+        wrote?;
+        Ok(ok.then_some(saved))
+    }
+
     /// 연결한 메모 · 나를 연결한 메모
     pub fn links(&self, id: &str) -> Value {
         let Some(e) = self.entries.get(id) else { return json!({ "links": [], "backlinks": [], "suggestions": [] }) };
@@ -1652,6 +1687,26 @@ mod tests {
         assert!(body::is_locked_body(&memo_file::parse_memo_file(&fs::read_to_string(&file).unwrap()).1), "잠근 파일은 그대로");
         v.scan();
         assert!(v.list().iter().any(|m| v.get(m["id"].as_str().unwrap()).unwrap()["body"] == "# 메모\n이 기기 글"), "우리 글은 사본으로");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn set_reminders_writes_and_lists() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let blank = v.create(None, None, "");
+        assert_eq!(v.set_reminders(&blank, vec![json!({ "id": "r1", "kind": "startup" })]).unwrap().unwrap().len(), 1);
+        assert!(v.all_reminders().is_empty(), "빈 새 메모는 파일을 만들지 않는다");
+        let id = v.create(None, None, "");
+        v.save(&id, "# 치과").unwrap();
+        let before = v.get(&id).unwrap()["updated"].clone();
+        v.set_reminders(&id, vec![json!({ "id": "r1", "kind": "startup", "title": "비밀" })]).unwrap().unwrap();
+        let all = v.all_reminders();
+        assert!(all.len() == 1 && all[0]["memoId"] == id.as_str() && all[0]["title"] == "치과" && all[0]["reminder"]["id"] == "r1", "{all:?}");
+        assert!(fs::read_to_string(root.join("치과.md")).unwrap().contains("reminders:"));
+        assert_eq!(v.get(&id).unwrap()["updated"], before, "알림은 내용 수정이 아니다");
+        assert!(v.set_reminders("없음", vec![]).unwrap().is_none());
         fs::remove_dir_all(root).unwrap();
     }
 
