@@ -53,8 +53,8 @@ fn lines(body: &str) -> impl Iterator<Item = &str> {
     body.split('\n').map(|l| l.strip_suffix('\r').unwrap_or(l))
 }
 
-/// HTML · XML 글자 참조(&amp; · &#39; · &#x1F600;) 풀기 — entities.js decodeEntities (HTML 표)
-pub fn decode_entities(s: &str) -> String {
+/// HTML · XML 글자 참조(&amp; · &#39; · &#x1F600;) 풀기 — entities.js decodeEntities (html: HTML 표, 아니면 XML 표)
+pub fn decode_entities(s: &str, html: bool) -> String {
     ENTITY
         .replace_all(s, |c: &Captures<str>| {
             let code = &c[1];
@@ -71,6 +71,7 @@ pub fn decode_entities(s: &str) -> String {
                 "gt" => ">",
                 "quot" => "\"",
                 "apos" => "'",
+                _ if !html => return c[0].to_string(),
                 "nbsp" => "\u{a0}",
                 "middot" => "·",
                 "hellip" => "…",
@@ -98,7 +99,7 @@ fn strip_inline(line: &str) -> String {
     let s = replace_all(&UNDERSCORE, &s, "${1}${3}");
     let s = replace_all(&CODE, &s, "${1}");
     let s = replace_all(&ESCAPED, &s, "${1}");
-    let s = decode_entities(&s);
+    let s = decode_entities(&s, true);
     js::trim(&replace_all(&SPACES, &s, " ")).to_string()
 }
 
@@ -343,4 +344,9 @@ pub static LOCK: LazyLock<Regex> = LazyLock::new(|| {
 
 pub fn is_locked_body(body: &str) -> bool {
     LOCK.is_match(body).unwrap_or(false)
+}
+
+/// 글 어딘가에 잠금 정보(<!-- memoking-lock) 가 들었나: 덧붙이거나 새로 쓰는 글로 잠긴 메모를 흉내 내지 못하게
+pub fn has_lock_marker(s: &str) -> bool {
+    s.split("<!--").skip(1).any(|rest| rest.trim_start_matches(js::is_space).starts_with("memoking-lock"))
 }

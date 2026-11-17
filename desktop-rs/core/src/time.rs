@@ -10,6 +10,11 @@ pub fn now_iso() -> String {
     to_local_iso(Local::now())
 }
 
+/// JS Date.now()
+pub fn now_ms() -> i64 {
+    chrono::Utc::now().timestamp_millis()
+}
+
 /// JS Date.parse 가 읽는 ISO 모양 → 시각 (못 읽으면 None)
 ///   날짜만(YYYY-MM-DD)은 UTC 자정, 시간대 없는 날짜+시각은 현지 시각 — JS 와 같다.
 ///   shortcut: ISO 가 아닌 모양(RFC 2822 등)은 None — 메모킹이 쓰는 값은 모두 ISO 라서. 다른 앱이 쓴 값이 보이면 넓힌다

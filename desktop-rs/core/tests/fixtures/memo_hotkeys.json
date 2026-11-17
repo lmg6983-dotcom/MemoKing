@@ -1,0 +1,759 @@
+[
+ {
+  "raw": null,
+  "id": "a",
+  "slot": "2",
+  "normalized": {},
+  "assigned": {
+   "2": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   }
+  }
+ },
+ {
+  "raw": null,
+  "id": "a",
+  "slot": null,
+  "normalized": {},
+  "assigned": {}
+ },
+ {
+  "raw": null,
+  "id": "b",
+  "slot": "1",
+  "show": true,
+  "normalized": {},
+  "assigned": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": true
+   }
+  }
+ },
+ {
+  "raw": null,
+  "id": "z",
+  "slot": "9",
+  "copy": false,
+  "show": false,
+  "normalized": {},
+  "assigned": {
+   "error": "복사하기와 띄우기 중 하나는 골라 주세요"
+  }
+ },
+ {
+  "raw": null,
+  "id": "z",
+  "slot": "10",
+  "normalized": {},
+  "assigned": {
+   "error": "1~9 중에서 골라 주세요"
+  }
+ },
+ {
+  "raw": null,
+  "id": "c",
+  "slot": "3",
+  "copy": false,
+  "show": true,
+  "normalized": {},
+  "assigned": {
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   }
+  }
+ },
+ {
+  "raw": "x",
+  "id": "a",
+  "slot": "2",
+  "normalized": {},
+  "assigned": {
+   "2": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   }
+  }
+ },
+ {
+  "raw": "x",
+  "id": "a",
+  "slot": null,
+  "normalized": {},
+  "assigned": {}
+ },
+ {
+  "raw": "x",
+  "id": "b",
+  "slot": "1",
+  "show": true,
+  "normalized": {},
+  "assigned": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": true
+   }
+  }
+ },
+ {
+  "raw": "x",
+  "id": "z",
+  "slot": "9",
+  "copy": false,
+  "show": false,
+  "normalized": {},
+  "assigned": {
+   "error": "복사하기와 띄우기 중 하나는 골라 주세요"
+  }
+ },
+ {
+  "raw": "x",
+  "id": "z",
+  "slot": "10",
+  "normalized": {},
+  "assigned": {
+   "error": "1~9 중에서 골라 주세요"
+  }
+ },
+ {
+  "raw": "x",
+  "id": "c",
+  "slot": "3",
+  "copy": false,
+  "show": true,
+  "normalized": {},
+  "assigned": {
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   }
+  }
+ },
+ {
+  "raw": {
+   "0": {
+    "id": "e"
+   },
+   "1": {
+    "id": "a"
+   },
+   "2": {
+    "id": "b",
+    "copy": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "4": {
+    "id": ""
+   },
+   "5": {
+    "id": 7
+   },
+   "6": null,
+   "9": {
+    "id": "g",
+    "copy": 0,
+    "show": 1
+   },
+   "10": {
+    "id": "d"
+   },
+   "x": {
+    "id": "f"
+   }
+  },
+  "id": "a",
+  "slot": "2",
+  "normalized": {
+   "1": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  },
+  "assigned": {
+   "2": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  }
+ },
+ {
+  "raw": {
+   "0": {
+    "id": "e"
+   },
+   "1": {
+    "id": "a"
+   },
+   "2": {
+    "id": "b",
+    "copy": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "4": {
+    "id": ""
+   },
+   "5": {
+    "id": 7
+   },
+   "6": null,
+   "9": {
+    "id": "g",
+    "copy": 0,
+    "show": 1
+   },
+   "10": {
+    "id": "d"
+   },
+   "x": {
+    "id": "f"
+   }
+  },
+  "id": "a",
+  "slot": null,
+  "normalized": {
+   "1": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  },
+  "assigned": {
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  }
+ },
+ {
+  "raw": {
+   "0": {
+    "id": "e"
+   },
+   "1": {
+    "id": "a"
+   },
+   "2": {
+    "id": "b",
+    "copy": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "4": {
+    "id": ""
+   },
+   "5": {
+    "id": 7
+   },
+   "6": null,
+   "9": {
+    "id": "g",
+    "copy": 0,
+    "show": 1
+   },
+   "10": {
+    "id": "d"
+   },
+   "x": {
+    "id": "f"
+   }
+  },
+  "id": "b",
+  "slot": "1",
+  "show": true,
+  "normalized": {
+   "1": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  },
+  "assigned": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": true
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  }
+ },
+ {
+  "raw": {
+   "0": {
+    "id": "e"
+   },
+   "1": {
+    "id": "a"
+   },
+   "2": {
+    "id": "b",
+    "copy": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "4": {
+    "id": ""
+   },
+   "5": {
+    "id": 7
+   },
+   "6": null,
+   "9": {
+    "id": "g",
+    "copy": 0,
+    "show": 1
+   },
+   "10": {
+    "id": "d"
+   },
+   "x": {
+    "id": "f"
+   }
+  },
+  "id": "z",
+  "slot": "9",
+  "copy": false,
+  "show": false,
+  "normalized": {
+   "1": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  },
+  "assigned": {
+   "error": "복사하기와 띄우기 중 하나는 골라 주세요"
+  }
+ },
+ {
+  "raw": {
+   "0": {
+    "id": "e"
+   },
+   "1": {
+    "id": "a"
+   },
+   "2": {
+    "id": "b",
+    "copy": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "4": {
+    "id": ""
+   },
+   "5": {
+    "id": 7
+   },
+   "6": null,
+   "9": {
+    "id": "g",
+    "copy": 0,
+    "show": 1
+   },
+   "10": {
+    "id": "d"
+   },
+   "x": {
+    "id": "f"
+   }
+  },
+  "id": "z",
+  "slot": "10",
+  "normalized": {
+   "1": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  },
+  "assigned": {
+   "error": "1~9 중에서 골라 주세요"
+  }
+ },
+ {
+  "raw": {
+   "0": {
+    "id": "e"
+   },
+   "1": {
+    "id": "a"
+   },
+   "2": {
+    "id": "b",
+    "copy": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "4": {
+    "id": ""
+   },
+   "5": {
+    "id": 7
+   },
+   "6": null,
+   "9": {
+    "id": "g",
+    "copy": 0,
+    "show": 1
+   },
+   "10": {
+    "id": "d"
+   },
+   "x": {
+    "id": "f"
+   }
+  },
+  "id": "c",
+  "slot": "3",
+  "copy": false,
+  "show": true,
+  "normalized": {
+   "1": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  },
+  "assigned": {
+   "1": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "g",
+    "copy": true,
+    "show": false
+   }
+  }
+ },
+ {
+  "raw": {
+   "1": {
+    "id": "b"
+   },
+   "9": {
+    "id": "a",
+    "show": true
+   }
+  },
+  "id": "a",
+  "slot": "2",
+  "normalized": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": false
+   },
+   "9": {
+    "id": "a",
+    "copy": true,
+    "show": true
+   }
+  },
+  "assigned": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": false
+   },
+   "2": {
+    "id": "a",
+    "copy": true,
+    "show": false
+   }
+  }
+ },
+ {
+  "raw": {
+   "1": {
+    "id": "b"
+   },
+   "9": {
+    "id": "a",
+    "show": true
+   }
+  },
+  "id": "a",
+  "slot": null,
+  "normalized": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": false
+   },
+   "9": {
+    "id": "a",
+    "copy": true,
+    "show": true
+   }
+  },
+  "assigned": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": false
+   }
+  }
+ },
+ {
+  "raw": {
+   "1": {
+    "id": "b"
+   },
+   "9": {
+    "id": "a",
+    "show": true
+   }
+  },
+  "id": "b",
+  "slot": "1",
+  "show": true,
+  "normalized": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": false
+   },
+   "9": {
+    "id": "a",
+    "copy": true,
+    "show": true
+   }
+  },
+  "assigned": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": true
+   },
+   "9": {
+    "id": "a",
+    "copy": true,
+    "show": true
+   }
+  }
+ },
+ {
+  "raw": {
+   "1": {
+    "id": "b"
+   },
+   "9": {
+    "id": "a",
+    "show": true
+   }
+  },
+  "id": "z",
+  "slot": "9",
+  "copy": false,
+  "show": false,
+  "normalized": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": false
+   },
+   "9": {
+    "id": "a",
+    "copy": true,
+    "show": true
+   }
+  },
+  "assigned": {
+   "error": "복사하기와 띄우기 중 하나는 골라 주세요"
+  }
+ },
+ {
+  "raw": {
+   "1": {
+    "id": "b"
+   },
+   "9": {
+    "id": "a",
+    "show": true
+   }
+  },
+  "id": "z",
+  "slot": "10",
+  "normalized": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": false
+   },
+   "9": {
+    "id": "a",
+    "copy": true,
+    "show": true
+   }
+  },
+  "assigned": {
+   "error": "1~9 중에서 골라 주세요"
+  }
+ },
+ {
+  "raw": {
+   "1": {
+    "id": "b"
+   },
+   "9": {
+    "id": "a",
+    "show": true
+   }
+  },
+  "id": "c",
+  "slot": "3",
+  "copy": false,
+  "show": true,
+  "normalized": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": false
+   },
+   "9": {
+    "id": "a",
+    "copy": true,
+    "show": true
+   }
+  },
+  "assigned": {
+   "1": {
+    "id": "b",
+    "copy": true,
+    "show": false
+   },
+   "3": {
+    "id": "c",
+    "copy": false,
+    "show": true
+   },
+   "9": {
+    "id": "a",
+    "copy": true,
+    "show": true
+   }
+  }
+ }
+]

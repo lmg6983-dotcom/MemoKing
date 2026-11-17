@@ -37,6 +37,16 @@ fn choseong_found(text: &str, term: &str) -> bool {
     t.windows(q.len()).any(|w| w == q.as_slice())
 }
 
+/// 초성 검색어(ㄱㅈㅅ)가 글의 어디에 맞나 (띄어쓰기는 건너뜀) → 맞은 첫 글자의 바이트 자리 (choseongRange 의 시작)
+pub fn choseong_start(text: &str, term: &str) -> Option<usize> {
+    if !is_choseong_query(term) {
+        return None;
+    }
+    let t: Vec<(usize, char)> = text.char_indices().filter(|(_, c)| !crate::js::is_space(*c)).map(|(i, c)| (i, cho_of(c))).collect();
+    let q: Vec<char> = term.chars().collect();
+    t.windows(q.len()).find(|w| w.iter().map(|x| x.1).eq(q.iter().copied())).map(|w| w[0].0)
+}
+
 /// 낱말마다 texts 중 하나에 들어 있으면 true (빈 검색어는 늘 true)
 pub fn matcher(query: &str) -> impl Fn(&[&str]) -> bool {
     let terms: Vec<String> = query.trim_matches(crate::js::is_space).to_lowercase().split(crate::js::is_space).filter(|t| !t.is_empty()).map(str::to_string).collect();

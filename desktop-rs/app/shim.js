@@ -102,6 +102,29 @@
     });
   }
 
-  window.memoking.vaultBase = `${scheme('memoking')}vault/`;
+  // 메모 편집기의 오른쪽 클릭: Electron 은 메인이 그린 메뉴에 "서식 지우기" 가 있었다 (desktop/context-menu.js) — WebView2 기본 메뉴에는 없어
+  //   같은 항목을 Rust 가 띄우는 메뉴(menu:choose)로. 표 · 그림 위처럼 화면이 따로 메뉴를 띄우는 곳(block-move.js)은 먼저 막혀 여기 오지 않는다
+  //   shortcut: 맞춤법 후보 · 사전에 추가는 빠진다 — 아쉽다는 말이 나오면 WebView2 ContextMenuRequested 로 기본 메뉴에 더하기
+  if (location.pathname.endsWith('/note.html')) {
+    window.addEventListener('contextmenu', async (e) => {
+      if (e.defaultPrevented || !(e.target instanceof Element) || !e.target.closest('[contenteditable="true"]')) return;
+      e.preventDefault();
+      const picked = !getSelection().isCollapsed;
+      const id = await call('menu:choose', [[
+        { id: 'cut', label: '잘라내기', accelerator: 'CmdOrCtrl+X', enabled: picked },
+        { id: 'copy', label: '복사', accelerator: 'CmdOrCtrl+C', enabled: picked },
+        { id: 'paste', label: '붙여넣기', accelerator: 'CmdOrCtrl+V' },
+        { id: 'pastePlain', label: '서식 없이 붙여넣기', accelerator: 'CmdOrCtrl+Shift+V' },
+        { type: 'separator' },
+        { id: 'clearFormat', label: '서식 지우기', accelerator: 'CmdOrCtrl+\\' },
+        { type: 'separator' },
+        { id: 'selectAll', label: '모두 선택', accelerator: 'CmdOrCtrl+A' },
+      ], { x: e.clientX, y: e.clientY }]).catch(() => null);
+      if (id === 'selectAll') document.execCommand('selectAll');
+      else if (id) call('edit:run', [id]);
+    });
+  }
+
+  window.memoking.vaultBase =`${scheme('memoking')}vault/`;
   window.memoking.historyBase = `${scheme('memoking')}history/`;
 })();

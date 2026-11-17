@@ -178,6 +178,11 @@ pub fn decode_uri_component(s: &str) -> Option<String> {
     decode(s, false)
 }
 
+/// encodeURIComponent
+pub fn encode_uri_component(s: &str) -> String {
+    s.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-_.!~*'()".contains(&b) { char::from(b).to_string() } else { format!("%{b:02X}") }).collect()
+}
+
 fn decode(s: &str, keep_reserved: bool) -> Option<String> {
     let b = s.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(b.len());

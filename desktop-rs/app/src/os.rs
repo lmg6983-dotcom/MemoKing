@@ -1,7 +1,7 @@
 // 운영체제와 붙는 곳 — 한 번만 켜기 · 실행 인자(MagicKey 약속, docs/magickey.md) · 알림 영역 아이콘 · 창 자리 기억.
 //   Electron 의 main.js(handleLaunch · 트레이) · jump-list.js(launchAction · readMagicKeyFile) · window-manager.js(listBounds · noteBounds · openNotes) 자리.
 use crate::memos;
-use crate::state::State;
+use crate::state::state;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -15,21 +15,17 @@ type Builder<'a> = WebviewWindowBuilder<'a, Wry, AppHandle>;
 /// 끝내는 중 — 이때 닫히는 메모는 "열려 있던 메모"로 남긴다 (다음에 켜면 다시 연다)
 static QUITTING: AtomicBool = AtomicBool::new(false);
 
-fn state(app: &AppHandle) -> tauri::State<'_, State> {
-    app.state::<State>()
-}
-
 // ---------- 창 자리 ----------
 
 /// Electron onScreen 그대로: 작업 영역에 창 윗막대를 잡을 만큼 걸쳐 있나 (논리 픽셀 { x, y, width, height })
-fn on_screen(b: &Value, areas: &[[f64; 4]]) -> Option<[f64; 4]> {
+pub fn on_screen(b: &Value, areas: &[[f64; 4]]) -> Option<[f64; 4]> {
     let n = |k: &str| b[k].as_f64();
     let (x, y, w, h) = (n("x")?, n("y")?, n("width")?, n("height")?);
     areas.iter().any(|&[ax, ay, aw, ah]| x < ax + aw - 40.0 && x + w > ax + 40.0 && y >= ay - 10.0 && y < ay + ah - 40.0).then_some([x, y, w, h])
 }
 
 // shortcut: 화면마다 배율이 다르면 논리 좌표가 Electron(DIP)과 조금 어긋날 수 있다 — 여러 배율 모니터에서 자리가 틀어지면 물리 좌표로 바꾸기
-fn work_areas(app: &AppHandle) -> Vec<[f64; 4]> {
+pub fn work_areas(app: &AppHandle) -> Vec<[f64; 4]> {
     let monitors = app.available_monitors().unwrap_or_default();
     monitors
         .iter()
@@ -49,9 +45,9 @@ fn place<'a>(app: &AppHandle, b: Builder<'a>, saved: &Value) -> Builder<'a> {
     }
 }
 
-/// 목록 창: 기억한 자리에, 처음에는 숨겨서 (start 가 띄울지 정한다)
+/// 목록 창: 기억한 자리에, 처음에는 숨겨서 (start 가 띄울지 정한다) · 늘 위에 두던 목록은 그대로
 pub fn place_list<'a>(app: &AppHandle, b: Builder<'a>) -> Builder<'a> {
-    place(app, b, &state(app).setting("listBounds")).visible(false)
+    place(app, b, &state(app).setting("listBounds")).visible(false).always_on_top(state(app).setting("listOnTop") == true)
 }
 
 pub fn place_note<'a>(app: &AppHandle, id: &str, b: Builder<'a>) -> Builder<'a> {
@@ -137,12 +133,14 @@ pub fn show_list(app: &AppHandle) {
         let _ = w.show();
         let _ = w.set_focus();
     }
+    crate::windows::sync_list_crown(app);
 }
 
-fn toggle_list(app: &AppHandle) {
+pub fn toggle_list(app: &AppHandle) {
     let Some(w) = app.get_webview_window("list") else { return };
     if w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false) && w.is_focused().unwrap_or(false) {
         let _ = w.hide();
+        crate::windows::sync_list_crown(app);
     } else {
         show_list(app);
     }
@@ -174,13 +172,14 @@ fn quit(app: &AppHandle) {
     });
 }
 
-// shortcut: Electron 트레이의 화면 캡처 · 최근 메모 · 일정 · 자동 실행 등은 아직 — 그 기능을 옮길 때 메뉴에 더하기
+// shortcut: Electron 트레이의 최근 메모 · 일정 · 자동 실행 등은 아직 — 그 기능을 옮길 때 메뉴에 더하기
 fn tray(app: &AppHandle) -> tauri::Result<()> {
     let Some(icon) = app.default_window_icon().cloned() else { return Ok(()) };
     let list = MenuItem::with_id(app, "list", "메모 목록", true, None::<&str>)?;
     let new = MenuItem::with_id(app, "new", "새 메모", true, None::<&str>)?;
+    let capture = MenuItem::with_id(app, "capture", "화면 캡처로 새 메모", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "끝내기", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&list, &new, &PredefinedMenuItem::separator(app)?, &quit_item])?;
+    let menu = Menu::with_items(app, &[&list, &new, &capture, &PredefinedMenuItem::separator(app)?, &quit_item])?;
     TrayIconBuilder::with_id("main")
         .icon(icon)
         .tooltip("메모킹")
@@ -196,6 +195,10 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
                         show_list(&app); // 메모 폴더가 없으면 고르는 화면으로
                     }
                 });
+            }
+            "capture" => {
+                let app = app.clone();
+                std::thread::spawn(move || crate::services::start_area_capture(&app));
             }
             "quit" => quit(app),
             _ => {}
@@ -264,16 +267,24 @@ pub fn start(app: &AppHandle, list: &WebviewWindow) {
     }
     let app2 = app.clone();
     list.on_window_event(move |e| match e {
-        WindowEvent::Moved(_) | WindowEvent::Resized(_) => remember(&app2, "list", None),
+        WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+            remember(&app2, "list", None);
+            crate::windows::sync_list_crown(&app2);
+        }
         // 목록을 닫아도 메모킹은 알림 영역에서 계속 (끝내기는 알림 영역 메뉴로)
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
             if let Some(w) = app2.get_webview_window("list") {
                 let _ = w.hide();
             }
+            crate::windows::sync_list_crown(&app2);
         }
         _ => {}
     });
+    // 늘 위 목록 창의 왕관 (창이 보이면 붙는다 — show_list)
+    if state(app).setting("listOnTop") == true {
+        crate::windows::set_list_crown(app, true, false);
+    }
     // 못 여는 메모(지웠거나 메모 폴더가 없음)는 기억에서 뺀다
     let open = state(app).setting("openNotes").as_array().cloned().unwrap_or_default();
     for id in open.iter().filter_map(Value::as_str) {

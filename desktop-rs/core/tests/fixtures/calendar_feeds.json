@@ -1,0 +1,306 @@
+[
+ {
+  "list": [
+   {
+    "id": "g1",
+    "url": " webcal://calendar.google.com/calendar/ical/x/basic.ics ",
+    "name": "  내   일정  "
+   },
+   {
+    "id": "g2",
+    "url": "WEBCALS://p01-caldav.icloud.com/a b"
+   }
+  ],
+  "feeds": [
+   {
+    "id": "g1",
+    "name": "내 일정",
+    "url": "https://calendar.google.com/calendar/ical/x/basic.ics",
+    "color": "#4285f4",
+    "on": true
+   },
+   {
+    "id": "g2",
+    "name": "iCloud 캘린더",
+    "url": "https://p01-caldav.icloud.com/a%20b",
+    "color": "#0b8043",
+    "on": true
+   }
+  ]
+ },
+ {
+  "list": [
+   {
+    "id": "n1",
+    "url": "https://caldav.calendar.naver.com/",
+    "user": "  me@naver.com ",
+    "pass": 12345,
+    "cals": {
+     "7": null,
+     "내캘린더": {
+      "on": false,
+      "color": "#ABCDEF"
+     },
+     "": {},
+     "회사": {
+      "color": "red"
+     }
+    }
+   }
+  ],
+  "feeds": [
+   {
+    "id": "n1",
+    "name": "네이버 캘린더",
+    "url": "https://caldav.calendar.naver.com/",
+    "color": "#4285f4",
+    "on": true,
+    "user": "me@naver.com",
+    "pass": "12345",
+    "cals": {
+     "7": {
+      "on": true
+     },
+     "내캘린더": {
+      "on": false,
+      "color": "#ABCDEF"
+     },
+     "회사": {
+      "on": true
+     }
+    }
+   }
+  ]
+ },
+ {
+  "list": [
+   {
+    "id": "n2",
+    "url": "https://caldav.calendar.naver.com/",
+    "user": "a"
+   },
+   {
+    "id": "n3",
+    "url": "https://caldav.calendar.naver.com/",
+    "user": "b",
+    "name": 5
+   },
+   {
+    "id": "n4",
+    "url": "https://caldav.calendar.naver.com",
+    "user": "a"
+   }
+  ],
+  "feeds": [
+   {
+    "id": "n2",
+    "name": "네이버 캘린더",
+    "url": "https://caldav.calendar.naver.com/",
+    "color": "#4285f4",
+    "on": true,
+    "user": "a",
+    "pass": ""
+   },
+   {
+    "id": "n3",
+    "name": "5",
+    "url": "https://caldav.calendar.naver.com/",
+    "color": "#0b8043",
+    "on": true,
+    "user": "b",
+    "pass": ""
+   }
+  ]
+ },
+ {
+  "list": [
+   {
+    "id": "o1",
+    "url": "https://outlook.office365.com/owa/calendar/x.ics",
+    "color": "#123456",
+    "on": false
+   },
+   {
+    "id": "w",
+    "url": "http://www.example.com:8080/cal?x=1#h"
+   },
+   {
+    "id": "bad",
+    "url": "ftp://example.com/a.ics"
+   },
+   {
+    "id": "bad2",
+    "url": "not a url"
+   },
+   {
+    "id": "x",
+    "url": "https://me.com/c"
+   },
+   "text",
+   3
+  ],
+  "feeds": [
+   {
+    "id": "o1",
+    "name": "Outlook 캘린더",
+    "url": "https://outlook.office365.com/owa/calendar/x.ics",
+    "color": "#123456",
+    "on": false
+   },
+   {
+    "id": "w",
+    "name": "example.com",
+    "url": "http://www.example.com:8080/cal?x=1#h",
+    "color": "#0b8043",
+    "on": true
+   },
+   {
+    "id": "x",
+    "name": "iCloud 캘린더",
+    "url": "https://me.com/c",
+    "color": "#8e24aa",
+    "on": true
+   }
+  ]
+ },
+ {
+  "list": [
+   {
+    "id": "f0",
+    "url": "https://example.com/0.ics",
+    "name": ""
+   },
+   {
+    "id": "f1",
+    "url": "https://example.com/1.ics",
+    "name": "가가가가가"
+   },
+   {
+    "id": "f2",
+    "url": "https://example.com/2.ics",
+    "name": "가가가가가가가가가가"
+   },
+   {
+    "id": "f3",
+    "url": "https://example.com/3.ics",
+    "name": "가가가가가가가가가가가가가가가"
+   },
+   {
+    "id": "f4",
+    "url": "https://example.com/4.ics",
+    "name": "가가가가가가가가가가가가가가가가가가가가"
+   },
+   {
+    "id": "f5",
+    "url": "https://example.com/5.ics",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가"
+   },
+   {
+    "id": "f6",
+    "url": "https://example.com/6.ics",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가"
+   },
+   {
+    "id": "f7",
+    "url": "https://example.com/7.ics",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가"
+   },
+   {
+    "id": "f8",
+    "url": "https://example.com/8.ics",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가"
+   },
+   {
+    "id": "f9",
+    "url": "https://example.com/9.ics",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가"
+   },
+   {
+    "id": "f10",
+    "url": "https://example.com/10.ics",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가"
+   },
+   {
+    "id": "f11",
+    "url": "https://example.com/11.ics",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가"
+   }
+  ],
+  "feeds": [
+   {
+    "id": "f0",
+    "name": "example.com",
+    "url": "https://example.com/0.ics",
+    "color": "#4285f4",
+    "on": true
+   },
+   {
+    "id": "f1",
+    "name": "가가가가가",
+    "url": "https://example.com/1.ics",
+    "color": "#0b8043",
+    "on": true
+   },
+   {
+    "id": "f2",
+    "name": "가가가가가가가가가가",
+    "url": "https://example.com/2.ics",
+    "color": "#8e24aa",
+    "on": true
+   },
+   {
+    "id": "f3",
+    "name": "가가가가가가가가가가가가가가가",
+    "url": "https://example.com/3.ics",
+    "color": "#f4511e",
+    "on": true
+   },
+   {
+    "id": "f4",
+    "name": "가가가가가가가가가가가가가가가가가가가가",
+    "url": "https://example.com/4.ics",
+    "color": "#039be5",
+    "on": true
+   },
+   {
+    "id": "f5",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가",
+    "url": "https://example.com/5.ics",
+    "color": "#616161",
+    "on": true
+   },
+   {
+    "id": "f6",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
+    "url": "https://example.com/6.ics",
+    "color": "#4285f4",
+    "on": true
+   },
+   {
+    "id": "f7",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
+    "url": "https://example.com/7.ics",
+    "color": "#0b8043",
+    "on": true
+   },
+   {
+    "id": "f8",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
+    "url": "https://example.com/8.ics",
+    "color": "#8e24aa",
+    "on": true
+   },
+   {
+    "id": "f9",
+    "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
+    "url": "https://example.com/9.ics",
+    "color": "#f4511e",
+    "on": true
+   }
+  ]
+ },
+ {
+  "list": "not a list",
+  "feeds": []
+ }
+]

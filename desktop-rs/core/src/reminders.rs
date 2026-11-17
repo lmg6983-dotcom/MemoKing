@@ -262,23 +262,6 @@ pub fn alert_time(start: Time, offset: i64, all_day: bool) -> Time {
     }
 }
 
-/// 아직 울릴 수 있는 미리 알림만 (now 보다 뒤). 반복 일정은 다음 회차에 울리므로 모두 남긴다.
-///   골랐는데 모두 지났으면(5분 뒤 일정에 "10분 전") 비워 두지 않고 fallback 에
-pub fn pending_alerts(alerts: &[i64], start: Time, repeat: bool, now: Time, fallback: Option<i64>, all_day: bool) -> Vec<i64> {
-    let mut list = alerts.to_vec();
-    list.sort_unstable_by(|a, b| b.cmp(a));
-    list.dedup();
-    if repeat {
-        return list;
-    }
-    let future = |o: i64| alert_time(start, o, all_day) > now;
-    let keep: Vec<i64> = list.iter().copied().filter(|&o| future(o)).collect();
-    match fallback {
-        Some(f) if keep.is_empty() && !list.is_empty() && future(f) => vec![f],
-        _ => keep,
-    }
-}
-
 /// 격주 · N주마다 일정에서 그날이 울리는 주인가 (기준 날이 든 주에서 interval 주째마다)
 fn on_week(repeat: &Value, day: Time) -> bool {
     let Some(interval) = repeat["interval"].as_i64().filter(|i| *i != 0) else { return true };
@@ -433,6 +416,95 @@ fn occurrence_end(start: Time, all_day: bool, end: Option<Time>) -> Time {
     }
 }
 
+/// from ~ to 사이의 회차들 (일정 탭 · 에이전트의 일정 답) — 만든 날보다 앞의 회차는 없다
+pub fn occurrences_between(r: &Value, from: Time, to: Time) -> Vec<Time> {
+    if !is_event(r) && r["task"] != true {
+        return vec![];
+    }
+    if r["kind"] == "at" {
+        return date_of(&r["at"]).filter(|t| *t < to && (*t >= from || occurrence_end(*t, r["allDay"] == true, date_of(&r["end"])) > from)).into_iter().collect();
+    }
+    let begin = date_of(&r["created"]).map_or(from, |c| from.max(time::js_local(c.year().into(), c.month0().into(), c.day().into(), 0, 0)));
+    let mut cursor = begin - Duration::milliseconds(1);
+    let mut out = vec![];
+    for _ in 0..100 {
+        match next_occurrence(r, cursor) {
+            Some(next) if next < to => {
+                out.push(next);
+                cursor = next;
+            }
+            _ => break,
+        }
+    }
+    out
+}
+
+/// 글 속 날짜(date-detect) → 일정 하나 (기본 미리 알림 중 아직 오지 않은 것). d: { at, hasTime, repeat, end, title }
+pub fn event_from_date(d: &Value, now: Time) -> Option<Value> {
+    let start = date_of(&d["at"])?;
+    let repeat = d["repeat"].as_object();
+    let all_day = !js_truthy(&d["hasTime"]) && repeat.is_none();
+    let fallback = fallback_alert(all_day);
+    let default = if all_day { -540 } else { 10 };
+    // 지난 미리 알림은 빼고, 모두 지났으면 정시(하루 종일은 당일 오전 9시)에
+    let future = |o: i64| alert_time(start, o, all_day) > now;
+    let alerts = if repeat.is_some() || future(default) {
+        vec![default]
+    } else if future(fallback) {
+        vec![fallback]
+    } else {
+        vec![]
+    };
+    let mut base = json!({ "action": "notify", "enabled": true, "created": time::to_local_iso(now), "alerts": alerts });
+    if js_truthy(&d["title"]) {
+        base["title"] = js::slice16(&js::string(&d["title"]), 80).into();
+    }
+    let now_iso = time::to_local_iso(now);
+    if let Some(rep) = repeat {
+        let get = |k: &str| rep.get(k).cloned().unwrap_or(Value::Null);
+        let mut r = json!({ "every": get("every"), "time": get("time") });
+        match rep.get("every").and_then(Value::as_str) {
+            Some("week") => {
+                r["weekdays"] = get("weekdays");
+                if js_truthy(&get("interval")) {
+                    r["interval"] = get("interval");
+                    r["from"] = get("from");
+                }
+            }
+            Some(every @ ("month" | "year")) => {
+                r["day"] = get("day");
+                if every == "year" {
+                    r["month"] = get("month");
+                }
+            }
+            _ => {}
+        }
+        base["kind"] = "repeat".into();
+        base["repeat"] = r;
+        return normalize_reminder(&base, &now_iso);
+    }
+    let at = if all_day { time::js_local(start.year().into(), start.month0().into(), start.day().into(), 0, 0) } else { start };
+    base["kind"] = "at".into();
+    base["at"] = time::to_local_iso(at).into();
+    if all_day {
+        base["allDay"] = true.into();
+        if let Some(end) = date_of(&d["end"]).filter(|e| *e > at) {
+            base["end"] = time::to_local_iso(end).into();
+        }
+    }
+    normalize_reminder(&base, &now_iso)
+}
+
+fn js_truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().is_some_and(|f| f != 0.0),
+        Value::String(s) => !s.is_empty(),
+        _ => true,
+    }
+}
+
 /// 한 번짜리 일정이 이미 지났는가
 pub fn is_past_event(r: &Value, now: Time) -> bool {
     r["kind"] == "at" && date_of(&r["at"]).is_some_and(|t| occurrence_end(t, r["allDay"] == true, date_of(&r["end"])) <= now)
@@ -465,4 +537,114 @@ pub fn is_live_cached(r: &Value, now: Time) -> bool {
     cache.retain(|_, (t, _)| fresh(t)); // 지난 것은 버려 쌓이지 않게
     cache.insert(key, (now, v));
     v
+}
+
+// ---------- 알림 문구 (describeReminder · alarmText — PC · 휴대폰 같은 말) ----------
+
+const WEEKDAY: [&str; 7] = ["일", "월", "화", "수", "목", "금", "토"];
+
+fn hhmm(t: Time) -> String {
+    t.format("%H:%M").to_string()
+}
+
+/// 날 이름 (time.js dayLabel): 어제 · 오늘 · 내일 · 모레 · 10월 12일 (월) · 2027년 1월 2일 (토)
+fn day_label(t: Time, now: Time) -> String {
+    match (t.date_naive() - now.date_naive()).num_days() {
+        -1 => "어제".into(),
+        0 => "오늘".into(),
+        1 => "내일".into(),
+        2 => "모레".into(),
+        _ => {
+            let year = if t.year() == now.year() { String::new() } else { format!("{}년 ", t.year()) };
+            format!("{year}{}월 {}일 ({})", t.month(), t.day(), WEEKDAY[t.weekday().num_days_from_sunday() as usize])
+        }
+    }
+}
+
+/// 오늘 14:00 · 10월 3일 (금) 09:00
+fn format_when(t: Time, now: Time) -> String {
+    format!("{} {}", day_label(t, now), hhmm(t))
+}
+
+/// 알림 한 줄 설명: "10분 타이머" · "내일 15:00~16:00" · "격주 월, 수 09:00" · "메모킹을 켤 때마다"
+pub fn describe_reminder(r: &Value, now: Time) -> String {
+    let n = |v: &Value| js::string(&js::num(js::number(v)));
+    match r["kind"].as_str() {
+        Some("timer") => {
+            let m = js::number(&r["minutes"]);
+            if m >= 60.0 && m % 60.0 == 0.0 {
+                format!("{}시간 타이머", js::string(&js::num(m / 60.0)))
+            } else {
+                format!("{}분 타이머", n(&r["minutes"]))
+            }
+        }
+        Some("at") => {
+            let Some(at) = date_of(&r["at"]) else { return String::new() };
+            let end = date_of(&r["end"]).filter(|e| *e > at);
+            match (r["allDay"] == true, end) {
+                (true, Some(e)) => format!("{} ~ {} 하루 종일", day_label(at, now), day_label(e, now)),
+                (true, None) => format!("{} 하루 종일", day_label(at, now)),
+                (false, Some(e)) if at.date_naive() == e.date_naive() => format!("{}~{}", format_when(at, now), hhmm(e)),
+                (false, Some(e)) => format!("{} ~ {}", format_when(at, now), format_when(e, now)),
+                (false, None) => format_when(at, now),
+            }
+        }
+        Some("repeat") => {
+            let rep = &r["repeat"];
+            let time = if r["allDay"] == true { "하루 종일".to_string() } else { js::string(&rep["time"]) };
+            let days: Vec<&str> = rep["weekdays"].as_array().into_iter().flatten().filter_map(|d| WEEKDAY.get(d.as_u64()? as usize).copied()).collect();
+            match rep["every"].as_str() {
+                Some("day") => format!("매일 {time}"),
+                Some("week") if days.len() == 7 => format!("매일 {time}"), // "매주 매일" 이 아니라
+                Some("week") => {
+                    let i = js::number(&rep["interval"]);
+                    let every = if i == 2.0 { "격주".to_string() } else if i > 2.0 { format!("{}주마다", n(&rep["interval"])) } else { "매주".into() };
+                    format!("{every} {} {time}", days.join(", "))
+                }
+                Some("month") => format!("매월 {}일 {time}", n(&rep["day"])),
+                _ => format!("매년 {}월 {}일 {time}", n(&rep["month"]), n(&rep["day"])),
+            }
+        }
+        _ => match r["startup"].as_str() {
+            Some("every") => "메모킹을 켤 때마다",
+            Some("daily") => "하루에 한 번, 처음 켤 때",
+            Some("once") => "다음에 켤 때 한 번만",
+            _ => "",
+        }
+        .into(),
+    }
+}
+
+/// 울릴 때 알림 글 → (제목, 때, 메모 띠 · 보관함에 쓰는 한 줄). due: 울린 회차와 놓쳤나 — None 이면 켤 때 알림
+///   일정이면 "내일 15:00 (30분 뒤)", 그 밖은 "알림, 10분 타이머"
+pub fn alarm_text(r: &Value, memo_title: &str, due: Option<&(Alert, bool)>, now: Time) -> (String, String, String) {
+    let title = r["title"].as_str().filter(|t| !t.is_empty()).unwrap_or(memo_title).to_string();
+    let all_day = r["allDay"] == true;
+    let when = |t: Time| if all_day { format!("{} 하루 종일", day_label(t, now)) } else { format_when(t, now) };
+    let label = match due {
+        None => format!("켤 때 알림, {}", describe_reminder(r, now)),
+        Some((_, missed)) if !is_event(r) => format!("{}, {}", if *missed { "놓친 알림" } else { "알림" }, describe_reminder(r, now)),
+        Some((a, missed)) => {
+            // 같은 때에 함께 울린 다른 회차의 미리 알림 ("…, 다음 일정 내일 09:00")
+            let more: Vec<String> = a.also.iter().map(|(s, _)| when(*s)).collect();
+            let tail = if more.is_empty() { String::new() } else { format!(", 다음 일정 {}", more.join(", ")) };
+            let mins = js::round((a.start - now).num_milliseconds() as f64 / 60_000.0) as i64;
+            let soon = match mins {
+                ..=0 => "지금 시작".to_string(),
+                1..60 => format!("{mins}분 뒤"),
+                60..1440 if mins % 60 != 0 => format!("{}시간 {}분 뒤", mins / 60, mins % 60),
+                60..1440 => format!("{}시간 뒤", mins / 60),
+                _ => String::new(),
+            };
+            if *missed {
+                format!("놓친 알림, {}{tail}", when(a.start))
+            } else if all_day || soon.is_empty() {
+                format!("{}{tail}", when(a.start))
+            } else {
+                format!("{} ({soon}){tail}", when(a.start))
+            }
+        }
+    };
+    let full = if title == memo_title { label.clone() } else { format!("{title}, {label}") };
+    (title, label, full)
 }

@@ -1,0 +1,111 @@
+[
+ {
+  "value": null,
+  "normalized": {
+   "quickMemo": "Control+Alt+C",
+   "magic": "Control+Alt+Space",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Ctrl+Alt+C, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Ctrl+Alt+CC Ctrl+Alt+`Ctrl+Alt+C"
+ },
+ {
+  "value": {},
+  "normalized": {
+   "quickMemo": "Control+Alt+C",
+   "magic": "Control+Alt+Space",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Ctrl+Alt+C, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Ctrl+Alt+CC Ctrl+Alt+`Ctrl+Alt+C"
+ },
+ {
+  "value": {
+   "quickMemo": "Control+Alt+Space"
+  },
+  "normalized": {
+   "quickMemo": "Control+Alt+Space",
+   "magic": "Control+Alt+C",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Ctrl+Alt+Space, 매직키는 Ctrl+Alt+C, 목록은 Ctrl+Alt+` — Ctrl+Alt+SpaceC Ctrl+Alt+`Ctrl+Alt+Space"
+ },
+ {
+  "value": {
+   "quickMemo": "Control+Alt+Space",
+   "magic": "Control+Alt+Space"
+  },
+  "normalized": {
+   "quickMemo": "Control+Alt+Space",
+   "magic": "Control+Alt+C",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Ctrl+Alt+Space, 매직키는 Ctrl+Alt+C, 목록은 Ctrl+Alt+` — Ctrl+Alt+SpaceC Ctrl+Alt+`Ctrl+Alt+Space"
+ },
+ {
+  "value": {
+   "magic": "Control+Alt+C",
+   "quickMemo": "Control+Alt+C"
+  },
+  "normalized": {
+   "quickMemo": "Control+Alt+C",
+   "magic": "Control+Alt+Space",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Ctrl+Alt+C, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Ctrl+Alt+CC Ctrl+Alt+`Ctrl+Alt+C"
+ },
+ {
+  "value": {
+   "list": "Control+Alt+C"
+  },
+  "normalized": {
+   "quickMemo": "Control+Alt+C",
+   "magic": "Control+Alt+Space",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Ctrl+Alt+C, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Ctrl+Alt+CC Ctrl+Alt+`Ctrl+Alt+C"
+ },
+ {
+  "value": {
+   "quickMemo": "Control+Shift+Q",
+   "list": "Control+Shift+Q"
+  },
+  "normalized": {
+   "quickMemo": "Control+Shift+Q",
+   "magic": "Control+Alt+Space",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Ctrl+Shift+Q, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Ctrl+Shift+QC Ctrl+Alt+`Ctrl+Shift+Q"
+ },
+ {
+  "value": {
+   "quickMemo": "Super+K",
+   "magic": "Alt+F4",
+   "list": "Control+Alt+`"
+  },
+  "normalized": {
+   "quickMemo": "Super+K",
+   "magic": "Control+Alt+Space",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Win+K, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Win+KC Ctrl+Alt+`Win+K"
+ },
+ {
+  "value": {
+   "quickMemo": 3
+  },
+  "normalized": {
+   "quickMemo": "Control+Alt+C",
+   "magic": "Control+Alt+Space",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Ctrl+Alt+C, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Ctrl+Alt+CC Ctrl+Alt+`Ctrl+Alt+C"
+ },
+ {
+  "value": "x",
+  "normalized": {
+   "quickMemo": "Control+Alt+C",
+   "magic": "Control+Alt+Space",
+   "list": "Control+Alt+`"
+  },
+  "text": "글을 고르고 Ctrl+Alt+C, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Ctrl+Alt+CC Ctrl+Alt+`Ctrl+Alt+C"
+ }
+]

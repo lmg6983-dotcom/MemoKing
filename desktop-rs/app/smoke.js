@@ -33,7 +33,7 @@ window.addEventListener('load', () => setTimeout(async () => {
     mk.on('memo:trashed', (t) => (trashed = t));
     await check('window.memoking (preload.cjs 그대로)', () => mk?.platform === 'desktop');
     await check('메모 폴더 열림', async () => Boolean((await mk.info()).vaultPath));
-    await check('옮기지 않은 채널은 실패로', () => mk.tags.aiStatus().then(() => false, (e) => /tags:ai-status/.test(e.message)));
+    await check('모르는 채널은 실패로', () => window.__TAURI_INTERNALS__.invoke('ipc', { channel: 'smoke:nope', args: [] }).then(() => false, (e) => /smoke:nope/.test(String(e))));
     const seed = (await mk.memos.list()).find((m) => m.title === '시험 메모');
     await check('목록: 메모 · 태그 · 그림', () => seed?.color === 'green' && seed.tags.includes('점검') && seed.thumb === 'attachments/dot.png');
     await check('목록 카드가 화면에', () => until(() => document.body.innerText.includes('시험 메모')));
@@ -82,7 +82,7 @@ window.addEventListener('load', () => setTimeout(async () => {
       return idx.schema === 'memoking.index/v1' && idx.memos?.some((m) => m.title === '가져온 글');
     }, 8000));
     await check('안내 파일', async () => (await text('_memoking/README.md')).startsWith('# 메모킹 폴더 안내'));
-    await check('메모 글 복사 (제목 줄 아래만)', async () => (await mk.copyMemoText(seed.id)) === true);
+    await check('메모 글 복사 (제목 줄 아래만)', async () => (await mk.memo.copyText(seed.id)) === true);
     await check('공유용 글 파일', async () => {
       const f = await mk.memo.shareFile(seed.id);
       return f.name === '시험 메모.txt' && atob(f.base64).length > 0;

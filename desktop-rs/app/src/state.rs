@@ -4,7 +4,11 @@ use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
+
+pub fn state(app: &AppHandle) -> tauri::State<'_, State> {
+    app.state::<State>()
+}
 
 pub struct State {
     pub settings_dir: PathBuf,
@@ -13,6 +17,8 @@ pub struct State {
     pub settings_reset: bool,
     pub vault: Mutex<Option<Vault>>,
     pub vault_error: Mutex<Option<String>>,
+    /// 켤 때 찾지 못한 쓰던 메모 폴더 (꺼 둔 사이 옮김 · 외장 드라이브를 뺌) — 빈 폴더를 새로 만들지 않고 기다린다
+    pub vault_missing: Mutex<Option<String>>,
     /// 메모 id → 메모 창 이름 (창 이름에는 영문 · 숫자만 쓸 수 있어 id 를 그대로 못 쓴다)
     pub note_labels: Mutex<HashMap<String, String>>,
     /// 이어 쓰기: 이미 알린 "id@updated" 와 마지막으로 알린 것 ({ id, title, from, at })
@@ -21,6 +27,8 @@ pub struct State {
     pub inserts: Mutex<HashMap<String, Value>>,
     /// 메모 창이 열리면 할 일 (목록 카드 메뉴의 잠그기 · 버전, 찾던 말) — memo:get command
     pub commands: Mutex<HashMap<String, Value>>,
+    /// 닫힌 메모를 여는 알림: 창이 열리면 띠로 (memo:get alarm)
+    pub alarms: Mutex<HashMap<String, Value>>,
 }
 
 /// 설정 폴더: Electron 과 같은 %APPDATA%\MemoKing (MagicKey · MagicSystem 이 여기서 읽는다).
@@ -66,10 +74,12 @@ impl State {
             settings_reset: reset,
             vault: Mutex::new(None),
             vault_error: Mutex::new(None),
+            vault_missing: Mutex::new(None),
             note_labels: Mutex::new(HashMap::new()),
             handoff: Default::default(),
             inserts: Default::default(),
             commands: Default::default(),
+            alarms: Default::default(),
         }
     }
 
@@ -99,8 +109,8 @@ impl State {
         app.path().document_dir().unwrap_or_else(|_| std::env::temp_dir()).join("메모킹")
     }
 
-    /// 메모 폴더 열기 (못 열면 vault_error 에 까닭)
-    pub fn open_vault(&self, dir: PathBuf) {
+    /// 메모 폴더 열기 (못 열면 vault_error 에 까닭) — 목록 창에 vault:opened
+    pub fn open_vault(&self, app: &AppHandle, dir: PathBuf) {
         let mut v = Vault::new(&dir, "pc");
         // 새 메모는 지금 고른 Work / Life 로 — 나눠 쓰지 않으면 Life (Electron viewMode)
         let mode = if self.setting("workLife") == true && self.setting("mode") == "work" { "work" } else { "life" };
@@ -110,6 +120,7 @@ impl State {
                 crate::index::opened(&dir);
                 *self.vault.lock().unwrap() = Some(v);
                 *self.vault_error.lock().unwrap() = None;
+                *self.vault_missing.lock().unwrap() = None;
                 self.set_setting("vaultPath", dir.to_string_lossy().into_owned().into());
             }
             Err(err) => {
@@ -117,6 +128,7 @@ impl State {
                 *self.vault_error.lock().unwrap() = Some(format!("메모 폴더를 열지 못했어요: {err}"));
             }
         }
+        let _ = app.emit_to("list", "vault:opened", [self.vault_info(app)]);
     }
 
     /// 화면이 묻는 메모 폴더 상태 (vaultInfo)
@@ -125,7 +137,7 @@ impl State {
         json!({
             "vaultPath": root,
             "vaultError": *self.vault_error.lock().unwrap(),
-            "missingPath": null,
+            "missingPath": *self.vault_missing.lock().unwrap(),
             "suggestedPath": State::suggested_vault(app).to_string_lossy(),
             "version": app.package_info().version.to_string(),
             "sandbox": false,

@@ -7,7 +7,7 @@ use memoking_core::vault::write_atomic;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 static PENDING: AtomicBool = AtomicBool::new(true);
 // 마지막으로 쓴 색인의 열쇠 (generatedAt 만 다르면 같은 색인 — Drive 가 매번 올리지 않게)
@@ -46,7 +46,6 @@ pub fn tick(app: &AppHandle) {
     match write_atomic(&root.join("_memoking").join("index.json"), out.text.as_bytes()) {
         Ok(()) => {
             *key = Some(out.key);
-            let _ = app.emit_to("list", "vault:indexed", [out.index["generatedAt"].clone()]);
         }
         Err(err) => {
             eprintln!("색인을 쓰지 못했어요: {err}");
