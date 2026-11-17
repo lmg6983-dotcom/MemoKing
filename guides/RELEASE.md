@@ -25,6 +25,34 @@ Release v0.76.0: MemoKing-Setup-0.76.0.exe · .blockmap · latest.yml · MemoKin
 
 **배포:** `package.json` 의 버전을 올리고 README 이력에 그 버전 줄을 쓴 뒤 → `git tag v<버전> && git push origin v<버전>` (또는 Actions › Release (PC) › Run workflow 에서 main)
 
+### PC Rust 판 베타 (desktop-rs)
+
+Rust + Tauri 로 다시 만든 PC 판은 정식 Release 와 따로, 사전 배포 **`desktop-rs`** 에 올려요 (휴대폰의 `android` 와 같은 방식).
+
+```
+Actions › Release (PC Rust 베타) › Run workflow   (.github/workflows/release-rs.yml, windows-latest)
+      │  ① AI 엔진 받기 (npm run llama) ② MCP 서버 빌드 ③ tauri build (Google 연결 정보 · 업데이트 서명)
+      ▼
+사전 배포 desktop-rs: MemoKing-Rust-Setup-<버전>.exe, MemoKing-Rust-Setup.exe, latest-tauri.json
+      ▲  latest-tauri.json 확인 (tauri-plugin-updater, 서명이 맞을 때만 설치)
+설치된 MemoKing Beta  desktop-rs/app/src/services.rs
+```
+
+- 받기: `https://github.com/lmg6983-dotcom/MemoKing/releases/download/desktop-rs/MemoKing-Rust-Setup.exe`
+- 버전: `desktop-rs/app/tauri.conf.json` 의 `version` 을 올린 뒤 Run workflow. 같은 버전이면 업데이트로 알리지 않아요.
+- 이름이 **MemoKing Beta** 라 Electron 판과 설치 폴더, 시작 메뉴 바로가기가 겹치지 않아요. 메모 폴더와 설정(`%APPDATA%\MemoKing`)은 같이 써서, 시험할 때는 Electron 판을 끄고 켜요 (둘 다 켜면 알림이 두 번 울려요).
+- 설치 파일에 AI 엔진(`llama\llama-server.exe`)과 MCP 서버(`memoking-mcp.exe`)가 함께 들어가요. 받아쓰기 엔진은 실행 파일 안에 있어요.
+
+**처음 한 번 준비 (자동 업데이트 서명)**
+
+1. 내 PC 에서 서명 열쇠를 만들어요: `npx @tauri-apps/cli@2.12.5 signer generate -w ~/.tauri/memoking.key` (비밀번호는 비워 두거나 정해요)
+2. 저장소 Settings › Secrets and variables › Actions
+   - **Secrets**: `TAURI_SIGNING_PRIVATE_KEY` 에 `~/.tauri/memoking.key` 파일 내용, 비밀번호를 정했으면 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+   - **Variables**: `TAURI_UPDATER_PUBKEY` 에 `~/.tauri/memoking.key.pub` 파일 내용
+3. 열쇠 파일은 잃어버리지 않게 따로 보관해요. 열쇠가 바뀌면 이미 설치한 베타는 새 버전을 설치하지 못해 한 번 직접 다시 설치해야 해요.
+
+서명 열쇠가 없어도 워크플로는 돌아요. 그때는 설치 파일만 올라가고 `latest-tauri.json` 은 없어서 자동 업데이트가 되지 않아요.
+
 ### 옛 배포 저장소(memoking-releases)
 
 v0.75.3 까지는 설치 파일을 따로 둔 공개 저장소 `memoking-releases` 에 올렸어요. v0.76.0 을 양쪽에 올려 옛 앱이 이 저장소로 넘어오게 한 뒤 그 저장소는 지웠어요. 그래서 v0.76.0 으로 업데이트하지 않은 채 남은 옛 앱(PC v0.75.3 · 휴대폰 0.53.x 까지)은 새 버전을 찾지 못해요 — 위 최신 설치 파일 링크로 한 번 다시 설치하면 돼요 (메모는 그대로). Secret `MEMOKING_RELEASES_TOKEN` 은 이제 쓰지 않으니 지워도 돼요.
