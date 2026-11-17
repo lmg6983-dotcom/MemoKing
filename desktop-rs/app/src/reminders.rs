@@ -145,9 +145,12 @@ fn fire(app: &AppHandle, id: &str, r: &Value, due: Option<(Alert, bool)>, now: c
         let _ = crate::memos::open_note(app, id); // 앞으로
         return;
     }
-    // shortcut: 닫힌 메모를 여는 알림은 메모 창 띠(memo:get 의 alarm) 대신 알림 창으로 알린다 — memo:get 이 기다리는 알림을 읽게 되면 띠로
     if r["action"] == "open" {
-        let _ = crate::memos::open_note(app, id);
+        state(app).alarms.lock().unwrap().insert(id.into(), alarm);
+        if crate::memos::open_note(app, id) == Ok(true) {
+            return;
+        }
+        state(app).alarms.lock().unwrap().remove(id); // 창을 열 수 없으면 알림 창으로라도
     }
     let preview = if memo["locked"] == true { String::new() } else { body::extract_preview(memo["body"].as_str().unwrap_or_default(), 120) };
     toast(app, id, &title, &label, &preview);

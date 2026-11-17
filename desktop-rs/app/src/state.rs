@@ -21,6 +21,8 @@ pub struct State {
     pub inserts: Mutex<HashMap<String, Value>>,
     /// 메모 창이 열리면 할 일 (목록 카드 메뉴의 잠그기 · 버전, 찾던 말) — memo:get command
     pub commands: Mutex<HashMap<String, Value>>,
+    /// 닫힌 메모를 여는 알림: 창이 열리면 띠로 (memo:get alarm)
+    pub alarms: Mutex<HashMap<String, Value>>,
 }
 
 /// 설정 폴더: Electron 과 같은 %APPDATA%\MemoKing (MagicKey · MagicSystem 이 여기서 읽는다).
@@ -70,6 +72,7 @@ impl State {
             handoff: Default::default(),
             inserts: Default::default(),
             commands: Default::default(),
+            alarms: Default::default(),
         }
     }
 

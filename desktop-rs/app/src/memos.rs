@@ -500,13 +500,13 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             let (layer, stack) = (crate::windows::layer_state(app, &arg_str(args, 0)), crate::windows::stack_state(app, &arg_str(args, 0)));
             with_vault(app, |v| {
                 let Some(mut m) = v.get(&arg_str(args, 0)) else { return Ok(Value::Null) };
-                // shortcut: 알림은 2단계 — 화면이 읽는 모양만 기본값으로
-                let o = m.as_object_mut().unwrap();
+                                let o = m.as_object_mut().unwrap();
                 let insert = st.inserts.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
                 o.insert("insert".into(), insert);
                 let command = st.commands.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
                 o.insert("command".into(), command);
-                for (k, val) in [("alarm", Value::Null), ("capture", crate::services::take_capture(o["id"].as_str().unwrap_or_default()))] {
+                let alarm = st.alarms.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
+                for (k, val) in [("alarm", alarm), ("capture", crate::services::take_capture(o["id"].as_str().unwrap_or_default()))] {
                     o.insert(k.into(), val);
                 }
                 for k in ["top", "bottom", "canTape"] {
