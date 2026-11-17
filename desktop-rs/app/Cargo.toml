@@ -16,6 +16,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.23"
@@ -32,6 +33,9 @@ arboard = { version = "3", default-features = false }
 # Google Drive 로그인(PKCE)
 getrandom = "0.3"
 sha2 = "0.10"
+# 알림 보관함: Windows 알림 DB(wpndatabase.db) 복사본 읽기 · 알림 그림 이름 · 크기
+rusqlite = { version = "0.37", features = ["bundled"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "ico"] }
 
 [target.'cfg(windows)'.dependencies]
 # 알림 창 (누르면 그 메모를 연다)
@@ -39,3 +43,5 @@ tauri-winrt-notification = "0.8"
 # Google 로그인 토큰을 Electron safeStorage 와 같게 감싼다 (DPAPI 로 감싼 열쇠 + AES-256-GCM)
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 aes-gcm = "0.10"
+# 화면 캡처 메모 (Linux 빌드에는 pipewire 가 있어야 해 Windows 만)
+xcap = "0.9"

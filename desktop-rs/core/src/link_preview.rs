@@ -93,7 +93,7 @@ pub fn stale_youtube_entry(url: &str, entry: &Value) -> bool {
 }
 
 fn clean(s: &str, max: usize) -> String {
-    squash(&decode_entities(s), max)
+    squash(&decode_entities(s, true), max)
 }
 
 /// 태그의 속성들 (이름은 소문자, 같은 이름이면 뒤의 것)
@@ -109,7 +109,7 @@ fn attrs_of(tag: &str) -> serde_json::Map<String, Value> {
 /// 상대 주소 → 절대 주소 (http · https 만, 아니면 "")
 fn absolute(href: Option<&str>, base: &str) -> String {
     let Some(href) = href.filter(|h| !h.is_empty()) else { return String::new() };
-    let joined = parse(base).and_then(|b| b.join(&decode_entities(js::trim(href))).ok());
+    let joined = parse(base).and_then(|b| b.join(&decode_entities(js::trim(href), true)).ok());
     joined.filter(|u| matches!(u.scheme(), "http" | "https")).map(|u| u.to_string()).unwrap_or_default()
 }
 

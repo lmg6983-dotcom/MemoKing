@@ -174,13 +174,14 @@ fn quit(app: &AppHandle) {
     });
 }
 
-// shortcut: Electron 트레이의 화면 캡처 · 최근 메모 · 일정 · 자동 실행 등은 아직 — 그 기능을 옮길 때 메뉴에 더하기
+// shortcut: Electron 트레이의 최근 메모 · 일정 · 자동 실행 등은 아직 — 그 기능을 옮길 때 메뉴에 더하기
 fn tray(app: &AppHandle) -> tauri::Result<()> {
     let Some(icon) = app.default_window_icon().cloned() else { return Ok(()) };
     let list = MenuItem::with_id(app, "list", "메모 목록", true, None::<&str>)?;
     let new = MenuItem::with_id(app, "new", "새 메모", true, None::<&str>)?;
+    let capture = MenuItem::with_id(app, "capture", "화면 캡처로 새 메모", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "끝내기", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&list, &new, &PredefinedMenuItem::separator(app)?, &quit_item])?;
+    let menu = Menu::with_items(app, &[&list, &new, &capture, &PredefinedMenuItem::separator(app)?, &quit_item])?;
     TrayIconBuilder::with_id("main")
         .icon(icon)
         .tooltip("메모킹")
@@ -196,6 +197,10 @@ fn tray(app: &AppHandle) -> tauri::Result<()> {
                         show_list(&app); // 메모 폴더가 없으면 고르는 화면으로
                     }
                 });
+            }
+            "capture" => {
+                let app = app.clone();
+                std::thread::spawn(move || crate::services::start_area_capture(&app));
             }
             "quit" => quit(app),
             _ => {}

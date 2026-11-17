@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **149 / 184**
-- 이벤트 (Rust → 화면): **45 / 58**
+- 채널 (화면 → Rust): **171 / 184**
+- 이벤트 (Rust → 화면): **50 / 58**
 
 ## 채널
 
@@ -46,12 +46,12 @@
 | ✅ | `attachment:save` |
 | ✅ | `attachment:save-as` |
 | ✅ | `attachment:share` |
-| ⬜ | `attachment:to-pdf` |
+| ✅ | `attachment:to-pdf` |
 | ✅ | `calendars:feeds` |
 | ✅ | `calendars:fetch` |
 | ✅ | `calendars:set-feeds` |
-| ⬜ | `capture:cancel` |
-| ⬜ | `capture:done` |
+| ✅ | `capture:cancel` |
+| ✅ | `capture:done` |
 | ✅ | `card:command` |
 | ✅ | `card:copy` |
 | ✅ | `card:share-file` |
@@ -76,14 +76,14 @@
 | ✅ | `folders:create` |
 | ✅ | `folders:delete` |
 | ✅ | `folders:rename` |
-| ⬜ | `history:apps` |
-| ⬜ | `history:block` |
-| ⬜ | `history:clear` |
-| ⬜ | `history:list` |
-| ⬜ | `history:remove` |
-| ⬜ | `history:set-enabled` |
-| ⬜ | `history:to-memo` |
-| ⬜ | `history:unblock` |
+| ✅ | `history:apps` |
+| ✅ | `history:block` |
+| ✅ | `history:clear` |
+| ✅ | `history:list` |
+| ✅ | `history:remove` |
+| ✅ | `history:set-enabled` |
+| ✅ | `history:to-memo` |
+| ✅ | `history:unblock` |
 | ✅ | `hotkey:set` |
 | ✅ | `hotkey:state` |
 | ✅ | `image:copy` |
@@ -98,9 +98,9 @@
 | ✅ | `list:on-top` |
 | ✅ | `list:show` |
 | ✅ | `list:toggle-top` |
-| ⬜ | `mcp:connect` |
-| ⬜ | `mcp:copy` |
-| ⬜ | `mcp:set-write` |
+| ✅ | `mcp:connect` |
+| ✅ | `mcp:copy` |
+| ✅ | `mcp:set-write` |
 | ✅ | `memo:create` |
 | ✅ | `memo:get` |
 | ✅ | `memo:handoff` |
@@ -127,9 +127,9 @@
 | ✅ | `mode:hours` |
 | ✅ | `mode:set` |
 | ✅ | `mode:work-life` |
-| ⬜ | `pdf:memo` |
-| ⬜ | `pdf:open` |
-| ⬜ | `pdf:save` |
+| ✅ | `pdf:memo` |
+| ✅ | `pdf:open` |
+| ✅ | `pdf:save` |
 | ✅ | `recovered:count` |
 | ✅ | `recovered:restore` |
 | ✅ | `reminders:add` |
@@ -176,11 +176,11 @@
 | ✅ | `tutorial:current` |
 | ✅ | `tutorial:event` |
 | ✅ | `tutorial:start` |
-| ⬜ | `update:check` |
-| ⬜ | `update:download` |
-| ⬜ | `update:install` |
-| ⬜ | `update:later` |
-| ⬜ | `update:state` |
+| ✅ | `update:check` |
+| ✅ | `update:download` |
+| ✅ | `update:install` |
+| ✅ | `update:later` |
+| ✅ | `update:state` |
 | ✅ | `vault:choose` |
 | ✅ | `vault:retry` |
 | ✅ | `vault:reveal` |
@@ -205,7 +205,7 @@
 | ✅ | `ai:token` |
 | ✅ | `bubble:hide` |
 | ✅ | `bubble:show` |
-| ⬜ | `capture:image` |
+| ✅ | `capture:image` |
 | ✅ | `drag:state` |
 | ✅ | `drive:status` |
 | ⬜ | `edit:clear-format` |
@@ -214,7 +214,7 @@
 | ✅ | `ghost:drop` |
 | ✅ | `ghost:mode` |
 | ✅ | `ghost:visible` |
-| ⬜ | `history:changed` |
+| ✅ | `history:changed` |
 | ✅ | `hud:hide` |
 | ✅ | `hud:show` |
 | ✅ | `keymap:changed` |
@@ -252,7 +252,7 @@
 | ⬜ | `stt:status` |
 | ✅ | `tutorial:finished` |
 | ✅ | `tutorial:step` |
-| ⬜ | `update:available` |
-| ⬜ | `update:ready` |
-| ⬜ | `update:state` |
+| ✅ | `update:available` |
+| ✅ | `update:ready` |
+| ✅ | `update:state` |
 | ⬜ | `vault:opened` |
