@@ -74,6 +74,10 @@ pub fn rescan(app: &AppHandle) {
         (ext, c.removed)
     };
     show_handoff(app, external.iter().map(|(id, _)| id.clone()).collect());
+    // 휴대폰에서 쓴 메모: 정해 둔 PC 한 대만 AI 태그 · 일정 (설정 › AI 도우미 › 휴대폰 메모도 이 PC에서)
+    if st.setting("aiPhone") == true {
+        crate::ai::later(app, external.iter().filter(|(_, m)| m["device"] == "phone").map(|(id, _)| id.clone()).collect());
+    }
     for (id, memo) in external {
         send_to_note(app, &id, "memo:external", [memo]);
     }

@@ -2,23 +2,23 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **179 / 184**
-- 이벤트 (Rust → 화면): **57 / 58**
+- 채널 (화면 → Rust): **184 / 184**
+- 이벤트 (Rust → 화면): **58 / 58**
 
 ## 채널
 
 | | 이름 |
 |---|---|
-| ⬜ | `ai:agent` |
-| ⬜ | `ai:agent-run` |
+| ✅ | `ai:agent` |
+| ✅ | `ai:agent-run` |
 | ✅ | `ai:ask` |
 | ✅ | `ai:cancel` |
 | ✅ | `ai:cancel-download` |
 | ✅ | `ai:download-default` |
 | ✅ | `ai:import` |
-| ⬜ | `ai:notice` |
-| ⬜ | `ai:notice-dismiss` |
-| ⬜ | `ai:notice-undo` |
+| ✅ | `ai:notice` |
+| ✅ | `ai:notice-dismiss` |
+| ✅ | `ai:notice-undo` |
 | ✅ | `ai:remove` |
 | ✅ | `ai:status` |
 | ✅ | `ai:try` |
@@ -198,7 +198,7 @@
 
 | | 이름 |
 |---|---|
-| ⬜ | `ai:notice` |
+| ✅ | `ai:notice` |
 | ✅ | `ai:progress` |
 | ✅ | `ai:status` |
 | ✅ | `ai:tagging` |
