@@ -93,3 +93,26 @@ export function corpus() {
   ];
   return [...files, ...bodies, ...lines];
 }
+
+// 색인(index.json)에 넣는 메모 묶음들 — [이름, { id, file, text }[]] (id · 파일 이름을 정해 두어 늘 같은 색인)
+export function indexSets() {
+  const head = (id, extra) => `---\nid: ${id}\ncreated: 2026-09-01T09:00:00+09:00\nupdated: 2026-09-02T10:30:00+09:00\n${extra}---\n`;
+  const linked = [
+    ['회의록.md', 'm1', 'color: green\npinned: true\nlinks: [m2, m3, m1, gone]\n', '# 주간 회의록\n\n위원회의 결정과 부서회의 안건을 정리했다. 고양이를 키우는 직원이 사무실에서 일정을 공유했다.\n\n## 안건\n- 예산 검토 #회의 #업무\n- 견적서 보내기\n\n## 다음 일정 ##\n\n![화이트보드](attachments/board.png)\n[회의 자료](attachments/slides.pdf)'],
+    ['업무/견적.md', 'm2', 'links: [m1]\n', '# 견적서 정리\n\n거래처에 견적서를 보냈다. 예산과 일정은 회의록에 있다. The quick brown fox and the lazy dog.\n\n```\n# 코드 안 제목은 소제목이 아님\n```'],
+    ['업무/출장.md', 'm3', '', '# 부산 출장\n\n부산으로 기차를 타고 출장을 간다. 숙소는 호텔, 일정은 회의 뒤에.\n\n| 날짜 | 할 일 |\n| --- | --- |\n| 월 | 회의 |'],
+    ['Travel.md', 'm4', 'color: blue\n', `# Travel plan\n\n${'Jeju island trip with family and friends, beach and hiking. '.repeat(5)}\n\n둘째 문단`],
+    ['apple.md', 'm5', 'links: [m4]\n', '# 하와이 여행\n\n소아과 진료 뒤 미술가 친구와 하와이로 간다. 사과와 바나나를 샀다. 2026 년 12 월.'],
+    ['가계부.md', 'm6', '', `# 가계부\n\n${'가'.repeat(230)}\n\n월세 관리비 보험`],
+    ['가계부 (사본).md', 'm7', 'links: [m6]\n', '# 가계부\n\n월세 · 관리비 · 보험 · 적금 · 대출 이자를 정리했다.\n\n짧은 줄\n\n또 다른 줄'],
+    ['빈 메모.md', 'm8', '', ''],
+    ['_memo.md', 'm9', '', '中國 漢字 메모 中文 ㄱㄴ 1번 abc ABC Abc café cafe'],
+  ].map(([file, id, extra, body]) => ({ id, file, text: `${head(id, extra)}${body}` }));
+
+  // 모두 같은 글이면 점수가 같다 — 같은 점수는 파일 이름 순
+  const same = ['b.md', 'A.md', 'a.md', '가.md', '1.md', 'ㄴ.md', 'a b.md', 'a_b.md', 'a(1).md', 'a.b.md'].map((file, i) => ({ id: `s${i}`, file, text: '# 같은 글\n\n사과 바나나 포도 수박' }));
+
+  // fixtures 의 모든 글 — 파일 이름은 차례 번호 (제목에서 만들면 같은 이름이 생긴다), 넷 중 하나는 폴더 안
+  const all = corpus().map((text, i) => ({ id: `c${i}`, file: `${i % 4 ? '' : '폴더/'}글 ${i}.md`, text }));
+  return [['empty', []], ['linked', linked], ['same', same], ['corpus', all]];
+}
