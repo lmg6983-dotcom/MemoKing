@@ -13,6 +13,7 @@ mod reminders;
 mod settings;
 mod shortcuts;
 mod state;
+mod windows;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 

@@ -29,6 +29,9 @@ import { noThink, sseText, engineError, chatBody } from '../../app/js/core/llama
 import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibleFix } from '../../app/js/core/ai-write.js';
 import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
 import { chunkMemo, askedPeriod, buildIndex as ragBuildIndex, retrieve as ragRetrieve, expandMessages, expandResult, ragMessages, finishAnswer } from '../../app/js/core/rag.js';
+import { StackStore } from '../../desktop/stacks.js';
+import { dropBounds, isInside } from '../../desktop/placement.js';
+import { placeBubble } from '../../desktop/bubble-place.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 import { driveCases } from './drive.mjs';
 
@@ -382,3 +385,55 @@ write('rag', ragQuestions.flatMap((q) => ragWords.map((words) => {
 })).concat([{ q: 'expand', expand: ['{"words":["a"," b ",1,null,"","c","d","e","f","g"]}', '{"words":"x"}', 'nope'].map(expandResult), messages: expandMessages('질문') }]));
 // Google Drive 동기화 (desktop/drive/sync-engine.js) — 장면은 drive.mjs
 write('drive_sync', await driveCases());
+// 메모 스택 (desktop/stacks.js): 읽은 그대로 쓴 글 + 차례로 한 일마다의 답과 스택들. 새 스택 id 는 차례 번호 (s1, s2 …)
+{
+  const memos = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const files = [
+    null, 'not json', '{"stacks":[{"memos":["a"]}]}',
+    JSON.stringify({ version: 1, stacks: [{ id: 'x', memos: ['a', 'b', 'gone', 'a'], active: 'gone' }, { memos: ['b', 'c', 'd'], active: 'd' }, { id: 0, memos: ['e', 'f'] }, { id: 7, memos: ['c', 'd', 3] }] }),
+    JSON.stringify({ stacks: [{ id: 's', memos: ['a', 'b', 'c'], active: 'b' }, { id: 't', memos: ['d', 'e'], active: 'e' }] }),
+  ];
+  const scripts = [
+    [['merge', 'a', ['b']], ['merge', 'a', ['c'], 'a'], ['addAfter', 'c', 'd'], ['reorder', 'd', 0], ['reorder', 'd', '2.7'], ['reorder', 'd', 'x'], ['reorder', 'a', -5], ['reorder', 'a', 99], ['neighbor', 'a', 1], ['neighbor', 'a', -1], ['setActive', 'b'], ['remove', 'b'], ['remove', 'c'], ['remove', 'a'], ['remove', 'z']],
+    [['merge', 'a', ['d']], ['merge', 'e', ['b', 'c']], ['merge', 'd', ['e']], ['merge', 'b', ['a', 'f']], ['merge', 'c', []], ['addAfter', 'f', 'b'], ['remove', 'd'], ['neighbor', 'zz', 1]],
+  ];
+  const open = (file) => {
+    let n = 0;
+    const io = { saved: null };
+    const store = new StackStore({ read: () => file, write: (t) => (io.saved = t), newId: () => `s${++n}` }).load((id) => memos.includes(id));
+    return { store, io };
+  };
+  const cases = [];
+  for (const file of files) {
+    const { store: first, io } = open(file);
+    first.save();
+    for (const ops of scripts) {
+      const { store } = open(file);
+      const steps = ops.map(([op, ...args]) => {
+        const r = op === 'merge' ? store.merge(args[0], args[1], args.length > 2 ? { activate: args[2] } : undefined) : store[op](...args);
+        return { ret: r === undefined ? null : structuredClone(r), stacks: structuredClone(store.all()) };
+      });
+      cases.push({ file, loaded: io.saved, ops, steps });
+    }
+  }
+  write('stacks', cases);
+}
+
+// 창 자리: 끌어 놓은 메모 창 (placement.js) · 상태 말풍선 (bubble-place.js)
+{
+  const area = { x: 0, y: 0, width: 1920, height: 1040 };
+  const second = { x: -1280, y: 100, width: 1280, height: 984 };
+  const points = [{ x: 500, y: 300 }, { x: 10, y: 5 }, { x: 1919, y: 1039 }, { x: 40.5, y: 18.5 }, { x: -600, y: 500 }];
+  const sizes = [{ width: 340, height: 380 }, { width: 2000, height: 1200 }];
+  const cases = [];
+  for (const p of points) for (const s of sizes) for (const a of [area, second]) cases.push({ drop: { p, s, a, bounds: dropBounds(p, s, a), inside: isInside(p, a) } });
+  const notes = [{ x: 400, y: 400, width: 340, height: 380 }, { x: 400, y: 50, width: 340, height: 380 }, { x: 1500, y: 50, width: 340, height: 380 }, { x: 0, y: 20, width: 1900, height: 900 }, { x: 10, y: 10, width: 300, height: 300 }];
+  for (const b of notes) {
+    for (const anchor of [b.x + 70, b.x + 2.5, 1910]) {
+      for (const sticker of [null, { x: b.x + 138, y: b.y - 26, width: 64, height: 52 }]) {
+        for (const barH of [36, 45]) cases.push({ bubble: { b, area, anchor, barH, sticker, r: placeBubble(b, area, anchor, barH, sticker) } });
+      }
+    }
+  }
+  write('placement', cases);
+}

@@ -22,14 +22,14 @@ fn state(app: &AppHandle) -> tauri::State<'_, State> {
 // ---------- 창 자리 ----------
 
 /// Electron onScreen 그대로: 작업 영역에 창 윗막대를 잡을 만큼 걸쳐 있나 (논리 픽셀 { x, y, width, height })
-fn on_screen(b: &Value, areas: &[[f64; 4]]) -> Option<[f64; 4]> {
+pub fn on_screen(b: &Value, areas: &[[f64; 4]]) -> Option<[f64; 4]> {
     let n = |k: &str| b[k].as_f64();
     let (x, y, w, h) = (n("x")?, n("y")?, n("width")?, n("height")?);
     areas.iter().any(|&[ax, ay, aw, ah]| x < ax + aw - 40.0 && x + w > ax + 40.0 && y >= ay - 10.0 && y < ay + ah - 40.0).then_some([x, y, w, h])
 }
 
 // shortcut: 화면마다 배율이 다르면 논리 좌표가 Electron(DIP)과 조금 어긋날 수 있다 — 여러 배율 모니터에서 자리가 틀어지면 물리 좌표로 바꾸기
-fn work_areas(app: &AppHandle) -> Vec<[f64; 4]> {
+pub fn work_areas(app: &AppHandle) -> Vec<[f64; 4]> {
     let monitors = app.available_monitors().unwrap_or_default();
     monitors
         .iter()

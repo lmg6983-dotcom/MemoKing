@@ -598,6 +598,16 @@ mod drive {
     }
 }
 
+// 숫자는 f64 로 맞춰 비교한다 (Rust 는 2.0, JS 는 2 로 적는다)
+fn num_norm(v: &Value) -> Value {
+    match v {
+        Value::Number(n) => json!(n.as_f64().unwrap()),
+        Value::Array(a) => Value::Array(a.iter().map(num_norm).collect()),
+        Value::Object(o) => Value::Object(o.iter().map(|(k, v)| (k.clone(), num_norm(v))).collect()),
+        _ => v.clone(),
+    }
+}
+
 #[test]
 fn tag_suggest() {
     use memoking_core::tag_suggest::*;
@@ -752,4 +762,72 @@ fn rag() {
         }
     }
     report("rag", fails, cases.len());
+}
+
+#[test]
+fn stacks() {
+    use memoking_core::stacks::Stacks;
+    let cases = fixtures("stacks");
+    let memos = ["a", "b", "c", "d", "e", "f"];
+    let open = |file: &Value| {
+        let mut n = 0;
+        let new_id = move || {
+            n += 1;
+            format!("s{n}")
+        };
+        Stacks::load(file.as_str(), |id| memos.contains(&id), Box::new(new_id))
+    };
+    let mut fails = vec![];
+    for c in &cases {
+        let loaded = open(&c["file"]).text();
+        if loaded != c["loaded"].as_str().unwrap() {
+            fails.push(format!("읽기 {}\n  JS  : {}\n  Rust: {loaded}", c["file"], c["loaded"]));
+        }
+        let mut s = open(&c["file"]);
+        for (op, step) in c["ops"].as_array().unwrap().iter().zip(c["steps"].as_array().unwrap()) {
+            let a = |i: usize| op[i].as_str().unwrap_or_default().to_string();
+            let ret = match op[0].as_str().unwrap() {
+                "merge" => {
+                    let moving: Vec<String> = op[2].as_array().unwrap().iter().map(|m| m.as_str().unwrap().to_string()).collect();
+                    json!(s.merge(&a(1), &moving, op.get(3).and_then(Value::as_str)))
+                }
+                "addAfter" => json!(s.add_after(&a(1), &a(2))),
+                "reorder" => json!(s.reorder(&a(1), &op[2])),
+                "setActive" => json!(s.set_active(&a(1))),
+                "neighbor" => json!(s.neighbor(&a(1), op[2].as_i64().unwrap() as i32)),
+                "remove" => json!(s.remove(&a(1))),
+                other => panic!("{other}"),
+            };
+            let got = json!({ "ret": ret, "stacks": s.stacks });
+            if num_norm(&got) != num_norm(step) {
+                fails.push(format!("{} {op}\n  JS  : {step}\n  Rust: {got}", c["file"]));
+            }
+        }
+    }
+    report("stacks", fails, cases.len());
+}
+
+#[test]
+fn placement() {
+    use memoking_core::placement::{drop_bounds, is_inside, place_bubble};
+    let r = |v: &Value| [v["x"].as_f64().unwrap(), v["y"].as_f64().unwrap(), v["width"].as_f64().unwrap(), v["height"].as_f64().unwrap()];
+    let cases = fixtures("placement");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = if let Some(d) = c.get("drop") {
+                let p = (d["p"]["x"].as_f64().unwrap(), d["p"]["y"].as_f64().unwrap());
+                let [x, y, w, h] = drop_bounds(p, (d["s"]["width"].as_f64().unwrap(), d["s"]["height"].as_f64().unwrap()), r(&d["a"]));
+                json!({ "drop": { "p": d["p"], "s": d["s"], "a": d["a"], "bounds": { "x": x, "y": y, "width": w, "height": h }, "inside": is_inside(p, r(&d["a"])) } })
+            } else {
+                let b = &c["bubble"];
+                let sticker = (!b["sticker"].is_null()).then(|| r(&b["sticker"]));
+                let mut out = b.clone();
+                out["r"] = place_bubble(r(&b["b"]), r(&b["area"]), b["anchor"].as_f64().unwrap(), b["barH"].as_f64().unwrap(), sticker);
+                json!({ "bubble": out })
+            };
+            (num_norm(&got) != num_norm(c)).then(|| format!("  JS  : {c}\n  Rust: {got}"))
+        })
+        .collect();
+    report("placement", fails, cases.len());
 }

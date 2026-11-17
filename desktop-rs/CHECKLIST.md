@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **128 / 184**
-- 이벤트 (Rust → 화면): **27 / 58**
+- 채널 (화면 → Rust): **149 / 184**
+- 이벤트 (Rust → 화면): **45 / 58**
 
 ## 채널
 
@@ -59,9 +59,9 @@
 | ✅ | `clipboard:write-text` |
 | ✅ | `conflict:get` |
 | ✅ | `conflict:resolve` |
-| ⬜ | `drag:end` |
-| ⬜ | `drag:move` |
-| ⬜ | `drag:start` |
+| ✅ | `drag:end` |
+| ✅ | `drag:move` |
+| ✅ | `drag:start` |
 | ✅ | `drive:auto` |
 | ✅ | `drive:cancel-login` |
 | ✅ | `drive:create-folder` |
@@ -138,19 +138,19 @@
 | ✅ | `share:targets` |
 | ✅ | `shortcuts:pause` |
 | ✅ | `shortcuts:set` |
-| ⬜ | `stack:activate` |
-| ⬜ | `stack:cycle` |
-| ⬜ | `stack:detach` |
-| ⬜ | `stack:join-menu` |
-| ⬜ | `stack:menu` |
-| ⬜ | `stack:new-tab` |
-| ⬜ | `stack:remove` |
-| ⬜ | `stack:reorder` |
-| ⬜ | `stack:tear-end` |
-| ⬜ | `stack:tear-move` |
-| ⬜ | `stack:tear-start` |
-| ⬜ | `sticker:hover` |
-| ⬜ | `sticker:peel` |
+| ✅ | `stack:activate` |
+| ✅ | `stack:cycle` |
+| ✅ | `stack:detach` |
+| ✅ | `stack:join-menu` |
+| ✅ | `stack:menu` |
+| ✅ | `stack:new-tab` |
+| ✅ | `stack:remove` |
+| ✅ | `stack:reorder` |
+| ✅ | `stack:tear-end` |
+| ✅ | `stack:tear-move` |
+| ✅ | `stack:tear-start` |
+| ✅ | `sticker:hover` |
+| ✅ | `sticker:peel` |
 | ⬜ | `stt:audio` |
 | ⬜ | `stt:download` |
 | ⬜ | `stt:options` |
@@ -186,13 +186,13 @@
 | ✅ | `vault:reveal` |
 | ✅ | `vault:use` |
 | ✅ | `win:close` |
-| ⬜ | `win:dim-titlebar` |
-| ⬜ | `win:grow-width` |
-| ⬜ | `win:inking` |
+| ✅ | `win:dim-titlebar` |
+| ✅ | `win:grow-width` |
+| ✅ | `win:inking` |
 | ✅ | `win:painted` |
 | ✅ | `win:spare` |
-| ⬜ | `win:status-bubble` |
-| ⬜ | `win:toggle-layer` |
+| ✅ | `win:status-bubble` |
+| ✅ | `win:toggle-layer` |
 
 ## 이벤트
 
@@ -203,20 +203,20 @@
 | ✅ | `ai:status` |
 | ✅ | `ai:tagging` |
 | ✅ | `ai:token` |
-| ⬜ | `bubble:hide` |
-| ⬜ | `bubble:show` |
+| ✅ | `bubble:hide` |
+| ✅ | `bubble:show` |
 | ⬜ | `capture:image` |
-| ⬜ | `drag:state` |
+| ✅ | `drag:state` |
 | ✅ | `drive:status` |
 | ⬜ | `edit:clear-format` |
 | ✅ | `edit:paste-plain` |
-| ⬜ | `ghost:data` |
-| ⬜ | `ghost:drop` |
-| ⬜ | `ghost:mode` |
-| ⬜ | `ghost:visible` |
+| ✅ | `ghost:data` |
+| ✅ | `ghost:drop` |
+| ✅ | `ghost:mode` |
+| ✅ | `ghost:visible` |
 | ⬜ | `history:changed` |
-| ⬜ | `hud:hide` |
-| ⬜ | `hud:show` |
+| ✅ | `hud:hide` |
+| ✅ | `hud:show` |
 | ✅ | `keymap:changed` |
 | ✅ | `list:crown-docked` |
 | ✅ | `list:on-top` |
@@ -226,7 +226,7 @@
 | ✅ | `memo:external` |
 | ✅ | `memo:handoff` |
 | ✅ | `memo:highlight` |
-| ⬜ | `memo:layer` |
+| ✅ | `memo:layer` |
 | ✅ | `memo:links-changed` |
 | ✅ | `memo:meta` |
 | ✅ | `memo:reminders` |
@@ -237,15 +237,15 @@
 | ✅ | `reminders:changed` |
 | ✅ | `settings:link-previews` |
 | ✅ | `shortcuts:changed` |
-| ⬜ | `stack:activating` |
-| ⬜ | `stack:hover` |
-| ⬜ | `stack:leaving` |
-| ⬜ | `stack:state` |
-| ⬜ | `status-bubble:gone` |
+| ✅ | `stack:activating` |
+| ✅ | `stack:hover` |
+| ✅ | `stack:leaving` |
+| ✅ | `stack:state` |
+| ✅ | `status-bubble:gone` |
 | ⬜ | `sticker:dock` |
-| ⬜ | `sticker:hover` |
-| ⬜ | `sticker:peel` |
-| ⬜ | `sticker:show` |
+| ✅ | `sticker:hover` |
+| ✅ | `sticker:peel` |
+| ✅ | `sticker:show` |
 | ⬜ | `stt:line` |
 | ⬜ | `stt:speakers` |
 | ⬜ | `stt:speaking` |
