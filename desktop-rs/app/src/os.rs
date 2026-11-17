@@ -49,9 +49,9 @@ fn place<'a>(app: &AppHandle, b: Builder<'a>, saved: &Value) -> Builder<'a> {
     }
 }
 
-/// 목록 창: 기억한 자리에, 처음에는 숨겨서 (start 가 띄울지 정한다)
+/// 목록 창: 기억한 자리에, 처음에는 숨겨서 (start 가 띄울지 정한다) · 늘 위에 두던 목록은 그대로
 pub fn place_list<'a>(app: &AppHandle, b: Builder<'a>) -> Builder<'a> {
-    place(app, b, &state(app).setting("listBounds")).visible(false)
+    place(app, b, &state(app).setting("listBounds")).visible(false).always_on_top(state(app).setting("listOnTop") == true)
 }
 
 pub fn place_note<'a>(app: &AppHandle, id: &str, b: Builder<'a>) -> Builder<'a> {

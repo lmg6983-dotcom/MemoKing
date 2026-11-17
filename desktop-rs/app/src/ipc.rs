@@ -8,7 +8,9 @@ use tauri::{AppHandle, Emitter, Webview};
 // async: Windows 에서는 동기 명령 안에서 창을 만들면(메모 창 열기) 멈춘다 — 비동기 명령은 다른 스레드에서 돈다
 #[tauri::command]
 pub async fn ipc(app: AppHandle, webview: Webview, channel: String, args: Vec<Value>) -> Result<Value, String> {
-    dispatch(&app, webview.label(), &channel, args)
+    // 막혀도 되는 스레드에서 — 링크 미리보기 · 그림 받기(몇 초)가 비동기 일꾼(코어 수만큼)을 다 붙잡아 다른 채널까지 멈추지 않게
+    let label = webview.label().to_string();
+    tauri::async_runtime::spawn_blocking(move || dispatch(&app, &label, &channel, args)).await.map_err(|e| e.to_string())?
 }
 
 /// memoking --smoke : 앱 안 점검 (smoke.js)
@@ -25,6 +27,9 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
         return r;
     }
     if let Some(r) = crate::settings::handle(app, label, channel, &args) {
+        return r;
+    }
+    if let Some(r) = crate::files::handle(app, label, channel, &args) {
         return r;
     }
     match channel {
