@@ -43,6 +43,9 @@ pub fn start(app: &AppHandle) {
         let _ = std::fs::write(dir.join("attachments/dot.png"), DOT_PNG);
         st.open_vault(dir);
     }
+    // 앱을 켤 때: 가장 최근에 고친 5개 중 다른 기기에서 방금 고친 것
+    let recent: Vec<String> = st.vault.lock().unwrap().as_ref().map(|v| v.list()).unwrap_or_default().iter().take(5).filter_map(|m| m["id"].as_str().map(str::to_string)).collect();
+    show_handoff(app, recent);
     // 다른 기기 · 탐색기에서 바뀐 메모 — 2초마다 다시 읽는다
     // shortcut: 파일 감시(fs.watch)는 아직 — 다시 읽기는 파일 시각만 보므로 가볍다. 늦다는 말이 나오면 notify 로
     let app = app.clone();
@@ -64,6 +67,7 @@ fn rescan(app: &AppHandle) {
         let ext: Vec<(String, Value)> = c.external.iter().filter(|id| !c.removed.contains(id)).map(|id| (id.clone(), v.get(id).unwrap_or(Value::Null))).collect();
         (ext, c.removed)
     };
+    show_handoff(app, external.iter().map(|(id, _)| id.clone()).collect());
     for (id, memo) in external {
         send_to_note(app, &id, "memo:external", [memo]);
     }
@@ -71,6 +75,24 @@ fn rescan(app: &AppHandle) {
         send_to_note(app, &id, "memo:removed", [Value::Null; 0]);
     }
     push_list(app);
+}
+
+/// 이어 쓰기 안내: 다른 기기에서 방금 고친 메모 하나를 목록에 알린다 (열어 둔 메모는 화면이 새 글을 보여 주므로 본 것으로만)
+fn show_handoff(app: &AppHandle, ids: Vec<String>) {
+    let st = state(app);
+    let now = chrono::Local::now().timestamp_millis();
+    let open: Vec<String> = st.note_labels.lock().unwrap().keys().cloned().collect();
+    for id in ids {
+        let Ok(Some(m)) = with_vault(app, |v| Ok(v.get(&id))) else { continue };
+        let Some(from) = memoking_core::handoff::handoff_from(m["device"].as_str(), m["updated"].as_str(), now) else { continue };
+        if !st.handoff.lock().unwrap().0.insert(format!("{id}@{}", m["updated"])) || open.contains(&id) {
+            continue;
+        }
+        let last = json!({ "id": id, "title": m["title"], "from": from, "at": now });
+        st.handoff.lock().unwrap().1 = Some(last.clone());
+        let _ = app.emit_to("list", "memo:handoff", [last]);
+        return;
+    }
 }
 
 fn send_to_note<S: serde::Serialize + Clone>(app: &AppHandle, id: &str, event: &str, payload: S) {
@@ -324,6 +346,92 @@ fn save_attachment_as(app: &AppHandle, f: &Value) -> Result<Value, String> {
     })
 }
 
+/// 글로 새 메모 (목록의 파일 가져오기 · 매직키): 문서 첨부는 메모 창이 열리며 편집기가 넣는다
+fn import_memo(app: &AppHandle, args: &[Value]) -> Result<Value, String> {
+    let body: String = args.first().and_then(Value::as_str).unwrap_or_default().chars().take(5_000_000).collect();
+    let opts = args.get(1).cloned().unwrap_or(Value::Null);
+    let id = with_vault(app, |v| v.import(&body, None).map_err(|e| e.to_string()))?.ok_or("이 파일로는 메모를 만들 수 없어요. 글 파일(.txt, .md 등)을 골라 주세요")?;
+    // 메모 폴더의 첨부만
+    let items: Vec<Value> = opts["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|it| {
+            let src = it["src"].as_str().filter(|s| s.strip_prefix("attachments/").is_some_and(|n| !n.is_empty() && !n.contains(['/', '\\'])))?;
+            Some(json!({ "kind": "file", "src": src, "name": it["name"].as_str()?.chars().take(255).collect::<String>() }))
+        })
+        .collect();
+    let open = opts["open"] == true || !items.is_empty();
+    if !items.is_empty() {
+        state(app).inserts.lock().unwrap().insert(id.clone(), Value::Array(items));
+    }
+    push_list(app);
+    if open {
+        open_note(app, &id)?;
+    }
+    Ok(id.into())
+}
+
+// 동기화 충돌 사본: "제목 (PC 충돌 2026-11-15 1530).md" → 원본 "제목.md" (conflicts.js CONFLICT_TAG 그대로)
+fn original_file_of(file: &str) -> Option<String> {
+    static TAG: std::sync::LazyLock<fancy_regex::Regex> = std::sync::LazyLock::new(|| memoking_core::js::re(r" \((?:PC|휴대폰) 충돌 \d{4}-\d{2}-\d{2} \d{4}(?: \d+)?\)(?=\.md$)"));
+    TAG.is_match(file).ok()?.then(|| TAG.replace(file, "").into_owned())
+}
+
+fn conflict_pair(v: &memoking_core::vault::Vault, copy_id: &str) -> Option<(Value, Option<Value>)> {
+    let copy = v.get(copy_id)?;
+    let orig = original_file_of(copy["file"].as_str()?)?;
+    let original = v.list().into_iter().find(|m| m["file"] == orig.as_str()).and_then(|m| v.get(m["id"].as_str()?));
+    Some((copy, original))
+}
+
+fn side(m: &Value) -> Value {
+    let locked = m["locked"] == true;
+    json!({ "id": m["id"], "title": m["title"], "file": m["file"], "updated": m["updated"], "locked": locked, "body": if locked { "" } else { m["body"].as_str().unwrap_or("") } })
+}
+
+/// keep: "copy" 사본 내용으로 원본을 바꾸고 사본은 휴지통 · "original" 원본 그대로, 사본만 휴지통
+fn resolve_conflict(app: &AppHandle, copy_id: &str, keep: &str) -> Result<Value, String> {
+    let fail = |m: &str| Ok(json!({ "ok": false, "message": m }));
+    // 사본 창을 열어 둔 채 막 고쳤으면 그 글부터 저장 (아직 저장 전인 0.6초 안의 글이 빠지지 않게)
+    // shortcut: Electron 처럼 저장이 끝나기를 기다리지 않고 0.5초 둔다 — 느린 PC 에서 마지막 글자가 빠지는 일이 보이면 응답을 받게
+    let label = state(app).note_labels.lock().unwrap().get(copy_id).cloned();
+    if let Some(w) = label.as_ref().and_then(|l| app.get_webview_window(l)) {
+        let _ = w.eval("window.mkFlushSync?.()");
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    let Some((copy, original)) = with_vault(app, |v| Ok(conflict_pair(v, copy_id)))? else { return fail("사본을 찾지 못했어요. 이미 지웠을 수 있어요") };
+    if copy["locked"] == true || original.as_ref().is_some_and(|o| o["locked"] == true) {
+        return fail("잠긴 메모는 직접 열어 고쳐 주세요");
+    }
+    if keep == "copy" {
+        let Some(orig) = original else { return fail("원본 메모를 찾지 못했어요. 사본을 그대로 쓰면 돼요") };
+        let oid = orig["id"].as_str().unwrap_or_default().to_string();
+        let (card, _) = with_vault(app, |v| v.save(&oid, copy["body"].as_str().unwrap_or_default()).map_err(|e| e.to_string()))?;
+        if card["refused"] == true {
+            return fail("원본을 바꾸지 못했어요. 잠시 뒤 다시 해 주세요");
+        }
+        let fresh = with_vault(app, |v| Ok(v.get(&oid)))?;
+        send_to_note(app, &oid, "memo:external", [fresh]); // 원본 창이 열려 있으면 바꾼 글로
+    }
+    state(app).note_labels.lock().unwrap().remove(copy_id);
+    if let Some(w) = label.and_then(|l| app.get_webview_window(&l)) {
+        let _ = w.destroy();
+    }
+    with_vault(app, |v| v.trash(copy_id).map_err(|e| e.to_string()))?;
+    push_list(app);
+    Ok(json!({ "ok": true, "message": if keep == "copy" { "사본 내용으로 바꾸고 사본은 휴지통으로 옮겼어요" } else { "사본을 휴지통으로 옮겼어요" } }))
+}
+
+/// 저장하지 못해 따로 남긴 글 (설정 폴더의 recovered/ — Electron 판이 남긴 것도)
+fn recovered_files(app: &AppHandle) -> Vec<PathBuf> {
+    if with_vault(app, |_| Ok(())).is_err() {
+        return vec![];
+    }
+    let dir = state(app).settings_dir.join("recovered");
+    std::fs::read_dir(dir).map_or(vec![], |rd| rd.flatten().map(|d| d.path()).filter(|p| p.extension().is_some_and(|e| e == "md")).collect())
+}
+
 /// 메모 채널 — 이 파일이 맡지 않는 채널이면 None
 pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let st = state(app);
@@ -342,7 +450,9 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             let Some(mut m) = v.get(&arg_str(args, 0)) else { return Ok(Value::Null) };
             // shortcut: 왕관 · 테이프 · 알림 · 캡처 · 스택은 2단계 — 화면이 읽는 모양만 기본값으로
             let o = m.as_object_mut().unwrap();
-            for (k, val) in [("top", json!(false)), ("bottom", json!(false)), ("canTape", json!(false)), ("onTop", json!(false)), ("alarm", Value::Null), ("capture", Value::Null), ("command", Value::Null), ("insert", Value::Null)] {
+            let insert = st.inserts.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
+            o.insert("insert".into(), insert);
+            for (k, val) in [("top", json!(false)), ("bottom", json!(false)), ("canTape", json!(false)), ("onTop", json!(false)), ("alarm", Value::Null), ("capture", Value::Null), ("command", Value::Null)] {
                 o.insert(k.into(), val);
             }
             let stack = json!({ "members": [], "active": o["id"] });
@@ -428,6 +538,48 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         "attachment:open" => open_attachment(app, &arg_str(args, 0)),
         "attachment:save-as" => save_attachment_as(app, args.first().unwrap_or(&Value::Null)),
+        "memo:handoff" => {
+            let last = st.handoff.lock().unwrap().1.clone();
+            let open = |id: &Value| st.note_labels.lock().unwrap().contains_key(id.as_str().unwrap_or_default());
+            let fresh = last.filter(|m| chrono::Local::now().timestamp_millis() - m["at"].as_i64().unwrap_or(0) < memoking_core::handoff::HANDOFF_MS && !open(&m["id"]));
+            Ok(fresh.unwrap_or(Value::Null))
+        }
+        "memo:import" => import_memo(app, args),
+        "memo:keep-copy" => {
+            let (source, copy) = (arg_str(args, 0), arg_str(args, 2));
+            let Some(body) = args.get(1).and_then(Value::as_str) else { return Some(Ok(Value::Null)) };
+            let unlocked = args.get(3).is_some_and(|o| o["unlocked"] == true);
+            let r = with_vault(app, |v| {
+                // 이미 만든 사본이 있으면 그 사본에 (저장되면 그대로)
+                if !copy.is_empty() && v.entry(&copy).is_some() {
+                    let (card, _) = v.save(&copy, body).map_err(|e| e.to_string())?;
+                    if card["refused"] != true || card["copied"] == true {
+                        return Ok(Some(copy.clone()));
+                    }
+                }
+                let color = v.entry(&source).map(|e| e.meta.color.clone());
+                let id = if unlocked && !v.is_open_lock(&source) { v.import(body, color.as_deref()) } else { v.import_copy_of(&source, body) };
+                id.map_err(|e| e.to_string())
+            });
+            push_list(app);
+            r.map(|id| id.map_or(Value::Null, Value::from))
+        }
+        "conflict:get" => with_vault(app, |v| {
+            Ok(conflict_pair(v, &arg_str(args, 0)).map_or(Value::Null, |(copy, original)| json!({ "copy": side(&copy), "original": original.as_ref().map_or(Value::Null, side) })))
+        }),
+        "conflict:resolve" => resolve_conflict(app, &arg_str(args, 0), &arg_str(args, 1)),
+        "recovered:count" => Ok(recovered_files(app).len().into()),
+        "recovered:restore" => {
+            let mut n = 0;
+            for f in recovered_files(app) {
+                let Ok(body) = std::fs::read_to_string(&f) else { continue };
+                if matches!(with_vault(app, |v| v.import(&body, None).map_err(|e| e.to_string())), Ok(Some(_))) && std::fs::remove_file(&f).is_ok() {
+                    n += 1;
+                }
+            }
+            push_list(app);
+            Ok(n.into())
+        }
         "memos:search" => {
             let exclude = args.get(1).and_then(Value::as_str).map(str::to_string);
             let found = with_vault(app, |v| Ok(v.search(&arg_str(args, 0), exclude.as_deref())));
@@ -561,4 +713,18 @@ pub fn serve_vault(app: &AppHandle, rel: &str) -> Option<(Vec<u8>, &'static str)
         _ => "application/octet-stream",
     };
     Some((bytes, mime))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::original_file_of;
+
+    #[test]
+    fn conflict_copy_names() {
+        assert_eq!(original_file_of("회의 (PC 충돌 2026-11-15 1530).md").as_deref(), Some("회의.md"));
+        assert_eq!(original_file_of("업무/회의 (휴대폰 충돌 2026-11-15 1530 2).md").as_deref(), Some("업무/회의.md"));
+        assert_eq!(original_file_of("회의 (다른 기기 10월 5일 08:34).md"), None);
+        assert_eq!(original_file_of("회의 (PC 충돌 2026-11-15 15:30).md"), None);
+        assert_eq!(original_file_of("회의.md"), None);
+    }
 }

@@ -15,6 +15,10 @@ pub struct State {
     pub vault_error: Mutex<Option<String>>,
     /// 메모 id → 메모 창 이름 (창 이름에는 영문 · 숫자만 쓸 수 있어 id 를 그대로 못 쓴다)
     pub note_labels: Mutex<HashMap<String, String>>,
+    /// 이어 쓰기: 이미 알린 "id@updated" 와 마지막으로 알린 것 ({ id, title, from, at })
+    pub handoff: Mutex<(std::collections::HashSet<String>, Option<Value>)>,
+    /// 메모 창이 열리며 넣을 문서 첨부 (memo:import → memo:get insert)
+    pub inserts: Mutex<HashMap<String, Value>>,
 }
 
 /// 설정 폴더: Electron 과 같은 %APPDATA%\MemoKing (MagicKey · MagicSystem 이 여기서 읽는다).
@@ -61,6 +65,8 @@ impl State {
             vault: Mutex::new(None),
             vault_error: Mutex::new(None),
             note_labels: Mutex::new(HashMap::new()),
+            handoff: Default::default(),
+            inserts: Default::default(),
         }
     }
 

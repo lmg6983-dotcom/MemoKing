@@ -1,7 +1,7 @@
 //! 메모 파일(.md) 형식 — 머리말(YAML) + 마크다운 본문. app/js/core/memo-file.js 의 읽기 · 쓰기
 use crate::{js, reminders, tables, time, yaml};
 use fancy_regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::sync::LazyLock;
 
@@ -12,7 +12,7 @@ const KNOWN_KEYS: [&str; 12] = ["id", "created", "updated", "color", "pinned", "
 pub static FRONTMATTER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)").unwrap());
 
 /// 머리말 (JS 의 normalizeMeta 결과와 같은 모양 · 같은 순서)
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Meta {
     pub id: Option<String>,
     pub created: Option<String>,

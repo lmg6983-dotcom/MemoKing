@@ -30,6 +30,8 @@ pub struct Entry {
     pub body: String,
     stamp: Option<(SystemTime, u64)>,
     pub id_saved: bool,
+    /// 지금 파일에 있는 머리말 (머리말만 쓰는 사이 다른 기기가 고쳤을 때, 이 기기가 바꾼 항목만 골라 더하려고)
+    disk_meta: Option<Meta>,
 }
 
 /// 다시 읽은 결과 — 화면에 알릴 것 (vault.js 의 'changed' 이벤트)
@@ -77,6 +79,8 @@ pub struct Vault {
     locks: HashMap<String, lock::Session>,
     /// 본문에서 뽑은 것 — 본문이 같으면 다시 뽑지 않는다 (JS bodyParts: 메모 2,000개를 저장마다 다 읽으면 1초 넘게 걸렸다)
     parts: std::sync::Mutex<HashMap<String, (u64, std::sync::Arc<Parts>)>>,
+    /// 다른 기기 글을 받아들인 메모 (adopt_theirs) — 다음 scan 이 external 로 알린다
+    adopted: Vec<String>,
 }
 
 /// 목록 카드 · 찾기가 본문에서 쓰는 것
@@ -142,6 +146,7 @@ impl Vault {
             seen_dirs: None,
             locks: HashMap::new(),
             parts: Default::default(),
+            adopted: vec![],
         }
     }
 
@@ -245,7 +250,7 @@ impl Vault {
             if old_body != Some(body.as_str()) && !self.own_files.contains(&file) {
                 external.push(id.clone());
             }
-            next.insert(id.clone(), Entry { id: id.clone(), file: Some(file), folder: String::new(), meta, body, stamp: Some(stamp), id_saved });
+            next.insert(id.clone(), Entry { id: id.clone(), file: Some(file), folder: String::new(), disk_meta: Some(meta.clone()), meta, body, stamp: Some(stamp), id_saved });
             changed.push(id);
         }
         let removed: Vec<String> = old.keys().filter(|id| !next.contains_key(*id)).cloned().collect();
@@ -267,6 +272,15 @@ impl Vault {
         let dirs = self.folders().join("\n");
         let dirs_changed = self.seen_dirs.as_ref().is_some_and(|d| *d != dirs);
         self.seen_dirs = Some(dirs);
+        for id in std::mem::take(&mut self.adopted) {
+            if self.entries.contains_key(&id) && !external.contains(&id) {
+                if body::is_locked_body(&self.entries[&id].body) {
+                    self.drop_unsafe_versions(&id);
+                }
+                external.push(id.clone());
+                changed.push(id);
+            }
+        }
         Changed { ids: changed, external, removed, folders: dirs_changed }
     }
 
@@ -411,7 +425,7 @@ impl Vault {
             data.insert("color".into(), c.into());
         }
         data.insert("mode".into(), mode.unwrap_or(&self.default_mode).into());
-        Entry { id: id.into(), file: None, folder: memo_file::clean_folder_name(folder), meta: memo_file::normalize_meta(&data), body: String::new(), stamp: None, id_saved: true }
+        Entry { id: id.into(), file: None, folder: memo_file::clean_folder_name(folder), meta: memo_file::normalize_meta(&data), body: String::new(), stamp: None, id_saved: true, disk_meta: None }
     }
 
     /// 새 메모 — 내용이 생길 때 파일로 만든다 (빈 파일이 쌓이지 않게)
@@ -557,6 +571,7 @@ impl Vault {
         write_atomic(&path, memo_file::serialize_memo_file(&e.meta, &e.body).as_bytes())?;
         e.stamp = stamp_of(&path).ok();
         e.id_saved = true;
+        e.disk_meta = Some(e.meta.clone());
         Ok(Wrote::Yes)
     }
 
@@ -577,14 +592,14 @@ impl Vault {
             return Ok(None);
         }
         let Ok(text) = fs::read_to_string(&path) else { return Ok(None) };
-        let (_, theirs) = memo_file::parse_memo_file(&text);
+        let (their_meta, theirs) = memo_file::parse_memo_file(&text);
         if body::same_body(&theirs, known) || body::same_body(&theirs, &e.body) || body::is_blank_body(&theirs) {
             return Ok(None);
         }
         if body::same_body(&e.body, known) {
-            // 이번 쓰기는 머리말만 — 들어온 글을 덮지 않는다
-            // shortcut: JS 는 들어온 글에 이 기기의 머리말 변경을 더해 쓴다(adoptTheirs). 여기서는 쓰지 않고 다시 읽는다 — 머리말 쓰기를 옮길 때
-            return Ok(Some(Wrote::Skipped));
+            // 이번 쓰기는 머리말만 — 들어온 글을 그대로 두고 이 기기가 바꾼 머리말만 더해 쓴다
+            self.adopt_theirs(e, theirs, their_meta);
+            return Ok(None);
         }
         if body::is_locked_body(&theirs) {
             return self.locked_on_disk(e, known, &theirs, copy);
@@ -598,6 +613,55 @@ impl Vault {
         self.keep_version(&e.id, &theirs, true);
         self.import(&memo_file::conflict_copy_body(&theirs, &memo_file::conflict_label(chrono::Local::now())), Some(&e.meta.color.clone()))?;
         Ok(None)
+    }
+
+    /// 머리말만 쓰는 사이 다른 기기가 글을 바꿨다 (JS adoptTheirs): 그쪽 글 · 머리말을 바탕으로, 이 기기가 (마지막으로 읽은 뒤)
+    ///   바꾼 항목만 더한다 — 그쪽에서 지운 알림이 되살아나지 않게. 잠금 정보(lockRefs · lockHideTitle)는 늘 그쪽 것
+    fn adopt_theirs(&mut self, e: &mut Entry, theirs: String, their_meta: Meta) {
+        let to = |m: &Meta| serde_json::to_value(m).unwrap();
+        let (mine, theirs_v) = (to(&e.meta), to(&their_meta));
+        let disk = e.disk_meta.as_ref().map(to);
+        let changed = |k: &str, v: &Value| disk.as_ref().is_none_or(|d| d.get(k) != Some(v));
+        let mut merged = theirs_v.as_object().unwrap().clone();
+        for (k, v) in mine.as_object().unwrap() {
+            match k.as_str() {
+                "extra" | "id" => {}
+                "reminders" => {
+                    let list = |v: Option<&Value>| v.and_then(Value::as_array).cloned().unwrap_or_default();
+                    merged.insert(k.clone(), Value::Array(merge_reminders(&list(Some(v)), &list(disk.as_ref().and_then(|d| d.get(k))), &list(theirs_v.get(k)))));
+                }
+                _ if changed(k, v) => {
+                    merged.insert(k.clone(), v.clone());
+                }
+                _ => {}
+            }
+        }
+        let lock_key = |k: &str| k == "lockRefs" || k == "lockHideTitle";
+        let disk_extra = disk.as_ref().and_then(|d| d["extra"].as_object().cloned()).unwrap_or_default();
+        let mut extra = theirs_v["extra"].as_object().cloned().unwrap_or_default();
+        for (k, v) in mine["extra"].as_object().unwrap() {
+            if !lock_key(k) && (disk.is_none() || disk_extra.get(k) != Some(v)) {
+                extra.insert(k.clone(), v.clone());
+            }
+        }
+        // 이 기기가 지운 항목도 (그쪽이 그사이 바꾸지 않았으면) 지운 채로
+        for (k, v) in &disk_extra {
+            if !lock_key(k) && !mine["extra"].as_object().unwrap().contains_key(k) && theirs_v["extra"].get(k) == Some(v) {
+                extra.shift_remove(k);
+            }
+        }
+        merged.insert("extra".into(), Value::Object(extra));
+        merged.insert("id".into(), mine["id"].clone());
+        e.meta = serde_json::from_value(Value::Object(merged)).unwrap_or(their_meta);
+        if body::is_locked_body(&theirs) {
+            for r in &mut e.meta.reminders {
+                if let Some(o) = r.as_object_mut() {
+                    o.shift_remove("title"); // 잠긴 글의 일정 이름은 풀린 머리말에 남기지 않는다
+                }
+            }
+        }
+        e.body = theirs;
+        self.adopted.push(e.id.clone()); // 다음 다시 읽기에서 열린 화면에 알린다 (scan → external)
     }
 
     /// 덮어쓰려는 사이 다른 기기가 잠근 글로 바꿨다 (JS lockedOnDisk)
@@ -1334,6 +1398,27 @@ pub fn is_program_file(name: &str) -> bool {
     PROGRAM_EXT.contains(&ext.as_str())
 }
 
+/// 알림 목록 합치기 (알림마다): 그쪽 목록을 바탕으로, 이 기기에서 새로 만든 것은 더하고, 바꾼 것은 바꾼 대로, 지운 것은 빼고
+///   — 그쪽에서 지운 것은 되살리지 않는다 (vault-locks.js mergeReminders)
+pub fn merge_reminders(mine: &[Value], disk: &[Value], theirs: &[Value]) -> Vec<Value> {
+    let by_id = |list: &[Value], id: &Value| list.iter().find(|r| r["id"] == *id).cloned();
+    let mut out: Vec<Value> = vec![];
+    for t in theirs {
+        let (d, m) = (by_id(disk, &t["id"]), by_id(mine, &t["id"]));
+        match (d, m) {
+            (Some(_), None) => {} // 이 기기에서 지움
+            (Some(d), Some(m)) if m != d => out.push(m),
+            _ => out.push(t.clone()),
+        }
+    }
+    for m in mine {
+        if by_id(disk, &m["id"]).is_none() && by_id(&out, &m["id"]).is_none() {
+            out.push(m.clone());
+        }
+    }
+    out
+}
+
 /// 지운 때: 휴지통 파일 이름 "제목 (20260930-153000).md" 의 시각 (현지)
 fn trashed_at(name: &str) -> Option<i64> {
     use chrono::TimeZone;
@@ -1591,5 +1676,36 @@ mod tests {
         assert!(c.folders && !c.is_empty() && c.ids.is_empty());
         assert!(v.scan().is_empty(), "한 번 알린 뒤로는 조용히");
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn meta_change_keeps_other_device_text() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let id = v.create(None, None, "");
+        v.save(&id, "# 메모\n처음").unwrap();
+        // 휴대폰이 글을 고쳤는데 아직 다시 읽기 전에 PC 에서 색을 바꿈
+        let file = root.join("메모.md");
+        let text = fs::read_to_string(&file).unwrap().replace("처음", "휴대폰 글").replace("color: yellow", "color: yellow\npinned: true");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(&file, text).unwrap();
+        let m = v.set_meta(&id, &json!({ "color": "blue" })).unwrap().unwrap();
+        assert!(m["body"].as_str().unwrap().trim_end() == "# 메모\n휴대폰 글" && m["color"] == "blue" && m["pinned"] == true, "{m}");
+        let text = fs::read_to_string(&file).unwrap();
+        assert!(text.contains("휴대폰 글") && text.contains("color: blue") && text.contains("pinned: true"));
+        assert_eq!(v.list().len(), 1, "사본을 만들지 않는다");
+        assert_eq!(v.scan().external, vec![id], "열린 화면에 알린다");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn merge_reminders_keeps_each_side() {
+        let r = |id: &str, at: &str| json!({ "id": id, "at": at });
+        let disk = [r("a", "1"), r("b", "1"), r("c", "1")];
+        let mine = [r("a", "2"), r("c", "1"), r("n", "1")]; // a 바꿈 · b 지움 · n 새로
+        let theirs = [r("a", "1"), r("b", "1"), r("t", "1")]; // c 지움 · t 새로
+        let out = merge_reminders(&mine, &disk, &theirs);
+        assert_eq!(out, vec![r("a", "2"), r("t", "1"), r("n", "1")]);
     }
 }

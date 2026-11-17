@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **41 / 187**
-- 이벤트 (Rust → 화면): **6 / 61**
+- 채널 (화면 → Rust): **48 / 187**
+- 이벤트 (Rust → 화면): **7 / 61**
 
 ## 채널
 
@@ -57,8 +57,8 @@
 | ⬜ | `card:share-file` |
 | ⬜ | `clipboard:write-rich` |
 | ⬜ | `clipboard:write-text` |
-| ⬜ | `conflict:get` |
-| ⬜ | `conflict:resolve` |
+| ✅ | `conflict:get` |
+| ✅ | `conflict:resolve` |
 | ⬜ | `drag:end` |
 | ⬜ | `drag:move` |
 | ⬜ | `drag:start` |
@@ -104,9 +104,9 @@
 | ⬜ | `memo:copy-text` |
 | ✅ | `memo:create` |
 | ✅ | `memo:get` |
-| ⬜ | `memo:handoff` |
-| ⬜ | `memo:import` |
-| ⬜ | `memo:keep-copy` |
+| ✅ | `memo:handoff` |
+| ✅ | `memo:import` |
+| ✅ | `memo:keep-copy` |
 | ✅ | `memo:link` |
 | ✅ | `memo:links` |
 | ✅ | `memo:lock` |
@@ -131,8 +131,8 @@
 | ⬜ | `pdf:memo` |
 | ⬜ | `pdf:open` |
 | ⬜ | `pdf:save` |
-| ⬜ | `recovered:count` |
-| ⬜ | `recovered:restore` |
+| ✅ | `recovered:count` |
+| ✅ | `recovered:restore` |
 | ⬜ | `reminders:add` |
 | ⬜ | `reminders:all` |
 | ⬜ | `reminders:set` |
@@ -229,7 +229,7 @@
 | ⬜ | `memo:alarm` |
 | ⬜ | `memo:command` |
 | ✅ | `memo:external` |
-| ⬜ | `memo:handoff` |
+| ✅ | `memo:handoff` |
 | ⬜ | `memo:highlight` |
 | ⬜ | `memo:layer` |
 | ✅ | `memo:links-changed` |

@@ -66,6 +66,16 @@ window.addEventListener('load', () => setTimeout(async () => {
     await check('지우기 → 휴지통 · 되돌리기 띠', async () => (await mk.memo.remove(fresh.id)) === true && (await until(() => trashed)).title === '새 메모');
     await check('휴지통 되살리기', async () => (await mk.trash.restore(trashed.name)) === fresh.id && (await mk.trash.list()).length === 0);
     await check('설정 읽기', async () => /^\d+\.\d+\.\d+$/.test((await mk.settings.get()).version));
+    await check('가져오기 → 새 메모', async () => {
+      const got = await mk.memo.import('# 가져온 글\n본문');
+      return (await mk.memos.list()).some((m) => m.id === got && m.title === '가져온 글');
+    });
+    await check('사본 남기기', async () => {
+      const copy = await mk.memo.keepCopy(seed.id, '# 남긴 사본\n글', null);
+      return copy && copy !== seed.id && (await mk.memo.get(copy)).body.includes('남긴 사본');
+    });
+    await check('따로 남긴 글 수', async () => (await mk.recovered.count()) === 0);
+    await check('이어 쓰기 안내 없음 (모두 이 PC 에서 고침)', async () => (await mk.memo.handoff()) === null);
     // 앱 화면 밖으로 넘어가지 않는다 (넘어가면 이 점검이 끝나지 않아 실패로 보인다)
     await check('다른 주소로 넘어가지 않음', async () => {
       const here = location.href;
