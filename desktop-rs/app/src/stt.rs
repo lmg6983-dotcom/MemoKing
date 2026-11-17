@@ -15,7 +15,6 @@ use sherpa_rs::transducer::{TransducerConfig, TransducerRecognizer};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
@@ -93,7 +92,6 @@ static WEB: LazyLock<ureq::Agent> = LazyLock::new(|| {
     ureq::Agent::config_builder().tls_config(tls).http_status_as_error(false).build().into()
 });
 static DOWNLOADS: LazyLock<Mutex<HashMap<String, (f64, String)>>> = LazyLock::new(Default::default); // 묶음 → (진행 0~1, 오류)
-static SEQ: AtomicU64 = AtomicU64::new(0);
 
 fn dir(app: &AppHandle) -> PathBuf {
     std::env::var_os("MEMOKING_STT_DIR").map_or_else(|| app.state::<State>().settings_dir.join("stt"), PathBuf::from)
@@ -203,7 +201,9 @@ fn get_part(root: &Path, part: &Part, on_fraction: &mut dyn FnMut(f64)) -> Resul
     std::fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
     let mut last = None;
     for src in part.sources {
-        let tmp = root.join(format!(".part-{}-{}", std::process::id(), SEQ.fetch_add(1, Ordering::Relaxed)));
+        // 이름을 고정해 두어 받다가 앱이 꺼져 남은 것도 다음에 지운다
+        let tmp = root.join(format!(".part-{}", part.dir));
+        let _ = std::fs::remove_dir_all(&tmp);
         let mut got = 0;
         let mut count = |n| {
             got += n;
