@@ -123,19 +123,19 @@ pub fn normalize_tag(name: &str) -> String {
 // ---------- tag-suggest.js ----------
 
 /// 넣은 차례를 지키는 Map (JS Map 처럼 — 있는 열쇠에 다시 넣어도 자리는 그대로)
-struct Ordered<V> {
-    at: HashMap<String, usize>,
-    items: Vec<(String, V)>,
+pub(crate) struct Ordered<V> {
+    pub(crate) at: HashMap<String, usize>,
+    pub(crate) items: Vec<(String, V)>,
 }
 
 impl<V> Ordered<V> {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Ordered { at: HashMap::new(), items: vec![] }
     }
-    fn get(&self, k: &str) -> Option<&V> {
+    pub(crate) fn get(&self, k: &str) -> Option<&V> {
         self.at.get(k).map(|i| &self.items[*i].1)
     }
-    fn set(&mut self, k: &str, v: V) {
+    pub(crate) fn set(&mut self, k: &str, v: V) {
         match self.at.get(k) {
             Some(i) => self.items[*i].1 = v,
             None => {
@@ -144,7 +144,7 @@ impl<V> Ordered<V> {
             }
         }
     }
-    fn entry(&mut self, k: &str, def: impl FnOnce() -> V) -> &mut V {
+    pub(crate) fn entry(&mut self, k: &str, def: impl FnOnce() -> V) -> &mut V {
         if !self.at.contains_key(k) {
             self.set(k, def());
         }
@@ -152,7 +152,7 @@ impl<V> Ordered<V> {
     }
 }
 
-fn cosine(a: &Ordered<f64>, b: &Ordered<f64>) -> f64 {
+pub(crate) fn cosine(a: &Ordered<f64>, b: &Ordered<f64>) -> f64 {
     let (small, large) = if a.items.len() <= b.items.len() { (a, b) } else { (b, a) };
     small.items.iter().fold(0.0, |sum, (t, w)| match large.get(t) {
         Some(o) if *o != 0.0 => sum + w * o,

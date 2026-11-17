@@ -449,6 +449,56 @@ fn write(app: &AppHandle, label: &str, job: &Value, cancel: &AtomicBool) -> Resu
     Ok(json!({ "text": clean_write_output(&raw) }))
 }
 
+/// AI 검색: 찾은 메모만 근거로 답 (물러서면 찾은 문장 그대로) → { text, sources, quoted }
+// shortcut: 찾기 색인을 물을 때마다 새로 만든다 (메모 수천 개에 수백 ms), 느리다는 말이 나오면 ai-tasks.js 처럼 바뀐 메모만 다시
+fn ask(app: &AppHandle, label: &str, id: &Value, question: &str, cancel: &AtomicBool) -> Result<Value, String> {
+    use memoking_core::rag::*;
+    let (messages, schema) = expand_messages(question);
+    // 넓히지 못해도(모델 오류 · 엉뚱한 답) 질문 낱말만으로 찾는다
+    let words = chat(app, &messages, 120, 0.0, Some(&schema), cancel, None).map(|a| expand_result(&a)).unwrap_or_default();
+    if cancel.load(Ordering::Relaxed) {
+        return Err("멈췄어요".into());
+    }
+    let (chunks, graph) = {
+        let st = app.state::<State>();
+        let guard = st.vault.lock().unwrap();
+        let Some(v) = guard.as_ref() else { return Err("메모 폴더가 아직 없어요. 먼저 메모 폴더를 골라 주세요".into()) };
+        let mut files: Vec<_> = v.files().filter(|e| !memoking_core::body::is_locked_body(&e.body)).collect();
+        files.sort_by(|a, b| a.file.cmp(&b.file));
+        let chunks: Vec<Chunk> = files
+            .iter()
+            .flat_map(|e| {
+                let title = memoking_core::body::extract_title(&e.body);
+                chunk_memo(&e.body).into_iter().map(move |text| Chunk { id: e.id.clone(), title: title.clone(), text, updated: e.meta.updated.clone() })
+            })
+            .collect();
+        // 그래프: 색인(index.json)의 연결 · 관련도
+        let index: Value = std::fs::read_to_string(v.root.join("_memoking").join("index.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        let graph: HashMap<String, Vec<(String, f64)>> = index["memos"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|m| {
+                let rel = m["related"].as_array().into_iter().flatten().map(|r| (r["id"].as_str().unwrap_or_default().to_string(), r["score"].as_f64().unwrap_or(0.0))).collect();
+                (m["id"].as_str().unwrap_or_default().to_string(), rel)
+            })
+            .collect();
+        (chunks, graph)
+    };
+    let now = chrono::Local::now();
+    let picked = retrieve(question, &build_index(chunks), &words, &|id| graph.get(id).cloned().unwrap_or_default(), 4, now);
+    let sources: Vec<Value> = picked.iter().map(|m| json!({ "id": m.id, "title": m.title, "via": m.via })).collect();
+    if picked.is_empty() {
+        return Ok(json!({ "text": NOT_FOUND, "sources": sources, "quoted": false }));
+    }
+    let token = |text: &str| {
+        let _ = app.emit_to(label, "ai:token", [json!({ "id": id, "text": text })]);
+    };
+    let raw = chat(app, &rag_messages(question, &picked, now), 400, 0.2, None, cancel, Some(&token))?;
+    let (text, quoted) = finish_answer(&raw, question, &picked, &words);
+    Ok(json!({ "text": text, "sources": sources, "quoted": quoted }))
+}
+
 // ---------- AI 태그 뒤처리 (ai-tagger.js) — 닫은 메모 · 설정의 "모든 메모" 를 하나씩 차례로 (모델이 하나라서) ----------
 // shortcut: 글 속 일정 자동 등록(ai-events.js · aiEvents)은 아직 — 태그만. date-detect.js 를 옮길 때 tag_one 앞에
 
@@ -658,6 +708,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             })
         }
         "ai:write" => job(label, &arg["id"], |cancel| write(app, label, &arg, cancel)),
+        "ai:ask" => job(label, &arg["id"], |cancel| ask(app, label, &arg["id"], &memoking_core::js::string(&arg["question"]), cancel)),
         "ai:cancel" => {
             if let Some(c) = JOBS.lock().unwrap().get(&format!("{label}:{}", memoking_core::js::string(&arg))) {
                 c.store(true, Ordering::Relaxed);

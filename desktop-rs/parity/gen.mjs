@@ -21,6 +21,7 @@ import { autoTagsFor } from '../../app/js/core/auto-tags.js';
 import { noThink, sseText, engineError, chatBody } from '../../app/js/core/llama-client.js';
 import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibleFix } from '../../app/js/core/ai-write.js';
 import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
+import { chunkMemo, askedPeriod, buildIndex as ragBuildIndex, retrieve as ragRetrieve, expandMessages, expandResult, ragMessages, finishAnswer } from '../../app/js/core/rag.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -263,3 +264,31 @@ write('ai_tags', tagSets.flatMap(([set, memos]) => tagTargets.slice(0, 14).map((
   const req = aiTagRequest(body, memos, { excludeId: id ?? undefined });
   return { set, body, id, messages: req.messages, schema: req.schema, existing: req.existing, grounded: [...req.grounded], results: answers.map((a) => aiTagResult(a, req.existing, body, req.grounded)) };
 })));
+
+// AI 검색: 조각 나누기 · 물은 때 · 찾기 · 답 묻는 말 · 답 다듬기 ("지금" 은 정해 둔 시각)
+const RAG_NOW = new Date('2026-11-18T15:00:00+09:00');
+const ragMemos = [
+  { id: 'w', body: '# 와이파이\n\n집 공유기 비밀번호는 abc12345 이다.\n손님용은 guest2026.', updated: '2026-11-17T10:00:00+09:00' },
+  { id: 'r', body: '# 출시 회의\n\n신제품 출시일은 12월 3일로 정했다. 담당자는 김대리.\n마케팅 예산 3천만 원.', updated: '2026-11-12T09:00:00+09:00' },
+  { id: 'm', body: '# 월세\n\n매달 25일 월세 80만 원 이체. 계좌는 국민 123-45.', updated: '2026-10-20T09:00:00+09:00' },
+  { id: 'c', body: `# 긴 메모\n\n${Array.from({ length: 30 }, (_, i) => `${i}번째 줄 회의 내용과 일정 정리 문장입니다.`).join('\n')}`, updated: '2026-11-18T08:00:00+09:00' },
+  { id: 't', body: '# 제주 여행\n\n숙소는 호텔, 비행기는 오전 9시. 렌터카 예약 완료!', updated: '2026-01-05T09:00:00+09:00' },
+  { id: 'e', body: '', updated: '2026-11-18T08:00:00+09:00' },
+  ...corpus().slice(0, 30).map((t, i) => ({ id: `c${i}`, body: mf.parseMemoFile(t).body, updated: '2026-11-11T09:00:00+09:00' })),
+];
+const ragChunks = ragMemos.flatMap((m) => chunkMemo(m.body).map((text) => ({ id: m.id, title: mf.extractTitle(m.body), text, updated: m.updated })));
+const ragIndex = ragBuildIndex(ragChunks.map((c) => ({ ...c })));
+const ragRelated = { w: [{ id: 'm', score: 0.8 }, { id: 'zz', score: 1 }, { id: 'r', score: 0.5 }], r: [{ id: 't', score: 0.4 }], m: [{ id: 'w', score: 0.9 }] };
+const ragQuestions = ['인터넷 암호 뭐였지', '출시일 언제야', '월세 얼마야', '지난주 회의 내용', '오늘 회의', '차 정비', '이번 달 일정', '올해 여행', '어제 뭐 했지', '그저께', '이번주 일정', '저번 달 월세', '없는말없는말', '뭐야', ''];
+const ragWords = [[], ['비번', '공유기'], ['  ', 7, null]];
+const ragAnswers = ['비밀번호는 abc12345예요 [1]', '메모에서 찾지 못했어요.', '답만 있어요', '[9] 없는 번호 [2]', '', '없어요', '첫째 [1][3] 둘째'];
+write('rag_chunks', ragMemos.map((m) => ({ id: m.id, updated: m.updated, body: m.body, chunks: chunkMemo(m.body) })));
+write('rag', ragQuestions.flatMap((q) => ragWords.map((words) => {
+  const w = expandResult(JSON.stringify({ words }));
+  const picked = ragRetrieve(q, ragIndex, { words: w, related: (id) => ragRelated[id] ?? [], limit: 4, now: RAG_NOW });
+  const p = askedPeriod(q, RAG_NOW);
+  return {
+    q, words, expanded: w, period: p && [p.from.getTime(), p.to.getTime()], picked,
+    messages: ragMessages(q, picked, RAG_NOW), finished: ragAnswers.map((a) => finishAnswer(a, q, picked, w)),
+  };
+})).concat([{ q: 'expand', expand: ['{"words":["a"," b ",1,null,"","c","d","e","f","g"]}', '{"words":"x"}', 'nope'].map(expandResult), messages: expandMessages('질문') }]));

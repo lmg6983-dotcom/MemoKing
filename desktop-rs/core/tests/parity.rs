@@ -342,3 +342,67 @@ fn ai_tags() {
         .collect();
     report("ai_tags", fails, cases.len());
 }
+
+#[test]
+fn rag() {
+    use memoking_core::rag::*;
+    let now = memoking_core::time::parse_js_date("2026-11-18T15:00:00+09:00").unwrap().with_timezone(&chrono::Local);
+    let memos = fixtures("rag_chunks");
+    let mut fails: Vec<String> = memos.iter().filter(|m| json!(chunk_memo(m["body"].as_str().unwrap())) != m["chunks"]).map(|m| format!("조각 {}", m["id"])).collect();
+    let chunks: Vec<Chunk> = memos
+        .iter()
+        .flat_map(|m| {
+            let title = memoking_core::body::extract_title(m["body"].as_str().unwrap());
+            chunk_memo(m["body"].as_str().unwrap()).into_iter().map(move |text| Chunk { id: m["id"].as_str().unwrap().into(), title: title.clone(), text, updated: m["updated"].as_str().map(str::to_string) })
+        })
+        .collect();
+    let index = build_index(chunks);
+    let related = |id: &str| -> Vec<(String, f64)> {
+        match id {
+            "w" => vec![("m".into(), 0.8), ("zz".into(), 1.0), ("r".into(), 0.5)],
+            "r" => vec![("t".into(), 0.4)],
+            "m" => vec![("w".into(), 0.9)],
+            _ => vec![],
+        }
+    };
+    let answers = ["비밀번호는 abc12345예요 [1]", "메모에서 찾지 못했어요.", "답만 있어요", "[9] 없는 번호 [2]", "", "없어요", "첫째 [1][3] 둘째"];
+    let cases = fixtures("rag");
+    for c in &cases {
+        let q = c["q"].as_str().unwrap();
+        if q == "expand" {
+            let got = json!(["{\"words\":[\"a\",\" b \",1,null,\"\",\"c\",\"d\",\"e\",\"f\",\"g\"]}", "{\"words\":\"x\"}", "nope"].map(expand_result));
+            let (m, s) = expand_messages("질문");
+            if got != c["expand"] || json!({ "messages": m, "schema": s }) != c["messages"] {
+                fails.push(format!("expand {got}"));
+            }
+            continue;
+        }
+        let words = expand_result(&json!({ "words": c["words"] }).to_string());
+        let picked = retrieve(q, &index, &words, &related, 4, now);
+        let period = asked_period(q, now).map(|(f, t)| json!([f.timestamp_millis(), t.timestamp_millis()]));
+        let got = json!({
+            "expanded": words,
+            "period": period,
+            "picked": picked.iter().map(Picked::to_json).collect::<Vec<_>>(),
+            "messages": rag_messages(q, &picked, now),
+            "finished": answers.map(|a| {
+                let (text, quoted) = finish_answer(a, q, &picked, &words);
+                json!({ "text": text, "quoted": quoted })
+            }),
+        });
+        // 점수는 끝자리만 다를 수 있다 (V8 Math.log 와 Rust ln 의 마지막 비트)
+        let round = |v: &Value| {
+            let mut v = v.clone();
+            for p in v.as_array_mut().into_iter().flatten() {
+                p["score"] = json!((p["score"].as_f64().unwrap() * 1e12).round());
+            }
+            v
+        };
+        let same = |k: &str, v: &Value| if k == "picked" { round(&c[k]) == round(v) } else { c[k] == *v };
+        let diff: Vec<String> = got.as_object().unwrap().iter().filter(|(k, v)| !same(k, v)).map(|(k, v)| format!("  {k}\n    JS  : {}\n    Rust: {v}", c[k.as_str()])).collect();
+        if !diff.is_empty() {
+            fails.push(format!("{q:?} {}\n{}", c["words"], diff.join("\n")));
+        }
+    }
+    report("rag", fails, cases.len());
+}
