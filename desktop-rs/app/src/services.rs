@@ -555,6 +555,8 @@ fn install_update(app: &AppHandle) -> bool {
     st(app).save_settings();
     // 설치 파일이 이전 설치 폴더를 지우려면 메모킹이 띄운 PowerShell 도우미가 꺼져 있어야 한다
     crate::history::stop_helpers();
+    // 업데이트 플러그인은 설치 파일을 띄우고 바로 끝내(Exit 이벤트 없음) 여기서 끈다. 남은 AI 엔진이 설치 폴더의 파일을 잡고 있지 않게
+    crate::ai::stop();
     if let Err(err) = up.install(bytes) {
         set_update(app, json!({ "status": "error", "message": memoking_core::update::update_error_text(&err.to_string()) }));
         return false;
