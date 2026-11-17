@@ -1,5 +1,5 @@
 //! 시각 — app/js/core/time.js 와 JS Date 에서 쓰는 만큼만.
-use chrono::{DateTime, FixedOffset, Local, NaiveDate, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Duration, FixedOffset, Local, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
 
 /// 2026-09-29T17:30:12+09:00 (사람이 읽기 쉬운 현지 시각 + 시간대) — toLocalIso
 pub fn to_local_iso(t: DateTime<Local>) -> String {
@@ -39,4 +39,18 @@ pub fn local_day(t: DateTime<FixedOffset>) -> (String, u32) {
     use chrono::Datelike;
     let l = t.with_timezone(&Local);
     (l.format("%Y-%m-%d").to_string(), l.weekday().num_days_from_sunday())
+}
+
+/// new Date(y, m, d, h, min) — m 은 0부터, 넘친 달 · 날 · 분은 JS 처럼 앞뒤로 넘겨 센다
+///   겹친 현지 시각(서머타임 끝)은 앞의 것, 없는 현지 시각(서머타임 시작)은 바뀌기 전 시간대로 읽어 뒤로 밀린다 — JS 와 같다
+pub fn js_local(y: i64, m: i64, d: i64, h: i64, min: i64) -> DateTime<Local> {
+    let first = NaiveDate::from_ymd_opt((y + m.div_euclid(12)) as i32, (m.rem_euclid(12) + 1) as u32, 1).expect("연도 범위");
+    let naive = first.and_hms_opt(0, 0, 0).unwrap() + Duration::days(d - 1) + Duration::hours(h) + Duration::minutes(min);
+    match Local.from_local_datetime(&naive) {
+        LocalResult::Single(t) | LocalResult::Ambiguous(t, _) => t,
+        LocalResult::None => {
+            let before = Local.offset_from_utc_datetime(&(naive - Duration::days(1)));
+            Local.from_utc_datetime(&(naive - Duration::seconds(before.local_minus_utc().into())))
+        }
+    }
 }

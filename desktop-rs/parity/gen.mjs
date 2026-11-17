@@ -11,6 +11,7 @@ import { isLockedBody, lockBody, lockRefKey } from '../../app/js/core/memo-lock.
 import { cleanFolderName } from '../../app/js/core/folders.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import { isProgramFile } from '../../app/js/core/file-kinds.js';
+import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, pendingAlerts, fallbackAlert } from '../../app/js/core/reminders.js';
 import { corpus, yamlStrings } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -80,3 +81,62 @@ write('lock_ref', ['attachments/a.png', 'attachments/한글 사진.jpg'].map((sr
 // 열기 전에 물을 프로그램 파일
 const fileNames = ['a.exe', 'A.EXE', 'setup.msi', 'x.lnk', 'run.ps1', 'doc.pdf', 'photo.png', 'noext', '.exe', 'archive.tar.gz', 'dir/evil.bat', 'dir\\evil.CMD', 'q.url?x', 'page.html#a.exe', 'x.settingcontent-ms', 'x.appref-ms', 'x.js', 'x.json'];
 write('program_files', fileNames.map((name) => ({ name, program: isProgramFile(name) })));
+
+// 알림이 울릴 때: 종류마다의 알림 × 정해 둔 "지금" (진짜 시계는 쓰지 않는다). 시각은 ms 숫자로
+const C = '2026-11-10T10:00:00+09:00';
+const rawReminders = [
+  { kind: 'timer', at: '2026-11-17T09:05:00+09:00', minutes: 10 },
+  { kind: 'timer', at: '2026-11-17T09:05:00+09:00', minutes: 10, last: '2026-11-17T09:05:01+09:00' },
+  { kind: 'at', at: '2026-11-17T09:00:00+09:00' },
+  { kind: 'at', at: '2026-11-17T09:00:00+09:00', end: '2026-11-17T10:00:00+09:00', alerts: [10, 1440] },
+  { kind: 'at', at: '2026-11-17T09:00:00+09:00', end: '2026-11-17T10:00:00+09:00', alerts: [0], last: '2026-11-16T09:00:00+09:00' },
+  { kind: 'at', at: '2026-11-17T09:00:00+09:00', alerts: [1440], created: '2026-11-16T20:00:00+09:00' },
+  { kind: 'at', at: '2026-11-17T09:00:00+09:00', alerts: [] },
+  { kind: 'at', at: '2026-11-18T00:00:00+09:00', end: '2026-11-20T00:00:00+09:00', allDay: true, alerts: [-540, 900] },
+  { kind: 'at', at: '2026-11-17T00:00:00+09:00', allDay: true },
+  { kind: 'repeat', repeat: { every: 'day', time: '09:00' }, alerts: [0, 1440] },
+  { kind: 'repeat', repeat: { every: 'day', time: '7:5' }, last: '2026-11-16T07:05:00+09:00' },
+  { kind: 'repeat', repeat: { every: 'week', weekdays: [1, 3], time: '09:00' } },
+  { kind: 'repeat', repeat: { every: 'week', weekdays: [5], time: '09:00', interval: 2, from: '2026-11-13' }, alerts: [30] },
+  { kind: 'repeat', repeat: { every: 'week', weekdays: [0, 6], time: '23:30', interval: 3 } },
+  { kind: 'repeat', repeat: { every: 'month', day: 31, time: '18:30' } },
+  { kind: 'repeat', repeat: { every: 'month', day: 29 }, allDay: true, alerts: [-540, 1440] },
+  { kind: 'repeat', repeat: { every: 'year', month: 2, day: 29, time: '07:00' } },
+  { kind: 'repeat', repeat: { every: 'year', month: 12, day: 31, time: '00:00' }, alerts: [10080] },
+  { kind: 'at', task: true, at: '2026-11-17T09:00:00+09:00' },
+  { kind: 'at', task: true, done: true, at: '2026-11-17T09:00:00+09:00', last: '2026-11-17T09:00:05+09:00' },
+  { kind: 'repeat', task: true, repeat: { every: 'week', weekdays: [2], time: '18:00' } },
+  { kind: 'at', at: '2026-11-17T09:00:00+09:00', alerts: [10], enabled: false },
+  { kind: 'repeat', repeat: { every: 'day', time: '09:00' }, enabled: false },
+  { kind: 'startup', startup: 'every' },
+  { kind: 'startup', startup: 'daily' },
+  { kind: 'startup', startup: 'daily', last: '2026-11-17T08:00:00+09:00' },
+  { kind: 'startup', startup: 'once' },
+];
+const reminders = rawReminders.map((raw, i) => normalizeReminder({ id: `r${i}`, action: 'notify', created: C, ...raw }));
+const nows = ['2025-06-01T00:00:00+09:00', '2026-11-16T08:50:00+09:00', '2026-11-17T08:49:00+09:00', '2026-11-17T08:59:00+09:00', '2026-11-17T09:00:30+09:00',
+  '2026-11-17T09:10:00+09:00', '2026-11-17T23:40:00+09:00', '2026-11-30T23:59:59+09:00', '2026-12-31T23:59:00+09:00', '2027-01-31T10:00:00+09:00',
+  '2027-02-27T12:00:00+09:00', '2028-02-28T21:00:00+09:00'];
+const ms = (d) => (d ? d.getTime() : null);
+const alertJson = (a) => (a ? { at: ms(a.at), start: ms(a.start), offset: a.offset, also: a.also.map((o) => ({ start: ms(o.start), offset: o.offset })), ...('missed' in a ? { missed: a.missed } : {}) } : null);
+write('reminders', reminders.flatMap((r) => nows.map((nowIso) => {
+  const now = new Date(nowIso);
+  const start = r.at ? new Date(r.at) : nextOccurrence(r, now);
+  const offs = alertsOf(r);
+  const t = nextTime(r, now);
+  return {
+    r,
+    now: nowIso,
+    next: ms(nextOccurrence(r, now)),
+    alert: alertJson(nextAlert(r, now)),
+    due: alertJson(dueOccurrence(r, now)),
+    startup: dueAtStartup(r, now),
+    fired: markFired(r, now),
+    live: isLiveCached(structuredClone(r), now),
+    nextTime: Number.isFinite(t) ? t : null,
+    pastEvent: isPastEvent(r, now),
+    alerts: offs,
+    alertTimes: start ? offs.map((o) => alertTime(start, o, Boolean(r.allDay)).getTime()) : null,
+    pending: start ? pendingAlerts(offs, start, { repeat: r.kind === 'repeat', now, fallback: fallbackAlert(Boolean(r.allDay)), allDay: Boolean(r.allDay) }) : null,
+  };
+})));

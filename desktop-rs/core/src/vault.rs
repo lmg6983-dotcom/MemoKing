@@ -335,7 +335,7 @@ impl Vault {
             .take(24)
             .map(|m| m.src.as_str())
             .collect();
-        let live_reminders = e.meta.reminders.iter().filter(|r| is_live_cached(r)).count();
+        let live_reminders = e.meta.reminders.iter().filter(|r| crate::reminders::is_live_cached(r, chrono::Local::now())).count();
         json!({
             "id": e.id,
             "file": e.file,
@@ -1452,21 +1452,6 @@ fn versions_to_prune(names: &[String], now: u128) -> Vec<String> {
 fn has_web_link(body: &str) -> bool {
     let b = body.to_lowercase();
     ["](http://", "](https://", "<http://", "<https://"].iter().any(|p| b.contains(p))
-}
-
-/// 종 단추 · 일정 탭이 세는 알림 (앞으로 울릴 것) — reminders.js isLiveCached
-///   shortcut: 반복 일정은 늘 살아 있다고 보고, 한 번 울리는 것은 켜져 있고 시각이 지나지 않았으면 — 알림을 옮길 때(2단계) JS 규칙 그대로
-fn is_live_cached(r: &Value) -> bool {
-    if r["enabled"] == false {
-        return false;
-    }
-    match r["kind"].as_str() {
-        Some("at" | "timer") => {
-            let end = r["end"].as_str().or(r["at"].as_str()).and_then(time::parse_js_date);
-            end.is_some_and(|t| t.timestamp_millis() > chrono::Local::now().timestamp_millis()) || (r["task"] == true && r["done"] != true)
-        }
-        _ => true,
-    }
 }
 
 #[cfg(test)]
