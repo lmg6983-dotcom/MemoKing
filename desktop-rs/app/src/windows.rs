@@ -1831,15 +1831,22 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         // 손글씨를 쓰는 동안은 창을 끌어도 다른 메모와 합치지 않는다
         "win:inking" => {
             let on = args.first().is_some_and(|v| v == true);
-            let drag = {
+            let dragging = {
                 let mut g = wm();
                 if on {
                     g.inking.insert(label.into());
                 } else {
                     g.inking.remove(label);
                 }
-                let mine = on && g.window_drag.as_ref().is_some_and(|(id, _)| note_label(app, id).as_deref() == Some(label));
-                if mine { g.window_drag.take() } else { None }
+                g.window_drag.as_ref().map(|(id, _)| id.clone())
+            };
+            // note_labels 는 WM 을 놓고 본다 (잠금 차례)
+            let mine = on && dragging.as_deref().is_some_and(|id| note_label(app, id).as_deref() == Some(label));
+            let drag = if mine {
+                let mut g = wm();
+                if g.window_drag.as_ref().map(|(id, _)| id) == dragging.as_ref() { g.window_drag.take() } else { None }
+            } else {
+                None
             };
             if let Some((_, h)) = drag {
                 clear_hover(app, &h);
