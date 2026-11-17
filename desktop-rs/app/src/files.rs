@@ -571,14 +571,11 @@ fn whats_new(app: &AppHandle) -> Value {
 
 // ---------- 목록 창 늘 위 ----------
 
-// shortcut: 왕관 스티커 창은 아직 — 늘 위인 동안 왕관은 늘 제목 줄의 작은 왕관(docked)으로 (누르면 떼어진다). 스티커 창을 옮길 때 진짜 자리 맞추기로
-fn set_list_on_top(app: &AppHandle, on: bool) -> bool {
+pub fn set_list_on_top(app: &AppHandle, on: bool) -> bool {
     let Some(w) = app.get_webview_window("list") else { return false };
     let _ = w.set_always_on_top(on);
     state(app).set_setting("listOnTop", on.into());
-    if on {
-        let _ = app.emit_to("list", "list:crown-docked", [json!({ "docked": true, "animate": true })]);
-    }
+    crate::windows::set_list_crown(app, on, true);
     let _ = app.emit_to("list", "list:on-top", [on]);
     on
 }
@@ -594,7 +591,8 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             crate::os::show_list(app);
             Ok(Value::Null)
         }
-        "list:on-top" | "list:crown-docked" => Ok(list_on_top(app).into()),
+        "list:on-top" => Ok(list_on_top(app).into()),
+        "list:crown-docked" => Ok(crate::windows::list_crown_docked().into()),
         "list:toggle-top" => Ok(set_list_on_top(app, !list_on_top(app)).into()),
         // 찾지 못한 메모 폴더를 다시 찾아본다 (외장 드라이브를 다시 꽂음 등) — 있으면 열고, 없으면 그대로
         "vault:retry" => {

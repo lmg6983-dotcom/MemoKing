@@ -53,6 +53,8 @@ struct Tear {
 struct Sticker {
     kind: &'static str,
     win: Option<String>,
+    /// 목록 창 왕관이 잘려 제목 줄의 작은 왕관으로 들어가 있다 (스티커 창 없음)
+    docked: bool,
 }
 
 /// PowerShell 도우미 (테이프: desktop-pin.ps1) — 붙여 둔 창은 도우미가 다시 뜨면 다시 알린다
@@ -1269,9 +1271,86 @@ fn sticker_size(kind: &str) -> (f64, f64) {
     }
 }
 
-fn sticker_bounds([x, y, w, _]: Rect, kind: &str) -> Rect {
+// 목록 창 제목 줄: 왼쪽은 로고 · Life/Work 스위치, 오른쪽은 단추 묶음 + 창 단추 — 스티커는 그 사이 빈 줄에
+const LIST_STICKER_LEFT: f64 = 200.0;
+const LIST_STICKER_RIGHT: f64 = 250.0;
+// 다시 붙일 때는 빈 줄이 16px 더 넉넉해야 — 창 폭을 조금씩 바꾸는 동안 스티커와 작은 왕관을 오가며 깜빡이지 않게
+const LIST_STICKER_SLACK: f64 = 16.0;
+
+/// list: 목록 창 — 가운데 빈 줄 안으로 (모자라면 로고 오른쪽, 그때는 작은 왕관으로 접힌다)
+fn sticker_bounds([x, y, w, _]: Rect, kind: &str, list: bool) -> Rect {
     let (sw, sh) = sticker_size(kind);
-    [(x + w / 2.0 - sw / 2.0).round(), (y - sh / 2.0).round(), sw, sh]
+    let mut cx = w / 2.0;
+    if list {
+        let lo = LIST_STICKER_LEFT + sw / 2.0;
+        cx = cx.min((w - LIST_STICKER_RIGHT - sw / 2.0).max(lo)).max(lo);
+    }
+    [(x + cx - sw / 2.0).round(), (y - sh / 2.0).round(), sw, sh]
+}
+
+/// 목록 창 왕관 스티커가 잘리지 않고 붙을 수 있는가 — docked: 지금 작은 왕관이면 여유(SLACK)를 더 본다
+fn list_sticker_fits(app: &AppHandle, o: &WebviewWindow, docked: bool) -> bool {
+    let Some(b) = bounds(o).filter(|_| !o.is_maximized().unwrap_or(false) && !o.is_fullscreen().unwrap_or(false)) else { return false };
+    let (sw, _) = sticker_size("crown");
+    if b[2] - LIST_STICKER_LEFT - LIST_STICKER_RIGHT - sw < if docked { LIST_STICKER_SLACK } else { 0.0 } {
+        return false;
+    }
+    // 창 위 가장자리 밖으로 반쯤 나가는 스티커가 화면(작업 표시줄 뺀) 밖에 걸리면 잘린다
+    let [sx, sy, sw, _] = sticker_bounds(b, "crown", true);
+    let [ax, ay, aw, _] = area_at(app, (b[0] + b[2] / 2.0, b[1] + b[3] / 2.0));
+    sy >= ay && sx >= ax && sx + sw <= ax + aw
+}
+
+/// 목록 창 왕관: 잘리면 바로 작은 왕관으로 접고, 자리가 나면 창을 옮기거나 늘이는 손이 멈춘 뒤(220ms) 다시 스티커로
+fn place_list_crown(app: &AppHandle) {
+    let Some(docked) = wm().stickers.get("list").filter(|s| s.kind == "crown").map(|s| s.docked) else { return };
+    let Some(o) = app.get_webview_window("list").filter(on_screen) else { return };
+    if !list_sticker_fits(app, &o, docked) {
+        wm().settle.remove("list");
+        return set_list_docked(app, true);
+    }
+    if docked {
+        let gen = next_seq();
+        wm().settle.insert("list".into(), gen);
+        let app = app.clone();
+        later(220, move || {
+            let fits = app.get_webview_window("list").filter(on_screen).is_some_and(|o| list_sticker_fits(&app, &o, true));
+            if fits && wm().settle.get("list") == Some(&gen) {
+                wm().settle.remove("list");
+                set_list_docked(&app, false);
+            }
+        });
+    }
+}
+
+fn set_list_docked(app: &AppHandle, docked: bool) {
+    let old = {
+        let mut g = wm();
+        let Some(s) = g.stickers.get_mut("list").filter(|s| s.docked != docked) else { return };
+        s.docked = docked;
+        s.win.take()
+    };
+    if let Some(l) = old {
+        close_sticker_win(app, "list", &l, Some("sticker:dock"));
+    }
+    emit(app, "list", "list:crown-docked", json!({ "docked": docked, "animate": true }));
+    if !docked {
+        open_sticker_win(app, "list", true);
+    }
+}
+
+/// 목록 창 늘 위 (files.rs list:toggle-top · 켤 때)
+pub fn set_list_crown(app: &AppHandle, on: bool, animate: bool) {
+    set_sticker(app, "list", on, "crown", animate);
+}
+
+/// 목록 창이 움직이거나 보이고 숨을 때 (os.rs)
+pub fn sync_list_crown(app: &AppHandle) {
+    sync_sticker(app, "list");
+}
+
+pub fn list_crown_docked() -> bool {
+    wm().stickers.get("list").is_some_and(|s| s.docked)
 }
 
 /// 덧창 바탕: 투명 · 그림자 없음 · 작업 표시줄 없음 · 포커스 받지 않음
@@ -1289,26 +1368,35 @@ fn set_sticker(app: &AppHandle, owner: &str, on: bool, kind: &'static str, anima
         }
     };
     if let Some(l) = old {
-        close_sticker_win(app, owner, &l, animate);
+        close_sticker_win(app, owner, &l, animate.then_some("sticker:peel"));
     }
     if keep {
         sync_sticker(app, owner);
         return;
     }
     if on {
-        wm().stickers.insert(owner.into(), Sticker { kind, win: None });
-        open_sticker_win(app, owner, animate);
+        // 목록 창 왕관이 처음부터 잘릴 자리면 스티커 창 없이 작은 왕관으로
+        let docked = owner == "list" && kind == "crown" && app.get_webview_window(owner).is_some_and(|o| !list_sticker_fits(app, &o, false));
+        wm().stickers.insert(owner.into(), Sticker { kind, win: None, docked });
+        if docked {
+            emit(app, owner, "list:crown-docked", json!({ "docked": true, "animate": animate }));
+        } else {
+            open_sticker_win(app, owner, animate);
+        }
     }
 }
 
 /// 주인 창이 움직이거나 보이고 숨을 때: 스티커 창도 따라 (최소화 · 숨김이면 거둔다)
 fn sync_sticker(app: &AppHandle, owner: &str) {
+    if owner == "list" {
+        place_list_crown(app);
+    }
     let Some((win, kind)) = wm().stickers.get(owner).map(|s| (s.win.clone(), s.kind)) else { return };
     let Some(o) = app.get_webview_window(owner) else { return };
     let sw = win.as_ref().and_then(|l| app.get_webview_window(l));
     if on_screen(&o) {
         match (sw, bounds(&o)) {
-            (Some(sw), Some(b)) => set_bounds(&sw, sticker_bounds(b, kind)),
+            (Some(sw), Some(b)) => set_bounds(&sw, sticker_bounds(b, kind, owner == "list")),
             (None, _) => {
                 if let Some(s) = wm().stickers.get_mut(owner) {
                     s.win = None;
@@ -1321,7 +1409,7 @@ fn sync_sticker(app: &AppHandle, owner: &str) {
         if let Some(s) = wm().stickers.get_mut(owner) {
             s.win = None;
         }
-        close_sticker_win(app, owner, &l, false);
+        close_sticker_win(app, owner, &l, None);
     }
 }
 
@@ -1332,11 +1420,11 @@ fn open_sticker_win(app: &AppHandle, owner: &str, animate: bool) {
     let label = format!("sticker-{gen}");
     let kind = {
         let mut g = wm();
-        let Some(s) = g.stickers.get_mut(owner).filter(|s| s.win.is_none()) else { return };
+        let Some(s) = g.stickers.get_mut(owner).filter(|s| s.win.is_none() && !s.docked) else { return };
         s.win = Some(label.clone());
         s.kind
     };
-    let r = sticker_bounds(b, kind);
+    let r = sticker_bounds(b, kind, owner == "list");
     let (app2, owner2, label2) = (app.clone(), owner.to_string(), label.clone());
     let built = overlay(app, &label, &format!("sticker.html?kind={kind}"), (r[2], r[3]))
         .position(r[0], r[1])
@@ -1349,7 +1437,7 @@ fn open_sticker_win(app: &AppHandle, owner: &str, animate: bool) {
                     return;
                 }
                 if let Some(o) = app2.get_webview_window(&owner2).and_then(|o| bounds(&o)) {
-                    set_bounds(&w, sticker_bounds(o, kind));
+                    set_bounds(&w, sticker_bounds(o, kind, owner2 == "list"));
                 }
                 let _ = w.show();
                 emit(&app2, &label2, "sticker:show", json!({ "animate": animate, "kind": kind }));
@@ -1364,8 +1452,8 @@ fn open_sticker_win(app: &AppHandle, owner: &str, animate: bool) {
     }
 }
 
-/// 스티커 창 거두기 — peel: 떼어지는 모습(sticker:peel) 뒤에
-fn close_sticker_win(app: &AppHandle, owner: &str, label: &str, peel: bool) {
+/// 스티커 창 거두기 — how: 떼어지는(sticker:peel) · 작은 왕관으로 들어가는(sticker:dock) 모습 뒤에
+fn close_sticker_win(app: &AppHandle, owner: &str, label: &str, how: Option<&str>) {
     let Some(w) = app.get_webview_window(label) else { return };
     let (app2, owner) = (app.clone(), owner.to_string());
     let destroy = move || {
@@ -1378,9 +1466,9 @@ fn close_sticker_win(app: &AppHandle, owner: &str, label: &str, peel: bool) {
             }
         }
     };
-    if peel && app.get_webview_window(label).is_some_and(|w| is_shown(&w)) {
-        emit(app, label, "sticker:peel", Value::Null);
-        later(220, destroy);
+    if let Some(how) = how.filter(|_| app.get_webview_window(label).is_some_and(|w| is_shown(&w))) {
+        emit(app, label, how, Value::Null);
+        later(if how == "sticker:dock" { 160 } else { 220 }, destroy);
     } else {
         destroy();
     }
@@ -1393,6 +1481,9 @@ fn sticker_owner(label: &str) -> Option<(String, &'static str)> {
 
 fn peel_sticker(app: &AppHandle, label: &str) -> bool {
     let Some((owner, kind)) = sticker_owner(label) else { return false };
+    if owner == "list" {
+        return !crate::files::set_list_on_top(app, false);
+    }
     let Some(id) = note_id(app, &owner) else { return false };
     let state = set_note_layer(app, &id, None, "");
     // 테이프를 떼면 바탕화면 층에서 보통 창으로 — 앞으로 가져와 떨어졌다는 것이 보이게
@@ -1770,7 +1861,10 @@ mod tests {
 
     #[test]
     fn sticker_sits_on_top_edge() {
-        assert_eq!(sticker_bounds([100.0, 200.0, 340.0, 380.0], "crown"), [238.0, 174.0, 64.0, 52.0]);
-        assert_eq!(sticker_bounds([100.0, 200.0, 340.0, 380.0], "tape"), [222.0, 185.0, 96.0, 30.0]);
+        assert_eq!(sticker_bounds([100.0, 200.0, 340.0, 380.0], "crown", false), [238.0, 174.0, 64.0, 52.0]);
+        assert_eq!(sticker_bounds([100.0, 200.0, 340.0, 380.0], "tape", false), [222.0, 185.0, 96.0, 30.0]);
+        // 목록 창: 넓으면 가운데, 좁으면 로고 오른쪽(200px)으로 밀린다
+        assert_eq!(sticker_bounds([0.0, 100.0, 800.0, 600.0], "crown", true), [368.0, 74.0, 64.0, 52.0]);
+        assert_eq!(sticker_bounds([0.0, 100.0, 440.0, 600.0], "crown", true), [200.0, 74.0, 64.0, 52.0]);
     }
 }

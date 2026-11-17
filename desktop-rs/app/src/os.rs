@@ -137,12 +137,14 @@ pub fn show_list(app: &AppHandle) {
         let _ = w.show();
         let _ = w.set_focus();
     }
+    crate::windows::sync_list_crown(app);
 }
 
 pub fn toggle_list(app: &AppHandle) {
     let Some(w) = app.get_webview_window("list") else { return };
     if w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false) && w.is_focused().unwrap_or(false) {
         let _ = w.hide();
+        crate::windows::sync_list_crown(app);
     } else {
         show_list(app);
     }
@@ -269,16 +271,24 @@ pub fn start(app: &AppHandle, list: &WebviewWindow) {
     }
     let app2 = app.clone();
     list.on_window_event(move |e| match e {
-        WindowEvent::Moved(_) | WindowEvent::Resized(_) => remember(&app2, "list", None),
+        WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+            remember(&app2, "list", None);
+            crate::windows::sync_list_crown(&app2);
+        }
         // 목록을 닫아도 메모킹은 알림 영역에서 계속 (끝내기는 알림 영역 메뉴로)
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
             if let Some(w) = app2.get_webview_window("list") {
                 let _ = w.hide();
             }
+            crate::windows::sync_list_crown(&app2);
         }
         _ => {}
     });
+    // 늘 위 목록 창의 왕관 (창이 보이면 붙는다 — show_list)
+    if state(app).setting("listOnTop") == true {
+        crate::windows::set_list_crown(app, true, false);
+    }
     // 못 여는 메모(지웠거나 메모 폴더가 없음)는 기억에서 뺀다
     let open = state(app).setting("openNotes").as_array().cloned().unwrap_or_default();
     for id in open.iter().filter_map(Value::as_str) {
