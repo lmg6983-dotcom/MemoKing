@@ -237,6 +237,26 @@ pub fn stop() {
 }
 
 /// 엔진을 띄워(이미 떠 있으면 그대로) 주소와 열쇠
+/// 메모킹이 충돌하거나 작업 관리자로 꺼져도 엔진(몇 GB 메모리)이 남지 않게: 엔진을 작업 개체에 넣으면 앱이 끝나 그 핸들이 닫힐 때 Windows 가 함께 끈다
+#[cfg(windows)]
+fn kill_with_app(child: &Child) {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::System::JobObjects::*;
+    // 핸들은 일부러 닫지 않는다 (닫히는 때가 엔진을 끄는 때)
+    static JOB: LazyLock<usize> = LazyLock::new(|| {
+        // SAFETY: 이름 없는 작업 개체를 만들고, 살아 있는 지역 구조체를 그 크기와 함께 넘긴다
+        unsafe {
+            let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info as *const _ as *const _, size_of_val(&info) as u32);
+            job as usize
+        }
+    });
+    // SAFETY: 두 핸들 모두 살아 있다 (작업 개체를 못 만들었으면 null 이라 실패만 한다)
+    unsafe { AssignProcessToJobObject(*JOB as _, child.as_raw_handle()) };
+}
+
 fn start(app: &AppHandle) -> Result<(String, String), String> {
     let _one = STARTING.lock().unwrap();
     if let Some(s) = &ENGINE.lock().unwrap().server {
@@ -264,6 +284,8 @@ fn start(app: &AppHandle) -> Result<(String, String), String> {
         ENGINE.lock().unwrap().error = msg.clone();
         msg
     })?;
+    #[cfg(windows)]
+    kill_with_app(&child);
     let log = Arc::new(Mutex::new(Vec::new()));
     if let Some(err) = child.stderr.take() {
         let log = log.clone();
