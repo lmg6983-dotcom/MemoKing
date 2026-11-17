@@ -5,4 +5,5 @@ pub mod memo_file;
 pub mod reminders;
 pub mod tables;
 pub mod time;
+pub mod vault;
 pub mod yaml;

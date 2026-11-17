@@ -83,3 +83,31 @@ fn memo_body() {
         .collect();
     report("memo_body", fails, cases.len());
 }
+
+#[test]
+fn names() {
+    use memoking_core::memo_file::{clean_folder_name, title_to_file_name};
+    let cases = fixtures("names");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let s = c["s"].as_str().unwrap();
+            let (file, folder) = (title_to_file_name(s), clean_folder_name(s));
+            (file != c["file"] || folder != c["folder"]).then(|| format!("{s:?}\n  JS  : {} · {}\n  Rust: {file:?} · {folder:?}", c["file"], c["folder"]))
+        })
+        .collect();
+    report("names", fails, cases.len());
+}
+
+#[test]
+fn conflict_copy() {
+    let cases = fixtures("conflict_copy");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = memoking_core::memo_file::conflict_copy_body(c["body"].as_str().unwrap(), "다른 기기 10월 5일 08:34");
+            (got != c["copy"]).then(|| format!("{:?}\n  JS  : {:?}\n  Rust: {got:?}", c["body"], c["copy"]))
+        })
+        .collect();
+    report("conflict_copy", fails, cases.len());
+}

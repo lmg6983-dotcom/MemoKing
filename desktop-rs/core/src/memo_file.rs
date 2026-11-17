@@ -138,3 +138,76 @@ pub fn serialize_memo_file(meta: &Meta, body: &str) -> String {
     let text = body.replace("\r\n", "\n");
     format!("---\n{}\n---\n{}\n", js::trim_end(&yaml), js::trim_end(&text))
 }
+
+// ---------- 파일 이름 · 충돌 사본 ----------
+
+/// 윈도우 · 안드로이드 · Google Drive 모두에서 안전한 파일 이름 (확장자 빼고) — titleToFileName
+pub fn title_to_file_name(title: &str) -> String {
+    use crate::js::re;
+    static BAD: LazyLock<Regex> = LazyLock::new(|| re(r#"[<>:"/\\|?*#^\[\]\x00-\x1f]"#));
+    static SPACES: LazyLock<Regex> = LazyLock::new(|| re(r"\s+"));
+    static EDGE: LazyLock<Regex> = LazyLock::new(|| re(r"^[.\s]+|[.\s]+$"));
+    static OFFICE: LazyLock<Regex> = LazyLock::new(|| re(r"^(~\$\s*)+"));
+    static RESERVED: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)^(con|prn|aux|nul|com\d|lpt\d)$"));
+    static DEVICE: LazyLock<Regex> = LazyLock::new(|| re(r"^([^.]*?)(\s*)(?=\.|$)"));
+    let s = BAD.replace_all(title, " ");
+    let s = SPACES.replace_all(&s, " ");
+    let s = EDGE.replace_all(js::trim(&s), "");
+    let s = OFFICE.replace(&s, "");
+    let mut name = js::trim(&js::slice16(&s, 60)).to_string();
+    if name.is_empty() {
+        name = crate::body::UNTITLED.into();
+    }
+    // 윈도우는 점 뒤가 있어도(con.txt) 장치 이름으로 본다
+    if RESERVED.is_match(js::trim(name.split('.').next().unwrap_or(""))).unwrap_or(false) {
+        name = DEVICE.replace(&name, "${1}_${2}").into_owned();
+    }
+    name
+}
+
+/// "다른 기기 10월 5일 08:34"
+pub fn conflict_label(now: chrono::DateTime<chrono::Local>) -> String {
+    use chrono::{Datelike, Timelike};
+    format!("다른 기기 {}월 {}일 {:02}:{:02}", now.month(), now.day(), now.hour(), now.minute())
+}
+
+/// 다른 기기에서 들어온 글의 사본 본문 — 제목 줄에 "(label)"
+pub fn conflict_copy_body(body: &str, label: &str) -> String {
+    use crate::js::re;
+    static HEADING: LazyLock<Regex> = LazyLock::new(|| re(r"^\s{0,3}#{1,6}\s+\S"));
+    let text = body.replace("\r\n", "\n");
+    let mut lines: Vec<String> = text.split('\n').map(str::to_string).collect();
+    let i = lines.iter().position(|l| !js::trim(l).is_empty());
+    match i {
+        Some(i) if HEADING.is_match(&lines[i]).unwrap_or(false) => lines[i] = format!("{} ({label})", js::trim_end(&lines[i])),
+        _ => {
+            let at = i.unwrap_or(0);
+            lines.splice(at..at, [format!("# {} ({label})", crate::body::extract_title(&text)), String::new()]);
+        }
+    }
+    lines.join("\n")
+}
+
+/// 폴더 이름 → 파일 이름으로 쓸 수 있는 이름, 못 쓰면 "" (folders.js cleanFolderName)
+pub fn clean_folder_name(raw: &str) -> String {
+    use crate::js::re;
+    static BAD: LazyLock<Regex> = LazyLock::new(|| re(r#"[\\/:*?"<>|\x00-\x1f]"#));
+    static SPACES: LazyLock<Regex> = LazyLock::new(|| re(r"\s+"));
+    static TAIL: LazyLock<Regex> = LazyLock::new(|| re(r"[.\s]+$"));
+    static DEVICE: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)^(con|prn|aux|nul|com\d|lpt\d)$"));
+    let s = SPACES.replace_all(&BAD.replace_all(raw, " "), " ").into_owned();
+    let name = TAIL.replace(&js::slice16(js::trim(&s), 40), "").into_owned();
+    let lower = name.to_lowercase();
+    if name.is_empty() || name.starts_with('.') || name.starts_with("~$") || lower == "_memoking" || lower == "attachments" || DEVICE.is_match(&name).unwrap_or(false) {
+        return String::new();
+    }
+    name
+}
+
+/// 메모 파일 경로 → 그 메모의 폴더 ("" = 폴더 없음)
+pub fn folder_of(file: &str) -> &str {
+    match file.find('/') {
+        Some(i) if i > 0 => &file[..i],
+        _ => "",
+    }
+}

@@ -8,6 +8,7 @@ import * as mf from '../../app/js/core/memo-file.js';
 import { extractTags } from '../../app/js/core/tags.js';
 import { taskProgress } from '../../app/js/core/tasks.js';
 import { isLockedBody } from '../../app/js/core/memo-lock.js';
+import { cleanFolderName } from '../../app/js/core/folders.js';
 import { corpus, yamlStrings } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -49,3 +50,9 @@ write('memo_body', corpus().map((text) => {
     locked: isLockedBody(body),
   };
 }));
+
+// 파일 이름 · 폴더 이름 · 다른 기기 충돌 사본 (제목 줄 · 본문마다)
+const names = [...new Set(corpus().flatMap((t) => [mf.extractTitle(mf.parseMemoFile(t).body), ...t.split('\n').slice(0, 3)]))]
+  .concat(['con', 'CON.txt', 'nul .md', 'com1', 'lpt9 x', '~$문서', '  ...점점  ', '<>:"/\\|?*#^[]', 'a'.repeat(70), '_memoking', 'Attachments', '.숨김', '업무', '업무 ', '업무.', '가'.repeat(50)]);
+write('names', names.map((s) => ({ s, file: mf.titleToFileName(s), folder: cleanFolderName(s) })));
+write('conflict_copy', corpus().map((t) => mf.parseMemoFile(t).body).map((body) => ({ body, copy: mf.conflictCopyBody(body, '다른 기기 10월 5일 08:34') })));

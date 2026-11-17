@@ -1802,6 +1802,7 @@ dependencies = [
  "fancy-regex",
  "serde",
  "serde_json",
+ "uuid",
  "yaml-rust2",
 ]
 
