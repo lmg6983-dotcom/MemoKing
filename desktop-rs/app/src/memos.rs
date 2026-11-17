@@ -75,6 +75,7 @@ fn rescan(app: &AppHandle) {
     for id in removed {
         send_to_note(app, &id, "memo:removed", [Value::Null; 0]);
     }
+    crate::shortcuts::refresh(app); // 다른 기기에서 지운 메모의 단축키는 놓아 다른 앱이 쓰게
     push_list(app);
 }
 
@@ -112,6 +113,7 @@ fn with_open_flag(app: &AppHandle, list: Vec<Value>) -> Value {
     let st = state(app);
     let open: Vec<String> = st.note_labels.lock().unwrap().keys().cloned().collect();
     let views = st.setting("viewCounts");
+    let hotkeys = crate::shortcuts::hotkeys(app);
     Value::Array(
         list.into_iter()
             .map(|mut m| {
@@ -119,7 +121,7 @@ fn with_open_flag(app: &AppHandle, list: Vec<Value>) -> Value {
                 let o = m.as_object_mut().unwrap();
                 o.insert("open".into(), open.contains(&id).into());
                 o.insert("stack".into(), 0.into());
-                o.insert("hotkey".into(), Value::Null);
+                o.insert("hotkey".into(), memoking_core::accelerators::slot_of(&hotkeys, &id).into());
                 o.insert("views".into(), views.get(&id).cloned().unwrap_or(0.into()));
                 m
             })
@@ -141,14 +143,15 @@ fn app_settings(app: &AppHandle) -> Value {
     let st = state(app);
     let s = |k: &str| st.setting(k);
     let not_false = |k: &str| s(k) != false;
-    let off = json!({ "registered": false, "key": "" });
+    let status = |name| crate::shortcuts::status(app, name);
+    let quick = status("quickMemo");
     json!({
         "trashDays": s("trashDays").as_u64().unwrap_or(30),
         "trashCount": with_vault(app, |v| Ok(v.trash_list().len())).unwrap_or(0),
         "autoStart": { "available": false, "enabled": false },
         "historyEnabled": s("historyEnabled") == true,
-        "quickMemo": { "enabled": not_false("quickMemo"), "registered": false, "key": "" },
-        "shortcuts": { "quickMemo": off, "magic": off, "list": off },
+        "quickMemo": { "enabled": not_false("quickMemo"), "registered": quick["registered"], "key": quick["label"] },
+        "shortcuts": { "quickMemo": quick, "magic": status("magic"), "list": status("list") },
         "fitTables": not_false("fitTables"),
         "linkPreviews": not_false("linkPreviews"),
         "autoTags": not_false("autoTags"),
@@ -695,7 +698,11 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             let picked = app.dialog().file().set_title("메모를 저장할 폴더 선택").set_directory(start).blocking_pick_folder();
             if let Some(dir) = picked.and_then(|p| p.into_path().ok()) {
                 st.open_vault(dir);
+                crate::shortcuts::refresh(app); // 다른 폴더의 메모 단축키
                 push_list(app);
+                if st.setting("tutorialDone") != true && !crate::ipc::smoke() {
+                    crate::shortcuts::start_tutorial(app);
+                }
             }
             Ok(st.vault_info(app))
         }
