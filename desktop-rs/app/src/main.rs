@@ -3,6 +3,7 @@
 
 mod ipc;
 mod memos;
+mod settings;
 mod state;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};

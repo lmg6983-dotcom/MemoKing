@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **48 / 187**
-- 이벤트 (Rust → 화면): **7 / 61**
+- 채널 (화면 → Rust): **61 / 187**
+- 이벤트 (Rust → 화면): **10 / 61**
 
 ## 채널
 
@@ -25,15 +25,15 @@
 | ⬜ | `ai:write` |
 | ✅ | `app:info` |
 | ⬜ | `app:report-problem` |
-| ⬜ | `app:set-ai-phone` |
-| ⬜ | `app:set-auto-events` |
+| ✅ | `app:set-ai-phone` |
+| ✅ | `app:set-auto-events` |
 | ⬜ | `app:set-auto-start` |
-| ⬜ | `app:set-auto-tags` |
-| ⬜ | `app:set-fit-tables` |
-| ⬜ | `app:set-link-previews` |
-| ⬜ | `app:set-magic-polish` |
+| ✅ | `app:set-auto-tags` |
+| ✅ | `app:set-fit-tables` |
+| ✅ | `app:set-link-previews` |
+| ✅ | `app:set-magic-polish` |
 | ⬜ | `app:set-quick-memo` |
-| ⬜ | `app:set-trash-days` |
+| ✅ | `app:set-trash-days` |
 | ✅ | `app:settings` |
 | ⬜ | `app:whats-new` |
 | ⬜ | `attachment:copy` |
@@ -88,10 +88,10 @@
 | ⬜ | `hotkey:state` |
 | ⬜ | `image:copy` |
 | ⬜ | `image:save` |
-| ⬜ | `keymap:get` |
+| ✅ | `keymap:get` |
 | ⬜ | `keymap:open-window` |
-| ⬜ | `keymap:reset` |
-| ⬜ | `keymap:set` |
+| ✅ | `keymap:reset` |
+| ✅ | `keymap:set` |
 | ⬜ | `link:open` |
 | ⬜ | `link:preview` |
 | ⬜ | `list:crown-docked` |
@@ -125,9 +125,9 @@
 | ✅ | `memos:list` |
 | ✅ | `memos:search` |
 | ⬜ | `menu:choose` |
-| ⬜ | `mode:hours` |
-| ⬜ | `mode:set` |
-| ⬜ | `mode:work-life` |
+| ✅ | `mode:hours` |
+| ✅ | `mode:set` |
+| ✅ | `mode:work-life` |
 | ⬜ | `pdf:memo` |
 | ⬜ | `pdf:open` |
 | ⬜ | `pdf:save` |
@@ -222,7 +222,7 @@
 | ⬜ | `history:changed` |
 | ⬜ | `hud:hide` |
 | ⬜ | `hud:show` |
-| ⬜ | `keymap:changed` |
+| ✅ | `keymap:changed` |
 | ⬜ | `list:crown-docked` |
 | ⬜ | `list:on-top` |
 | ⬜ | `list:tab` |
@@ -238,9 +238,9 @@
 | ✅ | `memo:removed` |
 | ✅ | `memo:trashed` |
 | ✅ | `memos:changed` |
-| ⬜ | `mode:changed` |
+| ✅ | `mode:changed` |
 | ⬜ | `reminders:changed` |
-| ⬜ | `settings:link-previews` |
+| ✅ | `settings:link-previews` |
 | ⬜ | `shortcuts:changed` |
 | ⬜ | `stack:activating` |
 | ⬜ | `stack:hover` |
