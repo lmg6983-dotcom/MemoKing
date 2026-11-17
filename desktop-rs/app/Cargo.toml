@@ -36,6 +36,8 @@ sha2 = "0.10"
 # 알림 보관함: Windows 알림 DB(wpndatabase.db) 복사본 읽기 · 알림 그림 이름 · 크기
 rusqlite = { version = "0.37", features = ["bundled"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "ico"] }
+# 받아쓰기 엔진 (sherpa-onnx, 이 PC 안에서만) — 빌드할 때 sherpa-onnx 미리 빌드한 라이브러리를 받아 붙인다
+sherpa-rs = { version = "0.6.8", default-features = false, features = ["download-binaries"] }
 
 [target.'cfg(windows)'.dependencies]
 # 알림 창 (누르면 그 메모를 연다)
@@ -50,3 +52,5 @@ windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com"
 windows-core = "0.62"
 # 화면 캡처 메모 (Linux 빌드에는 pipewire 가 있어야 해 Windows 만)
 xcap = "0.9"
+# Windows 는 정적 링크 — 실행 파일 옆에 DLL 을 두지 않아도 되게 (Linux 정적 링크는 RUSTFLAGS 를 바꿔야 해 동적)
+sherpa-rs = { version = "0.6.8", default-features = false, features = ["download-binaries", "static"] }

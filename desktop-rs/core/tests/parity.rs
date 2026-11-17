@@ -877,3 +877,54 @@ fn update() {
         .collect();
     report("update", fails, cases.len());
 }
+
+#[test]
+fn transcript() {
+    use memoking_core::transcript::*;
+    let cases = fixtures("transcript");
+    let s = |v: &Value| v.as_str().unwrap_or_default().to_string();
+    let lines = |v: &Value| -> Vec<Line> {
+        v.as_array().unwrap().iter().map(|l| Line { text: s(&l["text"]), start: l["start"].as_f64().unwrap(), end: l["end"].as_f64().unwrap(), speaker: l["speaker"].as_i64().unwrap_or(0) }).collect()
+    };
+    let vocab = |v: &Value| vocabulary_from(&v.as_array().unwrap().iter().map(|m| (String::new(), s(&m["body"]))).collect::<Vec<_>>(), 120);
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = match c["kind"].as_str().unwrap() {
+                "punctuate" => json!(punctuate(&s(&c["p"]))),
+                "join" => json!(join_transcript(&lines(&c["lines"]))),
+                "label" => {
+                    let segs: Vec<(f64, f64, i64)> = c["segs"].as_array().unwrap().iter().map(|g| (g["start"].as_f64().unwrap(), g["end"].as_f64().unwrap(), g["speaker"].as_i64().unwrap())).collect();
+                    json!(label_speakers(&lines(&c["lines"]), &segs).iter().map(|l| json!({ "text": l.text, "start": l.start, "end": l.end, "speaker": l.speaker })).collect::<Vec<_>>())
+                }
+                "cond" => {
+                    let mut cond = SpeechConditioner::new(16000.0);
+                    let out: Vec<Vec<f64>> = c["input"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|chunk| {
+                            let mut x: Vec<f32> = chunk.as_array().unwrap().iter().map(|v| v.as_f64().unwrap() as f32).collect();
+                            cond.process(&mut x);
+                            x.into_iter().map(f64::from).collect()
+                        })
+                        .collect();
+                    json!(out)
+                }
+                "vocab" => {
+                    let v = vocab(&c["memos"]);
+                    let mut known: Vec<String> = v.known.into_iter().collect();
+                    known.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16())); // JS sort() 는 UTF-16 차례
+                    json!({ "terms": v.terms.iter().map(|(t, w)| json!({ "term": t, "weight": w })).collect::<Vec<_>>(), "known": known })
+                }
+                "fix" => json!(fix_transcript(&s(&c["t"]), &vocab(&c["memos"]))),
+                "replace" => json!(replace_transcript(&s(&c["b"]), &s(&c["src"]), &s(&c["tr"]))),
+                k => panic!("{k}"),
+            };
+            // 소리는 f32 로 견준다 (serde_json 은 긴 소수의 끝자리를 조금 다르게 읽는다)
+            let want = if c["kind"] == "cond" { json!(c["out"].as_array().unwrap().iter().map(|x| x.as_array().unwrap().iter().map(|v| f64::from(v.as_f64().unwrap() as f32)).collect::<Vec<_>>()).collect::<Vec<_>>()) } else { c["out"].clone() };
+            (num_norm(&got) != num_norm(&want)).then(|| format!("{}\n  JS  : {}\n  Rust: {got}", c["kind"], c["out"]))
+        })
+        .collect();
+    report("transcript", fails, cases.len());
+}

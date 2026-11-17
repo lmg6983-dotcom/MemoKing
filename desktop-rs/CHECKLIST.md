@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **171 / 184**
-- 이벤트 (Rust → 화면): **50 / 58**
+- 채널 (화면 → Rust): **179 / 184**
+- 이벤트 (Rust → 화면): **57 / 58**
 
 ## 채널
 
@@ -38,7 +38,7 @@
 | ✅ | `app:whats-new` |
 | ✅ | `attachment:copy` |
 | ✅ | `attachment:copy-many` |
-| ⬜ | `attachment:drag-out` |
+| ✅ | `attachment:drag-out` |
 | ✅ | `attachment:fetch` |
 | ✅ | `attachment:info` |
 | ✅ | `attachment:open` |
@@ -151,13 +151,13 @@
 | ✅ | `stack:tear-start` |
 | ✅ | `sticker:hover` |
 | ✅ | `sticker:peel` |
-| ⬜ | `stt:audio` |
-| ⬜ | `stt:download` |
-| ⬜ | `stt:options` |
-| ⬜ | `stt:remove` |
-| ⬜ | `stt:start` |
-| ⬜ | `stt:status` |
-| ⬜ | `stt:stop` |
+| ✅ | `stt:audio` |
+| ✅ | `stt:download` |
+| ✅ | `stt:options` |
+| ✅ | `stt:remove` |
+| ✅ | `stt:start` |
+| ✅ | `stt:status` |
+| ✅ | `stt:stop` |
 | ✅ | `tags:ai` |
 | ✅ | `tags:ai-all` |
 | ✅ | `tags:ai-auto` |
@@ -208,7 +208,7 @@
 | ✅ | `capture:image` |
 | ✅ | `drag:state` |
 | ✅ | `drive:status` |
-| ⬜ | `edit:clear-format` |
+| ✅ | `edit:clear-format` |
 | ✅ | `edit:paste-plain` |
 | ✅ | `ghost:data` |
 | ✅ | `ghost:drop` |
@@ -242,17 +242,17 @@
 | ✅ | `stack:leaving` |
 | ✅ | `stack:state` |
 | ✅ | `status-bubble:gone` |
-| ⬜ | `sticker:dock` |
+| ✅ | `sticker:dock` |
 | ✅ | `sticker:hover` |
 | ✅ | `sticker:peel` |
 | ✅ | `sticker:show` |
-| ⬜ | `stt:line` |
-| ⬜ | `stt:speakers` |
-| ⬜ | `stt:speaking` |
-| ⬜ | `stt:status` |
+| ✅ | `stt:line` |
+| ✅ | `stt:speakers` |
+| ✅ | `stt:speaking` |
+| ✅ | `stt:status` |
 | ✅ | `tutorial:finished` |
 | ✅ | `tutorial:step` |
 | ✅ | `update:available` |
 | ✅ | `update:ready` |
 | ✅ | `update:state` |
-| ⬜ | `vault:opened` |
+| ✅ | `vault:opened` |

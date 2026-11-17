@@ -504,3 +504,46 @@ write('update', [
   ...snoozes.map((s) => ({ kind: 'snooze', s, out: up.isSnoozed(s, '1.2.0', 1000) })),
   ...notes.map((n) => ({ kind: 'notes', n, out: up.notesText(n) })),
 ]);
+
+// 받아쓰기: 문장부호 · 화자 이름표 · 소리 다듬기 · 말모음으로 고치기 · 음성 카드의 글 바꾸기
+{
+  const tl = await import('../../app/js/core/transcript-lines.js');
+  const tf = await import('../../app/js/core/transcript-fix.js');
+  const { replaceTranscript } = await import('../../app/js/core/voice-card.js');
+  const parts = ['', '  ', '안녕하세요', '회의 시작할까', '좋아요!', '그럼 그렇게 하죠', '진짜', 'hello', '이거 맞나요 ', '네,', '끝.', '뭐 할래', '음…', '괜찮은지'];
+  const L = (text, start, end, speaker) => ({ text, start, end, ...(speaker == null ? {} : { speaker }) });
+  const lineSets = [
+    [], [L('안녕하세요', 0, 1)], [L('안녕하세요', 0, 1.2, 2), L('네 반가워요', 1.2, 2.5, 5), L('  ', 2.5, 3, 7), L('어 그래요', 3, 4, 0), L('다음', 4, 5, 5)],
+    [L('혼자', 0, 1, 1), L('말해요', 1, 2, 1)], [L('모름', 0, 1, 0), L('하나', 1, 2, 3), L('둘', 2, 3, 4), L('둘 이어서', 3, 4, 4)],
+  ];
+  const plain = [L('하나', 0, 1.2), L('둘', 1.2, 2.5), L('셋', 2.5, 3), L('넷', 3, 4), L('다섯', 4, 5), L('여섯', 9.5, 12)];
+  const segSets = [[], [{ start: 0, end: 1.5, speaker: 3 }, { start: 1.5, end: 9, speaker: 0 }], [{ start: 0.5, end: 1, speaker: 1 }, { start: 0, end: 0.6, speaker: 2 }, { start: 3, end: 4.5, speaker: 2 }, { start: 4.4, end: 5, speaker: 1 }], [{ start: 10, end: 11, speaker: 0 }]];
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 48271) % 2147483647) / 2147483647) * 2 - 1;
+  const chunks = [[200, 0.001], [200, 0.3], [200, 0.02], [0, 0], [200, 0.9], [200, 0.003], [200, 0.05], [200, 0.4]]
+    .map(([n, amp]) => Float32Array.from({ length: n }, (_, i) => amp * (Math.sin(i / 7) * 0.7 + rnd() * 0.3)));
+  const cond = new tl.SpeechConditioner(16000);
+  const condCase = { kind: 'cond', input: chunks.map((c) => [...c]), out: chunks.map((c) => [...cond.process(Float32Array.from(c))]) };
+  const memos = [
+    { body: '# 메모킹 회의\n\n#메모킹 #카카오 #김민준\n오늘 메모장 정리' },
+    { body: '# 카카오 미팅\n## 메모킹 출시\n#메모킹 #김민준 #업무일지' },
+    { body: '# 업무일지 정리\n#업무일지 #프로젝트 Memoking release' },
+    { body: '# Memoking release notes\n## 회의록 작성\n#회의록 #Alpha #alpha 2024 12' },
+  ];
+  const corpusMemos = corpus().map((t) => ({ body: mf.parseMemoFile(t).body }));
+  const vocabOut = (v) => ({ terms: v, known: [...v.known].sort() });
+  const vocab = tf.vocabularyFrom(memos);
+  const texts = ['메모킹 회의', '메모깅 출시했어요', '카카우 미팅 잡았나요', '김민줜 씨가 말했다 .그리고', '화자 1: 업무일찌 정리 했어요 .  다음\n\n\n\n화자 2:  메모장 좋아요', '  메모깅을   봤어요?네  ', '', '프로젝드 진행 3.5배', '회의롞\t회의록!'];
+  const bodies = ['앞\n> ![녹음](attachments/a.m4a)\n>\n> 옛 글\n>\n> 둘째\n뒤', '![녹음](attachments/a.m4a) 같은 줄 글\n다음', '![녹음](<attachments/b c.m4a>)', '> ![녹음](attachments/a.m4a)', '없음', '> ![녹음](attachments/a.m4a)\n> 붙은 글'];
+  const transcripts = ['화자 1: 안녕하세요.\n화자 2: #태그 *별* 1. 목록\n- 줄', '', '  \n\n', '그냥 한 줄 [링크](x) <b> | ~ $ \\ _밑줄_ `코드`', '  # 제목처럼\n> 인용처럼\n12) 번호'];
+  write('transcript', [
+    ...parts.map((p) => ({ kind: 'punctuate', p, out: tl.punctuate(p) })),
+    ...lineSets.map((lines) => ({ kind: 'join', lines, out: tl.joinTranscript(lines) })),
+    ...segSets.map((segs) => ({ kind: 'label', lines: plain, segs, out: tl.labelSpeakers(plain, segs) })),
+    condCase,
+    { kind: 'vocab', memos, out: vocabOut(vocab) },
+    { kind: 'vocab', memos: corpusMemos, out: vocabOut(tf.vocabularyFrom(corpusMemos)) },
+    ...texts.flatMap((t) => [{ kind: 'fix', t, memos, out: tf.fixTranscript(t, vocab) }, { kind: 'fix', t, memos: [], out: tf.fixTranscript(t, []) }]),
+    ...bodies.flatMap((b) => ['attachments/a.m4a', 'attachments/b c.m4a'].flatMap((src) => transcripts.map((tr) => ({ kind: 'replace', b, src, tr, out: replaceTranscript(b, src, tr) })))),
+  ]);
+}
