@@ -3,7 +3,6 @@
 //   메모 폴더 잠금은 글을 복사하는 동안만 — 색인 만들기(메모 2,000개면 몇백 ms)는 잠금 밖에서 (JS 는 작업 스레드)
 use crate::state::State;
 use memoking_core::indexer::{index_key, index_output, IndexMemo, AGENT_GUIDE};
-use memoking_core::memo_file::Meta;
 use memoking_core::vault::write_atomic;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -34,8 +33,8 @@ pub fn tick(app: &AppHandle) {
     if !PENDING.swap(false, Ordering::Relaxed) {
         return;
     }
-    let copied: Option<(std::path::PathBuf, Vec<(String, String, Meta, String)>)> = app.state::<State>().vault.lock().unwrap().as_ref().map(|v| {
-        (v.root.clone(), v.files().map(|e| (e.id.clone(), e.file.clone().unwrap_or_default(), e.meta.clone(), e.body.clone())).collect())
+    let copied = app.state::<State>().vault.lock().unwrap().as_ref().map(|v| {
+        (v.root.clone(), v.files().map(|e| (e.id.clone(), e.file.clone().unwrap_or_default(), e.meta.clone(), e.body.clone())).collect::<Vec<_>>())
     });
     let Some((root, memos)) = copied else { return };
     let refs: Vec<IndexMemo> = memos.iter().map(|(id, file, meta, body)| IndexMemo { id, file, meta, body }).collect();
