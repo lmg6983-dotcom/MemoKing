@@ -578,6 +578,10 @@ fn edit_run(app: &AppHandle, label: &str, name: &str) -> Value {
         "pastePlain" => {
             let _ = app.emit_to(label, "edit:paste-plain", [text()]);
         }
+        // 메모 편집기 오른쪽 클릭 메뉴(shim.js)의 서식 지우기 — 편집기가 맡는다 (Ctrl+\ 와 같은 일)
+        "clearFormat" => {
+            let _ = app.emit_to(label, "edit:clear-format", [Value::Null; 0]);
+        }
         _ => {}
     }
     true.into()
