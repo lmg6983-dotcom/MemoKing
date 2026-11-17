@@ -154,10 +154,11 @@ fn app_settings(app: &AppHandle) -> Value {
         "magicPolish": not_false("magicPolish"),
         "autoEvents": not_false("autoEvents"),
         "aiPhone": s("aiPhone") == true,
-        "mode": if s("mode") == "work" { "work" } else { "life" },
+        // 나눠 쓰지 않으면 늘 Life (Electron viewMode)
+        "mode": if s("workLife") == true && s("mode") == "work" { "work" } else { "life" },
         "workLife": s("workLife") == true,
-        "workHours": s("workHours"),
-        "keymap": s("keymap").as_object().cloned().unwrap_or_default(),
+        "workHours": crate::settings::normalize_hours(&s("workHours")),
+        "keymap": Value::Object(crate::settings::clean_overrides(&s("keymap"))),
         "mcp": { "available": false, "connected": false },
         "version": app.package_info().version.to_string(),
     })

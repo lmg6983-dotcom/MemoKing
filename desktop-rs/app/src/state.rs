@@ -99,7 +99,8 @@ impl State {
     /// 메모 폴더 열기 (못 열면 vault_error 에 까닭)
     pub fn open_vault(&self, dir: PathBuf) {
         let mut v = Vault::new(&dir, "pc");
-        let mode = if self.setting("mode") == "work" { "work" } else { "life" };
+        // 새 메모는 지금 고른 Work / Life 로 — 나눠 쓰지 않으면 Life (Electron viewMode)
+        let mode = if self.setting("workLife") == true && self.setting("mode") == "work" { "work" } else { "life" };
         v.default_mode = mode.into();
         match v.open() {
             Ok(()) => {

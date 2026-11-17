@@ -28,6 +28,9 @@ window.addEventListener('load', () => setTimeout(async () => {
   });
 
   if (label === 'list') {
+    // 이벤트를 받을 준비는 미리 (Tauri 의 listen 은 비동기로 자리 잡는다)
+    let trashed = null;
+    mk.on('memo:trashed', (t) => (trashed = t));
     await check('window.memoking (preload.cjs 그대로)', () => mk?.platform === 'desktop');
     await check('메모 폴더 열림', async () => Boolean((await mk.info()).vaultPath));
     await check('옮기지 않은 채널은 실패로', () => mk.tags.aiStatus().then(() => false, (e) => /tags:ai-status/.test(e.message)));
@@ -61,8 +64,6 @@ window.addEventListener('load', () => setTimeout(async () => {
       && (await mk.memos.folders()).includes('업무') && (await mk.memos.list()).find((m) => m.id === seed.id).folder === '업무');
     await check('색 바꾸기', async () => (await mk.memo.set(fresh.id, { color: 'pink' }))?.color === 'pink');
     await check('버전 목록 (저장 전 글)', async () => Array.isArray(await mk.memo.versions(fresh.id)));
-    let trashed = null;
-    mk.on('memo:trashed', (t) => (trashed = t));
     await check('지우기 → 휴지통 · 되돌리기 띠', async () => (await mk.memo.remove(fresh.id)) === true && (await until(() => trashed)).title === '새 메모');
     await check('휴지통 되살리기', async () => (await mk.trash.restore(trashed.name)) === fresh.id && (await mk.trash.list()).length === 0);
     await check('설정 읽기', async () => /^\d+\.\d+\.\d+$/.test((await mk.settings.get()).version));
