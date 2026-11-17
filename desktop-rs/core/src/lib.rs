@@ -3,6 +3,7 @@ pub mod body;
 pub mod js;
 pub mod memo_file;
 pub mod reminders;
+pub mod search;
 pub mod tables;
 pub mod time;
 pub mod vault;

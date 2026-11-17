@@ -50,6 +50,22 @@ window.addEventListener('load', () => setTimeout(async () => {
     mk.on('memos:changed', (memos) => (pushed = memos));
     await check('새 메모 창 열기', async () => typeof (await mk.memo.create({})) === 'string');
     await check('저장한 메모가 목록에 (이벤트)', () => until(() => pushed?.some((m) => m.title === '새 메모' && m.open), 15000));
+    const fresh = pushed.find((m) => m.title === '새 메모');
+    // 메모 창 점검이 끝난 뒤에 그 메모를 지운다 (창이 먼저 닫히면 그쪽 결과가 오지 않는다)
+    let noteDone = false;
+    window.__TAURI__.event.listen('smoke:note-done', () => (noteDone = true));
+    await until(() => noteDone, 15000).catch(() => {});
+    await check('태그 목록', async () => (await mk.tags.list()).some((t) => t.name === '점검' && t.count === 1));
+    await check('초성 찾기', async () => (await mk.memos.search('ㅅㅎ')).some((m) => m.id === seed.id));
+    await check('폴더 만들고 옮기기', async () => (await mk.memos.createFolder('업무')) === '업무' && (await mk.memos.moveToFolder([seed.id], '업무')) === 1
+      && (await mk.memos.folders()).includes('업무') && (await mk.memos.list()).find((m) => m.id === seed.id).folder === '업무');
+    await check('색 바꾸기', async () => (await mk.memo.set(fresh.id, { color: 'pink' }))?.color === 'pink');
+    await check('버전 목록 (저장 전 글)', async () => Array.isArray(await mk.memo.versions(fresh.id)));
+    let trashed = null;
+    mk.on('memo:trashed', (t) => (trashed = t));
+    await check('지우기 → 휴지통 · 되돌리기 띠', async () => (await mk.memo.remove(fresh.id)) === true && (await until(() => trashed)).title === '새 메모');
+    await check('휴지통 되살리기', async () => (await mk.trash.restore(trashed.name)) === fresh.id && (await mk.trash.list()).length === 0);
+    await check('설정 읽기', async () => /^\d+\.\d+\.\d+$/.test((await mk.settings.get()).version));
     return done();
   }
 

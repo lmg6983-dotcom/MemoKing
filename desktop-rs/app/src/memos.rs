@@ -82,10 +82,14 @@ fn send_to_note<S: serde::Serialize + Clone>(app: &AppHandle, id: &str, event: &
 
 /// 목록 창의 메모 카드들 (열린 메모 표시와 함께)
 fn list_memos(app: &AppHandle) -> Value {
+    let list = state(app).vault.lock().unwrap().as_ref().map(|v| v.list()).unwrap_or_default();
+    with_open_flag(app, list)
+}
+
+fn with_open_flag(app: &AppHandle, list: Vec<Value>) -> Value {
     let st = state(app);
     let open: Vec<String> = st.note_labels.lock().unwrap().keys().cloned().collect();
     let views = st.setting("viewCounts");
-    let list = st.vault.lock().unwrap().as_ref().map(|v| v.list()).unwrap_or_default();
     Value::Array(
         list.into_iter()
             .map(|mut m| {
@@ -99,6 +103,43 @@ fn list_memos(app: &AppHandle) -> Value {
             })
             .collect(),
     )
+}
+
+// 폴더가 바뀌었다 — 열린 메모 창의 폴더 표시도 새로
+fn refresh_note_files(app: &AppHandle) {
+    let labels: Vec<(String, String)> = state(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    for (id, label) in labels {
+        let file = with_vault(app, |v| Ok(v.get(&id).map(|m| m["file"].clone()).unwrap_or(Value::Null))).unwrap_or(Value::Null);
+        let _ = app.emit_to(label.as_str(), "memo:meta", [json!({ "file": file })]);
+    }
+}
+
+/// 설정 화면이 읽는 것 (utils.js appSettings) — 아직 옮기지 않은 것은 "쓸 수 없음" 으로
+fn app_settings(app: &AppHandle) -> Value {
+    let st = state(app);
+    let s = |k: &str| st.setting(k);
+    let not_false = |k: &str| s(k) != false;
+    let off = json!({ "registered": false, "key": "" });
+    json!({
+        "trashDays": s("trashDays").as_u64().unwrap_or(30),
+        "trashCount": with_vault(app, |v| Ok(v.trash_list().len())).unwrap_or(0),
+        "autoStart": { "available": false, "enabled": false },
+        "historyEnabled": s("historyEnabled") == true,
+        "quickMemo": { "enabled": not_false("quickMemo"), "registered": false, "key": "" },
+        "shortcuts": { "quickMemo": off, "magic": off, "list": off },
+        "fitTables": not_false("fitTables"),
+        "linkPreviews": not_false("linkPreviews"),
+        "autoTags": not_false("autoTags"),
+        "magicPolish": not_false("magicPolish"),
+        "autoEvents": not_false("autoEvents"),
+        "aiPhone": s("aiPhone") == true,
+        "mode": if s("mode") == "work" { "work" } else { "life" },
+        "workLife": s("workLife") == true,
+        "workHours": s("workHours"),
+        "keymap": s("keymap").as_object().cloned().unwrap_or_default(),
+        "mcp": { "available": false, "connected": false },
+        "version": app.package_info().version.to_string(),
+    })
 }
 
 pub fn push_list(app: &AppHandle) {
@@ -157,6 +198,21 @@ fn create_memo(app: &AppHandle, opts: &Value) -> Result<Value, String> {
     let id = with_vault(app, |v| Ok(v.create(opts["color"].as_str(), opts["mode"].as_str(), opts["folder"].as_str().unwrap_or(""))))?;
     open_note(app, &id)?;
     Ok(id.into())
+}
+
+// 메모 창의 지우기: 휴지통으로 옮기고 창을 닫는다 — 목록이 되돌리기 띠를 띄운다
+fn remove_memo(app: &AppHandle, id: &str) -> Result<Value, String> {
+    let title = with_vault(app, |v| Ok(v.get(id).map(|m| m["title"].clone()).unwrap_or_default()))?;
+    let label = state(app).note_labels.lock().unwrap().remove(id);
+    let r = with_vault(app, |v| v.trash(id).map_err(|e| e.to_string()));
+    if let Some(w) = label.and_then(|l| app.get_webview_window(&l)) {
+        let _ = w.destroy();
+    }
+    if let Ok(Some(name)) = &r {
+        let _ = app.emit_to("list", "memo:trashed", [json!({ "name": name, "title": title })]);
+    }
+    push_list(app);
+    r.map(|n| n.is_some().into())
 }
 
 /// 메모 채널 — 이 파일이 맡지 않는 채널이면 None
@@ -222,6 +278,94 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             push_list(app);
             r.map(|()| true.into())
         }
+        "memos:search" => {
+            let exclude = args.get(1).and_then(Value::as_str).map(str::to_string);
+            let found = with_vault(app, |v| Ok(v.search(&arg_str(args, 0), exclude.as_deref())));
+            found.map(|list| with_open_flag(app, list))
+        }
+        "tags:list" => with_vault(app, |v| Ok(json!(memoking_core::search::collect_tags(&v.list())))),
+        "folders:create" => with_vault(app, |v| v.create_folder(&arg_str(args, 0)).map(Value::from)),
+        "folders:rename" => {
+            let r = with_vault(app, |v| v.rename_folder(&arg_str(args, 0), &arg_str(args, 1)).map(Value::from));
+            refresh_note_files(app);
+            r
+        }
+        "folders:delete" => {
+            let r = with_vault(app, |v| v.delete_folder(&arg_str(args, 0)));
+            refresh_note_files(app);
+            push_list(app);
+            r
+        }
+        "memo:move-folder" => {
+            let ids: Vec<String> = match args.first() {
+                Some(Value::Array(a)) => a.iter().take(500).map(|v| v.as_str().map_or_else(|| v.to_string(), str::to_string)).collect(),
+                Some(v) => vec![v.as_str().map_or_else(|| v.to_string(), str::to_string)],
+                None => vec![],
+            };
+            let folder = arg_str(args, 1);
+            let mut moved = 0;
+            for id in &ids {
+                if with_vault(app, |v| v.move_to_folder(id, &folder)).unwrap_or(false) {
+                    moved += 1;
+                }
+            }
+            refresh_note_files(app);
+            push_list(app);
+            Ok(moved.into())
+        }
+        "memo:set" => {
+            let id = arg_str(args, 0);
+            let r = with_vault(app, |v| v.set_meta(&id, args.get(1).unwrap_or(&Value::Null)).map_err(|e| e.to_string()));
+            if let Ok(Some(m)) = &r {
+                send_to_note(app, &id, "memo:meta", [m.clone()]);
+                push_list(app);
+            }
+            r.map(|m| m.unwrap_or(Value::Null))
+        }
+        "memo:remove" => remove_memo(app, &arg_str(args, 0)),
+        "memo:links" => with_vault(app, |v| Ok(v.links(&arg_str(args, 0)))),
+        "memo:link" => {
+            let target = arg_str(args, 1);
+            let on = args.get(2) != Some(&Value::Bool(false));
+            let r = with_vault(app, |v| v.link(&arg_str(args, 0), &target, on).map_err(|e| e.to_string()));
+            send_to_note(app, &target, "memo:links-changed", [Value::Null; 0]);
+            r.map(|x| x.unwrap_or(Value::Null))
+        }
+        "memo:versions" => with_vault(app, |v| Ok(json!(v.versions(&arg_str(args, 0))))),
+        "memo:version" => with_vault(app, |v| Ok(v.version(&arg_str(args, 0), &arg_str(args, 1)).map_or(Value::Null, Value::from))),
+        "memo:restore-version" => {
+            let id = arg_str(args, 0);
+            let r = with_vault(app, |v| v.restore_version(&id, &arg_str(args, 1)).map_err(|e| e.to_string()));
+            if let Ok(m) = &r {
+                if let (Some(title), Some(l)) = (m["title"].as_str(), state(app).note_labels.lock().unwrap().get(&id)) {
+                    if let Some(w) = app.get_webview_window(l) {
+                        let _ = w.set_title(title);
+                    }
+                }
+                push_list(app);
+            }
+            r
+        }
+        "trash:list" => with_vault(app, |v| Ok(json!(v.trash_list()))),
+        "trash:preview" => with_vault(app, |v| Ok(v.trash_preview(&arg_str(args, 0)).map_or(Value::Null, Value::from))),
+        "trash:restore" => {
+            let r = with_vault(app, |v| v.restore_trash(&arg_str(args, 0)).map_err(|e| e.to_string()));
+            push_list(app);
+            r.map(|id| id.map_or(Value::Null, Value::from))
+        }
+        "trash:delete" => with_vault(app, |v| v.delete_trash(&arg_str(args, 0)).map(Value::from).map_err(|e| e.to_string())),
+        "trash:empty" => with_vault(app, |v| Ok(v.empty_trash(None))),
+        "vault:choose" => {
+            use tauri_plugin_dialog::DialogExt;
+            let start = with_vault(app, |v| Ok(v.root.clone())).unwrap_or_else(|_| State::suggested_vault(app));
+            let picked = app.dialog().file().set_title("메모를 저장할 폴더 선택").set_directory(start).blocking_pick_folder();
+            if let Some(dir) = picked.and_then(|p| p.into_path().ok()) {
+                st.open_vault(dir);
+                push_list(app);
+            }
+            Ok(st.vault_info(app))
+        }
+        "app:settings" => Ok(app_settings(app)),
         "win:close" => {
             if let Some(w) = app.get_webview_window(label) {
                 let _ = w.close();

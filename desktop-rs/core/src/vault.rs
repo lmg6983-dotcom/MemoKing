@@ -626,6 +626,382 @@ impl Vault {
     }
 }
 
+// ---------- 휴지통 · 버전 · 폴더 · 머리말 · 연결 · 찾기 ----------
+impl Vault {
+    /// 찾기 — 제목 · 본문 글(서식 뺀 줄)에서
+    pub fn search(&self, query: &str, exclude: Option<&str>) -> Vec<Value> {
+        let matches = crate::search::matcher(query);
+        let texts: HashMap<&str, String> = self.entries.values().filter(|e| e.file.is_some()).map(|e| (e.id.as_str(), body::plain_lines(&e.body, usize::MAX).join("\n"))).collect();
+        self.list()
+            .into_iter()
+            .filter(|m| {
+                let id = m["id"].as_str().unwrap_or_default();
+                Some(id) != exclude && matches(&[m["title"].as_str().unwrap_or_default(), texts.get(id).map_or("", String::as_str)])
+            })
+            .collect()
+    }
+
+    /// 색 · 고정 · 표 크기 · 그림 · 회상 날 · Work/Life — 머리말만 쓴다. 쓰지 못했으면 되돌리고 None
+    pub fn set_meta(&mut self, id: &str, patch: &Value) -> io::Result<Option<Value>> {
+        let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
+        let prev = e.meta.clone();
+        if let Some(c) = patch["color"].as_str().filter(|c| memo_file::COLORS.contains(c)) {
+            e.meta.color = c.into();
+        }
+        if let Some(p) = patch["pinned"].as_bool() {
+            e.meta.pinned = p;
+        }
+        if patch["tables"].is_array() {
+            e.meta.tables = crate::tables::normalize_tables(&patch["tables"]);
+        }
+        if let Some(ink) = patch["ink"].as_str() {
+            e.meta.ink = memo_file::normalize_ink_path(&Value::String(ink.into()));
+        }
+        if let Some(day) = patch.get("day") {
+            e.meta.day = memo_file::normalize_day(if day.is_null() { &Value::Null } else { day });
+        }
+        if let Some(m) = patch["mode"].as_str().filter(|m| *m == "work" || *m == "life") {
+            e.meta.mode = m.into();
+        }
+        let known = e.body.clone();
+        let wrote = if e.file.is_some() { self.write(&mut e, &known) } else { Ok(Wrote::Yes) };
+        let ok = matches!(wrote, Ok(Wrote::Yes));
+        if !ok {
+            e.meta = prev; // 쓰지 못했다 — 바뀐 것처럼 보이지 않게
+        }
+        self.entries.insert(id.into(), e);
+        wrote?;
+        Ok(if ok { self.get(id) } else { None })
+    }
+
+    /// 연결한 메모 · 나를 연결한 메모
+    pub fn links(&self, id: &str) -> Value {
+        let Some(e) = self.entries.get(id) else { return json!({ "links": [], "backlinks": [], "suggestions": [] }) };
+        let brief = |e: &Entry| json!({ "id": e.id, "title": body::extract_title(&e.body), "color": e.meta.color });
+        let links: Vec<Value> = e.meta.links.iter().filter_map(|to| self.entries.get(to)).map(brief).collect();
+        let backlinks: Vec<Value> = self.entries.values().filter(|o| o.id != id && o.meta.links.iter().any(|l| l == id)).map(brief).collect();
+        // shortcut: 비슷한 메모 추천(색인의 related)은 색인(index.json)을 옮길 때
+        json!({ "links": links, "backlinks": backlinks, "suggestions": [] })
+    }
+
+    /// 메모 연결 켜고 끄기 — 쓰지 못했으면 되돌리고 None
+    pub fn link(&mut self, id: &str, target: &str, on: bool) -> io::Result<Option<Value>> {
+        if id == target || !self.entries.contains_key(id) || !self.entries.contains_key(target) {
+            return Ok(None);
+        }
+        // 상대 메모에 id 가 저장돼 있어야 파일 이름이 바뀌어도 연결이 남는다
+        if on {
+            let mut t = self.entries.remove(target).unwrap();
+            let known = t.body.clone();
+            let r = if t.file.is_some() && !t.id_saved { self.write(&mut t, &known) } else { Ok(Wrote::Yes) };
+            self.entries.insert(target.into(), t);
+            if !matches!(r?, Wrote::Yes) {
+                return Ok(None);
+            }
+        }
+        let mut e = self.entries.remove(id).unwrap();
+        let prev = e.meta.links.clone();
+        e.meta.links.retain(|l| l != target);
+        if on {
+            e.meta.links.push(target.into());
+        }
+        let known = e.body.clone();
+        let r = if e.file.is_some() { self.write(&mut e, &known) } else { Ok(Wrote::Yes) };
+        let ok = matches!(r, Ok(Wrote::Yes));
+        if !ok {
+            e.meta.links = prev;
+        }
+        self.entries.insert(id.into(), e);
+        r?;
+        Ok(ok.then(|| self.links(id)))
+    }
+
+    // ---------- 버전 ----------
+
+    /// 버전 목록 (새것 먼저)
+    pub fn versions(&self, id: &str) -> Vec<Value> {
+        let Some(dir) = self.version_dir(id) else { return vec![] };
+        let mut list: Vec<(u128, String, String)> = version_names(&dir).into_iter().filter_map(|n| Some((version_time(&n)?, fs::read_to_string(dir.join(&n)).ok()?, n))).collect();
+        list.sort_by_key(|v| std::cmp::Reverse(v.0));
+        list.into_iter()
+            .map(|(at, text, name)| {
+                let iso = chrono::DateTime::from_timestamp_millis(at as i64).map(|t| t.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string());
+                json!({ "name": name, "at": iso, "title": body::extract_title(&text), "preview": body::extract_preview(&text, 120), "chars": text.encode_utf16().count() })
+            })
+            .collect()
+    }
+
+    pub fn version(&self, id: &str, name: &str) -> Option<String> {
+        let dir = self.version_dir(id)?;
+        (version_time(name).is_some() && !name.contains(['/', '\\'])).then(|| fs::read_to_string(dir.join(name)).ok()).flatten()
+    }
+
+    /// 지금 내용도 버전으로 남겨 두고(되돌리기를 되돌릴 수 있게) 고른 버전으로 바꾼다
+    pub fn restore_version(&mut self, id: &str, name: &str) -> io::Result<Value> {
+        let (Some(text), Some(e)) = (self.version(id, name), self.entries.get(id)) else { return Ok(Value::Null) };
+        // 잠긴 메모 · 잠긴 버전은 열쇠를 다룰 때까지 되돌리지 않는다 (잠금이 풀리거나 비밀번호가 되돌아가지 않게)
+        if body::is_locked_body(&e.body) || body::is_locked_body(&text) {
+            return Ok(json!({ "error": "잠긴 메모에는 잠기기 전 버전을 되돌릴 수 없어요" }));
+        }
+        let current = e.body.clone();
+        self.keep_version(id, &current, true);
+        let mut e = self.entries.remove(id).unwrap();
+        let before = e.meta.clone();
+        e.body = text;
+        e.meta.updated = Some(time::now_iso());
+        e.meta.device = Some(self.device.clone());
+        let r = self.write(&mut e, &current);
+        let ok = matches!(r, Ok(Wrote::Yes));
+        if !ok {
+            e.body = current;
+            e.meta = before;
+        }
+        self.entries.insert(id.into(), e);
+        r?;
+        Ok(if ok { self.get(id).unwrap_or(Value::Null) } else { json!({ "error": "그사이 다른 기기에서 이 메모가 바뀌어 되돌리지 못했어요. 다시 해 주세요" }) })
+    }
+
+    // ---------- 폴더 ----------
+
+    pub fn create_folder(&self, name: &str) -> Result<String, String> {
+        let dir = memo_file::clean_folder_name(name);
+        if dir.is_empty() {
+            return Err("폴더 이름으로 쓸 수 없어요".into());
+        }
+        fs::create_dir_all(self.root.join(&dir)).map_err(|e| e.to_string())?;
+        Ok(dir)
+    }
+
+    /// 옮긴 메모의 머리말에 옮긴 때(moved) — 디스크의 글 그대로에 더한다 (잠긴 메모가 풀린 채 쓰이지 않게)
+    fn stamp_moved(&mut self, id: &str) {
+        let Some(file) = self.entries.get(id).and_then(|e| e.file.clone()) else { return };
+        let path = self.abs(&file);
+        let Ok(text) = fs::read_to_string(&path) else { return };
+        let (mut meta, b) = memo_file::parse_memo_file(&text);
+        let moved = time::now_iso();
+        meta.extra.insert("moved".into(), moved.clone().into());
+        if write_atomic(&path, memo_file::serialize_memo_file(&meta, &b).as_bytes()).is_ok() {
+            let e = self.entries.get_mut(id).unwrap();
+            e.meta.extra.insert("moved".into(), moved.into());
+            e.stamp = stamp_of(&path).ok();
+        }
+    }
+
+    /// 메모를 다른 폴더로 ("" = 맨 위) → 옮겼는가
+    pub fn move_to_folder(&mut self, id: &str, folder: &str) -> Result<bool, String> {
+        let dir = memo_file::clean_folder_name(folder);
+        if !folder.is_empty() && dir.is_empty() {
+            return Err("폴더 이름으로 쓸 수 없어요".into());
+        }
+        let Some(e) = self.entries.get_mut(id) else { return Ok(false) };
+        let Some(file) = e.file.clone() else {
+            e.folder = dir; // 아직 파일이 없는 새 메모 — 처음 저장할 때 이 폴더에
+            return Ok(true);
+        };
+        if memo_file::folder_of(&file) == dir {
+            return Ok(true);
+        }
+        let base = file.rsplit('/').next().unwrap_or(&file).trim_end_matches(".md").to_string();
+        let target = self.unique_file(&base, &dir, None);
+        if let Some(p) = self.abs(&target).parent() {
+            fs::create_dir_all(p).map_err(|e| e.to_string())?;
+        }
+        fs::rename(self.abs(&file), self.abs(&target)).map_err(|e| e.to_string())?;
+        self.entries.get_mut(id).unwrap().file = Some(target);
+        self.stamp_moved(id);
+        Ok(true)
+    }
+
+    /// 폴더 이름 바꾸기 → 새 이름
+    pub fn rename_folder(&mut self, from: &str, to: &str) -> Result<String, String> {
+        let dst = memo_file::clean_folder_name(to);
+        if memo_file::clean_folder_name(from) != from || dst.is_empty() {
+            return Err("폴더 이름으로 쓸 수 없어요".into());
+        }
+        if dst == from {
+            return Ok(dst);
+        }
+        let a = self.root.join(from);
+        if !a.is_dir() {
+            return Err("폴더를 찾지 못했어요. 다른 곳에서 지웠을 수 있어요".into());
+        }
+        let case_only = dst.to_lowercase() == from.to_lowercase(); // Windows 는 대소문자만 다른 이름을 같은 폴더로 본다
+        if !case_only && self.root.join(&dst).exists() {
+            return Err(format!("\"{dst}\" 폴더가 이미 있어요. 다른 이름을 써 주세요"));
+        }
+        if case_only {
+            let tmp = self.root.join(format!(".rename-{}", &uuid::Uuid::new_v4().simple().to_string()[..6]));
+            fs::rename(&a, &tmp).and_then(|()| fs::rename(&tmp, self.root.join(&dst))).map_err(|e| e.to_string())?;
+        } else {
+            fs::rename(&a, self.root.join(&dst)).map_err(|e| e.to_string())?;
+        }
+        let ids: Vec<String> = self.entries.values().filter(|e| e.file.as_deref().is_some_and(|f| memo_file::folder_of(f) == from)).map(|e| e.id.clone()).collect();
+        for id in &ids {
+            let e = self.entries.get_mut(id).unwrap();
+            let f = e.file.clone().unwrap();
+            e.file = Some(format!("{dst}{}", &f[from.len()..]));
+            self.stamp_moved(id);
+        }
+        Ok(dst)
+    }
+
+    /// 폴더 지우기: 안의 메모는 모두 맨 위로 꺼내고, 그러고 나서 비었으면 폴더를 지운다 (메모가 아닌 파일이 남으면 그대로)
+    pub fn delete_folder(&mut self, name: &str) -> Result<Value, String> {
+        if memo_file::clean_folder_name(name) != name {
+            return Err("폴더 이름으로 쓸 수 없어요".into());
+        }
+        let ids: Vec<String> = self.entries.values().filter(|e| e.file.as_deref().is_some_and(|f| memo_file::folder_of(f) == name)).map(|e| e.id.clone()).collect();
+        let mut moved = vec![];
+        for id in ids {
+            if self.move_to_folder(&id, "")? {
+                moved.push(id);
+            }
+        }
+        let dir = self.root.join(name);
+        let junk = ["desktop.ini", "thumbs.db", ".ds_store"];
+        fn files(d: &Path, junk: &[&str]) -> usize {
+            fs::read_dir(d).map_or(0, |rd| {
+                rd.flatten()
+                    .map(|x| if x.path().is_dir() { files(&x.path(), junk) } else { usize::from(!junk.contains(&x.file_name().to_string_lossy().to_lowercase().as_str())) })
+                    .sum()
+            })
+        }
+        let removed = !dir.exists() || (files(&dir, &junk) == 0 && fs::remove_dir_all(&dir).is_ok());
+        Ok(json!({ "moved": moved.len(), "removed": removed, "ids": moved }))
+    }
+
+    // ---------- 휴지통 ----------
+
+    /// 휴지통의 메모 파일 (이름만 받는다 — 휴지통 밖 경로는 거부)
+    fn trash_file(&self, name: &str) -> Option<PathBuf> {
+        let ok = !name.is_empty() && !name.contains(['/', '\\']) && name != ".." && name.to_lowercase().ends_with(".md");
+        let file = self.trash_dir().join(name);
+        (ok && file.is_file()).then_some(file)
+    }
+
+    // 휴지통 메모들 (이름, 파일, 지운 때 ms, 머리말, 본문)
+    fn trash_entries(&self) -> Vec<(String, PathBuf, i64, Meta, String)> {
+        let Ok(rd) = fs::read_dir(self.trash_dir()) else { return vec![] };
+        rd.flatten()
+            .filter_map(|d| {
+                let name = d.file_name().to_string_lossy().into_owned();
+                let path = d.path();
+                if !name.to_lowercase().ends_with(".md") || !path.is_file() {
+                    return None;
+                }
+                let at = trashed_at(&name).unwrap_or_else(|| fs::metadata(&path).and_then(|m| m.modified()).map_or(0, |t| ms(t) as i64));
+                let (meta, b) = memo_file::parse_memo_file(&fs::read_to_string(&path).ok()?);
+                Some((name, path, at, meta, b))
+            })
+            .collect()
+    }
+
+    pub fn trash_list(&self) -> Vec<Value> {
+        let mut list = self.trash_entries();
+        list.sort_by_key(|t| std::cmp::Reverse(t.2));
+        list.into_iter()
+            .map(|(name, _, at, meta, b)| {
+                let deleted = chrono::DateTime::from_timestamp_millis(at).map(|t| t.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string());
+                // shortcut: 잠긴 메모의 첨부 수(머리말 표)는 잠금을 옮길 때 — 잠긴 메모는 0 으로 보인다
+                let attachments = if body::is_locked_body(&b) { 0 } else { body::extract_media(&b).len() };
+                json!({ "name": name, "title": body::extract_title(&b), "preview": body::extract_preview(&b, 100), "color": meta.color, "deletedAt": deleted, "attachments": attachments })
+            })
+            .collect()
+    }
+
+    /// 휴지통 메모의 글 미리보기 (잠긴 메모는 내용을 보이지 않는다)
+    pub fn trash_preview(&self, name: &str) -> Option<String> {
+        let (_, b) = memo_file::parse_memo_file(&fs::read_to_string(self.trash_file(name)?).ok()?);
+        if body::is_locked_body(&b) {
+            return Some("(잠긴 메모라 내용을 볼 수 없어요)".into());
+        }
+        Some(crate::js::slice16(&body::plain_lines(&b, usize::MAX).into_iter().skip(1).collect::<Vec<_>>().join("\n"), 1500))
+    }
+
+    /// 메모 폴더로 되돌린다 (이름이 겹치면 "(2)") — 함께 휴지통에 간 첨부도. 되살린 메모 id
+    pub fn restore_trash(&mut self, name: &str) -> io::Result<Option<String>> {
+        let Some(file) = self.trash_file(name) else { return Ok(None) };
+        let (meta, b) = memo_file::parse_memo_file(&fs::read_to_string(&file)?);
+        if !body::is_locked_body(&b) {
+            for m in body::extract_media(&b) {
+                let (Some(live), held) = (self.resolve(&m.src), self.trash_dir().join(&m.src)) else { continue };
+                if m.src.starts_with("attachments/") && !live.exists() && held.exists() {
+                    let _ = fs::rename(held, live);
+                }
+            }
+        }
+        // 폴더에 있던 메모는 그 폴더로 (폴더가 없어졌으면 다시 만든다)
+        let dir = memo_file::clean_folder_name(meta.extra.get("trashedFrom").and_then(Value::as_str).unwrap_or(""));
+        let target = self.unique_file(&memo_file::title_to_file_name(&body::extract_title(&b)), &dir, None);
+        if let Some(p) = self.abs(&target).parent() {
+            fs::create_dir_all(p)?;
+        }
+        fs::rename(&file, self.abs(&target))?;
+        if meta.extra.contains_key("trashedFrom") {
+            let mut m = meta;
+            m.extra.shift_remove("trashedFrom");
+            write_atomic(&self.abs(&target), memo_file::serialize_memo_file(&m, &b).as_bytes())?;
+        }
+        // 이 기기에서 되살린 메모는 "다른 기기에서 방금 고친 메모" 로 알리지 않는다
+        self.own_files.insert(target.clone());
+        self.scan();
+        self.own_files.clear();
+        Ok(self.entries.values().find(|e| e.file.as_deref() == Some(target.as_str())).map(|e| e.id.clone()))
+    }
+
+    /// 휴지통의 메모 하나를 영구 삭제
+    pub fn delete_trash(&self, name: &str) -> io::Result<bool> {
+        let Some(file) = self.trash_file(name) else { return Ok(false) };
+        fs::remove_file(file)?;
+        self.purge_trash_attachments(i64::MAX);
+        Ok(true)
+    }
+
+    /// 휴지통 비우기 — older_than_days 를 주면 그보다 오래 있던 것만
+    pub fn empty_trash(&self, older_than_days: Option<u32>) -> Value {
+        let cutoff = older_than_days.map_or(i64::MAX, |d| ms(SystemTime::now()) as i64 - i64::from(d) * 86_400_000);
+        let mut memos = 0;
+        for (_, path, at, _, _) in self.trash_entries() {
+            if at <= cutoff && fs::remove_file(path).is_ok() {
+                memos += 1;
+            }
+        }
+        json!({ "memos": memos, "files": self.purge_trash_attachments(cutoff) })
+    }
+
+    /// 휴지통의 첨부 중 살아 있는 메모 · 휴지통의 메모가 쓰지 않는 것을 지운다
+    ///   잠긴 메모가 하나라도 있으면(어느 첨부를 쓰는지 열쇠 없이는 모른다) 아무것도 지우지 않는다 — 잃지 않게
+    fn purge_trash_attachments(&self, older_than: i64) -> usize {
+        let trash = self.trash_entries();
+        let bodies = self.entries.values().map(|e| e.body.as_str()).chain(trash.iter().map(|t| t.4.as_str()));
+        let mut used = HashSet::new();
+        for b in bodies {
+            if body::is_locked_body(b) {
+                return 0;
+            }
+            used.extend(body::extract_media(b).into_iter().map(|m| m.src));
+        }
+        let dir = self.trash_dir().join(ATTACH_DIR);
+        let Ok(rd) = fs::read_dir(&dir) else { return 0 };
+        rd.flatten()
+            .filter(|d| {
+                let src = format!("{ATTACH_DIR}/{}", d.file_name().to_string_lossy());
+                let old = d.metadata().and_then(|m| m.modified()).is_ok_and(|t| (ms(t) as i64) <= older_than);
+                d.path().is_file() && old && !used.contains(&src) && fs::remove_file(d.path()).is_ok()
+            })
+            .count()
+    }
+}
+
+/// 지운 때: 휴지통 파일 이름 "제목 (20260930-153000).md" 의 시각 (현지)
+fn trashed_at(name: &str) -> Option<i64> {
+    use chrono::TimeZone;
+    let stem = name.get(..name.len().checked_sub(3)?)?;
+    let inner = stem.strip_suffix(')')?.rsplit_once('(')?.1;
+    let n = chrono::NaiveDateTime::parse_from_str(inner, "%Y%m%d-%H%M%S").ok()?;
+    chrono::Local.from_local_datetime(&n).earliest().map(|t| t.timestamp_millis())
+}
+
 fn version_names(dir: &Path) -> Vec<String> {
     fs::read_dir(dir).map_or(vec![], |rd| rd.flatten().map(|d| d.file_name().to_string_lossy().into_owned()).filter(|n| version_time(n).is_some()).collect())
 }
@@ -752,5 +1128,58 @@ mod tests {
         let now = version_time("20261008-153000.md").unwrap();
         let names: Vec<String> = (0..35).map(|i| format!("202610{:02}-120000.md", 1 + i % 28) + if i >= 28 { "-2" } else { "" }).map(|n| n.replace(".md-2", "-2.md")).collect();
         assert_eq!(versions_to_prune(&names, now).len(), 5);
+    }
+
+    #[test]
+    fn trash_restore_folders_meta_links_versions() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let a = v.create(None, None, "");
+        v.save(&a, "# 가\n본문 하나").unwrap();
+        let b = v.create(None, None, "");
+        v.save(&b, "# 나\n장보기 목록").unwrap();
+        // 찾기 (초성)
+        assert_eq!(v.search("ㅈㅂㄱ", None).len(), 1);
+        assert_eq!(v.search("", Some(&a)).len(), 1);
+        // 머리말: 색 · 고정
+        let m = v.set_meta(&a, &json!({ "color": "blue", "pinned": true })).unwrap().unwrap();
+        assert!(m["color"] == "blue" && m["pinned"] == true);
+        assert_eq!(v.list()[0]["id"], json!(a), "고정한 메모가 먼저");
+        // 연결 · 나를 연결한 메모
+        v.link(&a, &b, true).unwrap().unwrap();
+        assert_eq!(v.links(&b)["backlinks"][0]["id"], json!(a));
+        // 폴더: 만들기 · 옮기기 · 이름 바꾸기 · 지우기 (메모는 맨 위로)
+        assert_eq!(v.create_folder("업무").unwrap(), "업무");
+        assert!(v.move_to_folder(&a, "업무").unwrap());
+        assert_eq!(v.entry(&a).unwrap().file.as_deref(), Some("업무/가.md"));
+        assert_eq!(v.rename_folder("업무", "회사").unwrap(), "회사");
+        assert!(root.join("회사/가.md").exists());
+        assert_eq!(v.folders(), vec!["회사"]);
+        let r = v.delete_folder("회사").unwrap();
+        assert!(r["moved"] == 1 && r["removed"] == true && root.join("가.md").exists());
+        // 휴지통 → 목록 · 미리보기 · 되살리기 (같은 id 로)
+        v.move_to_folder(&b, "보관").unwrap();
+        let name = v.trash(&b).unwrap().unwrap();
+        assert_eq!(v.trash_list()[0]["title"], "나");
+        assert_eq!(v.trash_preview(&name).as_deref(), Some("장보기 목록"));
+        let back = v.restore_trash(&name).unwrap().unwrap();
+        assert_eq!(back, b);
+        assert_eq!(v.entry(&b).unwrap().file.as_deref(), Some("보관/나.md"), "지운 폴더로 되살린다");
+        assert!(!fs::read_to_string(root.join("보관/나.md")).unwrap().contains("trashedFrom"));
+        // 영구 삭제 · 비우기
+        let n = v.trash(&b).unwrap().unwrap();
+        assert!(v.delete_trash(&n).unwrap() && v.trash_list().is_empty());
+        // 버전 되돌리기 (지금 글도 버전으로 남긴다)
+        v.save(&a, "# 가\n두 번째").unwrap();
+        let vs = v.versions(&a);
+        assert_eq!(vs.len(), 1);
+        let name = vs[0]["name"].as_str().unwrap().to_string();
+        assert_eq!(v.version(&a, &name).as_deref(), Some("# 가\n본문 하나"));
+        let restored = v.restore_version(&a, &name).unwrap();
+        assert_eq!(restored["body"], "# 가\n본문 하나");
+        assert!(!v.versions(&a).is_empty());
+        assert!(v.version(&a, "../x.md").is_none());
+        fs::remove_dir_all(root).unwrap();
     }
 }

@@ -111,3 +111,17 @@ fn conflict_copy() {
         .collect();
     report("conflict_copy", fails, cases.len());
 }
+
+#[test]
+fn search() {
+    let cases = fixtures("search");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let (q, t) = (c["q"].as_str().unwrap(), c["t"].as_str().unwrap());
+            let hit = memoking_core::search::matcher(q)(&[t]);
+            (hit != c["hit"]).then(|| format!("{q:?} in {t:?}: JS {} Rust {hit}", c["hit"]))
+        })
+        .collect();
+    report("search", fails, cases.len());
+}

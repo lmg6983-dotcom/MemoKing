@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **13 / 187**
-- 이벤트 (Rust → 화면): **3 / 61**
+- 채널 (화면 → Rust): **33 / 187**
+- 이벤트 (Rust → 화면): **6 / 61**
 
 ## 채널
 
@@ -34,7 +34,7 @@
 | ⬜ | `app:set-magic-polish` |
 | ⬜ | `app:set-quick-memo` |
 | ⬜ | `app:set-trash-days` |
-| ⬜ | `app:settings` |
+| ✅ | `app:settings` |
 | ⬜ | `app:whats-new` |
 | ⬜ | `attachment:copy` |
 | ⬜ | `attachment:copy-many` |
@@ -73,9 +73,9 @@
 | ⬜ | `drive:sync` |
 | ⬜ | `drive:use` |
 | ⬜ | `edit:run` |
-| ⬜ | `folders:create` |
-| ⬜ | `folders:delete` |
-| ⬜ | `folders:rename` |
+| ✅ | `folders:create` |
+| ✅ | `folders:delete` |
+| ✅ | `folders:rename` |
 | ⬜ | `history:apps` |
 | ⬜ | `history:block` |
 | ⬜ | `history:clear` |
@@ -107,23 +107,23 @@
 | ⬜ | `memo:handoff` |
 | ⬜ | `memo:import` |
 | ⬜ | `memo:keep-copy` |
-| ⬜ | `memo:link` |
-| ⬜ | `memo:links` |
+| ✅ | `memo:link` |
+| ✅ | `memo:links` |
 | ⬜ | `memo:lock` |
-| ⬜ | `memo:move-folder` |
+| ✅ | `memo:move-folder` |
 | ✅ | `memo:open` |
 | ⬜ | `memo:open-lock` |
-| ⬜ | `memo:remove` |
-| ⬜ | `memo:restore-version` |
+| ✅ | `memo:remove` |
+| ✅ | `memo:restore-version` |
 | ✅ | `memo:save` |
 | ✅ | `memo:save-sync` |
-| ⬜ | `memo:set` |
+| ✅ | `memo:set` |
 | ⬜ | `memo:unlock` |
-| ⬜ | `memo:version` |
-| ⬜ | `memo:versions` |
+| ✅ | `memo:version` |
+| ✅ | `memo:versions` |
 | ✅ | `memos:folders` |
 | ✅ | `memos:list` |
-| ⬜ | `memos:search` |
+| ✅ | `memos:search` |
 | ⬜ | `menu:choose` |
 | ⬜ | `mode:hours` |
 | ⬜ | `mode:set` |
@@ -166,13 +166,13 @@
 | ⬜ | `tags:ai-status` |
 | ⬜ | `tags:ai-stop` |
 | ⬜ | `tags:auto` |
-| ⬜ | `tags:list` |
+| ✅ | `tags:list` |
 | ⬜ | `tags:suggest` |
-| ⬜ | `trash:delete` |
-| ⬜ | `trash:empty` |
-| ⬜ | `trash:list` |
-| ⬜ | `trash:preview` |
-| ⬜ | `trash:restore` |
+| ✅ | `trash:delete` |
+| ✅ | `trash:empty` |
+| ✅ | `trash:list` |
+| ✅ | `trash:preview` |
+| ✅ | `trash:restore` |
 | ⬜ | `tutorial:action` |
 | ⬜ | `tutorial:current` |
 | ⬜ | `tutorial:event` |
@@ -182,7 +182,7 @@
 | ⬜ | `update:install` |
 | ⬜ | `update:later` |
 | ⬜ | `update:state` |
-| ⬜ | `vault:choose` |
+| ✅ | `vault:choose` |
 | ⬜ | `vault:retry` |
 | ⬜ | `vault:reveal` |
 | ⬜ | `vault:reveal-index` |
@@ -232,11 +232,11 @@
 | ⬜ | `memo:handoff` |
 | ⬜ | `memo:highlight` |
 | ⬜ | `memo:layer` |
-| ⬜ | `memo:links-changed` |
-| ⬜ | `memo:meta` |
+| ✅ | `memo:links-changed` |
+| ✅ | `memo:meta` |
 | ⬜ | `memo:reminders` |
 | ✅ | `memo:removed` |
-| ⬜ | `memo:trashed` |
+| ✅ | `memo:trashed` |
 | ✅ | `memos:changed` |
 | ⬜ | `mode:changed` |
 | ⬜ | `reminders:changed` |

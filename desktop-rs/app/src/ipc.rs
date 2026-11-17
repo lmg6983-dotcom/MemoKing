@@ -34,6 +34,9 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
                 println!("{} {} {}", if ok { "✔" } else { "✖" }, r["name"].as_str().unwrap_or("?"), r["detail"].as_str().unwrap_or(""));
             }
             done.0 += 1;
+            if label != "list" {
+                let _ = app.emit_to("list", "smoke:note-done", ());
+            }
             if done.0 == 2 {
                 let (app, code) = (app.clone(), i32::from(done.1 > 0));
                 std::thread::spawn(move || {

@@ -27,6 +27,7 @@ pub fn window<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWindowB
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![ipc::ipc])
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
         //   sync/<채널>: 동기 호출 (shim.js sendSync). 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
