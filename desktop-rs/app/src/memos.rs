@@ -714,12 +714,6 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             }
             Ok(Value::Null)
         }
-        "win:minimize" => {
-            if let Some(w) = app.get_webview_window(label) {
-                let _ = w.minimize();
-            }
-            Ok(Value::Null)
-        }
         // 예비 창은 아직 — 메모 창은 늘 주소의 id 로 연다
         "win:spare" => Ok(Value::Null),
         "win:painted" => Ok(Value::Null),

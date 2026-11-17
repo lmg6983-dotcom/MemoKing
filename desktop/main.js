@@ -233,7 +233,6 @@ function openVault(dir) {
       windowManager.forgetLayer(id); // 테이프로 바탕화면에 붙여 둔 기억
       if (memoHotkeys.slotOf(id)) memoHotkeys.set(id, null); // 단축키는 놓아 다른 앱이 쓰게
     });
-    next.on('indexed', (index) => windowManager.listWin?.webContents.send('vault:indexed', index.generatedAt));
     next.on('error', (err) => console.error('[vault]', err));
     next.open();
     vault = next;

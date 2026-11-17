@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **114 / 187**
-- 이벤트 (Rust → 화면): **24 / 61**
+- 채널 (화면 → Rust): **111 / 184**
+- 이벤트 (Rust → 화면): **23 / 58**
 
 ## 채널
 
@@ -101,7 +101,6 @@
 | ⬜ | `mcp:connect` |
 | ⬜ | `mcp:copy` |
 | ⬜ | `mcp:set-write` |
-| ✅ | `memo:copy-text` |
 | ✅ | `memo:create` |
 | ✅ | `memo:get` |
 | ✅ | `memo:handoff` |
@@ -185,13 +184,11 @@
 | ✅ | `vault:choose` |
 | ✅ | `vault:retry` |
 | ✅ | `vault:reveal` |
-| ✅ | `vault:reveal-index` |
 | ✅ | `vault:use` |
 | ✅ | `win:close` |
 | ⬜ | `win:dim-titlebar` |
 | ⬜ | `win:grow-width` |
 | ⬜ | `win:inking` |
-| ✅ | `win:minimize` |
 | ✅ | `win:painted` |
 | ✅ | `win:spare` |
 | ⬜ | `win:status-bubble` |
@@ -209,8 +206,6 @@
 | ⬜ | `bubble:hide` |
 | ⬜ | `bubble:show` |
 | ⬜ | `capture:image` |
-| ⬜ | `card:copied` |
-| ⬜ | `card:trash` |
 | ⬜ | `drag:state` |
 | ✅ | `drive:status` |
 | ⬜ | `edit:clear-format` |
@@ -260,5 +255,4 @@
 | ⬜ | `update:available` |
 | ⬜ | `update:ready` |
 | ⬜ | `update:state` |
-| ✅ | `vault:indexed` |
 | ⬜ | `vault:opened` |

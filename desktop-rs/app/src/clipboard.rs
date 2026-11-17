@@ -1,4 +1,4 @@
-// 클립보드 · 글 공유 채널 — desktop/ipc-handlers.js 의 clipboard:* · memo:copy-text · card:copy · card:share-file
+// 클립보드 · 글 공유 채널 — desktop/ipc-handlers.js 의 clipboard:* · card:copy · card:share-file
 use crate::state::State;
 use memoking_core::share_text::hotkey_copy_text;
 use serde_json::{json, Value};
@@ -24,7 +24,7 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             let r = if html.is_empty() { clip.write_text(text) } else { clip.write_html(html, Some(text)) };
             r.map(|()| true.into()).map_err(|e| e.to_string())
         }
-        "memo:copy-text" | "card:copy" => Ok(memo_text(app, &arg(0)).is_some_and(|(text, _)| clip.write_text(text).is_ok()).into()),
+        "card:copy" => Ok(memo_text(app, &arg(0)).is_some_and(|(text, _)| clip.write_text(text).is_ok()).into()),
         // 메모 공유: 글을 "제목.txt" 파일로 (공유 방법은 attachment:share 가 이어서)
         "card:share-file" => {
             use base64::Engine;

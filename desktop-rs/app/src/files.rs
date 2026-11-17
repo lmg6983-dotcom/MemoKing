@@ -606,12 +606,6 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             },
             None => Value::Null,
         }),
-        "vault:reveal-index" => {
-            if let Some(root) = vault_root(app) {
-                let _ = app.opener().reveal_item_in_dir(root.join("_memoking").join("index.json"));
-            }
-            Ok(Value::Null)
-        }
         "link:open" => Ok(open_web_page(app, &memoking_core::js::string(&arg(0))).into()),
         "link:preview" => Ok(link_preview(app, &arg_str(args, 0), arg(1)["refresh"].as_bool().unwrap_or(false))),
         "image:copy" => {

@@ -12,7 +12,7 @@ import { cleanFolderName } from '../../app/js/core/folders.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import { isProgramFile } from '../../app/js/core/file-kinds.js';
 import { shareText } from '../../app/js/core/share-text.js';
-import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, pendingAlerts, fallbackAlert, alarmText, describeReminder } from '../../app/js/core/reminders.js';
+import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, alarmText, describeReminder } from '../../app/js/core/reminders.js';
 import { normalizeFeeds } from '../../app/js/core/calendar-feed-list.js';
 import { hotkeyCopyText, normalizeHotkeys, assignHotkey } from '../../app/js/core/memo-hotkeys.js';
 import { isValidAccelerator, displayAccelerator, normalizeShortcuts, withShortcuts } from '../../app/js/core/accelerators.js';
@@ -155,7 +155,6 @@ write('reminders', reminders.flatMap((r) => nows.map((nowIso) => {
     // 울릴 때 글 (알림 실행기: 울릴 회차가 없으면 켤 때 알림으로)
     text: Object.values(alarmText(r, '메모 제목', dueOccurrence(r, now) ?? { startup: true }, now)),
     describe: describeReminder(r, now),
-    pending: start ? pendingAlerts(offs, start, { repeat: r.kind === 'repeat', now, fallback: fallbackAlert(Boolean(r.allDay)), allDay: Boolean(r.allDay) }) : null,
   };
 })));
 

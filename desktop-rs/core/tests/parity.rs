@@ -188,7 +188,6 @@ fn reminders() {
                 "alertTimes": start.map(|s| offs.iter().map(|&o| alert_time(s, o, all_day).timestamp_millis()).collect::<Vec<_>>()),
                 "text": alarm_text(r, "메모 제목", due_occurrence(r, now).as_ref(), now),
                 "describe": describe_reminder(r, now),
-                "pending": start.map(|s| pending_alerts(&offs, s, r["kind"] == "repeat", now, Some(fallback_alert(all_day)), all_day)),
             });
             let diff: Vec<String> = got.as_object().unwrap().iter().filter(|(k, v)| c[k.as_str()] != **v).map(|(k, v)| format!("  {k}\n    JS  : {}\n    Rust: {v}", c[k.as_str()])).collect();
             (!diff.is_empty()).then(|| format!("{} @ {}\n{}", r["id"], c["now"], diff.join("\n")))

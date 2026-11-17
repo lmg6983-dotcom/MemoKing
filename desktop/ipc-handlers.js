@@ -266,7 +266,6 @@ export function registerIpc(ctx) {
     return info;
   });
   ipcMain.handle('vault:reveal', () => getVault() && shell.openPath(getVault().root));
-  ipcMain.handle('vault:reveal-index', () => getVault() && shell.showItemInFolder(getVault().indexFile));
 
   // ---------- 튜토리얼 ----------
   ipcMain.handle('tutorial:start', () => startTutorial());
@@ -651,14 +650,6 @@ export function registerIpc(ctx) {
   }
 
   // ---------- 창 크기 조정 ----------
-  // 본문 복사 (메모 단축키와 같은 글: 제목 줄 빼고, 서식 기호 없이, 줄 앞 띄어쓰기 그대로)
-  ipcMain.handle('memo:copy-text', async (_e, id) => {
-    const m = getVault()?.get(String(id));
-    if (!m || m.locked) return false;
-    await writeClipboard({ text: hotkeyCopyText(m.body) });
-    return true;
-  });
-
   // 메모 단축키 (Ctrl+Alt+1~9)
   ipcMain.handle('hotkey:state', (_e, id) => memoHotkeys.state(String(id)));
   ipcMain.handle('hotkey:set', (_e, id, slot, opts) => {
@@ -1352,7 +1343,6 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 창 최소화 / 늘 위 / 스티커 ----------
-  ipcMain.handle('win:minimize', (event) => senderWindow(event)?.minimize());
   ipcMain.handle('capture:done', (event, rect) => {
     const r = rect && ['x', 'y', 'width', 'height'].every((k) => Number.isFinite(rect[k])) ? rect : null;
     return wm.finishAreaCapture(event.sender.id, r);

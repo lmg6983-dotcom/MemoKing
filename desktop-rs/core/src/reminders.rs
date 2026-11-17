@@ -262,23 +262,6 @@ pub fn alert_time(start: Time, offset: i64, all_day: bool) -> Time {
     }
 }
 
-/// 아직 울릴 수 있는 미리 알림만 (now 보다 뒤). 반복 일정은 다음 회차에 울리므로 모두 남긴다.
-///   골랐는데 모두 지났으면(5분 뒤 일정에 "10분 전") 비워 두지 않고 fallback 에
-pub fn pending_alerts(alerts: &[i64], start: Time, repeat: bool, now: Time, fallback: Option<i64>, all_day: bool) -> Vec<i64> {
-    let mut list = alerts.to_vec();
-    list.sort_unstable_by(|a, b| b.cmp(a));
-    list.dedup();
-    if repeat {
-        return list;
-    }
-    let future = |o: i64| alert_time(start, o, all_day) > now;
-    let keep: Vec<i64> = list.iter().copied().filter(|&o| future(o)).collect();
-    match fallback {
-        Some(f) if keep.is_empty() && !list.is_empty() && future(f) => vec![f],
-        _ => keep,
-    }
-}
-
 /// 격주 · N주마다 일정에서 그날이 울리는 주인가 (기준 날이 든 주에서 interval 주째마다)
 fn on_week(repeat: &Value, day: Time) -> bool {
     let Some(interval) = repeat["interval"].as_i64().filter(|i| *i != 0) else { return true };

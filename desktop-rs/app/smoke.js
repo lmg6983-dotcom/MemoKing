@@ -82,7 +82,7 @@ window.addEventListener('load', () => setTimeout(async () => {
       return idx.schema === 'memoking.index/v1' && idx.memos?.some((m) => m.title === '가져온 글');
     }, 8000));
     await check('안내 파일', async () => (await text('_memoking/README.md')).startsWith('# 메모킹 폴더 안내'));
-    await check('메모 글 복사 (제목 줄 아래만)', async () => (await mk.copyMemoText(seed.id)) === true);
+    await check('메모 글 복사 (제목 줄 아래만)', async () => (await mk.memo.copyText(seed.id)) === true);
     await check('공유용 글 파일', async () => {
       const f = await mk.memo.shareFile(seed.id);
       return f.name === '시험 메모.txt' && atob(f.base64).length > 0;

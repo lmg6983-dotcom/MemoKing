@@ -3,12 +3,12 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const EVENTS = [
-  'memos:changed', 'shortcuts:changed', 'memo:external', 'memo:removed', 'memo:trashed', 'memo:meta', 'memo:links-changed', 'vault:indexed', 'vault:opened',
+  'memos:changed', 'shortcuts:changed', 'memo:external', 'memo:removed', 'memo:trashed', 'memo:meta', 'memo:links-changed', 'vault:opened',
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:dock', 'sticker:hover', 'list:on-top', 'list:crown-docked',
   'stt:status', 'ai:status', 'ai:notice', 'ai:tagging', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
-  'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'card:trash', 'card:copied', 'edit:paste-plain', 'edit:clear-format',
+  'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'edit:paste-plain', 'edit:clear-format',
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -22,7 +22,6 @@ contextBridge.exposeInMainWorld('memoking', {
     choose: invoke('vault:choose'),
     retry: invoke('vault:retry'),
     reveal: invoke('vault:reveal'),
-    revealIndex: invoke('vault:reveal-index'),
   },
   memos: {
     list: invoke('memos:list'),
@@ -155,7 +154,6 @@ contextBridge.exposeInMainWorld('memoking', {
     empty: invoke('trash:empty'),
   },
 
-  copyMemoText: invoke('memo:copy-text'), // 메모 본문을 서식 기호 없이 클립보드에 → true | false
   // 메모 단축키 (Ctrl+Alt+1~9): state(메모 id) · set(메모 id, 칸|null, { copy, show }) → { ok, error?, state }
   hotkeys: {
     state: invoke('hotkey:state'),
@@ -281,7 +279,6 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   win: {
     close: invoke('win:close'),
-    minimize: invoke('win:minimize'),
     dimTitlebar: invoke('win:dim-titlebar'),
     toggleListTop: invoke('list:toggle-top'),
     listOnTop: invoke('list:on-top'),
