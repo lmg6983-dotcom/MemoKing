@@ -194,3 +194,44 @@ fn reminders() {
         .collect();
     report("reminders", fails, cases.len());
 }
+
+#[test]
+fn indexer() {
+    use memoking_core::indexer::*;
+    use memoking_core::memo_file::parse_memo_file;
+    let cases = fixtures("indexer");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let name = c["name"].as_str().unwrap();
+            let want = c["text"].as_str().unwrap();
+            if name == "guide" {
+                return (AGENT_GUIDE != want).then(|| "AGENT_GUIDE 다름".to_string());
+            }
+            let parsed: Vec<(&str, &str, _)> = c["memos"].as_array().unwrap().iter().map(|m| (m["id"].as_str().unwrap(), m["file"].as_str().unwrap(), parse_memo_file(m["text"].as_str().unwrap()))).collect();
+            let memos: Vec<IndexMemo> = parsed.iter().map(|(id, file, (meta, body))| IndexMemo { id, file, meta, body }).collect();
+            let out = index_output(&memos, c["now"].as_str().unwrap());
+            if out.text == want && out.key == c["key"].as_str().unwrap() {
+                return None;
+            }
+            // 처음 다른 줄만 (색인 글은 길다)
+            let line = want.lines().zip(out.text.lines()).position(|(a, b)| a != b).unwrap_or(0);
+            let (js, rs) = (want.lines().nth(line), out.text.lines().nth(line));
+            Some(format!("{name}: {line} 째 줄 (열쇠 같음: {})\n  JS  : {js:?}\n  Rust: {rs:?}", out.key == c["key"].as_str().unwrap()))
+        })
+        .collect();
+    report("indexer", fails, cases.len());
+}
+
+#[test]
+fn tokenize() {
+    let cases = fixtures("tokenize");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = json!(memoking_core::indexer::tokenize(c["text"].as_str().unwrap()));
+            (got != c["tokens"]).then(|| format!("{:?}\n  JS  : {}\n  Rust: {got}", c["text"].as_str().unwrap(), c["tokens"]))
+        })
+        .collect();
+    report("tokenize", fails, cases.len());
+}

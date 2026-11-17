@@ -1,5 +1,5 @@
 //! 메모 본문에서 뽑는 것 — 제목 · 미리 보기 · 첨부 · 태그 · 체크리스트 · 잠김.
-//!   app/js/core/memo-file.js (plainLines · extractTitle · extractPreview · extractMedia · isBlankBody),
+//!   app/js/core/memo-file.js (plainLines · extractTitle · extractPreview · extractHeadings · extractMedia · isBlankBody),
 //!   tags.js extractTags · tasks.js taskProgress · memo-lock.js isLockedBody
 use crate::js::{self, re};
 use crate::memo_file::FRONTMATTER;
@@ -235,6 +235,21 @@ pub fn extract_media(body: &str) -> Vec<Media> {
         }
     }
     found
+}
+
+/// 소제목(# …) 목록 — 코드 블록 안은 빼고 (extractHeadings)
+pub fn extract_headings(body: &str) -> Vec<String> {
+    static HEADING: LazyLock<Regex> = LazyLock::new(|| re(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$"));
+    let mut fence = false;
+    lines(body)
+        .filter_map(|line| {
+            if FENCE_LINE.is_match(line).unwrap_or(false) {
+                fence = !fence;
+            }
+            let m = (!fence).then(|| HEADING.captures(line).ok().flatten()).flatten()?;
+            Some(strip_inline(&m[1]))
+        })
+        .collect()
 }
 
 pub fn is_blank_body(body: &str) -> bool {
