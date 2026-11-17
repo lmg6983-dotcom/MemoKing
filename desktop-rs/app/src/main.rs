@@ -3,6 +3,7 @@
 
 mod clipboard;
 mod files;
+mod drive;
 mod index;
 mod ipc;
 mod memos;
@@ -101,6 +102,7 @@ fn main() {
             let app = app.handle();
             app.manage(state::State::load(app));
             memos::start(app);
+            drive::start(app);
             let list = os::place_list(app, window(app, "list", "index.html").title("메모킹").inner_size(440.0, 680.0).min_inner_size(440.0, 380.0)).build()?;
             os::start(app, &list);
             reminders::start(app);

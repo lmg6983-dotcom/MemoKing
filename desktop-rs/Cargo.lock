@@ -2294,6 +2294,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "md-5"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d89e7ee0cfbedfc4da3340218492196241d89eefb6dab27de5df917a6d2e78cf"
+dependencies = [
+ "cfg-if",
+ "digest",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2312,15 +2322,18 @@ dependencies = [
 name = "memoking"
 version = "0.88.0"
 dependencies = [
+ "aes-gcm",
  "arboard",
  "base64 0.23.1",
  "chrono",
  "encoding_rs",
  "fancy-regex",
+ "getrandom 0.3.4",
  "memoking-core",
  "serde",
  "serde_json",
  "sha1",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-clipboard-manager",
@@ -2330,6 +2343,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-winrt-notification",
  "ureq",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2341,6 +2355,7 @@ dependencies = [
  "chrono",
  "fancy-regex",
  "getrandom 0.3.4",
+ "md-5",
  "pbkdf2",
  "serde",
  "serde_json",

@@ -24,6 +24,7 @@ import { parseLinkPreview, detectCharset, hostOf, youtubeOEmbedUrl, parseYoutube
 import { imageExtFromType, imageExtFromUrl } from '../../app/js/core/remote-images.js';
 import { versionTitles } from '../../app/js/core/release-notes.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
+import { driveCases } from './drive.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
 fs.mkdirSync(out, { recursive: true });
@@ -270,3 +271,5 @@ const readme = [
 ].join('\n');
 write('release_notes', [[null, '0.88.0'], ['0.85.0', '0.88.0'], ['0.88.0', '0.88.0'], ['0.9.0', '0.20.0'], [null, '9.9.9']]
   .map(([from, to]) => ({ readme, from, to, titles: versionTitles(readme, from, to) })));
+// Google Drive 동기화 (desktop/drive/sync-engine.js) — 장면은 drive.mjs
+write('drive_sync', await driveCases());

@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **104 / 187**
-- 이벤트 (Rust → 화면): **23 / 61**
+- 채널 (화면 → Rust): **114 / 187**
+- 이벤트 (Rust → 화면): **24 / 61**
 
 ## 채널
 
@@ -62,16 +62,16 @@
 | ⬜ | `drag:end` |
 | ⬜ | `drag:move` |
 | ⬜ | `drag:start` |
-| ⬜ | `drive:auto` |
-| ⬜ | `drive:cancel-login` |
-| ⬜ | `drive:create-folder` |
-| ⬜ | `drive:disconnect` |
-| ⬜ | `drive:folders` |
-| ⬜ | `drive:login` |
-| ⬜ | `drive:set-client` |
-| ⬜ | `drive:status` |
-| ⬜ | `drive:sync` |
-| ⬜ | `drive:use` |
+| ✅ | `drive:auto` |
+| ✅ | `drive:cancel-login` |
+| ✅ | `drive:create-folder` |
+| ✅ | `drive:disconnect` |
+| ✅ | `drive:folders` |
+| ✅ | `drive:login` |
+| ✅ | `drive:set-client` |
+| ✅ | `drive:status` |
+| ✅ | `drive:sync` |
+| ✅ | `drive:use` |
 | ✅ | `edit:run` |
 | ✅ | `folders:create` |
 | ✅ | `folders:delete` |
@@ -212,7 +212,7 @@
 | ⬜ | `card:copied` |
 | ⬜ | `card:trash` |
 | ⬜ | `drag:state` |
-| ⬜ | `drive:status` |
+| ✅ | `drive:status` |
 | ⬜ | `edit:clear-format` |
 | ✅ | `edit:paste-plain` |
 | ⬜ | `ghost:data` |

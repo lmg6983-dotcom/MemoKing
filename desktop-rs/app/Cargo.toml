@@ -29,7 +29,13 @@ encoding_rs = "0.8"
 sha1 = "0.10"
 # 첨부를 파일 그대로 클립보드에 (clipboard-manager 가 이미 쓰는 것 — 파일 목록은 그 플러그인에 없다)
 arboard = { version = "3", default-features = false }
+# Google Drive 로그인(PKCE)
+getrandom = "0.3"
+sha2 = "0.10"
 
-# 알림 창 (누르면 그 메모를 연다)
 [target.'cfg(windows)'.dependencies]
+# 알림 창 (누르면 그 메모를 연다)
 tauri-winrt-notification = "0.8"
+# Google 로그인 토큰을 Electron safeStorage 와 같게 감싼다 (DPAPI 로 감싼 열쇠 + AES-256-GCM)
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+aes-gcm = "0.10"
