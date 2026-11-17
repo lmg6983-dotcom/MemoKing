@@ -311,6 +311,14 @@ fn load_app_names(app: &AppHandle) {
     });
 }
 
+/// 업데이트 설치 전: 팝업 도우미(PowerShell)를 끈다 (설치 파일이 이전 설치 폴더를 지울 수 있게)
+pub fn stop_helpers() {
+    ON.store(false, Ordering::SeqCst);
+    if let Some(mut c) = WATCHER.lock().unwrap().take() {
+        let _ = c.kill();
+    }
+}
+
 // 알림 DB 복사본에서 지난번 이후 새 토스트를 읽는다 (원본은 건드리지 않음)
 fn poll(app: &AppHandle) {
     let Some(src) = std::env::var_os("LOCALAPPDATA").map(|d| PathBuf::from(d).join("Microsoft").join("Windows").join("Notifications")) else { return };

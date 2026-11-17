@@ -11,5 +11,6 @@ pub mod search;
 pub mod share_text;
 pub mod tables;
 pub mod time;
+pub mod update;
 pub mod vault;
 pub mod yaml;

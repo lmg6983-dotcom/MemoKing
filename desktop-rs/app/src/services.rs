@@ -1,5 +1,5 @@
-// 곁가지 기능 — 화면 캡처 메모 · AI 비서 연결(MCP) · PDF.
-//   Electron 의 window-manager.js(startAreaCapture · finishAreaCapture · openCaptureMemo · openPdfWindow) · utils.js(mcpStatus · mcpConnect) · office-pdf.js 자리.
+// 곁가지 기능 — 화면 캡처 메모 · AI 비서 연결(MCP) · PDF · 자동 업데이트.
+//   Electron 의 window-manager.js(startAreaCapture · finishAreaCapture · openCaptureMemo · openPdfWindow) · utils.js(mcpStatus · mcpConnect) · office-pdf.js · updater.js 자리.
 use crate::state::State;
 use memoking_core::vault::write_atomic;
 use serde_json::{json, Map, Value};
@@ -220,8 +220,9 @@ fn with_error(mut status: Value, error: String) -> Value {
     status
 }
 
-/// 켤 때: 메모킹을 옮겨 설치했으면(연결된 실행 파일 자리가 다르면) 다시 연결
+/// 켤 때: 업데이트 확인을 걸고, 메모킹을 옮겨 설치했으면(연결된 실행 파일 자리가 다르면) 다시 연결
 pub fn start(app: &AppHandle) {
+    start_updates(app);
     let mcp = mcp_status(app);
     if !cfg!(debug_assertions) && mcp["stale"] == true && mcp["broken"] == false {
         mcp_connect(app, true);
@@ -289,6 +290,185 @@ fn office_to_pdf(app: &AppHandle, rel: &str) -> Value {
     pdf.map_or(Value::Null, |b| json!({ "$bytes": base64::engine::general_purpose::STANDARD.encode(b) }))
 }
 
+// ---------- 자동 업데이트 ----------
+// 켤 때(8초 뒤) · 4시간마다 · 설정의 "업데이트 확인" → 새 버전이 있으면 목록 창에 알림(버전 · 바뀐 점) → 받기를 고르면 진행률 → 다 받으면 설치하고 다시 켠다.
+//   "나중에" 를 고른 그 버전은 24시간 동안 다시 묻지 않는다. 개발 중에는 확인하지 않는다. 오류는 알리기만 하고 지금 버전은 그대로.
+// shortcut: 절전에서 깨어날 때 다시 보기(checkIfStale) · 목록 창이 없을 때 Windows 알림은 아직 — 전원 · 알림을 옮길 때
+
+const CHECK_EVERY: std::time::Duration = std::time::Duration::from_secs(4 * 60 * 60);
+const REMIND_MS: f64 = (4.0 * 60.0 - 10.0) * 60_000.0; // 같은 버전을 저절로 다시 알리는 간격
+
+#[derive(Default)]
+struct Updates {
+    state: Map<String, Value>,
+    update: Option<tauri_plugin_updater::Update>,
+    bytes: Option<Vec<u8>>,
+    announced: Option<(String, f64)>,
+}
+
+static UPDATES: Mutex<Option<Updates>> = Mutex::new(None);
+
+fn updates<T>(f: impl FnOnce(&mut Updates) -> T) -> T {
+    f(UPDATES.lock().unwrap().get_or_insert_with(|| Updates { state: json!({ "status": "idle" }).as_object().unwrap().clone(), ..Default::default() }))
+}
+
+fn update_enabled() -> bool {
+    !cfg!(debug_assertions) && !crate::ipc::smoke() // 개발 중에는 업데이트 정보가 없어 확인할 수 없다
+}
+
+fn now_ms() -> f64 {
+    chrono::Utc::now().timestamp_millis() as f64
+}
+
+/// 목록 창이 물어볼 때: 지금 상태 + 대화 상자를 띄울지 (숨겨 둔 버전이면 띄우지 않음)
+fn update_state(app: &AppHandle) -> Value {
+    let mut s = updates(|u| u.state.clone());
+    let offering = s["status"] == "ready" || s["status"] == "available";
+    let ask = offering && !memoking_core::update::is_snoozed(&st(app).setting("updateSnooze"), s.get("version").unwrap_or(&Value::Null), now_ms());
+    s.insert("ask".into(), ask.into());
+    s.insert("current".into(), app.package_info().version.to_string().into());
+    s.insert("enabled".into(), update_enabled().into());
+    s.into()
+}
+
+// 상태가 바뀌면 버전 · 바뀐 점만 이어 가고 (진행률 · 오류 글은 버림), 같은 상태면 덧붙인다
+fn set_update(app: &AppHandle, patch: Value) {
+    let state = updates(|u| {
+        let changed = patch["status"].is_string() && patch["status"] != u.state["status"];
+        if changed {
+            u.state = ["version", "notes"].iter().filter_map(|k| Some((k.to_string(), u.state.get(*k)?.clone()))).collect();
+        }
+        u.state.extend(patch.as_object().cloned().unwrap_or_default());
+        u.state.clone()
+    });
+    send_update(app, "update:state", state);
+}
+
+fn send_update(app: &AppHandle, event: &str, mut state: Map<String, Value>) {
+    state.insert("current".into(), app.package_info().version.to_string().into());
+    let _ = app.emit_to("list", event, [Value::Object(state)]);
+}
+
+/// 새 버전 · 받기 끝 — 목록 창을 (입력은 뺏지 않고) 보이게 해서 알린다
+fn announce(app: &AppHandle, event: &str) {
+    if let Some(w) = app.get_webview_window("list") {
+        if !w.is_visible().unwrap_or(false) || w.is_minimized().unwrap_or(false) {
+            let _ = w.unminimize();
+            let _ = w.show();
+        }
+    }
+    send_update(app, event, updates(|u| u.state.clone()));
+}
+
+// 비동기 일을 이 스레드에서 끝까지 (ipc 는 비동기 실행기 안이라 바로 block_on 하면 멈춘다)
+fn wait<T: Send + 'static>(f: impl std::future::Future<Output = T> + Send + 'static) -> T {
+    std::thread::spawn(move || tauri::async_runtime::block_on(f)).join().unwrap()
+}
+
+/// manual: 설정의 "업데이트 확인" (숨겨 둔 버전도 다시 보여 준다)
+fn check_update(app: &AppHandle, manual: bool) {
+    if ["downloading", "ready"].contains(&updates(|u| u.state["status"].as_str().unwrap_or_default().to_string()).as_str()) {
+        return; // 이미 받는 중 · 받아 둠
+    }
+    set_update(app, json!({ "status": "checking" }));
+    use tauri_plugin_updater::UpdaterExt;
+    let app2 = app.clone();
+    match wait(async move { app2.updater()?.check().await }) {
+        Err(err) => {
+            eprintln!("[update] {err}");
+            set_update(app, json!({ "status": "error", "message": memoking_core::update::update_error_text(&err.to_string()) }));
+        }
+        Ok(None) => set_update(app, json!({ "status": "latest" })),
+        Ok(Some(up)) => {
+            let version = up.version.clone();
+            let date = up.date.and_then(|d| chrono::DateTime::from_timestamp(d.unix_timestamp(), 0)).map(|d| d.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)).unwrap_or_default();
+            set_update(app, json!({ "status": "available", "version": version, "notes": memoking_core::update::notes_text(up.body.as_deref().unwrap_or_default()), "date": date }));
+            updates(|u| u.update = Some(up));
+            if !manual && memoking_core::update::is_snoozed(&st(app).setting("updateSnooze"), &version.clone().into(), now_ms()) {
+                return; // "나중에" 고른 버전 — 24시간 조용히
+            }
+            let fresh = updates(|u| {
+                let recent = !manual && u.announced.as_ref().is_some_and(|(v, at)| *v == version && now_ms() - at < REMIND_MS);
+                if !recent {
+                    u.announced = Some((version.clone(), now_ms()));
+                }
+                !recent
+            });
+            if fresh {
+                announce(app, "update:available");
+            }
+        }
+    }
+}
+
+/// 받기: 진행률을 알리고, 다 받으면 설치하고 다시 켠다
+fn download_update(app: &AppHandle) {
+    let Some(up) = updates(|u| if u.state["status"] == "available" { u.update.clone() } else { None }) else { return };
+    set_update(app, json!({ "status": "downloading", "percent": 0 }));
+    let (app2, mut got) = (app.clone(), 0u64);
+    let r = wait(async move {
+        up.download(
+            |chunk, total| {
+                got += chunk as u64;
+                let total = total.unwrap_or(0);
+                let percent = if total > 0 { (got as f64 * 100.0 / total as f64).round() } else { 0.0 };
+                set_update(&app2, json!({ "status": "downloading", "percent": percent, "transferred": got, "total": total }));
+            },
+            || {},
+        )
+        .await
+    });
+    match r {
+        Err(err) => set_update(app, json!({ "status": "error", "message": memoking_core::update::update_error_text(&err.to_string()) })),
+        Ok(bytes) => {
+            updates(|u| u.bytes = Some(bytes));
+            set_update(app, json!({ "status": "ready", "restarting": true }));
+            announce(app, "update:ready");
+            // "곧 다시 시작해요" 를 잠깐 보여 준 뒤
+            let app = app.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(1500));
+                install_update(&app);
+            });
+        }
+    }
+}
+
+/// 지금 재시작: 쓰던 메모를 저장하고 설치 → 다시 켬
+fn install_update(app: &AppHandle) -> bool {
+    let Some((up, bytes)) = updates(|u| if u.state["status"] == "ready" { u.update.clone().zip(u.bytes.clone()) } else { None }) else { return false };
+    let labels: Vec<String> = st(app).note_labels.lock().unwrap().values().cloned().collect();
+    for l in labels {
+        if let Some(w) = app.get_webview_window(&l) {
+            let _ = w.eval("window.mkFlushSync?.()");
+        }
+    }
+    std::thread::sleep(std::time::Duration::from_millis(500)); // 메모 창이 저장할 틈
+    st(app).save_settings();
+    // 설치 파일이 이전 설치 폴더를 지우려면 메모킹이 띄운 PowerShell 도우미가 꺼져 있어야 한다
+    crate::history::stop_helpers();
+    if let Err(err) = up.install(bytes) {
+        set_update(app, json!({ "status": "error", "message": memoking_core::update::update_error_text(&err.to_string()) }));
+        return false;
+    }
+    app.restart();
+}
+
+/// 켤 때: 8초 뒤 한 번, 그다음 4시간마다
+fn start_updates(app: &AppHandle) {
+    if !update_enabled() {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(8));
+        loop {
+            check_update(&app, false);
+            std::thread::sleep(CHECK_EVERY);
+        }
+    });
+}
+
 pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     Some(match channel {
         "capture:done" => finish_area_capture(app, label, args.first().unwrap_or(&Value::Null)),
@@ -316,6 +496,30 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         // shortcut: PDF 만들기는 Electron 의 printToPDF 자리 — Tauri 에는 없어 WebView2 PrintToPdf(webview2-com)로 옮길 때까지 실패(null)로 돌려준다
         "pdf:save" => Ok(Value::Null),
         "attachment:to-pdf" => Ok(office_to_pdf(app, args.first().and_then(Value::as_str).unwrap_or_default())),
+        "update:state" => Ok(update_state(app)),
+        "update:check" => {
+            if !update_enabled() {
+                let mut s = update_state(app);
+                s["status"] = "dev".into();
+                s["message"] = "개발 중에는 업데이트를 확인하지 않아요".into();
+                return Some(Ok(s));
+            }
+            check_update(app, true);
+            Ok(update_state(app))
+        }
+        "update:download" => {
+            download_update(app);
+            Ok(update_state(app))
+        }
+        // "나중에": 지금 제안 중인 버전을 24시간 숨긴다
+        "update:later" => {
+            let s = updates(|u| u.state.clone());
+            if (s["status"] == "available" || s["status"] == "ready") && s.get("version").is_some_and(|v| !v.is_null()) {
+                st(app).set_setting("updateSnooze", json!({ "version": s["version"], "until": now_ms() + memoking_core::update::SNOOZE_MS as f64 }));
+            }
+            Ok(update_state(app))
+        }
+        "update:install" => Ok(install_update(app).into()),
         _ => return None,
     })
 }

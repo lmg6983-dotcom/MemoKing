@@ -278,3 +278,21 @@ fn notify() {
         .collect();
     report("notify", fails, cases.len());
 }
+
+#[test]
+fn update() {
+    use memoking_core::update::*;
+    let cases = fixtures("update");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let got = match c["kind"].as_str().unwrap() {
+                "error" => json!(update_error_text(c["e"].as_str().unwrap())),
+                "snooze" => json!(is_snoozed(&c["s"], &json!("1.2.0"), 1000.0)),
+                _ => json!(notes_text(c["n"].as_str().unwrap())),
+            };
+            (got != c["out"]).then(|| format!("{}\n  JS  : {}\n  Rust: {got}", c, c["out"]))
+        })
+        .collect();
+    report("update", fails, cases.len());
+}

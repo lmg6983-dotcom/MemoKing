@@ -238,3 +238,14 @@ write('notify', [
   ...[['ocr', 'uia'], ['uia', 'ocr'], ['ocr', 'ocr'], ['msaa', 'uia'], ['ocr', ''], ['ocr', null]].map(([a, b]) => ({ kind: 'better', a, b, out: pn.betterReading({ via: a }, { via: b }) })),
   ...titles.flatMap((ts) => probeTitles.map((t) => ({ kind: 'title', ts, t, out: pn.correctTitle(t, pn.knownNames(ts)) }))),
 ]);
+
+// 자동 업데이트: 오류 글 · "나중에" 숨김 · 릴리스 노트
+const up = await import('../../desktop/updater.js');
+const errs = ['getaddrinfo ENOTFOUND github.com', 'net::ERR_INTERNET_DISCONNECTED', 'New version is not signed by the application owner', 'HttpError: 404', 'Cannot find latest.yml', 'Socket hang up', 'disk full', ''];
+const snoozes = [null, { version: '1.2.0', until: 2000 }, { version: '1.2.0', until: 500 }, { version: '1.3.0', until: 2000 }];
+const notes = ['<h2>바뀐 점</h2><ul><li>알림 &amp; 캡처</li><li>PDF</li></ul><p>둘째<br>줄</p>', '그냥 글\n\n\n  \n다음 &lt;b&gt;', '', '가'.repeat(4100), '  <br/>  '];
+write('update', [
+  ...errs.map((e) => ({ kind: 'error', e, out: up.updateErrorText(new Error(e)) })),
+  ...snoozes.map((s) => ({ kind: 'snooze', s, out: up.isSnoozed(s, '1.2.0', 1000) })),
+  ...notes.map((n) => ({ kind: 'notes', n, out: up.notesText(n) })),
+]);
