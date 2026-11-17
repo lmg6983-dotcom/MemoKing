@@ -1,0 +1,176 @@
+[
+ {
+  "acc": "Control+Alt+C",
+  "valid": true,
+  "display": "Ctrl+Alt+C",
+  "combo": "ctrl+alt+KeyC"
+ },
+ {
+  "acc": "Control+Alt+Space",
+  "valid": true,
+  "display": "Ctrl+Alt+Space",
+  "combo": "ctrl+alt+Space"
+ },
+ {
+  "acc": "Control+Alt+`",
+  "valid": true,
+  "display": "Ctrl+Alt+`",
+  "combo": "ctrl+alt+Backquote"
+ },
+ {
+  "acc": "Alt+F4",
+  "valid": false,
+  "display": "Alt+F4",
+  "combo": "alt+F4"
+ },
+ {
+  "acc": "Control+C",
+  "valid": false,
+  "display": "Ctrl+C",
+  "combo": "ctrl+KeyC"
+ },
+ {
+  "acc": "Shift+A",
+  "valid": false,
+  "display": "Shift+A",
+  "combo": "shift+KeyA"
+ },
+ {
+  "acc": "A",
+  "valid": false,
+  "display": "A",
+  "combo": "KeyA"
+ },
+ {
+  "acc": "Control+a",
+  "valid": false,
+  "display": "Ctrl+a",
+  "combo": "ctrl+a"
+ },
+ {
+  "acc": "Control+Control+A",
+  "valid": false,
+  "display": "Ctrl+Ctrl+A",
+  "combo": "ctrl+KeyA"
+ },
+ {
+  "acc": "Super+Shift+M",
+  "valid": true,
+  "display": "Win+Shift+M",
+  "combo": null
+ },
+ {
+  "acc": "Control+Shift+P",
+  "valid": true,
+  "display": "Ctrl+Shift+P",
+  "combo": "ctrl+shift+KeyP"
+ },
+ {
+  "acc": "Control+F24",
+  "valid": true,
+  "display": "Ctrl+F24",
+  "combo": "ctrl+F24"
+ },
+ {
+  "acc": "Control+F25",
+  "valid": false,
+  "display": "Ctrl+F25",
+  "combo": "ctrl+F25"
+ },
+ {
+  "acc": "Control+F05",
+  "valid": false,
+  "display": "Ctrl+F05",
+  "combo": "ctrl+F05"
+ },
+ {
+  "acc": "Alt+Up",
+  "valid": true,
+  "display": "Alt+Up",
+  "combo": "alt+ArrowUp"
+ },
+ {
+  "acc": "Control+Alt+\\",
+  "valid": true,
+  "display": "Ctrl+Alt+\\",
+  "combo": "ctrl+alt+Backslash"
+ },
+ {
+  "acc": "Control+Alt+=",
+  "valid": true,
+  "display": "Ctrl+Alt+=",
+  "combo": "ctrl+alt+Equal"
+ },
+ {
+  "acc": "Control+Alt+Enter",
+  "valid": false,
+  "display": "Ctrl+Alt+Enter",
+  "combo": "ctrl+alt+Enter"
+ },
+ {
+  "acc": "Meta+A",
+  "valid": false,
+  "display": "Meta+A",
+  "combo": "KeyA"
+ },
+ {
+  "acc": "Control+",
+  "valid": false,
+  "display": "Ctrl+",
+  "combo": null
+ },
+ {
+  "acc": "+",
+  "valid": false,
+  "display": "+",
+  "combo": null
+ },
+ {
+  "acc": "",
+  "valid": false,
+  "display": "",
+  "combo": null
+ },
+ {
+  "acc": "Shift+Alt+Shift+Z",
+  "valid": false,
+  "display": "Shift+Alt+Shift+Z",
+  "combo": "shift+alt+KeyZ"
+ },
+ {
+  "acc": "Control+Alt+1",
+  "valid": true,
+  "display": "Ctrl+Alt+1",
+  "combo": "ctrl+alt+Digit1"
+ },
+ {
+  "acc": "Control+Shift+Alt+Delete",
+  "valid": true,
+  "display": "Ctrl+Shift+Alt+Delete",
+  "combo": "ctrl+shift+alt+Delete"
+ },
+ {
+  "acc": "Super+L",
+  "valid": false,
+  "display": "Win+L",
+  "combo": null
+ },
+ {
+  "acc": "Control+Alt+Delete",
+  "valid": false,
+  "display": "Ctrl+Alt+Delete",
+  "combo": "ctrl+alt+Delete"
+ },
+ {
+  "acc": 7,
+  "valid": false,
+  "display": "7",
+  "combo": "Digit7"
+ },
+ {
+  "acc": null,
+  "valid": false,
+  "display": "",
+  "combo": null
+ }
+]

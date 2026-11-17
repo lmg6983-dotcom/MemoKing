@@ -5,7 +5,7 @@ use serde_json::{json, Map, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// JS 의 Boolean(v)
-fn truthy(v: Option<&Value>) -> bool {
+pub fn truthy(v: Option<&Value>) -> bool {
     match v {
         None | Some(Value::Null) => false,
         Some(Value::Bool(b)) => *b,
@@ -110,6 +110,12 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         _ => return None,
     })
+}
+
+/// actionUsing: 이 키를 쓰는 메모 창 기능의 이름 (같은 키가 둘이면 앞의 기능)
+pub fn action_using(overrides: &Value, combo: &str) -> Option<&'static str> {
+    let o = overrides.as_object().cloned().unwrap_or_default();
+    ACTIONS.iter().zip(raw_keys(&o)).find(|(_, keys)| keys.iter().any(|k| k == combo)).map(|(a, _)| a.1)
 }
 
 fn keymap_state(app: &AppHandle, label: &str, st: &State) -> Result<Value, String> {
@@ -309,6 +315,10 @@ mod tests {
         let (next, _) = set_action_key(&json!({ "find": ["ctrl+KeyB"], "bold": [] }), "find", None);
         assert_eq!(Value::Object(next), json!({ "bold": [] }));
         assert_eq!(set_action_key(&json!({ "x": 1 }), "nope", Some("ctrl+KeyQ")).0, Map::new());
+        // 전역 단축키로 가져가면 멈출 메모 창 기능
+        assert_eq!(action_using(&Value::Null, "ctrl+shift+KeyP"), Some("PDF로 저장"));
+        assert_eq!(action_using(&json!({ "pdf": [], "find": ["ctrl+shift+KeyP"] }), "ctrl+shift+KeyP"), Some("찾기"));
+        assert_eq!(action_using(&json!({ "find": ["ctrl+KeyB"] }), "ctrl+KeyB"), Some("찾기"), "같은 키면 앞의 기능");
     }
 
     #[test]

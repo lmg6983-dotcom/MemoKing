@@ -12,9 +12,12 @@ import { cleanFolderName } from '../../app/js/core/folders.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import { isProgramFile } from '../../app/js/core/file-kinds.js';
 import { shareText } from '../../app/js/core/share-text.js';
-import { hotkeyCopyText } from '../../app/js/core/memo-hotkeys.js';
 import { normalizeReminder, nextOccurrence, nextAlert, dueOccurrence, dueAtStartup, markFired, isLiveCached, nextTime, isPastEvent, alertsOf, alertTime, pendingAlerts, fallbackAlert, alarmText, describeReminder } from '../../app/js/core/reminders.js';
 import { normalizeFeeds } from '../../app/js/core/calendar-feed-list.js';
+import { hotkeyCopyText, normalizeHotkeys, assignHotkey } from '../../app/js/core/memo-hotkeys.js';
+import { isValidAccelerator, displayAccelerator, normalizeShortcuts, withShortcuts } from '../../app/js/core/accelerators.js';
+import { comboFromAccelerator } from '../../app/js/core/keymap.js';
+import { TUTORIAL_STEPS, TUTORIAL_EVENTS, tutorialStepFor, tutorialChapter, tutorialJumps, advanceTutorial } from '../../app/js/core/tutorial.js';
 import { indexOutput, tokenize, AGENT_GUIDE } from '../../app/js/core/indexer.js';
 import { NOUNS } from '../../app/js/core/korean-nouns.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
@@ -199,3 +202,28 @@ const feedLists = [
   'not a list',
 ];
 write('calendar_feeds', feedLists.map((list) => ({ list, feeds: normalizeFeeds(list) })));
+// 전역 단축키 글자: 쓸 만한지 · 보이는 글자 · 메모 창 키로
+const accs = ['Control+Alt+C', 'Control+Alt+Space', 'Control+Alt+`', 'Alt+F4', 'Control+C', 'Shift+A', 'A', 'Control+a', 'Control+Control+A', 'Super+Shift+M', 'Control+Shift+P', 'Control+F24', 'Control+F25',
+  'Control+F05', 'Alt+Up', 'Control+Alt+\\', 'Control+Alt+=', 'Control+Alt+Enter', 'Meta+A', 'Control+', '+', '', 'Shift+Alt+Shift+Z', 'Control+Alt+1', 'Control+Shift+Alt+Delete', 'Super+L', 'Control+Alt+Delete', 7, null];
+write('accelerators', accs.map((acc) => ({ acc, valid: isValidAccelerator(acc), display: displayAccelerator(acc), combo: comboFromAccelerator(acc) })));
+const shortcutSets = [undefined, {}, { quickMemo: 'Control+Alt+Space' }, { quickMemo: 'Control+Alt+Space', magic: 'Control+Alt+Space' }, { magic: 'Control+Alt+C', quickMemo: 'Control+Alt+C' },
+  { list: 'Control+Alt+C' }, { quickMemo: 'Control+Shift+Q', list: 'Control+Shift+Q' }, { quickMemo: 'Super+K', magic: 'Alt+F4', list: 'Control+Alt+`' }, { quickMemo: 3 }, 'x'];
+const guide = '글을 고르고 Ctrl+Alt+C, 매직키는 Ctrl+Alt+Space, 목록은 Ctrl+Alt+` — Ctrl+Alt+CC Ctrl+Alt+`Ctrl+Alt+C';
+write('shortcuts', shortcutSets.map((value) => ({ value: value ?? null, normalized: normalizeShortcuts(value), text: withShortcuts(guide, value) })));
+// 메모 단축키 칸 정리 · 정하기
+const hotkeySets = [null, 'x', { 1: { id: 'a' }, 2: { id: 'b', copy: false }, 3: { id: 'c', copy: false, show: true }, 10: { id: 'd' }, 0: { id: 'e' }, x: { id: 'f' }, 4: { id: '' }, 5: { id: 7 }, 6: null, 9: { id: 'g', copy: 0, show: 1 } },
+  { 9: { id: 'a', show: true }, 1: { id: 'b' } }];
+const assigns = [['a', '2', {}], ['a', null, {}], ['b', '1', { show: true }], ['z', '9', { copy: false, show: false }], ['z', '10', {}], ['c', '3', { copy: false, show: true }]];
+write('memo_hotkeys', hotkeySets.flatMap((raw) => assigns.map(([id, slot, o]) => ({ raw, id, slot, ...o, normalized: normalizeHotkeys(raw), assigned: run(() => assignHotkey(raw, id, slot, o).hotkeys) }))));
+// 튜토리얼: 단계(앱이 그대로 쓴다) · 넘어가기 · 기능이 꺼졌을 때 · 묶음 · 다시 볼 때 고를 곳
+write('tutorial_steps', TUTORIAL_STEPS);
+write('tutorial_events', TUTORIAL_EVENTS);
+const tutorialEvents = [...TUTORIAL_EVENTS, 'next', 'skip', 'nope'];
+write('tutorial', [-1, ...TUTORIAL_STEPS.keys(), TUTORIAL_STEPS.length].map((index) => ({
+  index,
+  advance: Object.fromEntries(tutorialEvents.map((e) => [e, advanceTutorial(index, e)])),
+  on: TUTORIAL_STEPS[index] ? tutorialStepFor(TUTORIAL_STEPS[index], () => true) : null,
+  off: TUTORIAL_STEPS[index] ? tutorialStepFor(TUTORIAL_STEPS[index], () => false) : null,
+  chapter: tutorialChapter(TUTORIAL_STEPS, index),
+  jumps: tutorialJumps(TUTORIAL_STEPS),
+})));

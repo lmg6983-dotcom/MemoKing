@@ -8,6 +8,7 @@ mod memos;
 mod os;
 mod reminders;
 mod settings;
+mod shortcuts;
 mod state;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -62,6 +63,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![ipc::ipc])
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
         //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상
@@ -101,6 +103,7 @@ fn main() {
             let list = os::place_list(app, window(app, "list", "index.html").title("메모킹").inner_size(440.0, 680.0).min_inner_size(440.0, 380.0)).build()?;
             os::start(app, &list);
             reminders::start(app);
+            shortcuts::start(app);
             Ok(())
         })
         .run(tauri::generate_context!())

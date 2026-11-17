@@ -139,7 +139,7 @@ pub fn show_list(app: &AppHandle) {
     }
 }
 
-fn toggle_list(app: &AppHandle) {
+pub fn toggle_list(app: &AppHandle) {
     let Some(w) = app.get_webview_window("list") else { return };
     if w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false) && w.is_focused().unwrap_or(false) {
         let _ = w.hide();
