@@ -6,7 +6,7 @@ use memoking_core::ai::*;
 use memoking_core::tag_suggest::{append_tags, auto_tags_for, remove_tags, suggest_tags_for};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -101,14 +101,6 @@ fn set_name(app: &AppHandle, name: &str) {
 
 // ---------- 모델 파일 ----------
 
-fn io_error(e: std::io::Error, other: &str) -> String {
-    if e.kind() == std::io::ErrorKind::StorageFull {
-        "저장 공간이 모자라요".into()
-    } else {
-        other.to_string()
-    }
-}
-
 /// 모델을 .part 로 채운 뒤(fill → 이름) 다 됐을 때만 바꿔 넣는다 — 몇 GB 라 도중에 끊겨도 쓰던 모델이 깨지지 않게
 fn bring_in(app: &AppHandle, fill: impl FnOnce(&PathBuf) -> Result<String, String>) -> Result<Value, String> {
     {
@@ -155,7 +147,7 @@ fn import_model(app: &AppHandle, role: &str) -> Result<Value, String> {
         return Err("모델 파일(.gguf)이 아니에요".into());
     }
     bring_in(app, |part| {
-        std::fs::copy(&source, part).map_err(|e| io_error(e, "모델 파일을 복사하지 못했어요"))?;
+        std::fs::copy(&source, part).map_err(|e| crate::stt::io_error(e, "모델 파일을 복사하지 못했어요"))?;
         Ok(source.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default())
     })
 }
@@ -197,30 +189,21 @@ fn download_default(app: &AppHandle) -> Result<Value, String> {
         if !res.status().is_success() {
             return Err(format!("받지 못했어요 ({}). 인터넷을 확인하고 다시 눌러 주세요", res.status().as_u16()));
         }
-        let cut = "받다가 끊겼어요. 인터넷을 확인하고 다시 눌러 주세요";
-        let mut out = std::fs::File::create(part).map_err(|e| io_error(e, cut))?;
-        let mut body = res.into_body().into_reader();
         let mut hash = Sha256::new();
         let (mut got, mut shown) = (0u64, 0.0);
-        let mut buf = vec![0u8; 1 << 16];
-        loop {
+        crate::stt::save_to(res, part, &mut |b| {
             if STOP_DOWNLOAD.load(Ordering::Relaxed) {
                 return Err("받기를 멈췄어요. 다시 누르면 처음부터 받아요".into());
             }
-            let n = body.read(&mut buf).map_err(|_| cut.to_string())?;
-            if n == 0 {
-                break;
-            }
-            hash.update(&buf[..n]);
-            out.write_all(&buf[..n]).map_err(|e| io_error(e, cut))?;
-            got += n as u64;
+            hash.update(b);
+            got += b.len() as u64;
             if size > 0 && got as f64 / size as f64 - shown >= 0.01 {
                 shown = got as f64 / size as f64;
                 ENGINE.lock().unwrap().progress = Some(shown);
                 emit(app);
             }
-        }
-        out.sync_all().map_err(|e| io_error(e, cut))?;
+            Ok(())
+        })?;
         let digest: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
         if digest != sha {
             return Err("받은 파일이 맞지 않아요. 다시 받아 주세요".into());

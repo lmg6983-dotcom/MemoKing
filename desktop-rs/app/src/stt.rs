@@ -134,13 +134,26 @@ fn emit(app: &AppHandle) {
 
 // ---------- 받기 ----------
 
-fn fetch_to(url: &str, file: &Path, on_bytes: &mut dyn FnMut(u64)) -> Result<(), String> {
+fn fetch_to(url: &str, file: &Path, on_chunk: &mut dyn FnMut(&[u8]) -> Result<(), String>) -> Result<(), String> {
     let offline = "받지 못했어요. 인터넷을 확인하고 다시 눌러 주세요";
     let res = WEB.get(url).call().map_err(|_| offline.to_string())?;
     if !res.status().is_success() {
         return Err(format!("받지 못했어요 ({}). 인터넷을 확인하고 다시 눌러 주세요", res.status().as_u16()));
     }
-    let cut = |e: std::io::Error| if e.kind() == std::io::ErrorKind::StorageFull { "저장 공간이 모자라요".to_string() } else { "받다가 끊겼어요. 인터넷을 확인하고 다시 눌러 주세요".to_string() };
+    save_to(res, file, on_chunk)
+}
+
+pub(crate) fn io_error(e: std::io::Error, other: &str) -> String {
+    if e.kind() == std::io::ErrorKind::StorageFull {
+        "저장 공간이 모자라요".into()
+    } else {
+        other.to_string()
+    }
+}
+
+/// 받은 본문을 file 로 (받아쓰기 · AI 모델). 조각마다 on_chunk (진행률 · 해시 · 멈추기), Err 면 그만 받는다
+pub(crate) fn save_to(res: ureq::http::Response<ureq::Body>, file: &Path, on_chunk: &mut dyn FnMut(&[u8]) -> Result<(), String>) -> Result<(), String> {
+    let cut = |e| io_error(e, "받다가 끊겼어요. 인터넷을 확인하고 다시 눌러 주세요");
     let mut out = std::fs::File::create(file).map_err(cut)?;
     let mut body = res.into_body().into_reader();
     let mut buf = vec![0u8; 1 << 16];
@@ -150,7 +163,7 @@ fn fetch_to(url: &str, file: &Path, on_bytes: &mut dyn FnMut(u64)) -> Result<(),
             return out.sync_all().map_err(cut);
         }
         out.write_all(&buf[..n]).map_err(cut)?;
-        on_bytes(n as u64);
+        on_chunk(&buf[..n])?;
     }
 }
 
@@ -204,9 +217,10 @@ fn get_part(root: &Path, part: &Part, on_fraction: &mut dyn FnMut(f64)) -> Resul
         let tmp = root.join(format!(".part-{}", part.dir));
         let _ = std::fs::remove_dir_all(&tmp);
         let mut got = 0;
-        let mut count = |n| {
-            got += n;
+        let mut count = |b: &[u8]| {
+            got += b.len();
             on_fraction((got as f64 / src.bytes as f64).min(1.0));
+            Ok(())
         };
         let r = std::fs::create_dir_all(&tmp).map_err(|e| e.to_string()).and_then(|_| {
             match src.archive {
