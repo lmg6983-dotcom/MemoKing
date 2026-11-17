@@ -191,11 +191,8 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
     }
     let label = format!("note-{}", NEXT_NOTE.fetch_add(1, Ordering::Relaxed));
     let title = with_vault(app, |v| Ok(v.get(id).and_then(|m| m["title"].as_str().map(str::to_string)).unwrap_or_default()))?;
-    // shortcut: 창 자리 기억(noteBounds) · 예비 창 · 스택 탭 · 왕관 · 테이프는 2단계 — 지금은 기본 크기로 화면 가운데쯤
-    let win = crate::window(app, &label, &format!("note.html?id={}", query_escape(id)))
-        .title(title)
-        .inner_size(340.0, 380.0)
-        .min_inner_size(240.0, 200.0)
+    // shortcut: 예비 창 · 스택 탭 · 왕관 · 테이프는 2단계 — 기억한 자리(noteBounds)가 없으면 기본 크기로 화면 가운데쯤
+    let win = crate::os::place_note(app, id, crate::window(app, &label, &format!("note.html?id={}", query_escape(id))).title(title).inner_size(340.0, 380.0).min_inner_size(240.0, 200.0))
         .build()
         .map_err(|e| e.to_string())?;
     st.note_labels.lock().unwrap().insert(id.to_string(), label);
@@ -205,6 +202,7 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
             closed_note(&app2, &id2);
         }
     });
+    crate::os::track_note(app, id, &win);
     push_list(app);
     Ok(true)
 }

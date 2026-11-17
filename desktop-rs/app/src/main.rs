@@ -3,6 +3,7 @@
 
 mod ipc;
 mod memos;
+mod os;
 mod settings;
 mod state;
 
@@ -49,7 +50,12 @@ pub fn window<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWindowB
 }
 
 fn main() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    // 두 번 켜면 이미 켜진 메모킹이 그 인자를 받는다 (점검 --smoke 는 켜 둔 메모킹과 상관없이 따로)
+    if !ipc::smoke() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(os::second_launch));
+    }
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![ipc::ipc])
@@ -88,7 +94,8 @@ fn main() {
             let app = app.handle();
             app.manage(state::State::load(app));
             memos::start(app);
-            window(app, "list", "index.html").title("메모킹").inner_size(440.0, 680.0).min_inner_size(440.0, 380.0).build()?;
+            let list = os::place_list(app, window(app, "list", "index.html").title("메모킹").inner_size(440.0, 680.0).min_inner_size(440.0, 380.0)).build()?;
+            os::start(app, &list);
             Ok(())
         })
         .run(tauri::generate_context!())
