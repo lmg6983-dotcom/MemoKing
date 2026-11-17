@@ -34,20 +34,20 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - run: cargo build
-      - name: 앱 안 점검 (--smoke)
-        run: target/debug/memoking.exe --smoke | Out-Host; if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: 화면 사진
-        if: always()
+      # 점검하는 동안(목록 · 메모 창 · 왕관 스티커) 화면 사진을 찍는다 — 점검이 끝나도 6초 더 떠 있다 (ipc.rs smoke:done)
+      - name: 앱 안 점검 (--smoke) · 화면 사진
         shell: pwsh
         run: |
-          $p = Start-Process target/debug/memoking.exe -PassThru
-          Start-Sleep 8
+          $p = Start-Process target/debug/memoking.exe -ArgumentList '--smoke' -RedirectStandardOutput smoke.txt -PassThru
+          Start-Sleep 6
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
           $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
           $img = New-Object System.Drawing.Bitmap $b.Width, $b.Height
           [System.Drawing.Graphics]::FromImage($img).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
           $img.Save("$PWD/screen.png")
-          Stop-Process $p
+          if (-not $p.WaitForExit(60000)) { Stop-Process $p; throw '점검이 60초 안에 끝나지 않았어요' }
+          Get-Content smoke.txt -Encoding utf8
+          exit $p.ExitCode
       - uses: actions/upload-artifact@v4
         if: always()
         with:

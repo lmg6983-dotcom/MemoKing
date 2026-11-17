@@ -15,10 +15,10 @@
     ipcRenderer: {
       invoke: (channel, ...args) => call(channel, args),
       send: (channel, ...args) => { call(channel, args).catch((e) => console.warn(`[ipc] ${channel}`, e)); },
-      // 창을 닫는 순간의 저장처럼 기다릴 수 없는 일 — 동기 XHR 로 Rust 를 바로 부른다 (memoking-sync 프로토콜)
+      // 창을 닫는 순간의 저장처럼 기다릴 수 없는 일 — 동기 XHR 로 Rust 를 바로 부른다 (memoking 프로토콜의 sync/, CSP 는 note.html 이 허용)
       sendSync: (channel, ...args) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${scheme('memoking-sync')}${channel}`, false);
+        xhr.open('POST', `${scheme('memoking')}sync/${channel}`, false);
         xhr.send(JSON.stringify(args));
         const r = JSON.parse(xhr.responseText || '{}');
         if (r.err) throw new Error(r.err);
@@ -26,7 +26,15 @@
       },
       on: (channel, handler) => {
         const win = window.__TAURI__.webviewWindow.getCurrentWebviewWindow();
-        unlisten.set(handler, win.listen(channel, (e) => handler({}, ...(Array.isArray(e.payload) ? e.payload : [e.payload]))));
+        // Tauri 는 한 이벤트의 받는 함수들을 차례로 부른다 — 하나가 던지면 뒤 것이 못 받으니 저마다 가둔다 (Electron 처럼)
+        const deliver = (e) => {
+          try {
+            handler({}, ...(Array.isArray(e.payload) ? e.payload : [e.payload]));
+          } catch (err) {
+            console.error(`[이벤트] ${channel}`, err);
+          }
+        };
+        unlisten.set(handler, win.listen(channel, deliver));
       },
       off: (_channel, handler) => {
         unlisten.get(handler)?.then((stop) => stop());
@@ -66,12 +74,15 @@
       const label = 'list';
       const bar = document.createElement('div');
       bar.className = 'mk-caption';
-      bar.innerHTML = `<style>
+      // 목록 창 CSP 는 style-src 'self' — <style> 대신 CSSOM 시트로
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(`
         .mk-caption { position: fixed; top: 0; right: 0; height: 44px; display: flex; z-index: 102; -webkit-app-region: no-drag; }
         .mk-caption button { width: 46px; height: 100%; border: 0; background: transparent; color: inherit; font: 10px 'Segoe Fluent Icons', 'Segoe MDL2 Assets'; }
         .mk-caption button:hover { background: rgba(127, 127, 127, 0.18); }
-        .mk-caption button.close:hover { background: #c42b1c; color: #fff; }
-      </style>
+        .mk-caption button.close:hover { background: #c42b1c; color: #fff; }`);
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+      bar.innerHTML = `
       <button tabindex="-1" aria-label="최소화" data-cmd="minimize">&#xE921;</button>
       <button tabindex="-1" aria-label="최대화" data-cmd="toggle_maximize">&#xE922;</button>
       <button tabindex="-1" aria-label="닫기" class="close" data-cmd="close">&#xE8BB;</button>`;

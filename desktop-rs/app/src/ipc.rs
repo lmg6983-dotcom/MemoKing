@@ -20,14 +20,23 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
     match channel {
         "smoke:emit" if smoke() => app.emit_to(label, args[0].as_str().unwrap_or_default(), [42]).map(|_| Value::Null).map_err(|e| e.to_string()),
         "smoke:done" if smoke() => {
+            // 목록 · 메모 창이 다 알려 오면 찍고, 화면 사진을 찍을 틈(6초)을 두고 끝낸다
+            static DONE: Mutex<(usize, usize)> = Mutex::new((0, 0)); // (알려 온 창, 실패)
             let results = args.into_iter().next().unwrap_or_default();
-            let mut failed = 0;
+            let mut done = DONE.lock().unwrap();
             for r in results.as_array().into_iter().flatten() {
                 let ok = r["ok"].as_bool() == Some(true);
-                failed += usize::from(!ok);
+                done.1 += usize::from(!ok);
                 println!("{} {} {}", if ok { "✔" } else { "✖" }, r["name"].as_str().unwrap_or("?"), r["detail"].as_str().unwrap_or(""));
             }
-            app.exit(i32::from(failed > 0));
+            done.0 += 1;
+            if done.0 == 2 {
+                let (app, code) = (app.clone(), i32::from(done.1 > 0));
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(6));
+                    app.exit(code);
+                });
+            }
             Ok(Value::Null)
         }
         "app:info" => Ok(json!({
