@@ -16,6 +16,7 @@ mod settings;
 mod shortcuts;
 mod state;
 mod stt;
+mod video;
 mod windows;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -132,7 +133,14 @@ fn memoking_uri(app: &AppHandle, label: &str, req: &http::Request<Vec<u8>>) -> h
     };
     if let Some(served) = served {
         let range = req.headers().get("range").and_then(|r| r.to_str().ok());
-        return served.and_then(|(file, mime)| file_response(&file, mime, range, allow)).unwrap_or_else(|| status(404));
+        let Some((file, mime)) = served else { return status(404) };
+        // HEVC 사본을 만드는 중이면 영상이 바로 실패하게 (다 되면 media:ready 로 다시 부른다, video.rs)
+        let file = match path.strip_prefix("/vault/") {
+            Some(rel) if mime.starts_with("video/") => video::playable(app, &percent_decode(rel), file),
+            _ => Some(file),
+        };
+        let Some(file) = file else { return status(503) };
+        return file_response(&file, mime, range, allow).unwrap_or_else(|| status(404));
     }
     // 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
     let (Some(channel), Some(_)) = (path.strip_prefix("/sync/"), &origin) else { return status(404) };

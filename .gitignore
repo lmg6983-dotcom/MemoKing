@@ -23,6 +23,8 @@ desktop/google-client.json
 
 # 로컬 AI 엔진 (npm run llama 로 받음)
 desktop/vendor/llama/
+# HEVC 영상 변환기 (desktop-rs/scripts/build-ffmpeg-min.sh 로 만듦)
+desktop/vendor/ffmpeg/
 .impeccable/critique/
 .impeccable/live/
 

@@ -44,6 +44,7 @@ pub fn start(app: &AppHandle) {
         let _ = std::fs::write(dir.join("시험 메모.md"), "---\nid: smoke-seed\ncolor: green\n---\n# 시험 메모\n\n#점검 ![점](attachments/dot.png)\n");
         let _ = std::fs::write(dir.join("attachments/dot.png"), DOT_PNG);
         let _ = std::fs::write(dir.join("attachments/clip.mp4"), include_bytes!("../smoke-clip.mp4")); // 동영상 점검 (96x64 H.264 2초)
+        let _ = std::fs::write(dir.join("attachments/clip-hevc.mp4"), include_bytes!("../smoke-clip-hevc.mp4")); // 같은 크기 HEVC 10비트 + 소리 (video.rs)
         st.open_vault(app, dir);
     }
     // 앱을 켤 때: 가장 최근에 고친 5개 중 다른 기기에서 방금 고친 것

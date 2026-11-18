@@ -9,6 +9,7 @@ const EVENTS = [
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:dock', 'sticker:hover', 'list:on-top', 'list:crown-docked',
   'stt:status', 'ai:status', 'ai:notice', 'ai:tagging', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'edit:paste-plain', 'edit:clear-format',
+  'media:converting', 'media:ready', // PC Rust 판만 보낸다: HEVC 영상의 H.264 사본 (desktop-rs/app/src/video.rs)
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
