@@ -412,23 +412,56 @@ pub fn start(app: &AppHandle, list: &WebviewWindow) {
     let args: Vec<String> = std::env::args().collect();
     let has_vault = state(app).vault.lock().unwrap().is_some();
     // --hidden: 로그인 때 자동 실행 — 창 없이 알림 영역에서 (메모 폴더가 없으면 고르게 띄운다)
-    if !launch(app, &args) && !(has_vault && args.iter().any(|a| a == "--hidden")) {
+    let show = !launch(app, &args) && !(has_vault && args.iter().any(|a| a == "--hidden"));
+    let open: Vec<String> = state(app).setting("openNotes").as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
+    if open.is_empty() {
+        if show {
+            show_list(app);
+        }
+        return;
+    }
+    // 지난번 열어 둔 메모: 숨긴 채 모두 만들어 다 그리면(늦어도 RESTORE_WAIT) 목록과 함께 한꺼번에 보인다 — 하나씩 뜨면 굼떠 보였다.
+    //   창 만들기는 이벤트 처리 안에서 하면 Windows 에서 멈춘다 — 다른 스레드에서
+    let app = app.clone();
+    std::thread::spawn(move || restore_notes(&app, &open, show));
+}
+
+/// 다시 켤 때 메모 창들을 기다리는 최대 시간 — 넘으면 다 그리지 못한 창도 함께 보인다
+const RESTORE_WAIT: Duration = Duration::from_millis(2500);
+
+fn restore_notes(app: &AppHandle, open: &[String], show: bool) {
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
+    let mut made = 0;
+    for id in open {
+        // 못 여는 메모(지웠거나 메모 폴더가 없음)는 기억에서 뺀다
+        let exists = state(app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(id).is_some());
+        if !exists {
+            set_open(app, id, false);
+            continue;
+        }
+        let tx = tx.clone();
+        let ready: crate::windows::Action = Box::new(move |_| {
+            let _ = tx.send(());
+        });
+        if memos::create_note_window(app, id, None, false, Some(ready)).is_ok() {
+            made += 1;
+        }
+    }
+    let until = std::time::Instant::now() + RESTORE_WAIT;
+    for _ in 0..made {
+        if rx.recv_timeout(until.saturating_duration_since(std::time::Instant::now())).is_err() {
+            break;
+        }
+    }
+    // 이제 한꺼번에: 목록 → 메모들 (이미 만든 창을 보이기만 해서 거의 같은 순간에 뜬다 · 스택 탭은 그 자리 · 스티커와 함께)
+    if show {
         show_list(app);
     }
-    // 지난번 열어 둔 메모는 목록을 먼저 띄운 뒤 하나씩 — 예전에는 메모 창을 모두 만든 뒤에야 목록이 떠 켜기가 굼떴다
-    //   (창 만들기는 화면 스레드 일이라 한꺼번에 만들면 그동안 아무 창도 그려지지 않는다)
-    let open = state(app).setting("openNotes").as_array().cloned().unwrap_or_default();
-    let app = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(250));
-        for id in open.iter().filter_map(Value::as_str) {
-            // 못 여는 메모(지웠거나 메모 폴더가 없음)는 기억에서 뺀다
-            if !memos::open_note(&app, id).unwrap_or(false) {
-                set_open(&app, id, false);
-            }
-            std::thread::sleep(std::time::Duration::from_millis(120));
+    for id in open {
+        if !memos::open_note(app, id).unwrap_or(false) {
+            set_open(app, id, false);
         }
-    });
+    }
 }
 
 #[cfg(test)]
