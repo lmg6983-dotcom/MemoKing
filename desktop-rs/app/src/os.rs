@@ -526,6 +526,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn remind_from_first_line_date() {
+        use chrono::{Datelike, TimeZone, Timelike};
+        let now = chrono::Local.with_ymd_and_hms(2026, 11, 18, 10, 0, 0).unwrap();
+        let d = remind_from_text("내일 오후 3시 치과\n둘째 줄 모레 5시", now).unwrap();
+        assert_eq!(d["title"], "치과");
+        assert_eq!(d["hasTime"], true);
+        // 화면 · 저장은 지역 시각: UTC 로 적은 at 이 이 PC 시각 내일 15:00 이어야 (시간대가 어긋나면 9시간 틀린다)
+        let at = chrono::DateTime::parse_from_rfc3339(d["at"].as_str().unwrap()).unwrap().with_timezone(&chrono::Local);
+        assert_eq!((at.day(), at.hour(), at.minute()), (19, 15, 0));
+        let r = memoking_core::reminders::event_from_date(&d, now).unwrap();
+        let start = chrono::DateTime::parse_from_rfc3339(r["at"].as_str().unwrap()).unwrap().with_timezone(&chrono::Local);
+        assert_eq!((start.day(), start.hour()), (19, 15));
+        assert_eq!(r["title"], "치과");
+        assert!(remind_from_text("날짜 없는 글\n내일 3시", now).is_none()); // 첫 줄만 본다
+    }
+
+    #[test]
     fn restores_only_bounds_on_a_screen() {
         let screen = [[0.0, 0.0, 1920.0, 1040.0]];
         assert_eq!(on_screen(&json!({ "x": 100, "y": 50, "width": 340, "height": 380 }), &screen), Some([100.0, 50.0, 340.0, 380.0]));

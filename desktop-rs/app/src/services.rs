@@ -44,6 +44,11 @@ fn screens() -> Vec<((i32, i32), image::RgbaImage)> {
     Vec::new()
 }
 
+/// 화면 캡처(사각형 고르기)가 떠 있는가
+pub fn area_capturing() -> bool {
+    AREA.lock().unwrap().is_some()
+}
+
 /// 모니터마다 찍은 화면을 띄우고 사각형을 고르게 한다 (capture.html) — 창 만들기라 이벤트 처리 밖의 스레드에서 부른다
 pub fn start_area_capture(app: &AppHandle) -> bool {
     if state(app).vault.lock().unwrap().is_none() {

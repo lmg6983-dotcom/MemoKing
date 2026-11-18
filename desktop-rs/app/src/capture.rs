@@ -29,7 +29,8 @@ pub fn pressed(app: &AppHandle) {
         *COOL.lock().unwrap() = Some(Instant::now() + Duration::from_millis(DOUBLE_MS));
         let app = app.clone();
         std::thread::spawn(move || {
-            if !crate::services::start_area_capture(&app) && state(&app).vault.lock().unwrap().is_some() {
+            // 캡처 화면이 이미 떠 있으면 그대로 (실패가 아니다)
+            if !crate::services::start_area_capture(&app) && state(&app).vault.lock().unwrap().is_some() && !crate::services::area_capturing() {
                 crate::windows::show_hud(&app, "화면을 캡처하지 못했어요", "잠시 뒤 두 번 다시 눌러 주세요.", "warn");
             }
         });
@@ -119,7 +120,7 @@ pub fn stop() {
 
 fn request(app: &AppHandle, line: &str) -> Result<Value, String> {
     let mut slot = HELPER.lock().unwrap();
-    for attempt in 0..2 {
+    for _ in 0..2 {
         if slot.is_none() {
             *slot = Some(spawn_helper(app)?);
         }
@@ -134,9 +135,6 @@ fn request(app: &AppHandle, line: &str) -> Result<Value, String> {
         if let Some(mut h) = slot.take() {
             let _ = h.child.kill();
             let _ = h.child.wait();
-        }
-        if attempt == 1 {
-            break;
         }
     }
     Err("도우미 응답 시간 초과".into())

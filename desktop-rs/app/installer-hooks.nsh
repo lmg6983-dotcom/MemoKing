@@ -3,7 +3,8 @@
 ; 메모킹 1.0 으로 갈아탈 때: Electron 판(0.87 까지) · Rust 베타("MemoKing Beta")를 지우고 이 판으로.
 ;   메모 폴더 · 설정(%APPDATA%\MemoKing)은 그대로 둔다 — 세 판이 같은 것을 쓴다.
 ;   Electron 판의 자동 업데이트(electron-updater)는 이 설치 파일을 "--updated /S --force-run" 으로 띄운다 (조용히 설치 → 다시 켜기)
-;   지우는 것은 파일을 깔기 전에: Electron 판 바로가기 이름(MemoKing.lnk)이 이 판과 같아, 나중에 지우면 새 바로가기가 지워진다
+;   지우는 것은 파일을 깔기 전에: 예전 판의 지우개가 끝난 뒤 깔아야, 지우개가 같은 이름의 것(베타 · 이 판의 MemoKing.exe ·
+;   바로가기 · 레지스트리 값)을 새로 깐 뒤에 건드리지 않는다 (Electron 판 바로가기 이름은 메모킹.lnk)
 ;   자동 시작을 켜 두었으면 이 판의 자동 시작으로 옮긴다 (tauri-plugin-autostart 와 같은 값: 이름 MemoKing, "<exe>" --hidden)
 
 Var mkAutoStart

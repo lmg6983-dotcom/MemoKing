@@ -1,0 +1,91 @@
+# PC 설치 파일 갈아타기 점검 — Electron 판(0.87) · Rust 베타(0.88.6)가 깔린 PC 에서 새 설치 파일을 Electron 업데이트처럼
+#   ("--updated /S --force-run") 돌리고, 예전 판이 지워졌는지 · 메모 설정이 남았는지 · 자동 시작이 옮겨졌는지 · 새 판이 켜졌는지 본다
+#   (desktop-rs/app/installer-hooks.nsh). 설치 조각이나 배포 설정이 바뀔 때, 그리고 손으로
+name: PC 설치 갈아타기 점검
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - desktop-rs/app/installer-hooks.nsh
+      - desktop-rs/app/tauri.conf.json
+      - .github/workflows/installer-rs.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-rs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migrate:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-rs
+
+      - name: 새 설치 파일 만들기 (debug)
+        working-directory: desktop-rs/app
+        run: npx --yes @tauri-apps/cli@2.12.5 build --debug --bundles nsis
+
+      - name: 예전 판 깔기 (Electron 0.87.0 · Rust 베타 0.88.6) + 자동 시작 · 설정 표시
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.87.0 -p 'MemoKing-Setup-0.87.0.exe' -D old --repo $env:GITHUB_REPOSITORY
+          gh release download desktop-rs -p 'MemoKing-Rust-Setup-0.88.6.exe' -D old --repo $env:GITHUB_REPOSITORY
+          Start-Process -Wait old/MemoKing-Setup-0.87.0.exe -ArgumentList '/S'
+          Start-Process -Wait old/MemoKing-Rust-Setup-0.88.6.exe -ArgumentList '/S'
+          Start-Sleep 3
+          Get-Process MemoKing -ErrorAction SilentlyContinue | Stop-Process -Force
+          $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          Set-ItemProperty $run 'com.memoking.desktop' "`"$env:LOCALAPPDATA\Programs\MemoKing\MemoKing.exe`" --hidden"
+          Set-ItemProperty $run 'MemoKing Beta' "`"$env:LOCALAPPDATA\MemoKing Beta\MemoKing.exe`" --hidden"
+          New-Item -ItemType Directory -Force "$env:APPDATA\MemoKing" | Out-Null
+          Set-Content "$env:APPDATA\MemoKing\migrate-marker.txt" 'keep me'
+          "Electron: $(Test-Path "$env:LOCALAPPDATA\Programs\MemoKing\Uninstall MemoKing.exe")"
+          "베타: $(Test-Path "$env:LOCALAPPDATA\MemoKing Beta\uninstall.exe")"
+          Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Filter *.lnk -Recurse | ForEach-Object Name
+
+      - name: 새 설치 파일을 Electron 업데이트처럼 돌리기
+        run: |
+          $setup = Get-ChildItem desktop-rs/target/debug/bundle/nsis/*-setup.exe | Select-Object -First 1
+          "설치 파일: $($setup.Name)"
+          $p = Start-Process $setup.FullName -ArgumentList '--updated','/S','--force-run' -PassThru
+          if (-not $p.WaitForExit(300000)) { Stop-Process $p; throw '설치가 5분 안에 끝나지 않았어요' }
+          "설치 끝 (exit $($p.ExitCode))"
+          Start-Sleep 8
+
+      - name: 결과 확인
+        run: |
+          $fail = @()
+          function Check($ok, $what) { if ($ok) { "✔ $what" } else { "✖ $what"; $script:fail += $what } }
+          $run = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          $menu = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs"
+          $links = Get-ChildItem $menu -Filter *.lnk -Recurse | ForEach-Object Name
+          "시작 메뉴: $($links -join ', ')"
+          "자동 시작: $(($run.PSObject.Properties | Where-Object Name -like '*emo*' | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ' | ')"
+          Check (-not (Test-Path "$env:LOCALAPPDATA\Programs\MemoKing")) 'Electron 판 폴더 지움'
+          Check (-not (Test-Path "$env:LOCALAPPDATA\MemoKing Beta")) '베타 폴더 지움'
+          Check (Test-Path "$env:LOCALAPPDATA\MemoKing\MemoKing.exe") '새 판 설치 (%LOCALAPPDATA%\MemoKing)'
+          Check (Test-Path "$env:APPDATA\MemoKing\migrate-marker.txt") '설정 폴더는 그대로'
+          Check ($links -notcontains '메모킹.lnk') 'Electron 판 바로가기 지움'
+          Check ($links -notcontains 'MemoKing Beta.lnk') '베타 바로가기 지움'
+          Check ($links -contains 'MemoKing.lnk') '새 판 바로가기'
+          Check ($null -eq $run.'com.memoking.desktop' -and $null -eq $run.'MemoKing Beta') '예전 자동 시작 지움'
+          Check ($run.'MemoKing' -like "*$env:LOCALAPPDATA\MemoKing\MemoKing.exe*--hidden") '자동 시작 옮김'
+          $proc = Get-Process MemoKing -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$env:LOCALAPPDATA\MemoKing\*" }
+          Check ($null -ne $proc) '다 깔고 새 판이 켜짐 (--force-run)'
+          Get-Process MemoKing -ErrorAction SilentlyContinue | Stop-Process -Force
+          if ($fail.Count) { throw "갈아타기 점검 실패: $($fail -join ', ')" }
