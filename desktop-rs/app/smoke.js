@@ -55,7 +55,7 @@ window.addEventListener('load', () => setTimeout(async () => {
     let overs = 0;
     for (const t of ['dragenter', 'dragleave', 'drop']) window.addEventListener(t, (e) => log.push(`${at()}s ${t}${t === 'drop' ? `(files=${e.dataTransfer?.files?.length})` : ''}`), true);
     window.addEventListener('dragover', () => overs++, true);
-    const chips = () => document.querySelectorAll('.mk-doc a[href^="attachments/"], .mk-doc img[src*="attachments/"]').length;
+    const chips = () => document.querySelectorAll('.mk-doc a[href^="attachments/"]').length; // 파일 칩만 (문서는 PDF 썸네일 그림이 함께 붙는다)
     window.addEventListener('error', (e) => log.push(`${at()}s 오류 ${e.message}`));
     window.addEventListener('unhandledrejection', (e) => log.push(`${at()}s 거부 ${e.reason?.message ?? e.reason}`));
     for (const k of ['error', 'warn']) {
@@ -74,10 +74,22 @@ window.addEventListener('load', () => setTimeout(async () => {
     log.push(`${at()}s 편집기 준비 (${new URLSearchParams(location.search).get('id') ? '' : 'id 없음 '}${performance.getEntriesByType('navigation')[0]?.name.includes('spare') ? '예비 창' : '새 창'}) · 준비 알림`);
     // 놓을 곳: 첫 줄 가운데 (창 안 CSS 좌표 → 메인이 화면 좌표로)
     const first = document.querySelector('.mk-doc > *')?.getBoundingClientRect() ?? document.querySelector('.mk-doc').getBoundingClientRect();
-    await invoke('smoke:droptest-ready', [first.left + Math.min(first.width, 300) / 2, first.top + first.height / 2]);
+    const tx = first.left + Math.min(first.width, 300) / 2;
+    const ty = first.top + first.height / 2;
+    await invoke('smoke:droptest-ready', [tx, ty]);
+    // 놓을 자리 위에 무엇이 있나 · 창 크기 · 보임 · 포커스가 바뀌는지
+    const what = () => {
+      const el = document.elementFromPoint(tx, ty);
+      return el ? `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? `.${el.className.split(' ')[0]}` : ''}` : '없음';
+    };
+    let lastWhat = '';
+    setInterval(() => {
+      const w = `${what()} · ${innerWidth}x${innerHeight} · ${document.visibilityState}${document.hasFocus() ? ' · 포커스' : ''}`;
+      if (w !== lastWhat) log.push(`${at()}s 자리 ${(lastWhat = w)}`);
+    }, 200);
     let last = 0;
-    const tEnd = Date.now() + 45000;
-    while (Date.now() < tEnd && chips() < 2) {
+    const tEnd = Date.now() + 22000; // 두 번째 놓기(약 12초)가 끝난 뒤까지 다 남긴다
+    while (Date.now() < tEnd) {
       await new Promise((r) => setTimeout(r, 200));
       if (chips() !== last) log.push(`${at()}s 파일 ${(last = chips())}개 들어감`);
     }
