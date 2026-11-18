@@ -150,7 +150,7 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .invoke_handler(tauri::generate_handler![ipc::ipc])
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
-        //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상 · history/<이름>: 알림 보관함 그림
+        //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상 · poster/<경로>: 동영상 첫 장면 · history/<이름>: 알림 보관함 그림
         .register_asynchronous_uri_scheme_protocol("memoking", |ctx, req, responder| {
             // 파일 읽기 · 동기 호출은 화면 스레드 밖에서 — 큰 영상을 읽거나 창을 만드는 호출이 화면을 멈추지 않게
             let (app, label) = (ctx.app_handle().clone(), ctx.webview_label().to_string());
@@ -212,6 +212,14 @@ fn memoking_uri(app: &AppHandle, label: &str, req: &http::Request<Vec<u8>>) -> h
         return status(403);
     }
     let allow = origin.clone().unwrap_or_default();
+    // poster/<경로>: 동영상 첫 장면 JPG · 못 뽑으면 204 (화면이 스스로 그린다 — video-poster.js nativeFrame)
+    if let Some(rel) = path.strip_prefix("/poster/") {
+        let shot = memos::serve_vault(app, rel).filter(|(_, mime)| mime.starts_with("video/")).and_then(|(file, _)| video::poster(app, &file));
+        return match shot {
+            Some(jpg) => file_response(&jpg, "image/jpeg", None, allow).unwrap_or_else(|| status(404)),
+            None => http::Response::builder().status(204).header("Access-Control-Allow-Origin", allow).body(Vec::new()).unwrap(),
+        };
+    }
     let served = match (path.strip_prefix("/vault/"), path.strip_prefix("/history/")) {
         (Some(rel), _) => Some(memos::serve_vault(app, rel)),
         (_, Some(name)) => Some(history::serve_image(app, name)),

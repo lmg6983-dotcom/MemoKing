@@ -91,20 +91,55 @@ fn convert(ffmpeg: &Path, src: &Path, out: &Path, audio: bool) -> Result<(), Str
     cmd.args(["-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i"]).arg(src);
     cmd.args(["-map", "0:v:0", "-map", if audio { "0:a:0?" } else { "-0:a" }, "-vf", "scale='min(iw,1920)':'min(ih,1920)':force_original_aspect_ratio=decrease:force_divisible_by=2,format=nv12"]);
     cmd.args(["-c:v", "h264_mf", "-b:v", "8M", "-c:a", "copy", "-movflags", "+faststart", "-f", "mp4"]).arg(&part);
-    cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
-    #[cfg(windows)]
-    std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW
-    let res = cmd.spawn().map_err(|e| e.to_string()).and_then(|child| {
-        #[cfg(windows)]
-        crate::ai::kill_with_app(&child);
-        let o = child.wait_with_output().map_err(|e| e.to_string())?;
-        if o.status.success() { Ok(()) } else { Err(String::from_utf8_lossy(&o.stderr).trim().to_string()) }
-    });
-    let res = res.and_then(|()| std::fs::rename(&part, out).map_err(|e| e.to_string()));
+    let res = run(cmd).and_then(|()| std::fs::rename(&part, out).map_err(|e| e.to_string()));
     if res.is_err() {
         let _ = std::fs::remove_file(&part);
     }
     res
+}
+
+/// ffmpeg 를 창 없이 돌리고 끝나기를 기다린다 (메모킹이 꺼지면 같이 끝난다)
+fn run(mut cmd: std::process::Command) -> Result<(), String> {
+    cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW
+    let child = cmd.spawn().map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    crate::ai::kill_with_app(&child);
+    let o = child.wait_with_output().map_err(|e| e.to_string())?;
+    if o.status.success() { Ok(()) } else { Err(String::from_utf8_lossy(&o.stderr).trim().to_string()) }
+}
+
+/// 목록 카드 · 메모 속 동영상의 첫 장면: 1초쯤의 장면을 폭 480 JPG 로 → 캐시 파일 (사진 썸네일 옆, main.rs prune_thumbs 가 같이 정리)
+///   예전: 창마다 화면에서 동영상을 열어 그렸다 (카드마다 영상 디코더 · 메모리, HEVC 는 사본이 다 될 때까지 못 그림).
+///   ffmpeg 가 HEVC 도 스스로 푼다. 못 뽑으면(다른 형식 · 깨진 파일) None — 화면이 예전처럼 그린다 (video-poster.js)
+pub fn poster(app: &AppHandle, file: &Path) -> Option<PathBuf> {
+    let ffmpeg = ffmpeg_path(app)?;
+    let dir = app.path().app_cache_dir().ok()?.join("thumbs");
+    let out = dir.join(format!("{}-poster.jpg", cache_key(file)?));
+    if out.is_file() {
+        return Some(out);
+    }
+    // 목록에 영상이 많아도 하나씩
+    static ONE: Mutex<()> = Mutex::new(());
+    let _one = ONE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if out.is_file() || FAILED.lock().unwrap().contains(&out) {
+        return out.is_file().then_some(out);
+    }
+    std::fs::create_dir_all(&dir).ok()?;
+    let part = out.with_extension("part");
+    // 1초 장면 (처음은 검은 화면이 많다) — 1초보다 짧은 영상은 첫 장면
+    for at in ["1", "0"] {
+        let mut cmd = std::process::Command::new(&ffmpeg);
+        cmd.args(["-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-ss", at, "-i"]).arg(file);
+        cmd.args(["-map", "0:v:0", "-frames:v", "1", "-vf", "scale='min(480,iw)':-2,format=yuvj420p", "-c:v", "mjpeg", "-q:v", "5", "-f", "image2", "-update", "1"]).arg(&part);
+        if run(cmd).is_ok() && part.metadata().is_ok_and(|m| m.len() > 0) && std::fs::rename(&part, &out).is_ok() {
+            return Some(out);
+        }
+    }
+    let _ = std::fs::remove_file(&part);
+    FAILED.lock().unwrap().insert(out); // 이번 실행에서는 다시 하지 않는다
+    None
 }
 
 /// 사본이 한도를 넘으면 오래된 것부터 지운다

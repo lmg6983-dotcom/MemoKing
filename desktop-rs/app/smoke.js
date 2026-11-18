@@ -74,6 +74,14 @@ window.addEventListener('load', () => setTimeout(async () => {
       return clip(false, 'clip-hevc.mp4');
     }));
     await check('HEVC 동영상 첫 장면 그리기', () => clip(true, 'clip-hevc.mp4'));
+    // 목록 카드의 첫 장면은 메인이 ffmpeg 로 뽑는다 (video.rs poster) — HEVC 도 사본 없이
+    const poster = async (name) => {
+      const res = await fetch(`${mk.posterBase}attachments/${name}`);
+      return res.status === 200 && res.headers.get('content-type') === 'image/jpeg' && (await res.blob()).size > 100;
+    };
+    await check('동영상 첫 장면 (메인 ffmpeg)', () => poster('clip.mp4'));
+    await check('HEVC 동영상 첫 장면 (메인 ffmpeg)', () => poster('clip-hevc.mp4'));
+    await check('동영상이 아닌 파일의 첫 장면은 204', async () => (await fetch(`${mk.posterBase}attachments/dot.png`)).status === 204);
     await check('CSS app-region 읽힘 (창 끌기)', () => dragRegion('.titlebar'));
     await check('창 단추 셋 (CSP 아래에서도 모양)', () => {
       const b = document.querySelectorAll('.mk-caption button');

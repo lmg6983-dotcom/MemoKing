@@ -136,4 +136,5 @@
 
   window.memoking.vaultBase =`${scheme('memoking')}vault/`;
   window.memoking.historyBase = `${scheme('memoking')}history/`;
+  window.memoking.posterBase = `${scheme('memoking')}poster/`; // 동영상 첫 장면은 메인이 ffmpeg 로 (video.rs poster)
 })();

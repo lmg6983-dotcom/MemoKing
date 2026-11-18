@@ -3,6 +3,7 @@
 #   bash desktop-rs/scripts/build-ffmpeg-min.sh [나올 폴더]   (기본 desktop/vendor/ffmpeg)
 #   Linux(Ubuntu) 에서 mingw-w64 로 크로스 빌드: apt-get install -y mingw-w64 nasm
 #   담는 것: mov/mp4 읽기 · mp4 쓰기 · hevc/h264 풀기 · Windows 에 든 H.264 인코더(h264_mf) · 크기/화소 형식/회전 필터
+#            · 첫 장면 JPG (mjpeg · image2 — 목록 카드의 동영상 첫 장면, video.rs poster)
 #   GPL · nonfree 부품(x264, x265 등)은 넣지 않는다 (app/vendor/LICENSES.md)
 set -euo pipefail
 
@@ -38,10 +39,10 @@ cd "$WORK/ffmpeg-$VER"
   --disable-everything --disable-network --disable-avdevice --disable-ffplay --disable-ffprobe \
   --enable-w32threads --enable-mediafoundation --enable-d3d11va \
   --enable-protocol=file \
-  --enable-demuxer=mov --enable-muxer=mp4 \
+  --enable-demuxer=mov --enable-muxer=mp4,image2 \
   --enable-parser=hevc,h264,aac \
   --enable-decoder=hevc,h264 \
-  --enable-encoder=h264_mf \
+  --enable-encoder=h264_mf,mjpeg \
   --enable-filter=buffer,buffersink,abuffer,abuffersink,null,anull,format,scale,transpose,hflip,vflip
 make -j"$(nproc)" ffmpeg.exe
 x86_64-w64-mingw32-strip ffmpeg.exe
