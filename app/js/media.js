@@ -14,6 +14,18 @@ export function vaultUrl(src) {
   return `${base}${decoded.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+// 메모 안 사진은 화면에 맞게 줄인 그림으로 (PC Rust 판의 memoking 주소 ?thumb=폭 — 원본이 그보다 작으면 원본).
+//   휴대폰 사진(1,200만 화소)을 창마다 통째로 풀지 않게. 크게 보기 · 복사 · 저장 · 돌리기는 원본(fullUrl · vaultUrl)
+let imageThumb = 0;
+/** 이 창의 메모 안 사진을 줄여 보인다 (긴 변 w px) — PC 메모 창만 부른다 (인쇄 · PDF 저장 · 휴대폰은 원본) */
+export const useImageThumbs = (w) => void (imageThumb = Math.round(w));
+/** 메모 안에 보일 사진 주소 */
+export const shownUrl = (src) => (imageThumb && /\.(jpe?g|png|webp|bmp)$/i.test(src) ? `${vaultUrl(src)}?thumb=${imageThumb}` : vaultUrl(src));
+/** 작은 자리(사진 줄의 썸네일 등)에 보일 주소 — 줄인 그림을 쓰는 창이면 폭 w 로 */
+export const smallUrl = (url, src, w) => (imageThumb && /\.(jpe?g|png|webp|bmp)$/i.test(src) ? `${url}?thumb=${w}` : url);
+/** 줄인 그림 주소 → 원본 주소 */
+export const fullUrl = (url) => String(url).replace(/\?thumb=\d+$/, '');
+
 const MIME_EXT = {
   'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/bmp': 'bmp',
   'image/svg+xml': 'svg', 'image/avif': 'avif',

@@ -1,6 +1,7 @@
 // 묶음 사진 보기 (PC·휴대폰 함께) — 카카오톡 묶음 사진처럼 메모에는 몇 장만 모아 보이고, 누르면 크게 한 장씩 넘겨 본다
 //   ← → · 밀기로 넘기기, Esc · 닫기. 휠 · 두 손가락 · 두 번 누르기 · + - 0 으로 확대 · 축소 (크게 보면 끌어서 둘러보기). "그리기" 로 그 장 위에 펜 · 형광펜으로 쓰고 완료하면 그린 것을 그 장에 합쳐 저장
 //   (원본 파일은 그대로 두고 새 그림 파일로 바꾼다 — 메모에서 되돌리기 Ctrl+Z 로 원래 장으로)
+import { smallUrl } from './media.js';
 import { createInkSurface, createInkToolbar, inkHistory, inkTools, inkKeys, strokeEl } from './ink-editor.js';
 import { icon } from './icons.js';
 import { SAVE_ICON, SHARE_ICON, TRASH_ICON } from './content-icons.js';
@@ -206,7 +207,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     strip.replaceChildren(...images.map((it, k) => {
       const b = el('button', `mk-album-thumb${k === i ? ' on' : ''}${it.inked ? ' inked' : ''}`, { type: 'button', role: 'tab', ariaLabel: `${k + 1}번째 장`, title: `${k + 1}번째 장${it.inked ? ' (그린 장)' : ''}` });
       b.setAttribute('aria-selected', String(k === i));
-      const t = el('img', '', { src: url(it.src), alt: '', loading: 'lazy', draggable: false });
+      const t = el('img', '', { src: smallUrl(url(it.src), it.src, 256), alt: '', loading: 'lazy', draggable: false }); // 아래 사진 줄은 작은 그림 (큰 그림은 원본)
       b.append(t);
       b.addEventListener('click', () => !reorder.justDropped && goTo(k));
       return b;

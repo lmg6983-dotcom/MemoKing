@@ -675,7 +675,26 @@ export function registerIpc(ctx) {
     return want - w;
   });
 
-  // ---------- 휴지통 ----------
+  // PDF 미리보기: 문서를 100% 로 볼 만큼 창을 키운다 (작업 영역 안, 줄이지는 않음) → 키우기 전 자리 | null
+  ipcMain.handle('win:fit-size', (event, width, height) => {
+    const win = senderWindow(event);
+    if (!win) return null;
+    const old = win.getBounds();
+    const area = screen.getDisplayMatching(old).workArea;
+    const w = Math.max(old.width, Math.min(area.width - 24, Math.ceil(Number(width) || 0)));
+    const h = Math.max(old.height, Math.min(area.height - 24, Math.ceil(Number(height) || 0)));
+    if (w <= old.width && h <= old.height) return null;
+    const x = Math.max(area.x, Math.min(old.x, area.x + area.width - w));
+    const y = Math.max(area.y, Math.min(old.y, area.y + area.height - h));
+    win.setBounds({ x, y, width: w, height: h });
+    return old;
+  });
+  ipcMain.handle('win:restore-bounds', (event, b) => {
+    const win = senderWindow(event);
+    const r = { x: Number(b?.x), y: Number(b?.y), width: Number(b?.width), height: Number(b?.height) };
+    if (win && Object.values(r).every(Number.isFinite) && r.width >= 100 && r.height >= 100) win.setBounds(r);
+  });
+
   ipcMain.handle('trash:list', () => getVault()?.trashList() ?? []);
   ipcMain.handle('trash:preview', (_e, name) => getVault()?.trashPreview(String(name ?? '')) ?? null);
   ipcMain.handle('trash:restore', (_e, name) => {
@@ -1228,6 +1247,16 @@ export function registerIpc(ctx) {
 
   // ---------- 스택 (탭) ----------
   ipcMain.handle('win:close', (event) => senderWindow(event)?.close());
+  ipcMain.handle('app:restoring', () => false); // Electron 은 열어 둔 메모를 기다리지 않는다 — 로딩 화면은 목록이 준비되면 바로 걷힌다
+  // 닫기 전에 숨긴다 (화면이 저장을 마치면 win:close) — 스택이면 탭 모두 (close 가 스택을 모두 닫는다)
+  ipcMain.handle('win:hide-closing', (event) => {
+    const win = senderWindow(event);
+    if (!win) return;
+    const id = [...wm.noteWins].find(([, w]) => w === win)?.[0];
+    const stack = id ? wm.stacks?.stackOf(id) : null;
+    for (const m of stack?.memos ?? []) wm.noteWins.get(m)?.hide();
+    win.hide();
+  });
   // 탭 줄 안에서 끌어 순서 바꾸기
   ipcMain.handle('stack:reorder', (_e, id, index) => {
     const stack = wm.stacks?.reorder(String(id), index);
@@ -1245,6 +1274,7 @@ export function registerIpc(ctx) {
   };
   ipcMain.handle('stack:new-tab', (_e, fromId) => newTabAfter(fromId));
   ipcMain.handle('stack:remove', (_e, id) => wm.removeFromStack(String(id), 'close'));
+  ipcMain.handle('stack:remove-hidden', (_e, id) => wm.removeFromStack(String(id), 'hide'));
   ipcMain.handle('stack:detach', (_e, id) => wm.removeFromStack(String(id), 'detach'));
   ipcMain.handle('stack:tear-start', (_e, id, offset, point) => {
     const p = asPoint(point);

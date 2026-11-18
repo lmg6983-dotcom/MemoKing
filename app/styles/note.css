@@ -242,7 +242,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .mk-doc li[data-item-type="task"][data-checked="true"] > p { color: var(--note-muted); text-decoration: line-through; }
 
 /* 밑줄 · 글자 색 · 하이라이트 */
-.mk-doc u { text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
+.mk-doc u { text-decoration-thickness: 1px; text-underline-offset: 2px; } /* 1.5px 는 100% 화면에서 2px 로 그려져 두꺼웠다 */
 .mk-doc mark { padding: 0.05em 0.1em; border-radius: 3px; color: #1f1f1f; } /* 배경색은 요소의 style 에서 */
 /* 어두운 화면: 형광펜 칠 · 흰 바탕 그림(흰 바탕 손 메모 · 가져온 일정의 달력 그림)은 조금 어둡게 — 검은 바탕에서 혼자 눈부시지 않게 (파일은 그대로) */
 [data-color="charcoal"] .mk-doc mark { filter: brightness(0.8); }
@@ -314,7 +314,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .mk-video { position: relative; display: block; background: #000; }
 .mk-video .plyr { border-radius: inherit; }
 
-/* 그 밖의 파일: 파일 칩 (끌어서 순서 바꾸기 · 옆의 열기 버튼이나 더블클릭으로 열기) */
+/* 그 밖의 파일: 파일 칩 (끌어서 순서 바꾸기 · 한 번 눌러 열기) */
 .mk-doc a[href^="attachments/"] {
   display: inline-flex;
   align-items: center;
@@ -333,7 +333,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   transition: background-color 0.15s ease-out;
 }
 .mk-doc p.mk-file-line { caret-color: transparent; }
-@media (hover: hover) and (pointer: fine) { .mk-doc a[href^="attachments/"]:hover { background: var(--note-hover); box-shadow: inset 0 0 0 1px var(--note-muted); } }
+/* 마우스를 올리면 문단의 흐린 점선(옮기기)만 — 칩 안쪽 선까지 그리면 둥근 칩 위에 선이 두 겹으로 겹쳐 보였다 */
 .mk-doc a[href^="attachments/"]::before {
   content: "";
   width: 16px;
@@ -2624,3 +2624,19 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-doc p:has(> .mk-doc-pending) .mk-doc-pending-page { border-radius: 0; box-shadow: none; }
 .mk-doc p:has(> .mk-doc-pending) :is(.mk-doc-pending-bar, .mk-doc-pending-label) { margin-left: 12px; margin-right: 12px; }
 .mk-doc p:has(> .mk-doc-pending) .mk-doc-pending-label { margin-bottom: 8px; }
+/* PC(마우스): 위 막대 · 확대 막대를 메모 창 단추(.icon-btn 32px · 아이콘 18px) 크기에 맞춘다 — 휴대폰 손가락 크기 그대로라 PC 에서는 혼자 컸다 */
+@media (hover: hover) and (pointer: fine) {
+  .mk-pdf-bar { gap: 2px; padding: 4px 6px; }
+  .mk-pdf-ibtn { width: 32px; height: 32px; border-radius: var(--radius-sm, 8px); }
+  .mk-pdf-ibtn svg { width: 18px; height: 18px; }
+  .mk-pdf-heading { padding: 0 4px; }
+  .mk-pdf-title { font-size: 13px; }
+  .mk-pdf-sub { font-size: 11px; }
+  .mk-pdf-done { height: 28px; padding: 0 12px; font-size: 12.5px; }
+  .mk-pdf-pages { padding-top: 52px; }
+  .mk-pdf-zoombar { right: 12px; bottom: 12px; padding: 3px; border-radius: 10px; }
+  .mk-pdf-zoombar .mk-pdf-ibtn { width: 28px; height: 28px; border-radius: 7px; }
+  .mk-pdf-zsym { font-size: 15px; }
+  .mk-pdf-zoomval { min-width: 44px; height: 28px; border-radius: 7px; font-size: 12px; }
+  .mk-pdf-pill { bottom: 12px; padding: 5px 12px; font-size: 12px; }
+}

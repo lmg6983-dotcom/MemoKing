@@ -301,8 +301,17 @@ pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
             bubble_away(&app, &label);
             moving(&app, &id, &label, matches!(e, WindowEvent::Moved(_)));
         }
+        WindowEvent::Focused(true) => {
+            if let Some(w) = app.get_webview_window(&label) {
+                webview_visible(&w, true); // 다른 길로 보인 창이어도 (안전망)
+                memory_low(&w, false);
+            }
+        }
         WindowEvent::Focused(false) => {
             bubble_away(&app, &label);
+            if let Some(w) = app.get_webview_window(&label) {
+                memory_low(&w, true); // 바탕화면에 붙여 둔 메모는 대개 보기만 한다 — 다시 누르면 보통으로
+            }
             // 테이프 메모: 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로
             let h = wm().pinned.get(&label).copied();
             if let Some(h) = h {
@@ -348,7 +357,57 @@ pub fn shown(app: &AppHandle, id: &str, win: &WebviewWindow) {
     apply_layer(app, id, win, false);
 }
 
+/// 이 창의 WebView2 에 메모리를 덜 쓰라고(low) · 보통으로 — 숨거나 포커스가 없는 창은 덜 (캐시 · 풀어 둔 그림을 놓는다).
+///   다시 쓰면 조금 느릴 수 있어 포커스를 받는 순간 보통으로 되돌린다. 화면 · 상태는 그대로 (닫거나 멈추지 않는다)
+#[cfg(windows)]
+pub fn memory_low(w: &WebviewWindow, low: bool) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL};
+    use windows::core::Interface;
+    let level = if low { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW } else { COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL };
+    let _ = w.with_webview(move |wv| unsafe {
+        // 오래된 WebView2 런타임(_19 없음)이면 그대로
+        if let Ok(core) = wv.controller().CoreWebView2().and_then(|c| c.cast::<ICoreWebView2_19>()) {
+            let _ = core.SetMemoryUsageTargetLevel(level);
+        }
+    });
+}
+#[cfg(not(windows))]
+pub fn memory_low(_w: &WebviewWindow, _low: bool) {}
+
+/// WebView2 에 이 창이 보이는지 알린다 — Tauri 는 창을 숨겨도 웹뷰에는 알리지 않아, 숨은 창도 그리기 자원(화면 조각 · GPU 메모리)을 쥐고 있었다
+#[cfg(windows)]
+fn webview_visible(w: &WebviewWindow, on: bool) {
+    let win = w.clone();
+    let _ = w.with_webview(move |wv| unsafe {
+        // 끄기는 UI 스레드에서 그 순간에도 숨어 있을 때만 (그사이 보였으면 빈 화면이 되지 않게)
+        if on || !win.is_visible().unwrap_or(true) {
+            let _ = wv.controller().SetIsVisible(on);
+        }
+    });
+}
+#[cfg(not(windows))]
+fn webview_visible(_w: &WebviewWindow, _on: bool) {}
+
+/// 메모 창 보이기 — 웹뷰를 먼저 보이게 해 그리기를 시작시키고 창을 띄운다
+pub fn show_note_win(w: &WebviewWindow) {
+    webview_visible(w, true);
+    let _ = w.show();
+}
+
+/// 숨은 지 오래(60초)된 창은 웹뷰도 안 보임으로 — 바로 끄면 탭을 오갈 때 다시 그리느라 흰 화면이 비칠 수 있어 잠시 둔다
+const DEEP_HIDE_MS: u64 = 60_000;
+pub fn hide_deep_later(w: &WebviewWindow) {
+    let w = w.clone();
+    later(DEEP_HIDE_MS, move || {
+        if !is_shown(&w) {
+            webview_visible(&w, false);
+        }
+    });
+}
+
 fn hide_note(app: &AppHandle, w: &WebviewWindow) {
+    memory_low(w, true);
+    hide_deep_later(w);
     let _ = w.hide();
     sync_sticker(app, w.label());
     bubble_away(app, w.label());
@@ -589,19 +648,32 @@ pub fn show_tab(app: &AppHandle, id: &str, at: Option<Rect>, focus: bool) -> boo
     ok
 }
 
-/// 지금 탭의 바로 앞 · 뒤 탭(Ctrl+Tab 으로 갈 곳)을 숨긴 창으로 미리 만들어 둔다 (Electron prewarmStack).
-///   바꿀 때 창을 새로 만들며 기다리지 않게, 둘까지만, 하나씩 조금 쉬었다가 (보이는 탭을 그리는 데 방해되지 않게)
+/// 미리 만들어 둘 탭 창 수 (보이는 탭 빼고) — 넘는 탭은 누를 때 만든다 (창마다 웹뷰 메모리)
+const PREWARM_MAX: usize = 4; // 숨은 탭도 하나에 수십 MB — 메모리와 맞바꿔 4 (숨은 동안은 memory_low)
+
+/// 스택의 다른 탭들을 숨긴 창으로 미리 만들어 둔다 (Electron prewarmStack) — 가까운 탭(Ctrl+Tab 으로 갈 곳)부터
+///   바꿀 때 창을 새로 만들며 기다리지 않게. PREWARM_MAX 개까지, 하나씩 조금 쉬었다가 (보이는 탭을 그리는 데 방해되지 않게)
+///   (예전: 앞 · 뒤 둘만 — 그 밖의 탭은 누르면 창을 새로 만들고 다 그릴 때까지 기다렸다)
 fn prewarm(app: &AppHandle, id: &str) {
     let (app, id) = (app.clone(), id.to_string());
-    later(700, move || {
+    later(400, move || {
         // 그사이 다른 탭으로 바꿨거나 스택을 닫았으면 그만
         let Some(s) = stack_of(&app, &id).filter(|s| s.active.as_deref() == Some(id.as_str())) else { return };
         let Some(b) = visible_stack_win(&app, &s, None).and_then(|w| bounds(&w)) else { return };
-        let near = stacks(&app, |s| [s.neighbor(&id, 1), s.neighbor(&id, -1)]).unwrap_or_default();
+        let n = s.memos.len();
+        let Some(i) = s.memos.iter().position(|m| *m == id) else { return };
+        let warm = s.memos.iter().filter(|m| **m != id && note_win(&app, m).is_some()).count();
+        if warm >= PREWARM_MAX {
+            return;
+        }
+        // 오른쪽 · 왼쪽 번갈아 가까운 차례로
+        let near = (1..n).flat_map(|k| [(i + k) % n, (i + n - k) % n]).map(|j| s.memos[j].clone());
         let exists = |m: &str| state(&app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(m).is_some());
-        let Some(m) = near.into_iter().flatten().find(|m| note_win(&app, m).is_none() && exists(m)) else { return };
+        let Some(m) = near.into_iter().find(|m| *m != id && note_win(&app, m).is_none() && exists(m)) else { return };
         // 예비 창은 남겨 둔다 (지금 열려는 다른 메모가 가져가게)
-        if crate::memos::create_note_window(&app, &m, Some(b), false, None).is_ok() {
+        if let Ok(w) = crate::memos::create_note_window(&app, &m, Some(b), false, None) {
+            memory_low(&w, true);
+            hide_deep_later(&w);
             prewarm(&app, &id);
         }
     });
@@ -628,7 +700,7 @@ fn reveal_tab(app: &AppHandle, id: &str, b: Option<Rect>, focus: bool) {
     if let Some(from) = &shown_win {
         hand_over_sticker(app, from, &win);
     }
-    let _ = win.show();
+    show_note_win(&win);
     if focus {
         let _ = win.set_focus();
     }
@@ -676,7 +748,7 @@ fn stack_into(app: &AppHandle, target: &str, moving: &str) -> bool {
         Some(w) => {
             let _ = w.unminimize();
             set_bounds(&w, b);
-            let _ = w.show();
+            show_note_win(&w);
             let _ = w.set_focus();
             shown(app, moving, &w);
             emit(app, w.label(), "memo:layer", layer_state(app, moving));
@@ -686,7 +758,7 @@ fn stack_into(app: &AppHandle, target: &str, moving: &str) -> bool {
             let moving = moving.to_string();
             create_hidden(app, &moving.clone(), Some(b), move |app| {
                 if let Some(w) = note_win(app, &moving) {
-                    let _ = w.show();
+                    show_note_win(&w);
                     let _ = w.set_focus();
                     shown(app, &moving, &w);
                 }
@@ -716,7 +788,7 @@ pub fn remove_from_stack(app: &AppHandle, id: &str, mode: &str) -> bool {
                     if let Some(b) = b {
                         set_bounds(&w, b);
                     }
-                    let _ = w.show();
+                    show_note_win(&w);
                     if focus {
                         let _ = w.set_focus();
                     }
@@ -739,6 +811,12 @@ pub fn remove_from_stack(app: &AppHandle, id: &str, mode: &str) -> bool {
                 let _ = w.close();
             }
         }
+        // 화면이 저장 · 태그를 마저 하고 win:close 로 닫는다 — 그동안 숨겨 두고 닫는 중으로 (다시 열면 새 창)
+        "hide" => {
+            if let Some(w) = &win {
+                hide_closing(app, w);
+            }
+        }
         "detach" => {
             let b = b.map(|[x, y, w, h]| [x + 28.0, y + 28.0, w, h]);
             if let Some(b) = b {
@@ -749,7 +827,7 @@ pub fn remove_from_stack(app: &AppHandle, id: &str, mode: &str) -> bool {
                     if let Some(b) = b {
                         set_bounds(&w, b);
                     }
-                    let _ = w.show();
+                    show_note_win(&w);
                     let _ = w.set_focus();
                     shown(app, id, &w);
                 }
@@ -797,7 +875,7 @@ fn tear_start(app: &AppHandle, id: &str, offset: &Value, p: (f64, f64)) -> bool 
         Some(w) => {
             set_bounds(&w, b);
             if !is_shown(&w) {
-                let _ = w.show();
+                show_note_win(&w);
                 shown(app, id, &w);
             }
             w.label().to_string()
@@ -806,7 +884,7 @@ fn tear_start(app: &AppHandle, id: &str, offset: &Value, p: (f64, f64)) -> bool 
             let id2 = id.to_string();
             let reveal = move |app: &AppHandle| {
                 if let Some(w) = note_win(app, &id2).filter(|w| !is_shown(w)) {
-                    let _ = w.show();
+                    show_note_win(&w);
                     shown(app, &id2, &w);
                 }
             };
@@ -1517,9 +1595,12 @@ fn open_sticker_win(app: &AppHandle, owner: &str, animate: bool) {
             })
             .build()
         });
-    if built.is_err() {
-        if let Some(s) = wm().stickers.get_mut(owner).filter(|s| s.win.as_deref() == Some(label.as_str())) {
-            s.win = None;
+    match built {
+        Ok(w) => memory_low(&w, true), // 그림 한 장짜리 덧창
+        Err(_) => {
+            if let Some(s) = wm().stickers.get_mut(owner).filter(|s| s.win.as_deref() == Some(label.as_str())) {
+                s.win = None;
+            }
         }
     }
 }
@@ -1621,6 +1702,7 @@ fn ensure_overlay(app: &AppHandle, label: &str, page: &str, size: (f64, f64), pa
     };
     let w = b.build().ok()?;
     let _ = w.set_ignore_cursor_events(true);
+    memory_low(&w, true); // 글 몇 줄만 그리는 덧창
     Some(w)
 }
 
@@ -1795,6 +1877,14 @@ fn hide_bubble(app: &AppHandle, owner: &str) {
         emit(app, &label, "bubble:hide", Value::Null); // 먼저 비우고 숨긴다 (다음에 보일 때 지난 글이 비치지 않게)
         if is_shown(&w) {
             let _ = w.hide();
+            // 숨은 채 30초면 없앤다 — 메모 창마다 말풍선 웹뷰가 하나씩 숨어 남았다 (다음에 뜰 때 다시 만든다)
+            let app = app.clone();
+            later(30_000, move || {
+                if let Some(w) = app.get_webview_window(&label).filter(|w| !is_shown(w)) {
+                    wm().loaded.remove(&label);
+                    let _ = w.destroy();
+                }
+            });
         }
     }
 }
@@ -1862,6 +1952,54 @@ fn grow_width(app: &AppHandle, label: &str, extra: &Value) -> Value {
     (want - w).into()
 }
 
+/// 닫는 중인 메모 창을 먼저 숨긴다 — 화면은 남은 일(녹음 마무리 · 태그 · 저장)을 숨은 채 마치고 win:close.
+///   닫는 중으로 적어 두어 그사이 같은 메모를 열면 이 창 대신 새 창이 뜬다
+fn hide_closing(app: &AppHandle, w: &WebviewWindow) {
+    wm().closing_notes.insert(w.label().to_string());
+    hide_note(app, w);
+}
+
+/// 메모 창 × · Ctrl+W: 스택이면 탭 모두 함께 숨긴다 (CloseRequested 가 스택을 모두 닫으므로)
+fn hide_for_close(app: &AppHandle, label: &str) {
+    let Some(w) = app.get_webview_window(label) else { return };
+    if let Some(s) = note_id(app, label).and_then(|id| stack_of(app, &id)) {
+        for m in &s.memos {
+            if let Some(t) = note_win(app, m).filter(|t| t.label() != label && is_shown(t)) {
+                hide_note(app, &t);
+            }
+        }
+    }
+    hide_closing(app, &w);
+}
+
+/// PDF 미리보기: 문서를 100% 로 볼 만큼 창을 키운다 (작업 영역 안, 줄이지는 않음) → 키우기 전 자리 (그대로면 null)
+fn fit_size(app: &AppHandle, label: &str, w: &Value, h: &Value) -> Value {
+    let (want_w, want_h) = (memoking_core::js::number(w).ceil(), memoking_core::js::number(h).ceil());
+    let Some(win) = app.get_webview_window(label) else { return Value::Null };
+    let Some(old @ [x, y, cw, ch]) = bounds(&win) else { return Value::Null };
+    let [ax, ay, aw, ah] = area_at(app, (x + cw / 2.0, y + ch / 2.0));
+    let nw = want_w.min(aw - 24.0).max(cw);
+    let nh = want_h.min(ah - 24.0).max(ch);
+    if nw <= cw && nh <= ch {
+        return Value::Null;
+    }
+    // 넘치면 화면 안으로 옮긴다
+    let nx = x.min(ax + aw - nw).max(ax);
+    let ny = y.min(ay + ah - nh).max(ay);
+    set_bounds(&win, [nx, ny, nw, nh]);
+    rect_json(old)
+}
+
+/// fit_size 가 돌려준 자리로 되돌린다 (미리보기를 닫을 때)
+fn restore_bounds(app: &AppHandle, label: &str, b: &Value) {
+    let n = |k: &str| b[k].as_f64();
+    if let (Some(win), Some(x), Some(y), Some(w), Some(h)) = (app.get_webview_window(label), n("x"), n("y"), n("width"), n("height")) {
+        if w >= 100.0 && h >= 100.0 {
+            set_bounds(&win, [x, y, w, h]);
+        }
+    }
+}
+
 pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let arg = |i: usize| args.get(i).map(|v| v.as_str().map_or_else(|| memoking_core::js::string(v), str::to_string)).unwrap_or_default();
     let at = |i: usize| args.get(i).and_then(point);
@@ -1876,6 +2014,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         "stack:new-tab" => new_tab_after(app, &arg(0)),
         "stack:remove" => remove_from_stack(app, &arg(0), "close").into(),
+        "stack:remove-hidden" => remove_from_stack(app, &arg(0), "hide").into(),
         "stack:detach" => remove_from_stack(app, &arg(0), "detach").into(),
         "stack:tear-start" => at(2).is_some_and(|p| tear_start(app, &arg(0), args.get(1).unwrap_or(&Value::Null), p)).into(),
         "stack:tear-move" => {
@@ -1920,6 +2059,16 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         // 목록 창 제목 줄 어둡게(대화 상자 · 안내 뒤): Electron 은 Windows 가 그린 창 단추 색을 바꿨다. Tauri 는 화면이 단추를 그려(shim.js) 막이 함께 덮는다
         "win:dim-titlebar" => Value::Null,
         "win:grow-width" => grow_width(app, label, args.first().unwrap_or(&Value::Null)),
+        "app:restoring" => crate::os::RESTORING.load(std::sync::atomic::Ordering::SeqCst).into(),
+        "win:hide-closing" => {
+            hide_for_close(app, label);
+            Value::Null
+        }
+        "win:fit-size" => fit_size(app, label, args.first().unwrap_or(&Value::Null), args.get(1).unwrap_or(&Value::Null)),
+        "win:restore-bounds" => {
+            restore_bounds(app, label, args.first().unwrap_or(&Value::Null));
+            Value::Null
+        }
         // 손글씨를 쓰는 동안은 창을 끌어도 다른 메모와 합치지 않는다
         "win:inking" => {
             let on = args.first().is_some_and(|v| v == true);

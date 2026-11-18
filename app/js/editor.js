@@ -22,7 +22,7 @@ import { icon } from './icons.js';
 import { remarkEmptyTasks } from './core/empty-tasks.js';
 import { remarkInlineHtmlMarks, stringifyHandlers, safeColor, DEFAULT_HIGHLIGHT } from './core/html-marks.js';
 import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
-import { vaultUrl, mediaKind, baseName } from './media.js';
+import { vaultUrl, shownUrl, mediaKind, baseName } from './media.js';
 import { onMedia, videoPoster } from './video-poster.js';
 import { openAlbumViewer } from './album-viewer.js';
 import { touchMode } from './keyboard-guard.js';
@@ -268,7 +268,7 @@ function mediaView(node, view, getPos) {
   const pdfThumb = Boolean(pdfOfTitle(title)); // 문서를 PDF 로 넣은 첫 쪽 썸네일 — 누르면 PDF 미리보기
   dom.className = album ? `mk-image mk-album-img${isAlbumPageTitle(title) ? ' mk-album-page' : ''}` : pdfThumb ? 'mk-image mk-pdf-thumb' : 'mk-image'; // mk-album-page: 문서를 넣은 장 (종이 묶음 모양)
   dom.decoding = 'async'; // 큰 사진이 많은 메모도 여는 순간 멈추지 않게 (푸는 동안 글은 먼저 보인다)
-  dom.src = vaultUrl(src);
+  dom.src = shownUrl(src); // PC 메모 창은 줄인 그림 (크게 보기는 원본 — album-viewer)
   dom.alt = plainAlt(alt);
   if (title && !album && !pdfThumb) dom.title = title;
   if (pdfThumb) warmPdf();

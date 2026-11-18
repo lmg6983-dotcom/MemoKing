@@ -13,6 +13,11 @@
   <script type="module" src="js/list.js"></script>
 </head>
 <body>
+  <!-- 켤 때 로딩 화면: 목록이 준비되고 열어 둔 메모 창이 함께 뜨면 걷힌다 (list.js · os.rs app:ready) -->
+  <div id="boot" class="boot" role="status" aria-label="메모킹을 여는 중">
+    <img class="boot-mark" src="assets/mark-64.png" alt="" draggable="false">
+    <span class="boot-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+  </div>
   <header class="titlebar">
     <span class="brand-mark"><img class="brand-icon" src="assets/mark-64.png" alt="메모킹" title="메모킹" draggable="false"></span>
     <!-- 메모킹 Work / Life: 일할 때 메모와 일상 메모를 나눠 보기 (core/modes.js) -->
