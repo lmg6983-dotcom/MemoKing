@@ -8,7 +8,7 @@ import { hideDeleteButton } from './delete-button.js';
 import { attachStatusBubble, statusChanged } from './status-bubble.js';
 import { COLORS, COLOR_NAMES, extractTitle, isBlankBody, conflictCopyBody, sameBody } from './core/memo-file.js';
 import { TEXT_COLORS, HIGHLIGHT_COLORS } from './core/html-marks.js';
-import { fileExtension } from './media.js';
+import { fileExtension, useImageThumbs } from './media.js';
 import { isDataImage, decodeDataImage } from './core/remote-images.js';
 import { setupReminderPanel } from './reminder-panel.js';
 import { reminderAt } from './date-remind.js';
@@ -77,6 +77,8 @@ setCopyHost({
 });
 // 저장 단추의 결과 (delete-button.js)
 window.addEventListener('mk:notice', (e) => setStatus(e.detail?.text ?? '', Boolean(e.detail?.error)));
+// 메모 안 사진은 이 화면 폭에 맞게 줄인 그림으로 (원본 사진을 창마다 통째로 풀지 않게 — 크게 보기 · 복사 · 저장은 원본)
+useImageThumbs(Math.min(2048, Math.ceil((screen.width * (devicePixelRatio || 1)) / 256) * 256));
 const params = new URLSearchParams(location.search);
 // 미리 불러 둔 예비 창(window-manager.js makeSpare): 편집기 코드는 다 읽어 두고, 열 메모가 정해질 때까지 기다린다
 if (params.get('spare') === '1') {

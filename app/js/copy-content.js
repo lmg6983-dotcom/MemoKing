@@ -8,6 +8,7 @@ import { plainTextOf, spacedHtml } from './clipboard-text.js';
 import { mediaKindOf, isAlbumTitle, plainAlt, pdfOfTitle } from './core/memo-file.js';
 import { textBase64 } from './core/base64.js';
 import { voiceAudioOf } from './voice-card-view.js';
+import { fullUrl } from './media.js';
 
 let host = {
   /** @param {string} pngBase64 */
@@ -65,6 +66,15 @@ function toPng(img) {
 
 /** 화면의 그림 → PNG base64 (원래 크기로) */
 export async function pngBase64(img) {
+  // 메모 안 사진은 줄인 그림으로 보일 수 있다 — 복사는 원본으로
+  const full = fullUrl(img.currentSrc || img.src);
+  if (full !== (img.currentSrc || img.src)) {
+    const orig = new Image();
+    orig.crossOrigin = 'anonymous';
+    orig.src = full;
+    await orig.decode();
+    img = orig;
+  }
   if (!img.complete || !img.naturalWidth) await img.decode().catch(() => {});
   try {
     return toPng(img);
@@ -189,7 +199,8 @@ export async function copyBlock(view, pos, node, target) {
       } catch (err) {
         // 다른 사이트 그림이 CORS 를 막아 그림으로는 못 읽으면 그 주소라도
         if (err?.name !== 'SecurityError' && err?.name !== 'EncodingError') throw err;
-        await copyText({ text: img.currentSrc || img.src, html: `<img src="${(img.currentSrc || img.src).replace(/"/g, '&quot;')}">` });
+        const u = fullUrl(img.currentSrc || img.src);
+        await copyText({ text: u, html: `<img src="${u.replace(/"/g, '&quot;')}">` });
         return '주소';
       }
     }
@@ -218,7 +229,7 @@ export function handleImageCopy(view, event) {
   event.preventDefault();
   const cut = event.type === 'cut';
   const { from, to } = sel;
-  const src = img.currentSrc || img.src;
+  const src = fullUrl(img.currentSrc || img.src);
   copyImage(img)
     .catch(() => copyText({ text: src, html: `<img src="${src.replace(/"/g, '&quot;')}">` })) // 그림으로 못 읽으면 주소라도
     .then(() => {
