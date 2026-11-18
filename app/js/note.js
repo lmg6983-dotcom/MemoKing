@@ -38,7 +38,7 @@ import { createFindBar } from './find-bar.js';
 import { createAiWritePanel } from './ai-write-panel.js';
 import { UI } from './core/ui-text.js';
 import { pickFolder } from './folder-ui.js';
-import { folderOf } from './core/folders.js';
+import { folderOf, UNFILED_LABEL } from './core/folders.js';
 import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from './note-shared.js';
 
 const SAVE_DELAY = 600;
@@ -501,10 +501,13 @@ function applyMeta(next) {
   $('mode-btn').querySelector('span').textContent = moveLabel(memo);
   showModeTheme();
   // 메모킹 폴더: 폴더에 있으면 윗막대에 이름 (누르면 옮기기), 메뉴에는 지금 폴더
+  // 폴더가 없으면 "미분류" — 폴더에 넣는 곳이 윗막대에 늘 보이게 (예전: 폴더가 없으면 숨어 메뉴 안에서만 옮길 수 있었다)
   const folder = folderOf(memo.file);
-  $('folder-tag').hidden = !folder;
-  $('folder-tag').querySelector('span').textContent = folder;
-  $('folder-label').textContent = folder || '폴더 없음';
+  $('folder-tag').hidden = false;
+  $('folder-tag').classList.toggle('unfiled', !folder);
+  $('folder-tag').title = folder ? '다른 폴더로 옮기기' : '폴더에 넣기';
+  $('folder-tag').querySelector('span').textContent = folder || UNFILED_LABEL;
+  $('folder-label').textContent = folder || UNFILED_LABEL;
 }
 
 for (const color of COLORS) {
