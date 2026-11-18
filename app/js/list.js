@@ -348,6 +348,8 @@ el.folderBtn?.addEventListener('click', async () => {
 const LAYOUT_KEY = 'memoking.layout';
 let layout = 'grid';
 let lastCols = 0;
+let previewCap = Infinity;
+let previewCapFor = 0;
 
 function columnsFor(width) {
   if (layout === 'rows') return 1;
@@ -366,6 +368,10 @@ function layoutCards(memos) {
   });
   const had = Boolean(el.cards.querySelector('.item'));
   el.cards.replaceChildren(...columns);
+  // 미리 보기는 보일 만큼만 그린다: 줄 수 x 카드 폭 / 3px (글자가 3px 보다 좁지 않다), 200자 단위로 (폭이 조금 바뀔 때마다 카드를 새로 만들지 않게).
+  //   1,200자를 다 그리면 메모 2,000개를 처음 쌓는 데 1초 더 걸렸다. 줄 수가 그대로인 채 폭만 1.5배 넘게 늘면 relayoutIfNeeded 가 다시 쌓는다
+  previewCap = Math.ceil(((layout === 'rows' ? 2 : 6) * (columns[0].clientWidth || 4000)) / 600) * 200;
+  previewCapFor = el.cards.clientWidth;
   stackCards(columns, memos.map(cardFor), { chunk: !had }); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다). 나눠 쌓기는 처음에만 (보던 자리가 튀지 않게)
   if (cardCache.size > memos.length + 200) {
     const shown = new Set(memos.map((m) => m.id));
@@ -642,7 +648,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
 // 바뀌지 않은 메모의 카드는 다시 만들지 않고 그대로 옮겨 쌓는다 (휴대폰과 같음)
 //   — 검색 · 필터 · 저장 때마다 모든 카드를 새로 만들고 높이를 다시 재서, 메모가 많으면 그때마다 화면이 멈칫했다
 const cardCache = new Map(); // 메모 id → { key, li }
-const cardKey = (memo) => `${JSON.stringify(memo)}|${friendlyTime(memo.updated)}|${state.workLife ? 1 : 0}|${!state.folder || state.query ? 1 : 0}`;
+const cardKey = (memo) => `${JSON.stringify(memo)}|${friendlyTime(memo.updated)}|${state.workLife ? 1 : 0}|${!state.folder || state.query ? 1 : 0}|${previewCap}`;
 function cardFor(memo) {
   const key = cardKey(memo);
   const hit = cardCache.get(memo.id);
@@ -687,7 +693,7 @@ function renderCard(memo) {
     preview.className = 'card-preview';
     // 태그는 카드 아래 줄에 따로 보이므로 미리 보기 글에서는 뺀다 (휴대폰과 같음)
     const tagSet = new Set((memo.tags ?? []).map((t) => t.toLocaleLowerCase('ko')));
-    preview.textContent = shortUrls(memo.preview).replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
+    preview.textContent = shortUrls(memo.preview.slice(0, previewCap)).replace(/(^|\s)#([^\s#]+)/g, (m, sp, t) => (tagSet.has(t.toLocaleLowerCase('ko')) ? sp : m)).replace(/\s{2,}/g, ' ').trim();
     if (preview.textContent) card.append(preview);
   }
   if (memo.thumb) {
@@ -2105,7 +2111,7 @@ let relayoutFrame = 0;
 function relayoutIfNeeded() {
   relayoutFrame = 0;
   if (el.main.hidden || activeTab !== 'memos') return;
-  if (columnsFor(el.cards.clientWidth || window.innerWidth) !== lastCols) render();
+  if (columnsFor(el.cards.clientWidth || window.innerWidth) !== lastCols || el.cards.clientWidth > previewCapFor * 1.5) render();
 }
 const scheduleRelayout = () => {
   if (!relayoutFrame) relayoutFrame = requestAnimationFrame(relayoutIfNeeded);
