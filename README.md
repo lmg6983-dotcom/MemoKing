@@ -129,7 +129,7 @@ npm test                     # 화면 · 공용 JS 단위 테스트
 | [기여 안내](CONTRIBUTING.md) | 커밋 · PR · 릴리스 글 쓰는 법 |
 | [오픈소스 목록](app/vendor/LICENSES.md) | 함께 묶은 오픈소스와 라이선스 |
 
-README의 화면 사진은 `npm run shots:sns`로 실제 앱을 띄워 찍은 것이에요 (`out/sns/` → `assets/screenshots/`).
+README의 화면 사진은 실제 앱 화면이에요 (`assets/screenshots/`).
 
 ## 📜 라이선스
 

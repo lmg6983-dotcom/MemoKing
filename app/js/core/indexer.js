@@ -199,7 +199,7 @@ export const indexKey = (index) => JSON.stringify({ ...index, generatedAt: null 
 
 /**
  * 색인과 파일에 쓸 글, 비교 열쇠(generatedAt 만 다르면 같은 색인 — 불필요한 동기화 방지).
- *   큰 JSON 만들기까지 작업 스레드(desktop/index-worker.js)에서 끝내 메인 프로세스는 받아 쓰기만
+ *   큰 JSON 만들기까지 작업 스레드(desktop-rs/core/src/indexer.rs)에서 끝내 메인 프로세스는 받아 쓰기만
  */
 export function indexOutput(memos) {
   const index = buildIndex(memos);

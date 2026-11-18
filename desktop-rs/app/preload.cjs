@@ -8,7 +8,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:dock', 'sticker:hover', 'list:on-top', 'list:crown-docked',
-  'stt:status', 'ai:status', 'ai:notice', 'ai:tagging', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
+  'stt:status', 'ai:status', 'ai:notice', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'edit:paste-plain', 'edit:clear-format',
   'media:converting', 'media:ready', // PC Rust 판만 보낸다: HEVC 영상의 H.264 사본 (desktop-rs/app/src/video.rs)
 ];
@@ -36,14 +36,6 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   tags: {
     list: invoke('tags:list'),
-    auto: invoke('tags:auto'),
-    suggest: invoke('tags:suggest'),
-    ai: invoke('tags:ai'), // AI 로 고르기 → 칩 목록 | { error }
-    aiAuto: invoke('tags:ai-auto'), // 닫은 뒤 AI 가 고른 태그를 저절로 (메인에서, ai/ai-tagger.js)
-    aiAll: invoke('tags:ai-all'), // 아직 보지 않은 모든 메모에 → { done, total } (진행은 'ai:tagging')
-    aiStop: invoke('tags:ai-stop'),
-    aiClear: invoke('tags:ai-clear'), // AI 가 단 태그를 모두 걷어 냄 → 메모 수
-    aiStatus: invoke('tags:ai-status'),
   },
   memo: {
     open: invoke('memo:open'),
@@ -113,10 +105,7 @@ contextBridge.exposeInMainWorld('memoking', {
     setAutoStart: invoke('app:set-auto-start'),
     setQuickMemo: invoke('app:set-quick-memo'),
     setFitTables: invoke('app:set-fit-tables'),
-    setAutoTags: invoke('app:set-auto-tags'),
     setMagicPolish: invoke('app:set-magic-polish'),
-    setAutoEvents: invoke('app:set-auto-events'),
-    setAiPhone: invoke('app:set-ai-phone'),
     setLinkPreviews: invoke('app:set-link-previews'),
     setPerf: invoke('app:set-perf'), // 빠르게 열기 기능 켜고 끄기 (이름, 켜짐) → 켜짐 — PC Rust 판
     setTrashDays: invoke('app:set-trash-days'),
@@ -138,12 +127,6 @@ contextBridge.exposeInMainWorld('memoking', {
     set: invoke('keymap:set'),
     reset: invoke('keymap:reset'),
     openWindow: invoke('keymap:open-window'),
-  },
-  // AI 비서 연결 (MCP): connect(true|false) · copy() 다른 AI 앱용 설정 글 복사 · setWrite(켜기)
-  mcp: {
-    connect: invoke('mcp:connect'),
-    copy: invoke('mcp:copy'),
-    setWrite: invoke('mcp:set-write'),
   },
   // 휴지통 (지운 메모)
   // 창을 닫으며 저장하지 못해 따로 남긴 글 (ipc-handlers memo:save-sync) — 몇 개인지 · 메모로 되살리기 → 되살린 수

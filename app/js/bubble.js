@@ -1,4 +1,4 @@
-// 상태 말풍선 창 (메인 프로세스가 메모 창 바깥에 띄운다 — desktop/status-bubble-window.js)
+// 상태 말풍선 창 (메인 프로세스가 메모 창 바깥에 띄운다 — desktop-rs/app/src/windows.rs)
 //   place: above(창 위, 꼬리 아래로) · right / left(창 옆, 꼬리가 창 쪽으로) · over(창 안 윗막대 위, 꼬리 없음)
 //   above 에서 위 스티커(왕관 · 테이프)와 겹치면: 스티커 왼쪽에 들어가면 그 폭으로, 안 되면 스티커 위로 올린다
 import { reduceMotion } from './dom.js';

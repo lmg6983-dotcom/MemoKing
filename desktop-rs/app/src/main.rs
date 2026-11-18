@@ -31,9 +31,9 @@ mod windows;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
-// desktop/preload.cjs 를 그대로 끼워 넣는다 (shim.js 가 require('electron') 을 Tauri 로 바꿔 줌)
+// preload.cjs(Electron 판에서 가져온 화면 쪽 API 모양)를 그대로 끼워 넣는다 (shim.js 가 require('electron') 을 Tauri 로 바꿔 줌)
 fn init_script() -> String {
-    let mut s = include_str!("../shim.js").replace("/*PRELOAD*/", include_str!("../../../desktop/preload.cjs"));
+    let mut s = include_str!("../shim.js").replace("/*PRELOAD*/", include_str!("../preload.cjs"));
     if ipc::smoke() {
         s.push_str(include_str!("../smoke.js"));
     }

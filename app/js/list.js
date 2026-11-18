@@ -1144,7 +1144,6 @@ async function loadSettings() {
   for (const box of document.querySelectorAll('.perf-flag')) box.checked = s.perf?.[box.dataset.perf] !== false;
   showQuickMemo(s.quickMemo);
   showShortcuts(s.shortcuts);
-  showMcp(s.mcp);
   $('trash-days').value = String(s.trashDays);
   renderWorkSettings($('work-settings'), {
     enabled: s.workLife === true,
@@ -1165,37 +1164,6 @@ function showQuickMemo(q) {
     : '어디서든 고른 내용을 바로 메모로 만들어요. 두 번 누르면 화면 영역 캡처';
 }
 
-// ---------- AI 비서 연결 (MCP) ----------
-function showMcp(m, message = '') {
-  $('mcp-adv').closest('section').hidden = !m; // PC Rust 판은 MCP 가 없어 칸째 숨긴다
-  if (!m) return;
-  $('mcp-title').textContent = m.connected && !m.stale ? 'Claude 데스크톱에 연결됨' : m.stale ? '다시 연결이 필요해요' : UI.notConnected;
-  $('mcp-sub').textContent = message || (m.broken
-    ? 'Claude 데스크톱 설정 파일을 읽지 못했어요. 설정 복사로 직접 넣어 주세요'
-    : m.stale ? '메모킹을 다른 곳에 다시 설치했어요. 연결을 눌러 새 위치로 맞춰 주세요'
-      : m.connected ? 'Claude 데스크톱을 껐다 켜면 메모킹 도구(메모 찾기, 읽기, 남기기)가 보여요'
-        : m.claudeFound ? '연결하면 Claude에게 "장보기 메모에 우유 추가해 줘" 처럼 부탁할 수 있어요'
-          : 'Claude 데스크톱이 없으면 설정 복사로 다른 AI 앱(Cursor 등)에 넣을 수 있어요');
-  $('mcp-box').classList.toggle('on', m.connected && !m.stale);
-  if (m.connected) $('mcp-adv').open = true; // 연결해 둔 사람에게는 상태가 보이게
-  $('mcp-connect').textContent = m.stale ? '다시 연결' : 'Claude 데스크톱에 연결';
-  $('mcp-connect').hidden = m.connected && !m.stale;
-  $('mcp-disconnect').hidden = !m.connected;
-  $('mcp-write').checked = m.write;
-}
-$('mcp-connect').addEventListener('click', async () => {
-  const m = await api.mcp.connect(true);
-  showMcp(m, m.error ?? '연결했어요. Claude 데스크톱을 껐다 켜면 메모킹 도구가 보여요');
-});
-$('mcp-disconnect').addEventListener('click', async () => {
-  const m = await api.mcp.connect(false);
-  showMcp(m, m.error ?? '');
-});
-$('mcp-copy').addEventListener('click', async () => {
-  await api.mcp.copy();
-  showMcp((await api.settings.get()).mcp, '설정을 복사했어요. AI 앱의 MCP 설정(mcpServers)에 붙여 넣어 주세요');
-});
-$('mcp-write').addEventListener('change', async (e) => showMcp(await api.mcp.setWrite(e.target.checked)));
 // 다른 기기에 설치: 휴대폰 앱(QR 코드 · 링크 복사 · 브라우저로) · Windows PC 버전(링크 복사 · 브라우저로) — 늘 최신 설치 파일 주소
 let phoneQrDone = false;
 async function paintPhoneQr() {
@@ -1280,7 +1248,7 @@ api.on('shortcuts:changed', async () => {
   if (isCapturing()) return; // 여기서 바꾸는 중이면 끝날 때 다시 그린다
   await refreshShortcuts({ onlyIfChanged: true });
 });
-// ---------- 음성 녹음 · 받아쓰기 (desktop/stt) ----------
+// ---------- 음성 녹음 · 받아쓰기 (desktop-rs/app/src/stt.rs) ----------
 // 데이터는 처음 한 번 받는다 (받아쓰기 약 80MB, 말한 사람 나누기 약 30MB) — 이 PC 의 앱 데이터 폴더에, 메모 폴더에는 넣지 않음
 function renderStt(st) {
   if (!st || !api.stt) return;
@@ -1323,7 +1291,7 @@ if (api.stt) {
 } else {
   for (const x of ['stt-enabled', 'stt-download', 'stt-speaker']) $(x).closest('label, div').hidden = true;
 }
-// ---------- AI 도우미 (desktop/ai — 인터넷 없이 이 PC 안에서) ----------
+// ---------- AI 도우미 (desktop-rs/app/src/ai.rs — 인터넷 없이 이 PC 안에서) ----------
 // 모델 파일(.gguf)은 사용자가 넣는다 (USB 로 옮긴 파일도). 이 PC 의 앱 데이터 폴더에 복사되고, 메모 폴더에는 넣지 않음
 const AI_HINT = {
   chat: '맞춤법, 태그, 일정, 매직 에이전트에 써요. 아래에서 카나나2를 받아 주세요 (인터넷이 없는 PC는 받아 둔 파일 넣기)',
@@ -2536,7 +2504,7 @@ liftBoot();
 // 고르기 칸(role=radiogroup): 칸마다 radio, 화살표로 고르기 (dom.js)
 radioGroups();
 
-// ---------- 자동 업데이트 (desktop/updater.js) ----------
+// ---------- 자동 업데이트 (desktop-rs/app/src/services.rs) ----------
 // 새 버전: 바뀐 점을 보여 주고 받기 → 진행률 → 다 받으면 "지금 재시작" / "나중에 (끝낼 때 설치)".
 //   "나중에" 를 고른 버전은 24시간 다시 묻지 않는다 (main 이 기억). 설정 › 업데이트 확인 은 숨겨 둔 버전도 다시 보여 준다
 const updateEl = {

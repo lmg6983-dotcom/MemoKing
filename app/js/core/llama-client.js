@@ -1,4 +1,4 @@
-// llama-server(OpenAI 모양) 와 말하는 법 (PC desktop/ai · 휴대폰 android/web/js/local-ai.js 가 함께) — 순수 함수
+// llama-server(OpenAI 모양) 와 말하는 법 (PC desktop-rs/app/src/ai.rs · 휴대폰 android/web/js/local-ai.js 가 함께) — 순수 함수
 //   주고받는 길(HTTP · 네이티브)만 기기마다 다르다
 
 /** 다 오기 전의 생각 블록도 뗀다 (Qwen3 계열) */

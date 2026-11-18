@@ -16,15 +16,10 @@ android/.idea/
 android/.kotlin/
 *.iml
 
-# PC 메모킹 Google 로그인용 OAuth 클라이언트 (설정에서 붙여 넣거나 이 파일로)
-desktop/google-client.json
-
 *.exe
 
-# 로컬 AI 엔진 (npm run llama 로 받음)
-desktop/vendor/llama/
 # HEVC 영상 변환기 (desktop-rs/scripts/build-ffmpeg-min.sh 로 만듦)
-desktop/vendor/ffmpeg/
+desktop-rs/vendor/ffmpeg/
 .impeccable/critique/
 .impeccable/live/
 

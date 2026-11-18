@@ -14,7 +14,7 @@ const listFiles = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap(
 
 test('화면이 듣는 이벤트는 모두 preload 허용 목록에 있다', () => {
   // 다른 창(OCR 등)의 preload 는 onShow 같은 함수로만 주고, 화면의 api.on(…) 은 이 목록을 거친다
-  const list = /const EVENTS = \[([\s\S]*?)\];/.exec(fs.readFileSync(path.join(root, 'desktop', 'preload.cjs'), 'utf8'))[1];
+  const list = /const EVENTS = \[([\s\S]*?)\];/.exec(fs.readFileSync(path.join(root, 'desktop-rs', 'app', 'preload.cjs'), 'utf8'))[1];
   const allowed = new Set([...list.matchAll(/'([^']+)'/g)].map((m) => m[1]));
   const missing = [];
   for (const file of listFiles(path.join(root, 'app', 'js'))) {
@@ -22,5 +22,5 @@ test('화면이 듣는 이벤트는 모두 preload 허용 목록에 있다', () 
       if (!allowed.has(m[1])) missing.push(`${path.relative(root, file)}: ${m[1]}`);
     }
   }
-  assert.deepEqual(missing, [], 'desktop/preload.cjs 의 EVENTS 에 넣어 주세요');
+  assert.deepEqual(missing, [], 'desktop-rs/app/preload.cjs 의 EVENTS 에 넣어 주세요');
 });

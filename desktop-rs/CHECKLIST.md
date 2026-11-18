@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **184 / 184**
-- 이벤트 (Rust → 화면): **58 / 58**
+- 채널 (화면 → Rust): **182 / 193**
+- 이벤트 (Rust → 화면): **60 / 61**
 
 ➖ 는 Rust 판에 일부러 두지 않은 것 (AI 비서 연결 MCP: AI 는 Google Drive 의 메모 폴더를 직접 읽고 쓴다)
 
@@ -27,13 +27,15 @@
 | ✅ | `ai:write` |
 | ✅ | `app:info` |
 | ✅ | `app:report-problem` |
-| ✅ | `app:set-ai-phone` |
-| ✅ | `app:set-auto-events` |
+| ✅ | `app:restoring` |
+| ⬜ | `app:set-ai-phone` |
+| ⬜ | `app:set-auto-events` |
 | ✅ | `app:set-auto-start` |
-| ✅ | `app:set-auto-tags` |
+| ⬜ | `app:set-auto-tags` |
 | ✅ | `app:set-fit-tables` |
 | ✅ | `app:set-link-previews` |
 | ✅ | `app:set-magic-polish` |
+| ✅ | `app:set-perf` |
 | ✅ | `app:set-quick-memo` |
 | ✅ | `app:set-trash-days` |
 | ✅ | `app:settings` |
@@ -45,6 +47,7 @@
 | ✅ | `attachment:info` |
 | ✅ | `attachment:open` |
 | ✅ | `attachment:read` |
+| ✅ | `attachment:rotate` |
 | ✅ | `attachment:save` |
 | ✅ | `attachment:save-as` |
 | ✅ | `attachment:share` |
@@ -114,6 +117,7 @@
 | ✅ | `memo:move-folder` |
 | ✅ | `memo:open` |
 | ✅ | `memo:open-lock` |
+| ✅ | `memo:preload` |
 | ✅ | `memo:remove` |
 | ✅ | `memo:restore-version` |
 | ✅ | `memo:save` |
@@ -132,6 +136,7 @@
 | ✅ | `pdf:memo` |
 | ✅ | `pdf:open` |
 | ✅ | `pdf:save` |
+| ✅ | `perf:log` |
 | ✅ | `recovered:count` |
 | ✅ | `recovered:restore` |
 | ✅ | `reminders:add` |
@@ -147,6 +152,7 @@
 | ✅ | `stack:menu` |
 | ✅ | `stack:new-tab` |
 | ✅ | `stack:remove` |
+| ✅ | `stack:remove-hidden` |
 | ✅ | `stack:reorder` |
 | ✅ | `stack:tear-end` |
 | ✅ | `stack:tear-move` |
@@ -160,15 +166,15 @@
 | ✅ | `stt:start` |
 | ✅ | `stt:status` |
 | ✅ | `stt:stop` |
-| ✅ | `tags:ai` |
-| ✅ | `tags:ai-all` |
-| ✅ | `tags:ai-auto` |
-| ✅ | `tags:ai-clear` |
-| ✅ | `tags:ai-status` |
-| ✅ | `tags:ai-stop` |
-| ✅ | `tags:auto` |
+| ⬜ | `tags:ai` |
+| ⬜ | `tags:ai-all` |
+| ⬜ | `tags:ai-auto` |
+| ⬜ | `tags:ai-clear` |
+| ⬜ | `tags:ai-status` |
+| ⬜ | `tags:ai-stop` |
+| ⬜ | `tags:auto` |
 | ✅ | `tags:list` |
-| ✅ | `tags:suggest` |
+| ⬜ | `tags:suggest` |
 | ✅ | `trash:delete` |
 | ✅ | `trash:empty` |
 | ✅ | `trash:list` |
@@ -189,9 +195,12 @@
 | ✅ | `vault:use` |
 | ✅ | `win:close` |
 | ✅ | `win:dim-titlebar` |
+| ✅ | `win:fit-size` |
 | ✅ | `win:grow-width` |
+| ✅ | `win:hide-closing` |
 | ✅ | `win:inking` |
 | ✅ | `win:painted` |
+| ✅ | `win:restore-bounds` |
 | ✅ | `win:spare` |
 | ✅ | `win:status-bubble` |
 | ✅ | `win:toggle-layer` |
@@ -203,8 +212,9 @@
 | ✅ | `ai:notice` |
 | ✅ | `ai:progress` |
 | ✅ | `ai:status` |
-| ✅ | `ai:tagging` |
+| ⬜ | `ai:tagging` |
 | ✅ | `ai:token` |
+| ✅ | `app:ready` |
 | ✅ | `bubble:hide` |
 | ✅ | `bubble:show` |
 | ✅ | `capture:image` |
@@ -223,6 +233,8 @@
 | ✅ | `list:crown-docked` |
 | ✅ | `list:on-top` |
 | ✅ | `list:tab` |
+| ✅ | `media:converting` |
+| ✅ | `media:ready` |
 | ✅ | `memo:alarm` |
 | ✅ | `memo:command` |
 | ✅ | `memo:external` |

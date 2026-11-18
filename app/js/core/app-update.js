@@ -1,6 +1,6 @@
 // 휴대폰 앱 안 업데이트의 판단 규칙 (android/web/js/updates.js 가 쓴다 — Kotlin 쪽은 AppUpdate.kt, 규칙은 AppUpdateTest.kt)
 //   · 앱을 켤 때 조용히 확인하되 6시간 안에 또 확인하지 않는다 · 설정 › 업데이트 확인 은 언제나
-//   · 새 버전이 있어도 "나중에" 를 고르면 그 버전은 24시간 다시 묻지 않는다 (PC 의 desktop/updater.js 와 같은 약속)
+//   · 새 버전이 있어도 "나중에" 를 고르면 그 버전은 24시간 다시 묻지 않는다 (PC 의 desktop-rs/app/src/services.rs 와 같은 약속)
 import { formatBytes } from './file-kinds.js';
 
 export const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;

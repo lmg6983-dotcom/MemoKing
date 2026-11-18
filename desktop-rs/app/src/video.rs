@@ -69,13 +69,13 @@ fn cache_dir(app: &AppHandle) -> PathBuf {
     base.join("video-cache")
 }
 
-/// ffmpeg: MEMOKING_FFMPEG, 설치본의 resources\ffmpeg, 개발 중이면 desktop/vendor/ffmpeg (desktop-rs/scripts/build-ffmpeg-min.sh)
+/// ffmpeg: MEMOKING_FFMPEG, 설치본의 resources\ffmpeg, 개발 중이면 desktop-rs/vendor/ffmpeg (desktop-rs/scripts/build-ffmpeg-min.sh)
 fn ffmpeg_path(app: &AppHandle) -> Option<PathBuf> {
     let name = format!("ffmpeg{}", std::env::consts::EXE_SUFFIX);
     let candidates = [
         std::env::var_os("MEMOKING_FFMPEG").map(PathBuf::from),
         app.path().resource_dir().ok().map(|d| d.join("ffmpeg").join(&name)),
-        Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../desktop/vendor/ffmpeg").join(&name)),
+        Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../vendor/ffmpeg").join(&name)),
     ];
     candidates.into_iter().flatten().find(|p| p.is_file())
 }

@@ -197,7 +197,7 @@ impl Drive {
     }
 
     // ---------- OAuth 클라이언트 ----------
-    //   설정에 붙여 넣은 것 → 환경 변수 → 빌드 때 넣은 것(release.yml 의 MEMOKING_GOOGLE_CLIENT_ID · SECRET) · %APPDATA%\MemoKing\google-client.json → 예전에 로그인했던 클라이언트
+    //   설정에 붙여 넣은 것 → 환경 변수 → 빌드 때 넣은 것(release-rs.yml 의 MEMOKING_GOOGLE_CLIENT_ID · SECRET) · %APPDATA%\MemoKing\google-client.json → 예전에 로그인했던 클라이언트
 
     fn bundled(&self) -> Option<(String, String)> {
         if let Some(id) = option_env!("MEMOKING_GOOGLE_CLIENT_ID").map(str::trim).filter(|s| !s.is_empty()) {

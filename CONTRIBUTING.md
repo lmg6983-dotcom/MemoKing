@@ -13,12 +13,13 @@
 
 ## 🔧 개발 준비
 
-[Node.js](https://nodejs.org) 22 이상이면 돼요. 모든 명령과 폴더 구조는 [개발 안내](guides/DEVELOP.md)에 있어요.
+PC 판은 [Rust](https://rustup.rs) + Tauri, 화면 테스트는 [Node.js](https://nodejs.org) 22 이상이에요. 모든 명령과 폴더 구조는 [개발 안내](guides/DEVELOP.md)에 있어요.
 
 ```sh
-npm start    # 앱 실행
-npm test     # 단위 테스트 — PR 전에 꼭
-npm run smoke  # 실제 Electron 자동 점검
+cd desktop-rs && cargo run            # 앱 실행
+cargo test --workspace                # Rust 단위 테스트 — PR 전에 꼭
+cargo run -- --smoke                  # 앱 안 자동 점검
+npm test                              # 화면 · 공용 JS 단위 테스트 (저장소 맨 위에서)
 ```
 
 ## ✍️ 커밋 메시지
@@ -62,7 +63,7 @@ Closes #123
 
    - `**제목**:` 은 굵은 소제목, 문장 끝 `. ` 마다 목록 한 줄이 돼요.
    - 휴대폰 버전이 함께 바뀌면 `(휴대폰 X.Y.Z)` 를 적어요 — 휴대폰 업데이트 안내가 이 표시로 줄을 찾아요.
-2. `package.json` 버전을 맞추고 `vX.Y.Z` 태그를 올리면 [release.yml](.github/workflows/release.yml)이 설치 파일을 빌드해 릴리스를 만들어요.
+2. `desktop-rs/Cargo.toml` · `desktop-rs/app/tauri.conf.json` 버전을 맞추고 Actions › Release (PC) 를 돌리면 [release-rs.yml](.github/workflows/release-rs.yml)이 설치 파일을 빌드해 릴리스 `vX.Y.Z` 를 만들어요.
 3. 릴리스 본문(`scripts/release-body.mjs`)은 ✨ 바뀐 점 · 📥 받기 표 · 지난 버전과 비교 링크로 저절로 채워져요.
 
 자세한 배포 설정은 [배포 안내](guides/RELEASE.md)에 있어요.

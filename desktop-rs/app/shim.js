@@ -1,4 +1,4 @@
-// Electron 의 desktop/preload.cjs 를 고치지 않고 그대로 돌린다: require('electron') 자리에 Tauri 를 넣는다.
+// preload.cjs(Electron 판에서 가져온 것)를 그대로 돌린다: require('electron') 자리에 Tauri 를 넣는다.
 //   화면(app/)은 Electron 때와 똑같은 window.memoking 을 본다. 채널 이름도 그대로 → Rust 의 ipc::dispatch 가 받는다.
 (() => {
   const tauri = () => window.__TAURI_INTERNALS__;

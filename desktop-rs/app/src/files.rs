@@ -573,8 +573,8 @@ pub fn perf_log(text: &str) {
 /// 설정 › 문제 보내기: 최근 기록은 클립보드에, 들어가는 만큼은 새 메일 본문에 (보낼지는 사용자가)
 fn report_problem(app: &AppHandle) -> Value {
     use tauri_plugin_clipboard_manager::ClipboardExt;
-    // 받는 주소는 desktop/support-mail.js 한 곳에만 (개인 메일이라 따로 둔 파일)
-    let to = include_str!("../../../desktop/support-mail.js").split('\'').nth(1).unwrap_or_default();
+    // 받는 주소는 support-mail.js 한 곳에만 (개인 메일이라 따로 둔 파일)
+    let to = include_str!("../support-mail.js").split('\'').nth(1).unwrap_or_default();
     // 오류 기록 (설정 폴더 logs\memoking.log — 위 log())
     let log = std::fs::read_to_string(state(app).settings_dir.join("logs").join("memoking.log")).unwrap_or_default();
     let all: Vec<String> = log.split('\n').filter(|l| !l.is_empty()).map(str::to_string).collect();

@@ -29,7 +29,7 @@ jobs:
       - uses: actions/cache@v4
         id: cache
         with:
-          path: desktop/vendor/ffmpeg
+          path: desktop-rs/vendor/ffmpeg
           key: ffmpeg-min-${{ hashFiles('desktop-rs/scripts/build-ffmpeg-min.sh') }}
       - if: steps.cache.outputs.cache-hit != 'true'
         run: sudo apt-get update && sudo apt-get install -y mingw-w64 nasm
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-min
-          path: desktop/vendor/ffmpeg/
+          path: desktop-rs/vendor/ffmpeg/
 
   release:
     needs: ffmpeg
@@ -58,20 +58,14 @@ jobs:
         with:
           workspaces: desktop-rs
 
-      - name: HEVC 영상 변환기 받기 (desktop/vendor/ffmpeg)
+      - name: HEVC 영상 변환기 받기 (desktop-rs/vendor/ffmpeg)
         uses: actions/download-artifact@v4
         with:
           name: ffmpeg-min
-          path: desktop/vendor/ffmpeg
+          path: desktop-rs/vendor/ffmpeg
 
       # 배포판에만 쓰는 설정: 함께 넣을 파일, 업데이트 파일 만들기
       #   서명 공개 열쇠와 업데이트 주소는 tauri.conf.json 에 있다. 개인 열쇠(비밀값)가 없으면 업데이트 파일 없이 설치 파일만 만든다
-      # Rust 판이 쓰지 않는 화면 파일은 설치 파일에 넣지 않는다 (Tauri 는 app/ 를 통째로 싣는다)
-      #   tesseract 한글 OCR (약 9MB): Electron 판의 알림 캡처 읽기용 — Rust 판은 Windows OCR 로 읽는다 (history.rs)
-      - name: 쓰지 않는 화면 파일 빼기
-        shell: bash
-        run: rm -rf app/vendor/tesseract app/ocr.html app/js/ocr.js
-
       - name: 배포 설정 만들기
         run: |
           if [ "$HAS_SIGNING_KEY" != "true" ]; then
@@ -81,7 +75,7 @@ jobs:
             const signed = process.env.HAS_SIGNING_KEY === "true";
             const conf = {
               bundle: {
-                resources: { "../../desktop/vendor/ffmpeg/": "ffmpeg/" },
+                resources: { "../vendor/ffmpeg/": "ffmpeg/" },
                 createUpdaterArtifacts: signed,
               },
             };

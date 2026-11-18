@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HEVC 동영상을 이 PC 에서 재생하도록 H.264 로 바꾸는 작은 ffmpeg.exe (win64, LGPL) 를 만든다.
-#   bash desktop-rs/scripts/build-ffmpeg-min.sh [나올 폴더]   (기본 desktop/vendor/ffmpeg)
+#   bash desktop-rs/scripts/build-ffmpeg-min.sh [나올 폴더]   (기본 desktop-rs/vendor/ffmpeg)
 #   Linux(Ubuntu) 에서 mingw-w64 로 크로스 빌드: apt-get install -y mingw-w64 nasm
 #   담는 것: mov/mp4 읽기 · mp4 쓰기 · hevc/h264 풀기 · Windows 에 든 H.264 인코더(h264_mf) · 크기/화소 형식/회전 필터
 #            · 첫 장면 JPG (mjpeg · image2 — 목록 카드의 동영상 첫 장면, video.rs poster)
@@ -14,7 +14,7 @@ TARBALL=ffmpeg-$VER.tar.xz
 URLS=("https://ffmpeg.org/releases/$TARBALL" "http://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/ffmpeg_$VER.orig.tar.xz")
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-OUT=$(mkdir -p "${1:-$ROOT/desktop/vendor/ffmpeg}" && cd "${1:-$ROOT/desktop/vendor/ffmpeg}" && pwd)
+OUT=$(mkdir -p "${1:-$ROOT/desktop-rs/vendor/ffmpeg}" && cd "${1:-$ROOT/desktop-rs/vendor/ffmpeg}" && pwd)
 # 이 스크립트(설정)가 바뀌어도 다시 빌드하게 스크립트 해시까지 적어 둔다
 STAMP="ffmpeg $VER $(sha256sum "$0" | cut -c1-16)"
 if [ -f "$OUT/ffmpeg.exe" ] && grep -qxF "$STAMP" "$OUT/VERSION" 2>/dev/null; then

@@ -22,8 +22,6 @@ val webOut = layout.buildDirectory.dir("generated/web")
 val syncWeb by tasks.registering(Sync::class) {
     from(rootDir.resolve("../app")) {
         into("www/app")
-        // 데스크탑에서만 쓰는 것 (글자 인식 OCR 15MB · 매직키 검색) 은 APK 에 넣지 않는다
-        exclude("vendor/tesseract/**", "ocr.html", "js/ocr.js")
     }
     from(rootDir.resolve("web")) {
         into("www/m")

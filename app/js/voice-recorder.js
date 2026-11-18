@@ -1,7 +1,7 @@
 // 음성 메모 녹음 (PC 메모 창) — 마이크로 녹음하고, 끝내면 소리 파일을 메모 폴더에 저장해 음성 카드로 넣는다.
 //   휴대폰과 같은 모양: 녹음 중에는 위쪽 막대에 빨간 점 · 시간 · 소리 크기 · 잠시 멈춤 · 끝내기.
 //   파일은 m4a(가능하면) 또는 weba(WebM 소리) — 휴대폰·다른 PC 에서도 그대로 재생된다.
-//   받아쓰기(켰고 데이터가 있으면): 녹음하는 소리를 16kHz 로 바꿔 메인 프로세스(desktop/stt)로 보내고,
+//   받아쓰기(켰고 데이터가 있으면): 녹음하는 소리를 16kHz 로 바꿔 메인 프로세스(desktop-rs/app/src/stt.rs)로 보내고,
 //   한 문장이 끝날 때마다 패널에 글이 나타난다. 끝내면 소리와 받아쓴 글이 한 음성 카드로.
 import { voiceCardMarkdown, recordingClock, recordingWhen } from './core/voice-card.js';
 import { icon as svg } from './icons.js';

@@ -110,13 +110,13 @@ android/
   web/                   휴대폰 화면 (앱에 assets/www/m 으로 들어감)
     index.html           처음 설정 · 목록 · 메모 · 시트들
     js/app.js            시작, 화면 바꾸기, 설정·휴지통, 공유받기, 알림
-    js/vault.js          desktop/vault.js 를 옮긴 것 (규칙 같음, 파일 읽기·쓰기만 앱에 맡김)
+    js/vault.js          desktop-rs/core/src/vault.rs 를 옮긴 것 (규칙 같음, 파일 읽기·쓰기만 앱에 맡김)
     js/list-view.js      목록 화면
     js/note-view.js      메모 화면 (app/js/note.js 의 휴대폰판) · 추천 태그 · 연결
     js/recorder.js       녹음 화면 (시간·받아쓴 글·멈춤·끝내기)
     js/share-image.js    메모를 그림(PNG)으로 (html-to-image)
-    js/alarms.js         예약 알림 실행기 (desktop/alarms.js + 시스템 알람 맡기기)
-    js/web-fetch.js      링크 미리보기 (desktop/link-previews.js 와 같은 저장 위치)
+    js/alarms.js         예약 알림 실행기 (desktop-rs/app/src/reminders.rs + 시스템 알람 맡기기)
+    js/web-fetch.js      링크 미리보기 (desktop-rs/core/src/link_preview.rs 와 같은 저장 위치)
     js/drive.js          Google Drive 연결 화면 · 동기화 상태
     dev/                 PC 브라우저 미리보기 서버·자동 점검 (APK 에는 안 들어감)
 ```

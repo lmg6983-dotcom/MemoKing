@@ -165,7 +165,7 @@
       <button type="button" class="btn update-btn" id="update-check" data-state="idle">업데이트 확인</button>
     </div>
     <nav class="set-jump" aria-label="설정 바로가기">
-      <a href="#set-drive">동기화</a><a href="#set-local-ai" data-alt="set-ai">AI</a><a href="#set-view">보기</a><a href="#set-stt">녹음</a><a href="#set-keys">단축키</a><a href="#set-storage">저장</a><a href="#set-phone">설치</a>
+      <a href="#set-drive">동기화</a><a href="#set-local-ai">AI</a><a href="#set-view">보기</a><a href="#set-stt">녹음</a><a href="#set-keys">단축키</a><a href="#set-storage">저장</a><a href="#set-phone">설치</a>
     </nav>
     <section class="set-sec" aria-labelledby="set-daily">
       <h3 class="set-title" id="set-daily">자주 쓰는 기능</h3>
@@ -231,25 +231,6 @@
         <p class="set-note">MagicKey 로 저장할 때 뒤에서 해요.</p>
       </div>
       <p class="set-note">기본 모델: 카카오 카나나2 · Powered by Kanana · <a href="https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/LICENSE" target="_blank" rel="noopener">라이선스 보기</a></p>
-    </section>
-    <section class="set-sec" aria-labelledby="set-ai">
-      <h3 class="set-title" id="set-ai">다른 AI 앱과 연결</h3>
-      <details class="drive-adv" id="mcp-adv">
-        <summary>Claude 데스크톱 같은 다른 AI 앱이 내 메모를 찾게 하기 (고급)</summary>
-      <div class="drive-box" id="mcp-box">
-        <svg class="drive-box-icon"><use href="#i-link"/></svg>
-        <div class="drive-box-text"><b id="mcp-title"></b><small id="mcp-sub" role="status"></small></div>
-      </div>
-      <div class="dialog-actions left">
-        <button id="mcp-connect" class="btn">Claude 데스크톱에 연결</button>
-        <button id="mcp-copy" class="link-btn">다른 AI 앱용 설정 복사</button>
-        <button id="mcp-disconnect" class="link-btn danger" hidden>연결 끊기</button>
-      </div>
-      <label class="setting-row sub-row">
-        <input type="checkbox" id="mcp-write" class="switch" role="switch" checked>
-        <span>AI가 메모를 남기도록 허용 <small>끄면 찾기와 읽기만 해요. 잠긴 메모는 언제나 볼 수 없어요</small></span>
-      </label>
-      </details>
     </section>
     <section class="set-sec" aria-labelledby="set-view">
       <h3 class="set-title" id="set-view">메모 보기</h3>

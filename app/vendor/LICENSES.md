@@ -10,8 +10,6 @@
 | remark-math | 6.0.0 | MIT | https://github.com/remarkjs/remark-math/tree/main/packages/remark-math |
 | html-to-image | 1.11.13 | MIT | https://github.com/bubkoo/html-to-image |
 | chrono-node | 2.10.1 | MIT | https://github.com/wanasit/chrono |
-| @modelcontextprotocol/sdk | 1.30.1 | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
-| zod | 4.6.5 | MIT | https://github.com/colinhacks/zod |
 | @noble/ciphers | 2.4.0 | MIT | https://github.com/paulmillr/noble-ciphers |
 | @noble/hashes | 2.4.0 | MIT | https://github.com/paulmillr/noble-hashes |
 | fullcalendar | 7.1.0 | MIT | https://github.com/fullcalendar/fullcalendar |
@@ -26,7 +24,6 @@
 | hwp.js | 0.0.3 | Apache-2.0 | https://github.com/hahnlee/hwp.js |
 | jszip | 3.10.1 | (MIT OR GPL-3.0-or-later) | https://github.com/Stuk/jszip |
 | canvas-confetti | 1.9.4 | ISC | https://github.com/catdad/canvas-confetti |
-| tesseract.js (+ tesseract.js-core, kor tessdata_best) | 7.0.0 | Apache-2.0 | https://github.com/naptha/tesseract.js |
 | qrcode-generator | 1.4.4 | MIT | https://github.com/kazuhikoarase/qrcode-generator |
 | perfect-freehand | 1.2.3 | MIT | https://github.com/steveruizok/perfect-freehand |
 | FFmpeg (ffmpeg.exe, PC Rust 판 HEVC 변환기 · 빌드 방법 desktop-rs/scripts/build-ffmpeg-min.sh) | 8.0.1 | LGPL-2.1-or-later | https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz |
