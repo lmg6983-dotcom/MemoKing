@@ -78,7 +78,15 @@ fn main() {
         .register_asynchronous_uri_scheme_protocol("memoking", |ctx, req, responder| {
             // 파일 읽기 · 동기 호출은 화면 스레드 밖에서 — 큰 영상을 읽거나 창을 만드는 호출이 화면을 멈추지 않게
             let (app, label) = (ctx.app_handle().clone(), ctx.webview_label().to_string());
-            std::thread::spawn(move || responder.respond(memoking_uri(&app, &label, &req)));
+            std::thread::spawn(move || {
+                let res = memoking_uri(&app, &label, &req);
+                // 점검 때는 오간 것을 남긴다 (WebView2 가 동영상을 어떻게 청하는지 CI 로그에서 보려고)
+                if ipc::smoke() && !req.uri().path().starts_with("/sync/") {
+                    let h = |m: &http::HeaderMap, k: &str| m.get(k).and_then(|v| v.to_str().ok()).unwrap_or("-").to_string();
+                    println!("[memoking] {} {} range={} origin={} -> {} type={} len={} content-range={}", req.method(), req.uri().path(), h(req.headers(), "range"), h(req.headers(), "origin"), res.status().as_u16(), h(res.headers(), "content-type"), res.body().len(), h(res.headers(), "content-range"));
+                }
+                responder.respond(res)
+            });
         })
         .setup(|app| {
             let app = app.handle();

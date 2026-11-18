@@ -43,6 +43,29 @@ window.addEventListener('load', () => setTimeout(async () => {
       img.onerror = () => reject(new Error(`못 읽음 ${img.src}`));
       img.src = `${mk.vaultBase}attachments/dot.png`;
     }));
+    // 동영상: 메모 속 재생기처럼(출처 허락 없이) 한 장면이 나오는지, 목록 첫 장면처럼(crossOrigin) 캔버스에 그려 꺼낼 수 있는지
+    const clip = (cors) => new Promise((resolve, reject) => {
+      const v = document.createElement('video');
+      v.muted = true;
+      v.preload = 'auto';
+      if (cors) v.crossOrigin = 'anonymous';
+      v.onerror = () => reject(new Error(`재생 못 함 code=${v.error?.code} ${v.error?.message ?? ''}`));
+      v.onloadeddata = () => {
+        v.currentTime = 1;
+        v.onseeked = () => {
+          if (!cors) return resolve(v.videoWidth === 96);
+          const c = document.createElement('canvas');
+          c.width = v.videoWidth;
+          c.height = v.videoHeight;
+          c.getContext('2d').drawImage(v, 0, 0);
+          resolve(c.toDataURL('image/jpeg').length > 100);
+        };
+      };
+      setTimeout(() => reject(new Error(`10초 안에 못 읽음 readyState=${v.readyState} network=${v.networkState}`)), 10000);
+      v.src = `${mk.vaultBase}attachments/clip.mp4`;
+    });
+    await check('동영상 재생 (메모 속 재생기)', () => clip(false));
+    await check('동영상 첫 장면 그리기 (목록 카드)', () => clip(true));
     await check('CSS app-region 읽힘 (창 끌기)', () => dragRegion('.titlebar'));
     await check('창 단추 셋 (CSP 아래에서도 모양)', () => {
       const b = document.querySelectorAll('.mk-caption button');
