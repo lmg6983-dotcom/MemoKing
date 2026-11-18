@@ -76,7 +76,7 @@ struct TopWatch {
     gen: u64,
 }
 
-type Action = Box<dyn FnOnce(&AppHandle) + Send>;
+pub type Action = Box<dyn FnOnce(&AppHandle) + Send>;
 
 #[derive(Default)]
 struct Wm {
@@ -158,7 +158,7 @@ pub fn bounds(w: &WebviewWindow) -> Option<Rect> {
     Some([p.x, p.y, z.width, z.height])
 }
 
-fn set_bounds(w: &WebviewWindow, [x, y, width, height]: Rect) {
+pub fn set_bounds(w: &WebviewWindow, [x, y, width, height]: Rect) {
     let _ = w.set_position(LogicalPosition::new(x, y));
     let _ = w.set_size(LogicalSize::new(width, height));
 }
@@ -184,7 +184,7 @@ fn cursor(app: &AppHandle) -> Option<(f64, f64)> {
 }
 
 /// 기억한 이 메모 창 자리 (지금 있는 화면 안일 때만)
-fn saved_bounds(app: &AppHandle, id: &str) -> Option<Rect> {
+pub fn saved_bounds(app: &AppHandle, id: &str) -> Option<Rect> {
     crate::os::on_screen(&state(app).setting("noteBounds")[id], &crate::os::work_areas(app))
 }
 
@@ -507,12 +507,14 @@ fn clear_hover(app: &AppHandle, h: &Hover) {
 
 /// 숨겨 만든 메모 창 — 메모를 다 그리면(win:painted, 늦어도 1.5초) then
 fn create_hidden(app: &AppHandle, id: &str, b: Option<Rect>, then: impl FnOnce(&AppHandle) + Send + 'static) -> Option<WebviewWindow> {
-    let w = crate::memos::create_note_window(app, id, b, false).ok()?;
-    let label = w.label().to_string();
-    wm().reveal.insert(label.clone(), Box::new(then));
-    let app = app.clone();
+    crate::memos::create_note_window(app, id, b, false, Some(Box::new(then))).ok()
+}
+
+/// 이 메모 창이 메모를 다 그리면(win:painted, 늦어도 1.5초) then
+pub fn when_painted(app: &AppHandle, label: &str, then: Action) {
+    wm().reveal.insert(label.to_string(), then);
+    let (app, label) = (app.clone(), label.to_string());
     later(1500, move || painted(&app, &label));
-    Some(w)
 }
 
 /// 메모 창이 메모를 그렸다 (win:painted)
@@ -693,7 +695,7 @@ pub fn remove_from_stack(app: &AppHandle, id: &str, mode: &str) -> bool {
                     shown(app, id, &w);
                 }
                 None => {
-                    if let Ok(w) = crate::memos::create_note_window(app, id, b, true) {
+                    if let Ok(w) = crate::memos::create_note_window(app, id, b, true, None) {
                         shown(app, id, &w);
                     }
                 }
