@@ -6,49 +6,39 @@
 
 소스와 설치 파일 모두 이 공개 저장소(**`lmg6983-dotcom/MemoKing`**)에 있어요. 앱은 이 저장소의 Release 를 토큰 없이 읽고, 올리기는 Actions 의 기본 토큰(`github.token`)으로 해서 따로 만들 토큰이 없어요.
 
+1.0 부터 PC 정식판은 **Rust + Tauri 판**(`desktop-rs/`)이에요. Electron 판(0.87 까지)은 더 만들지 않아요.
+
 ```
-git tag v0.76.0 && git push origin v0.76.0
-      │  .github/workflows/release.yml (windows-latest)
-      │  ① 태그 = package.json 버전 확인 ② npm test ③ scripts/build-dist.mjs --publish always
+Actions › Release (PC) › Run workflow   (.github/workflows/release-rs.yml, windows-latest)
+      │  ffmpeg 빌드 → tauri build (Google 연결 정보 · 업데이트 서명)
       ▼
-Release v0.76.0: MemoKing-Setup-0.76.0.exe · .blockmap · latest.yml · MemoKing-Setup.exe
-      ▲  latest.yml 확인 (켤 때 8초 뒤 · 4시간마다 · 절전 해제 · 설정 › 업데이트 확인)
-설치된 메모킹  desktop/updater.js (electron-updater, autoDownload 끔)
-      → 새 버전 대화 상자(바뀐 점 = README 이 버전 줄) → 받기(진행률) → 지금 재시작 / 나중에(끝낼 때 설치)
+Release v<버전> (최신): MemoKing-Setup-<버전>.exe · MemoKing-Setup.exe · latest-tauri.json · latest.yml
+      ▲  latest-tauri.json — Rust 판 (tauri-plugin-updater, 서명이 맞을 때만 설치, services.rs)
+      ▲  latest.yml        — Electron 판 0.87 (electron-updater) → 이 설치 파일로 갈아탄다
+      ▲  사전 배포 desktop-rs 의 latest-tauri.json 도 같은 것으로 — Rust 베타도 갈아탄다
 ```
 
 - 최신 설치 파일: `https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe`
+- 버전: `desktop-rs/Cargo.toml` 의 `workspace.package.version` 과 `desktop-rs/app/tauri.conf.json` 의 `version` 을 함께 올리고, README 이력 표에 같은 버전 줄을 써요 (Release 본문 · 앱의 바뀐 점 안내가 그 줄을 읽어요). 같은 버전이면 업데이트로 알리지 않아요.
 - 휴대폰: `.github/workflows/android.yml` 이 main 에서 APK 를 만들면 사전 배포 `android` 에 `MemoKing-android.apk` · `android-latest.json` 을 올리고, 앱은 그것을 봐요.
-- 사전 배포 `desktop` 은 main 이 바뀔 때마다 만드는 시험용 설치 파일이에요 (`desktop.yml`). 사전 배포라 "최신 릴리스" 링크와 자동 업데이트에는 걸리지 않아요.
-- 설정: `scripts/build-dist.mjs` — nsis `perMachine: false` · `oneClick: false`, `publish: github (MemoKing, releaseType: release)`. 빌드가 끝나면 `dist/` 에 `latest.yml` · `.blockmap` 이 있는지 스스로 확인하고 없으면 실패해요.
-- Secrets: `MEMOKING_GOOGLE_CLIENT_ID` · `MEMOKING_GOOGLE_CLIENT_SECRET` (Google 로그인 연결 정보)
+- Secrets: `MEMOKING_GOOGLE_CLIENT_ID` · `MEMOKING_GOOGLE_CLIENT_SECRET` (Google 로그인 연결 정보) · `TAURI_SIGNING_PRIVATE_KEY` (업데이트 서명)
+- AI 엔진(llama-server)은 설치 파일에 넣지 않아요. AI를 처음 쓸 때 앱이 llama.cpp 릴리스에서 받아 설정 폴더 `ai\engine` 에 둬요 (`desktop-rs/app/src/ai.rs` 의 `LLAMA_TAG`). 받아쓰기 엔진은 실행 파일 안에 있어요.
+- AI 비서 연결(MCP)은 Rust 판에 없어요. Gemini 같은 AI 는 Google Drive 의 메모킹 동기화 폴더를 직접 읽고 써요.
 
-**배포:** `package.json` 의 버전을 올리고 README 이력에 그 버전 줄을 쓴 뒤 → `git tag v<버전> && git push origin v<버전>` (또는 Actions › Release (PC) › Run workflow 에서 main)
+**Electron 판 · Rust 베타에서 갈아타기** (`desktop-rs/app/installer-hooks.nsh`)
 
-### PC Rust 판 베타 (desktop-rs)
-
-Rust + Tauri 로 다시 만든 PC 판은 정식 Release 와 따로, 사전 배포 **`desktop-rs`** 에 올려요 (휴대폰의 `android` 와 같은 방식).
-
-```
-Actions › Release (PC Rust 베타) › Run workflow   (.github/workflows/release-rs.yml, windows-latest)
-      │  tauri build (Google 연결 정보 · 업데이트 서명)
-      ▼
-사전 배포 desktop-rs: MemoKing-Rust-Setup-<버전>.exe, MemoKing-Rust-Setup.exe, latest-tauri.json
-      ▲  latest-tauri.json 확인 (tauri-plugin-updater, 서명이 맞을 때만 설치)
-설치된 MemoKing Beta  desktop-rs/app/src/services.rs
-```
-
-- 받기: `https://github.com/lmg6983-dotcom/MemoKing/releases/download/desktop-rs/MemoKing-Rust-Setup.exe`
-- 버전: `desktop-rs/app/tauri.conf.json` 의 `version` 을 올린 뒤 Run workflow. 같은 버전이면 업데이트로 알리지 않아요.
-- 이름이 **MemoKing Beta** 라 Electron 판과 설치 폴더, 시작 메뉴 바로가기가 겹치지 않아요. 메모 폴더와 설정(`%APPDATA%\MemoKing`)은 같이 써서, 시험할 때는 Electron 판을 끄고 켜요 (둘 다 켜면 알림이 두 번 울려요).
-- AI 엔진(llama-server)은 설치 파일에 넣지 않아요. AI를 처음 쓸 때(모델 받기 · 넣기 · 처음 켜기) 앱이 llama.cpp 릴리스에서 받아 설정 폴더 `ai\engine` 에 둬요 (`desktop-rs/app/src/ai.rs` 의 `LLAMA_TAG` — `scripts/get-llama.mjs` 와 같은 판으로). 받아쓰기 엔진은 실행 파일 안에 있어요.
-- AI 비서 연결(MCP)은 Rust 판에 없어요. Gemini 같은 AI 는 Google Drive 의 메모킹 동기화 폴더를 직접 읽고 써요. 설정 화면의 "다른 AI 앱과 연결" 칸도 보이지 않아요.
+- 설치 파일이 파일을 깔기 전에 Electron 판(`%LOCALAPPDATA%\Programs\MemoKing`)과 Rust 베타(`%LOCALAPPDATA%\MemoKing Beta`)를 조용히 지워요. 바로가기 이름이 같아, 나중에 지우면 새 바로가기가 지워지기 때문이에요.
+- 메모 폴더와 설정(`%APPDATA%\MemoKing`)은 그대로예요. 세 판이 같은 것을 써요.
+- 자동 시작을 켜 두었으면 새 판의 자동 시작으로 옮겨요.
+- Electron 판의 자동 업데이트는 설치 파일을 `--updated /S --force-run` 으로 띄워요. `--force-run` 이 있으면 다 깔고 바로 켜요.
+- Electron 판이 코드 서명 확인(`publisherName`)을 켠 채 빌드됐다면 서명 없는 Rust 설치 파일을 거절해요. 그때는 최신 설치 파일 링크로 한 번 직접 설치해요.
+- `release.yml`(Electron 판 배포)은 태그로 돌지 않게 껐어요. `v*.*.*` 태그가 Rust 판 Release 를 덮어쓰지 않게요.
 
 **자동 업데이트 서명**
 
 - 공개 열쇠는 `desktop-rs/app/tauri.conf.json` 의 `plugins.updater.pubkey` 에 있어요. 앱은 이 열쇠로 서명이 맞는 설치 파일만 설치해요.
 - 개인 열쇠는 저장소 Settings › Secrets and variables › Actions › **Secrets** 의 `TAURI_SIGNING_PRIVATE_KEY` 에 넣어요 (비밀번호 없음). 열쇠 파일은 저장소 밖에 따로 보관해요.
-- 열쇠를 바꾸려면 `npx @tauri-apps/cli@2.12.5 signer generate -w memoking.key` 로 새로 만들고 공개 열쇠와 Secret 을 함께 바꿔요. 이미 설치한 베타는 새 열쇠로 서명한 버전을 설치하지 못해 한 번 직접 다시 설치해야 해요.
+- 열쇠를 바꾸려면 `npx @tauri-apps/cli@2.12.5 signer generate -w memoking.key` 로 새로 만들고 공개 열쇠와 Secret 을 함께 바꿔요. 이미 설치한 앱은 새 열쇠로 서명한 버전을 설치하지 못해 한 번 직접 다시 설치해야 해요.
 
 서명 열쇠가 없어도 워크플로는 돌아요. 그때는 설치 파일만 올라가고 `latest-tauri.json` 은 없어서 자동 업데이트가 되지 않아요.
 

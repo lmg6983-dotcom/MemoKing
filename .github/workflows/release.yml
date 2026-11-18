@@ -1,14 +1,12 @@
-# PC 정식 배포 — v*.*.* 태그를 올리면 Windows 설치 파일을 빌드해 이 저장소의 Release 에 올린다.
+# (예전) Electron 판 PC 배포 — 1.0 부터 PC 정식판은 Rust 판(release-rs.yml)이다. 태그로는 돌지 않고, 손으로만.
+#   v*.*.* 태그를 올리면 Electron 판이 Rust 판 Release 를 덮어쓰지 않게 태그 실행을 껐다.
 #   올라가는 것: MemoKing-Setup-<버전>.exe · .blockmap · latest.yml (자동 업데이트용) + MemoKing-Setup.exe (늘 같은 이름의 최신 링크)
 #   공개 저장소라 앱은 토큰 없이 Release 를 읽고, 올리기는 이 저장소의 기본 토큰(github.token)으로 한다.
 #   SIGNPATH_API_TOKEN 이 있으면 설치 파일을 SignPath 로 서명한 뒤 올린다 (guides/RELEASE.md 의 코드 서명).
 #   최신 설치 파일: https://github.com/lmg6983-dotcom/MemoKing/releases/latest/download/MemoKing-Setup.exe
-name: Release (PC)
+name: Release (PC Electron, 예전)
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
   workflow_dispatch: # Actions 탭 › Run workflow — main 을 고르면 package.json 버전으로 (v<버전> 태그 · Release 는 마지막 단계가 만든다)
     inputs:
       allow_no_google:

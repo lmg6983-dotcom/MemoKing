@@ -1,17 +1,19 @@
-# PC Rust 판 베타 배포 (desktop-rs/). Actions 탭 › Run workflow 로만 돈다.
-#   올라가는 곳: 이 저장소의 사전 배포 `desktop-rs` (안드로이드의 `android` 와 같은 방식, 정식 Release 와 따로)
-#   올라가는 것: MemoKing-Rust-Setup-<버전>.exe, MemoKing-Rust-Setup.exe (늘 같은 이름), latest-tauri.json (자동 업데이트)
+# PC 정식 배포 (1.0 부터 Rust + Tauri 판, desktop-rs/). Actions 탭 › Run workflow 로만 돈다.
+#   올라가는 곳: 이 저장소의 정식 Release v<버전> (최신 표시) — 받기 링크 releases/latest/download/MemoKing-Setup.exe
+#   올라가는 것: MemoKing-Setup-<버전>.exe, MemoKing-Setup.exe (늘 같은 이름), latest-tauri.json (Rust 판 자동 업데이트),
+#              latest.yml (Electron 판 0.87 까지의 자동 업데이트가 이것을 보고 이 설치 파일로 갈아탄다 — installer-hooks.nsh)
+#   예전 Rust 베타(사전 배포 desktop-rs)도 갈아타게 그곳의 latest-tauri.json 을 이 버전으로 바꾼다
 #   설치 파일에 함께 넣는 것: HEVC 영상 변환기 ffmpeg (desktop-rs/scripts/build-ffmpeg-min.sh)
-#   AI 엔진 llama-server 는 넣지 않는다 — 앱이 AI 를 처음 쓸 때 llama.cpp 릴리스에서 받는다 (ai.rs ensure_engine, 설치 파일 48MB 중 32MB 였다)
-#   버전은 desktop-rs/app/tauri.conf.json 의 version. 올려야 자동 업데이트가 새 버전으로 알아본다
-#   처음 한 번 준비: guides/RELEASE.md 의 "PC Rust 판 베타"
-name: Release (PC Rust 베타)
+#   AI 엔진 llama-server 는 넣지 않는다 — 앱이 AI 를 처음 쓸 때 llama.cpp 릴리스에서 받는다 (ai.rs ensure_engine)
+#   버전은 desktop-rs/app/tauri.conf.json 의 version (README 이력 표에 같은 버전 줄이 있어야 바뀐 점이 붙는다)
+#   처음 한 번 준비: guides/RELEASE.md
+name: Release (PC)
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write # 사전 배포 만들기, 파일 올리기
+  contents: write # Release 만들기, 파일 올리기
 
 concurrency:
   group: release-rs
@@ -62,7 +64,7 @@ jobs:
           name: ffmpeg-min
           path: desktop/vendor/ffmpeg
 
-      # 배포판에만 쓰는 설정: 이름(Electron 판과 바로가기, 설치 폴더가 겹치지 않게), 함께 넣을 파일, 업데이트 파일 만들기
+      # 배포판에만 쓰는 설정: 함께 넣을 파일, 업데이트 파일 만들기
       #   서명 공개 열쇠와 업데이트 주소는 tauri.conf.json 에 있다. 개인 열쇠(비밀값)가 없으면 업데이트 파일 없이 설치 파일만 만든다
       # Rust 판이 쓰지 않는 화면 파일은 설치 파일에 넣지 않는다 (Tauri 는 app/ 를 통째로 싣는다)
       #   tesseract 한글 OCR (약 9MB): Electron 판의 알림 캡처 읽기용 — Rust 판은 Windows OCR 로 읽는다 (history.rs)
@@ -78,7 +80,6 @@ jobs:
           node -e '
             const signed = process.env.HAS_SIGNING_KEY === "true";
             const conf = {
-              productName: "MemoKing Beta",
               bundle: {
                 resources: { "../../desktop/vendor/ffmpeg/": "ffmpeg/" },
                 createUpdaterArtifacts: signed,
@@ -102,30 +103,46 @@ jobs:
           fi
           npx --yes @tauri-apps/cli@2.12.5 build --config tauri.release.json
 
-      - name: 사전 배포 desktop-rs 에 올리기
+      - name: Release 에 올리기
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(node -p "require('./desktop-rs/app/tauri.conf.json').version")
+          tag="v${version}"
+          name="MemoKing-Setup-${version}.exe"
           dir=desktop-rs/target/release/bundle/nsis
           exe=$(ls "$dir"/*-setup.exe | head -1)
-          cp "$exe" "MemoKing-Rust-Setup-${version}.exe"
-          cp "$exe" MemoKing-Rust-Setup.exe
-          files=("MemoKing-Rust-Setup-${version}.exe" MemoKing-Rust-Setup.exe)
+          cp "$exe" "$name"
+          cp "$exe" MemoKing-Setup.exe
+          # Electron 판(electron-updater)이 보는 업데이트 정보 — 내려받은 파일의 sha512 를 맞춰 본다
+          node -e '
+            const fs = require("fs"), [version, file] = process.argv.slice(1), buf = fs.readFileSync(file);
+            const sha = require("crypto").createHash("sha512").update(buf).digest("base64");
+            fs.writeFileSync("latest.yml", `version: ${version}\nfiles:\n  - url: ${file}\n    sha512: ${sha}\n    size: ${buf.length}\npath: ${file}\nsha512: ${sha}\nreleaseDate: \x27${new Date().toISOString()}\x27\n`);
+          ' "$version" "$name"
+          files=("$name" MemoKing-Setup.exe latest.yml)
           if [ -f "$exe.sig" ]; then
             node -e '
-              const [version, sig] = process.argv.slice(1);
-              const url = `https://github.com/lmg6983-dotcom/MemoKing/releases/download/desktop-rs/MemoKing-Rust-Setup-${version}.exe`;
-              const feed = { version, notes: `메모킹 PC Rust 베타 ${version}`, pub_date: new Date().toISOString(), platforms: { "windows-x86_64": { signature: require("fs").readFileSync(sig, "utf8").trim(), url } } };
+              const [version, sig, name] = process.argv.slice(1);
+              const url = `https://github.com/lmg6983-dotcom/MemoKing/releases/download/v${version}/${name}`;
+              const feed = { version, notes: `메모킹 ${version}`, pub_date: new Date().toISOString(), platforms: { "windows-x86_64": { signature: require("fs").readFileSync(sig, "utf8").trim(), url } } };
               require("fs").writeFileSync("latest-tauri.json", JSON.stringify(feed, null, 2));
-            ' "$version" "$exe.sig"
+            ' "$version" "$exe.sig" "$name"
             files+=(latest-tauri.json)
           fi
-          notes="메모킹 PC 를 Rust + Tauri 로 다시 만든 베타 ${version} 이에요. 같은 메모 폴더, 설정을 쓰니 시험할 때는 Electron 판 메모킹을 끄고 켜 주세요 (둘 다 켜면 알림이 두 번 울려요)."
-          if gh release view desktop-rs >/dev/null 2>&1; then
-            gh release edit desktop-rs --notes "$notes"
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            import { releaseBody } from "./scripts/release-body.mjs";
+            writeFileSync("release-notes.md", releaseBody(readFileSync("README.md", "utf8"), process.argv[1]));
+          ' "$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
           else
-            gh release create desktop-rs --prerelease --target "$GITHUB_SHA" --title "메모킹 PC Rust 베타" --notes "$notes"
+            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "메모킹 ${tag}" --notes-file release-notes.md --latest
           fi
-          gh release upload desktop-rs "${files[@]}" --clobber
-          echo "https://github.com/${GITHUB_REPOSITORY}/releases/download/desktop-rs/MemoKing-Rust-Setup.exe"
+          # 예전 Rust 베타가 보는 곳에도 새 버전 정보를 (베타 앱이 이 버전으로 업데이트 → 설치 파일이 베타를 지운다)
+          if [ -f latest-tauri.json ] && gh release view desktop-rs >/dev/null 2>&1; then
+            gh release upload desktop-rs latest-tauri.json --clobber
+            gh release edit desktop-rs --notes "Rust 베타는 끝났어요. 메모킹 ${tag} 정식판으로 업데이트돼요: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/MemoKing-Setup.exe"
+          fi
+          echo "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/MemoKing-Setup.exe"
