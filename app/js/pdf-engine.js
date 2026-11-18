@@ -57,6 +57,14 @@ let warmed = false;
 export function warmPdf() {
   if (warmed) return;
   warmed = true;
+  // 숨은 창(미리 만든 탭 · 예비 창)은 보일 때까지 미룬다 — PDF 엔진은 창마다 수 MB 를 차지해, 숨은 창마다 올리면 메모리만 쌓였다
+  if (globalThis.document?.visibilityState === 'hidden') {
+    document.addEventListener('visibilitychange', () => {
+      warmed = false;
+      warmPdf();
+    }, { once: true });
+    return;
+  }
   (globalThis.requestIdleCallback ?? ((f) => setTimeout(f, 1500)))(() => pdfium().catch(() => (warmed = false)), { timeout: 4000 });
 }
 /** 지금 바로 올리기 시작 (못 올려도 조용히 — 실제로 쓸 때 다시 해 보고 알린다) */

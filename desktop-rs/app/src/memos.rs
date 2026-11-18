@@ -218,7 +218,7 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
     let label = st.note_labels.lock().unwrap().get(id).cloned();
     if let Some(w) = label.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         let _ = w.unminimize();
-        let _ = w.show();
+        crate::windows::show_note_win(&w);
         let _ = w.set_focus();
         crate::windows::shown(app, id, &w);
         return Ok(true);
@@ -273,6 +273,7 @@ fn make_spare(app: &AppHandle) {
     };
     match crate::window(app, &label, "note.html?spare=1").inner_size(340.0, 380.0).min_inner_size(240.0, 200.0).visible(false).build() {
         Ok(w) => {
+            crate::windows::memory_low(&w, true); // 기다리는 동안은 덜 (메모를 건네받아 포커스를 받으면 보통)
             let l = label.clone();
             w.on_window_event(move |e| {
                 if let WindowEvent::Destroyed = e {
@@ -354,7 +355,7 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
             let id = id.to_string();
             Some(Box::new(move |app: &AppHandle| {
                 if let Some(w) = app.get_webview_window(&label) {
-                    let _ = w.show();
+                    crate::windows::show_note_win(&w);
                     let _ = w.set_focus();
                     crate::windows::shown(app, &id, &w);
                 }
