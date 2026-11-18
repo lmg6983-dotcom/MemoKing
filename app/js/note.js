@@ -24,7 +24,7 @@ import { setupVoiceRecorder } from './voice-recorder.js';
 import { setupAnnotation } from './ink-annotate.js';
 import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups, swipeDismiss, EASE_OUT, busyWhile, busyUntilBlur } from './dom.js';
 import { createClearStamp } from './clear-stamp.js';
-import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
+import { trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
 import { hintOnce } from './hints.js';
 import { toggleShortcutSheet } from './shortcut-sheet.js';
@@ -202,56 +202,6 @@ function isDirty() {
 }
 
 // ---------- 추천 태그 (휴대폰과 같음): 태그 없는 메모에 이 폴더의 태그 중 맞는 것을 아래 막대에 ----------
-const tagBar = $('tag-suggest-bar');
-let tagTimer = 0;
-let tagDismissed = false;
-let tagSeq = 0;
-function scheduleTagBar() {
-  clearTimeout(tagTimer);
-  tagTimer = setTimeout(renderTagBar, 1500); // 쓰는 동안은 기다렸다가
-}
-async function renderTagBar() {
-  if (!tagBar || !editor || tagDismissed) return;
-  const body = editor.getMarkdown();
-  if (extractTags(body).length) {
-    tagBar.hidden = true;
-    return;
-  }
-  const seq = ++tagSeq;
-  let list = [];
-  try {
-    list = (await api.tags.suggest?.(body, id)) ?? [];
-  } catch {
-    list = [];
-  }
-  const ai = (await api.ai?.status().catch(() => null))?.chat.state;
-  if (seq !== tagSeq) return;
-  fillSuggestChips($('tag-suggest-chips'), list, addTags);
-  $('tag-ai-btn').hidden = !['ready', 'running'].includes(ai); // 글 모델을 넣은 PC 에서만
-  tagBar.hidden = list.length === 0; // 추천이 있을 때만 (AI 단추만으로 모든 메모에 막대를 띄우지 않게 — 닫을 때 AI 태그는 그대로)
-}
-// AI로 고르기: 쓰는 동안 저절로 돌리면 8GB PC 가 무거워져 누를 때만 (모델은 이 PC 안)
-$('tag-ai-btn')?.addEventListener('click', async () => {
-  const btn = $('tag-ai-btn');
-  const seq = ++tagSeq;
-  btn.disabled = true;
-  btn.textContent = 'AI가 고르는 중…';
-  const r = await api.tags.ai(editor.getMarkdown(), id).catch((err) => ({ error: err.message }));
-  btn.disabled = false;
-  btn.textContent = 'AI로 고르기';
-  if (seq !== tagSeq) return;
-  if (r.error) return setStatus(r.error, true);
-  if (!r.length) return setStatus('AI가 맞는 태그를 찾지 못했어요');
-  fillSuggestChips($('tag-suggest-chips'), r, addTags);
-});
-function addTags(names) {
-  if (!editor || !names.length) return;
-  editor.appendMarkdown(names.map((n) => `#${n}`).join(' '));
-  flush();
-  setStatus(`${names.map((n) => `#${n}`).join(' ')} 태그를 달았어요`);
-  tagBar.hidden = true;
-}
-tagBar?.addEventListener('mousedown', (e) => e.preventDefault()); // 커서 유지
 // AI 가 뒤에서 한 일 (매직키 다듬기 · 일정 자동 등록): 알림을 눌러 열면 아래 막대에서 되돌리기 (메인 aiNotices)
 function showAiNotice(n) {
   const bar = $('ai-notice-bar');
@@ -267,14 +217,8 @@ $('ai-notice-undo')?.addEventListener('click', async () => {
   if (r?.message) setStatus(r.message, !r.ok);
 });
 $('ai-notice-close')?.addEventListener('click', async () => showAiNotice(await api.ai.noticeDismiss(id).catch(() => null)));
-$('tag-suggest-close')?.addEventListener('click', () => {
-  tagDismissed = true;
-  tagBar.hidden = true;
-});
-
 function onChange(md) {
   current = md;
-  scheduleTagBar();
   // 튜토리얼 따라 하기: 글을 쓰면 · 꾸미면 · 체크리스트 · 태그를 붙이면 (단계 시작 때보다 늘면) 다음 단계로
   const advance = coach?.step?.advance;
   if (advance && tutBase && tutorialDone(advance, tutBase, tutCounts(md))) {
@@ -1817,33 +1761,6 @@ function showTasks(tasks, opts) {
   clearStamp.show(tasks, opts);
 }
 
-// 닫을 때: 태그 · 일정을 저절로 (설정 › 태그 자동 추가 · 일정 자동 등록)
-//   글 모델을 넣은 PC: AI가 고른 태그를 사용자 태그와 합쳐 3개까지 — 창을 닫은 뒤 메인이 단다(aiTagAfterClose, 메모마다 한 번).
-//   아니면 태그 없는 메모에 확실한 추천 태그 (휴대폰과 같음)
-// 이 창에서 글을 고쳤나 (열 때 모습과 다른가) — 보기만 하고 닫으면 닫을 때 할 일(태그 달기)을 건너뛴다
-let openedBody = null;
-const editedHere = () => Boolean(editor) && openedBody !== null && editor.getMarkdown() !== openedBody;
-
-async function autoTagOnClose() {
-  if (!editor || tagDismissed || memo?.locked) return false; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
-  if (!editedHere()) return false; // 보기만 한 메모: 설정 · AI 상태 · 태그 추천을 묻지 않는다 (닫을 때 수백 ms — 속도 기록), 열어 본 것만으로 태그가 붙어 저장되지도 않게
-  try {
-    const body = editor.getMarkdown();
-    if (isBlankBody(body)) return false;
-    const [s, ai] = await Promise.all([api.settings.get(), api.ai?.status().catch(() => null)]); // 차례로 묻지 않고 함께
-    const tagsOn = s?.autoTags !== false;
-    // 일정 자동 등록(설정 › AI 도우미)도 같은 길로 — 메인이 새로 쓴 줄의 일정 · 태그를 차례로
-    if ((tagsOn || s?.autoEvents !== false) && ['ready', 'running'].includes(ai?.chat.state)) return true;
-    if (!tagsOn || extractTags(body).length) return false;
-    const list = (await api.tags.suggest?.(body, id)) ?? [];
-    const sure = list.filter((t) => t.sure && t.existing).slice(0, 2);
-    if (sure.length) editor.appendMarkdown(sure.map((t) => `#${t.name}`).join(' '));
-  } catch {
-    // 태그를 못 달아도 닫기는 그대로
-  }
-  return false;
-}
-const aiTagAfterClose = (ask) => ask && api.tags.aiAuto?.(id).catch(() => {}); // 기다리지 않는다 (저장한 뒤에 부름)
 
 // 닫기: 창(스택이면 탭)부터 숨기고, 남은 일(녹음 마무리 · 태그 · 저장)은 숨은 채 마친 뒤 없앤다
 //   (예전: 설정 · AI 상태 · 태그 추천 · 저장을 차례로 기다린 뒤에야 창이 사라져 닫기가 굼떴다)
@@ -1861,9 +1778,7 @@ async function finishClose(hide, vanish = false) {
   try {
     await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
     await annotation?.exit(); // 주석을 그리던 중이면 저장하고 닫는다
-    const askAi = await autoTagOnClose();
     await flush();
-    aiTagAfterClose(askAi);
   } finally {
     api.perf?.log(`메모 닫기: 숨기기 ${hidden}ms · 저장 마무리 ${Math.round(performance.now() - t0)}ms`)?.catch(() => {});
     api.win.close();
@@ -2190,7 +2105,7 @@ if (!memo) {
     api.perf?.log(`메모 열기 (${perf.how} · 스냅샷): 스냅샷 보임 ${perfMs(perf.snap)}ms · 편집기 완성 ${perfMs(perf.editor)}ms (글 ${memo.body.length}자)`)?.catch(() => {});
   }
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
-  current = saved = openedBody = editor.getMarkdown();
+  current = saved = editor.getMarkdown();
   // 목록 안 그림을 열며 목록 뒤로 옮겼으면 고친 대로 저장
   if (editor.listsFixed()) {
     saved = '';
@@ -2198,7 +2113,6 @@ if (!memo) {
   }
   refreshLinks();
   refreshHotkey();
-  scheduleTagBar();
   reminderPanel = setupReminderPanel({
     api,
     memoId: id,

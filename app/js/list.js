@@ -1138,10 +1138,7 @@ async function loadSettings() {
   $('history-enabled').checked = s.historyEnabled;
   showBlockedCount();
   $('fit-tables').checked = s.fitTables !== false;
-  $('auto-tags').checked = $('auto-tags-ai').checked = s.autoTags !== false;
   $('magic-polish').checked = s.magicPolish !== false;
-  $('auto-events').checked = s.autoEvents !== false;
-  $('ai-phone').checked = s.aiPhone === true;
   $('link-previews').checked = s.linkPreviews !== false;
   showQuickMemo(s.quickMemo);
   showShortcuts(s.shortcuts);
@@ -1354,17 +1351,7 @@ function renderAi(st, failed = {}) {
   $('ai-default-stop').hidden = !downloading;
   $('ai-default').textContent = old ? `${DEFAULT_MODEL.label}로 바꾸기 (${DEFAULT_MODEL.approx}, 한국어에 맞춘 모델)` : `${DEFAULT_MODEL.label} 받기 (${DEFAULT_MODEL.approx})`;
   $('ai-try').hidden = !ready;
-  // 글 모델이 있으면 태그 켜고 끄기는 "AI 가 자동으로 하는 일" 묶음에서 (위 태그 자동 추가 줄은 AI 없는 PC 용)
-  $('ai-auto-group').hidden = !ready;
-  $('auto-tags').closest('label').hidden = ready;
-}
-// AI 태그: 예전 메모에도 달기 ⇄ 멈추기, 진행은 메인이 'ai:tagging' 으로 ({ done, total } · { error } · null = 끝)
-const AI_TAGS_NOTE = $('ai-tags-note').textContent;
-function renderAiTagging(p) {
-  const on = Boolean(p && !p.error);
-  $('ai-tags-note').textContent = p?.error ?? (on ? `AI 태그를 다는 중이에요 ${p.done} / ${p.total}` : AI_TAGS_NOTE);
-  $('ai-tags-all').textContent = on ? '멈추기' : '예전 메모에도 달기';
-  $('ai-tags-clear').hidden = on; // 다는 중에는 지우기를 멈추기 옆에 두지 않는다
+  $('ai-auto-group').hidden = !ready; // 글 모델이 있으면 "AI가 자동으로 하는 일" (MagicKey 다듬기)
 }
 if (api.ai) {
   api.on('ai:status', (st) => renderAi(st));
@@ -1390,18 +1377,6 @@ if (api.ai) {
   });
   $('ai-default-stop').addEventListener('click', () => api.ai.cancelDownload());
   $('ai-reinstall').addEventListener('click', () => api.links.open(WINDOWS_SETUP));
-  api.on('ai:tagging', renderAiTagging);
-  api.tags.aiStatus().then(renderAiTagging);
-  $('ai-tags-all').addEventListener('click', async () => {
-    if ($('ai-tags-all').textContent === '멈추기') return api.tags.aiStop();
-    const p = await api.tags.aiAll();
-    if (!p?.total) $('ai-tags-note').textContent = '예전 메모도 모두 봤어요';
-  });
-  $('ai-tags-clear').addEventListener('click', async () => {
-    if (!(await confirmDialog('AI가 단 태그를 모든 메모에서 지울까요?\n지운 메모에는 AI 태그를 다시 달지 않아요. 직접 단 태그는 그대로예요.', '지우기'))) return;
-    const n = await api.tags.aiClear();
-    $('ai-tags-note').textContent = n ? `메모 ${n}개에서 AI 태그를 지웠어요` : '지울 AI 태그가 없어요';
-  });
   $('ai-try').addEventListener('click', async () => {
     const btn = $('ai-try');
     btn.disabled = true;
@@ -1423,20 +1398,8 @@ $('fit-tables').addEventListener('change', async (e) => {
 $('link-previews').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setLinkPreviews(e.target.checked);
 });
-// 태그 자동 추가: AI 없는 PC 는 위 줄, 글 모델이 있으면 AI 묶음의 줄 (같은 설정)
-for (const id of ['auto-tags', 'auto-tags-ai']) {
-  $(id).addEventListener('change', async (e) => {
-    $('auto-tags').checked = $('auto-tags-ai').checked = await api.settings.setAutoTags(e.target.checked);
-  });
-}
 $('magic-polish').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setMagicPolish(e.target.checked);
-});
-$('auto-events').addEventListener('change', async (e) => {
-  e.target.checked = await api.settings.setAutoEvents(e.target.checked);
-});
-$('ai-phone').addEventListener('change', async (e) => {
-  e.target.checked = await api.settings.setAiPhone(e.target.checked);
 });
 
 // 메모 보기 › 내 손에 맞추기: 꾹 눌러 줄 옮기기 시간 (메모 창들과 같은 저장소 — hold-tune.js)

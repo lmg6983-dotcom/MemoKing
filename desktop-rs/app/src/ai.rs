@@ -3,7 +3,6 @@
 //   메모리 8GB PC 를 생각해 쓸 때만 띄우고 5분 쓰지 않으면 끈다. 모델이 멈추거나 꺼져도 앱은 그대로.
 use crate::state::State;
 use memoking_core::ai::*;
-use memoking_core::tag_suggest::{append_tags, auto_tags_for, remove_tags, suggest_tags_for};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
@@ -16,7 +15,6 @@ use tauri::{AppHandle, Emitter, Manager};
 
 const IDLE: Duration = Duration::from_secs(5 * 60);
 const START: Duration = Duration::from_secs(3 * 60); // 느린 PC 에서 큰 모델을 올리는 시간
-const MAX_TAGS: usize = 3; // 한 메모의 태그 (사용자 + AI) — AI 는 이만큼까지만 채운다
 
 // 기본 모델 (core/model-catalog.js DEFAULT_MODEL) — 카카오 카나나2 3B instruct 를 imatrix 4비트로
 const MODEL_REPO: &str = "mradermacher/kanana-2-3b-instruct-i1-GGUF";
@@ -531,22 +529,6 @@ fn chat(app: &AppHandle, messages: &Value, max_tokens: usize, temperature: f64, 
     Ok(no_think(&text))
 }
 
-/// 메모 폴더의 메모들 (id, 본문) — 파일 이름 순 (HashMap 차례는 돌릴 때마다 달라 추천이 흔들리지 않게)
-fn bodies(app: &AppHandle) -> Vec<(String, String)> {
-    let st = app.state::<State>();
-    let guard = st.vault.lock().unwrap();
-    let mut list: Vec<(&str, String, String)> = guard.as_ref().map(|v| v.files().map(|e| (e.file.as_deref().unwrap_or_default(), e.id.clone(), e.body.clone())).collect()).unwrap_or_default();
-    list.sort_by(|a, b| a.0.cmp(b.0));
-    list.into_iter().map(|(_, id, body)| (id, body)).collect()
-}
-
-/// AI 로 태그 고르기 → 칩 목록
-fn pick_tags(app: &AppHandle, body: &str, id: Option<&str>) -> Result<Vec<Value>, String> {
-    let req = ai_tag_request(body, &bodies(app), id);
-    let answer = chat(app, &req.messages, 80, 0.0, Some(&req.schema), &AtomicBool::new(false), None)?;
-    Ok(ai_tag_result(&answer, &req.existing, body, &req.grounded))
-}
-
 /// 글 도우미: spell → { fixed: [] } (믿을 만한 답만, 아니면 원래 글) · style · draft → { text }
 fn write(app: &AppHandle, label: &str, job: &Value, cancel: &AtomicBool) -> Result<Value, String> {
     let id = job["id"].clone();
@@ -745,7 +727,6 @@ fn run_agent_action(app: &AppHandle, a: &Value) -> Value {
             };
             let message = format!("일정을 넣었어요 · {}", memoking_core::reminders::describe_reminder(&saved[0], now));
             crate::reminders::changed(app, &id, saved);
-            tagger_add(app, vec![id.clone()]);
             json!({ "ok": true, "id": id, "message": message })
         }
         Some(kind @ ("memo" | "summary")) => {
@@ -765,7 +746,6 @@ fn run_agent_action(app: &AppHandle, a: &Value) -> Value {
                 _ => return fail(SAVED_ELSEWHERE),
             };
             crate::memos::push_list(app);
-            tagger_add(app, vec![id.clone()]);
             json!({ "ok": true, "id": id, "message": if kind == "summary" { "요약을 새 메모로 저장했어요" } else { "메모를 만들었어요" } })
         }
         Some("append") => {
@@ -799,298 +779,8 @@ fn run_agent_action(app: &AppHandle, a: &Value) -> Value {
     }
 }
 
-// ---------- AI 뒤처리 (ai-tagger.js) — 닫은 메모 · 휴대폰에서 들어온 메모 · 설정의 "모든 메모" 를 하나씩 차례로 (모델이 하나라서) ----------
-//   ① 일정: 새로 쓴 줄의 앞으로의 날짜를 AI 가 골라 일정으로 (본 줄은 머리말 aiEvents — 지운 일정은 되살리지 않음)
-//   ② 태그: 메모마다 한 번, AI 가 고른 태그를 사용자 태그와 합쳐 3개까지 (본 메모는 머리말 aiTags)
-const SETTLE: Duration = Duration::from_secs(60); // 휴대폰에서 쓰는 중인 메모는 1분 조용해진 뒤에
-// 이보다 오래된 메모를 처음 볼 때는 일정을 넣지 않고 본 줄로만 ("내일" 이 쓴 날이 아니라 오늘 기준으로 계산되므로)
-const FRESH_MS: i64 = 24 * 60 * 60_000;
-
-#[derive(Default)]
-struct Tagger {
-    queue: Vec<String>,
-    running: bool,
-    batch: Option<(Vec<String>, usize, usize)>, // (남은 것, done, total)
-}
-
-static TAGGER: LazyLock<Mutex<Tagger>> = LazyLock::new(Default::default);
-
-fn batch_status() -> Value {
-    TAGGER.lock().unwrap().batch.as_ref().map_or(Value::Null, |b| json!({ "done": b.1, "total": b.2 }))
-}
-
-fn tagging(app: &AppHandle, p: Value) {
-    let _ = app.emit_to("list", "ai:tagging", [p]);
-}
-
-fn tagger_add(app: &AppHandle, ids: Vec<String>) {
-    let mut t = TAGGER.lock().unwrap();
-    for id in ids {
-        if !t.queue.contains(&id) {
-            t.queue.push(id);
-        }
-    }
-    if t.running {
-        return;
-    }
-    t.running = true;
-    let app = app.clone();
-    std::thread::spawn(move || tagger_run(&app));
-}
-
-fn tags_on(app: &AppHandle) -> bool {
-    app.state::<State>().setting("autoTags") != false
-}
-
-fn events_on(app: &AppHandle) -> bool {
-    app.state::<State>().setting("autoEvents") != false
-}
-
-/// 휴대폰에서 들어온 메모: 이어서 쓰는 중일 수 있어 1분 조용해진 뒤에 (aiPhone — PC 가 여러 대면 저마다 고쳐 써서 Drive 충돌 사본이 생기므로 정한 한 대만)
-pub fn later(app: &AppHandle, ids: Vec<String>) {
-    static WAITING: LazyLock<Mutex<HashMap<String, Instant>>> = LazyLock::new(Default::default); // id → 이때까지 조용하면
-    if ids.is_empty() {
-        return;
-    }
-    let due = Instant::now() + SETTLE;
-    WAITING.lock().unwrap().extend(ids.into_iter().map(|id| (id, due)));
-    let app = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(SETTLE);
-        let ready: Vec<String> = {
-            let mut w = WAITING.lock().unwrap();
-            let ready: Vec<String> = w.iter().filter(|(_, t)| **t <= Instant::now()).map(|(id, _)| id.clone()).collect();
-            w.retain(|id, _| !ready.contains(id));
-            ready
-        };
-        if !ready.is_empty() {
-            tagger_add(&app, ready);
-        }
-    });
-}
-
-fn tagger_run(app: &AppHandle) {
-    let enabled = || tags_on(app) || events_on(app);
-    loop {
-        let ready = model(app).is_file();
-        let id = {
-            let mut t = TAGGER.lock().unwrap();
-            // 빈 것을 본 그 잠금 안에서 끈다 (풀고 끄면 그사이 넣은 메모는 아무도 돌리지 않는다)
-            if t.queue.is_empty() || !enabled() || !ready {
-                t.running = false;
-                return;
-            }
-            t.queue.remove(0)
-        };
-        if let Err(err) = tag_one(app, &id) {
-            // 모델이 멈춤 등 — 이 메모는 표시하지 않고(다음에 다시), 한꺼번에 하던 것은 멈춘다
-            eprintln!("AI 태그 {err}");
-            let mut t = TAGGER.lock().unwrap();
-            let had = t.batch.take().is_some();
-            t.queue.clear();
-            t.running = false;
-            drop(t);
-            if had {
-                tagging(app, json!({ "error": format!("AI 태그를 달지 못했어요: {err}") }));
-            }
-            return;
-        }
-        let mut t = TAGGER.lock().unwrap();
-        let Some(b) = t.batch.as_mut() else { continue };
-        let Some(i) = b.0.iter().position(|x| *x == id) else { continue };
-        b.0.remove(i);
-        b.1 += 1;
-        if b.0.is_empty() {
-            t.batch = None;
-        }
-        drop(t);
-        tagging(app, batch_status());
-    }
-}
-
-fn is_open(app: &AppHandle, id: &str) -> bool {
-    app.state::<State>().note_labels.lock().unwrap().contains_key(id)
-}
-
 fn memo(app: &AppHandle, id: &str) -> Option<Value> {
     app.state::<State>().vault.lock().unwrap().as_ref().and_then(|v| v.get(id))
-}
-
-/// 글 속 일정 (ai-tasks.js autoEvents): 아직 보지 않은 줄 중 앞으로의 날짜가 있는 줄을 AI 가 고르고 이름 → (넣을 일정, 본 줄).
-///   fresh 가 아니면(오래된 메모를 처음 볼 때 — "내일" 이 쓴 날이 아니라 오늘 기준이 되므로) 묻지 않고 본 줄로만.
-///   written: 글을 쓴 때 — "내일" 은 이때 기준 (휴대폰에서 밤 11시 반에 쓴 메모를 PC 가 자정 넘어 봐도 하루 밀리지 않게)
-fn auto_events(app: &AppHandle, body: &str, seen: &[String], existing: &[Value], fresh: bool, written: chrono::DateTime<chrono::Local>) -> Result<(Vec<Value>, Vec<String>), String> {
-    use memoking_core::ai_events::*;
-    let cands = event_candidates(body, seen, written);
-    if cands.is_empty() || !fresh {
-        return Ok((vec![], next_seen(seen, &cands)));
-    }
-    let (messages, schema) = ai_event_request(&cands);
-    let answer = chat(app, &messages, 60 + cands.len() * 40, 0.0, Some(&schema), &AtomicBool::new(false), None)?;
-    Ok((ai_event_result(&answer, &cands, existing, chrono::Local::now()), next_seen(seen, &cands)))
-}
-
-fn tag_one(app: &AppHandle, id: &str) -> Result<(), String> {
-    let Some(mut m) = memo(app, id) else { return Ok(()) };
-    let body = m["body"].as_str().unwrap_or_default().to_string();
-    if m["locked"] == true || is_open(app, id) || memoking_core::body::is_blank_body(&body) {
-        return Ok(());
-    }
-    // 그사이 고쳤거나 열었으면 건드리지 않는다 (다음에 닫을 때 다시)
-    let changed = || memo(app, id).is_none_or(|now| now["body"] != body.as_str()) || is_open(app, id);
-    if events_on(app) {
-        let ms = |k: &str| m[k].as_str().and_then(memoking_core::time::parse_js_date).map(|t| t.with_timezone(&chrono::Local));
-        let now = chrono::Local::now();
-        let fresh = !m["aiEvents"].is_null() || ms("created").is_some_and(|c| now - c < chrono::Duration::milliseconds(FRESH_MS));
-        let seen: Vec<String> = m["aiEvents"].as_array().into_iter().flatten().map(memoking_core::js::string).collect();
-        let existing = m["reminders"].as_array().cloned().unwrap_or_default();
-        let (events, seen) = auto_events(app, &body, &seen, &existing, fresh, ms("updated").unwrap_or(now))?;
-        if changed() {
-            return Ok(());
-        }
-        if !events.is_empty() || json!(seen) != m["aiEvents"] {
-            let saved = app.state::<State>().vault.lock().unwrap().as_mut().map(|v| v.add_ai_events(id, &events, &seen));
-            match saved {
-                Some(Ok(Some(_))) if events.is_empty() => crate::memos::push_list(app),
-                Some(Ok(Some(after))) => on_events(app, id, &events, after["reminders"].as_array().cloned().unwrap_or_default()),
-                Some(Err(e)) => eprintln!("AI 일정을 적지 못했어요: {e}"),
-                _ => {}
-            }
-        }
-        let Some(after) = memo(app, id) else { return Ok(()) };
-        m = after;
-    }
-    if !tags_on(app) || m["aiTags"].is_array() {
-        return Ok(());
-    }
-    let room = MAX_TAGS.saturating_sub(memoking_core::body::extract_tags(&body).len());
-    // 짧은 메모(인사 · 한 줄 대답)에는 저절로 달지 않는다 — 고를 주제가 없는데 억지로 채우던 것
-    let plain: String = memoking_core::body::plain_lines(&body, usize::MAX).join("").chars().filter(|c| !memoking_core::js::is_space(*c)).collect();
-    if room == 0 || plain.encode_utf16().count() < MIN_AI_TEXT {
-        return Ok(());
-    }
-    let names: Vec<String> = pick_tags(app, &body, Some(id))?.into_iter().take(room).filter_map(|t| t["name"].as_str().map(str::to_string)).collect();
-    if changed() {
-        return Ok(());
-    }
-    let saved = app.state::<State>().vault.lock().unwrap().as_mut().map(|v| v.set_ai_tags(id, &append_tags(&body, &names), &names));
-    if matches!(saved, Some(Ok(Some(_)))) {
-        crate::memos::push_list(app);
-    }
-    Ok(())
-}
-
-/// 아직 보지 않은 모든 메모 → { done, total }
-fn tag_all(app: &AppHandle) -> Value {
-    let list = app.state::<State>().vault.lock().unwrap().as_ref().map(|v| v.list()).unwrap_or_default();
-    let todo = |id: &str| {
-        memo(app, id).is_some_and(|m| {
-            let body = m["body"].as_str().unwrap_or_default();
-            m["aiTags"].is_null() && m["locked"] != true && !memoking_core::body::is_blank_body(body) && memoking_core::body::extract_tags(body).len() < MAX_TAGS
-        })
-    };
-    let ids: Vec<String> = list.iter().filter_map(|m| m["id"].as_str()).filter(|id| todo(id)).map(str::to_string).collect();
-    let total = ids.len();
-    TAGGER.lock().unwrap().batch = (total > 0).then(|| (ids.clone(), 0, total));
-    tagging(app, batch_status());
-    tagger_add(app, ids);
-    json!({ "done": 0, "total": total })
-}
-
-fn tag_stop(app: &AppHandle) {
-    let mut t = TAGGER.lock().unwrap();
-    t.queue.clear();
-    t.batch = None;
-    drop(t);
-    tagging(app, Value::Null);
-}
-
-/// AI 가 단 태그를 모든 메모에서 걷어 낸다 (다시 달지 않음) → 걷어 낸 메모 수. 열려 있는 메모는 건너뜀
-fn tag_clear(app: &AppHandle) -> usize {
-    tag_stop(app);
-    let list = app.state::<State>().vault.lock().unwrap().as_ref().map(|v| v.list()).unwrap_or_default();
-    let mut n = 0;
-    for id in list.iter().filter_map(|m| m["id"].as_str()) {
-        let Some(m) = memo(app, id) else { continue };
-        let names: Vec<String> = m["aiTags"].as_array().into_iter().flatten().filter_map(|t| t.as_str().map(str::to_string)).collect();
-        if names.is_empty() || m["locked"] == true || is_open(app, id) {
-            continue;
-        }
-        let body = remove_tags(m["body"].as_str().unwrap_or_default(), &names);
-        if matches!(app.state::<State>().vault.lock().unwrap().as_mut().map(|v| v.set_ai_tags(id, &body, &[])), Some(Ok(Some(_)))) {
-            n += 1;
-        }
-    }
-    if n > 0 {
-        crate::memos::push_list(app);
-    }
-    n
-}
-
-// ---------- AI 가 뒤에서 한 일 (main.js showAiNotice): Windows 알림을 누르면 메모가 열리고, 메모 창 아래 막대에서 되돌린다 ----------
-//   알림을 누르는 습관은 "열기"라 알림 자체로는 되돌리지 않는다. 메모마다 차례로 쌓고 막대는 마지막 것부터
-// shortcut: 일정 자동 등록의 알림만 — 매직키 다듬기(polish)의 알림은 다듬기를 옮길 때 되돌리기와 함께
-
-struct Notice {
-    text: String,
-    reminders: Vec<String>, // AI 가 넣은 일정 id — 되돌리면 이것만 뺀다
-}
-
-const MAX_AI_NOTICES: usize = 30; // 열어 보지 않은 메모가 이보다 많으면 오래된 것부터 버린다
-static NOTICES: Mutex<Vec<(String, Vec<Notice>)>> = Mutex::new(Vec::new()); // (메모 id, 알림들) — 오래된 메모부터
-
-/// 글에서 찾은 일정을 넣었다: 일정 탭 · 알림을 새로 하고 알린다 (본 줄은 그대로 — 다시 넣지 않음). all: 그 메모의 일정 전부
-fn on_events(app: &AppHandle, id: &str, events: &[Value], all: Vec<Value>) {
-    crate::reminders::changed(app, id, all);
-    let now = chrono::Local::now();
-    let list: Vec<String> = events
-        .iter()
-        .map(|r| format!("{}{}", memoking_core::reminders::describe_reminder(r, now), r["title"].as_str().filter(|t| !t.is_empty()).map_or(String::new(), |t| format!(" {t}"))))
-        .collect();
-    let text = format!("AI가 일정을 넣었어요: {}", list.join(", "));
-    {
-        let mut all = NOTICES.lock().unwrap();
-        let mut mine = all.iter().position(|n| n.0 == id).map_or_else(Vec::new, |i| all.remove(i).1);
-        mine.push(Notice { text: text.clone(), reminders: events.iter().filter_map(|r| r["id"].as_str().map(str::to_string)).collect() });
-        all.push((id.to_string(), mine)); // 맨 뒤(새것)로
-        if all.len() > MAX_AI_NOTICES {
-            all.remove(0);
-        }
-    }
-    crate::reminders::toast(app, id, &format!("일정 {}개를 넣었어요", events.len()), &list.join("\n"), "눌러서 열기 · 메모에서 되돌릴 수 있어요", Some(json!({ "text": text })));
-}
-
-/// 그 메모의 마지막 알림 { text } | null
-fn last_notice(id: &str) -> Value {
-    NOTICES.lock().unwrap().iter().find(|n| n.0 == id).and_then(|n| n.1.last()).map_or(Value::Null, |n| json!({ "text": n.text }))
-}
-
-fn drop_notice(id: &str) -> Option<Notice> {
-    let mut all = NOTICES.lock().unwrap();
-    let i = all.iter().position(|n| n.0 == id)?;
-    let last = all[i].1.pop();
-    if all[i].1.is_empty() {
-        all.remove(i);
-    }
-    last
-}
-
-/// AI 가 넣은 일정만 뺀다 → { ok, message }
-fn undo_events(app: &AppHandle, id: &str, ids: &[String]) -> Value {
-    let list = memo(app, id).and_then(|m| m["reminders"].as_array().cloned()).unwrap_or_default();
-    let ours = |r: &Value| r["id"].as_str().is_some_and(|x| ids.iter().any(|i| i == x));
-    if !list.iter().any(ours) {
-        return json!({ "ok": false, "message": "넣은 일정이 이미 없어요" });
-    }
-    let keep = list.iter().filter(|r| !ours(r)).cloned().collect();
-    let saved = app.state::<State>().vault.lock().unwrap().as_mut().map(|v| v.set_reminders(id, keep));
-    match saved {
-        Some(Ok(Some(saved))) => {
-            crate::reminders::changed(app, id, saved);
-            json!({ "ok": true, "message": "AI가 넣은 일정을 뺐어요" })
-        }
-        _ => json!({ "ok": false, "message": "일정을 빼지 못했어요. 일정 탭에서 지워 주세요" }),
-    }
 }
 
 // ---------- 채널 ----------
@@ -1117,21 +807,6 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
     let s = |i: usize| args.get(i).and_then(Value::as_str);
     let arg = args.first().cloned().unwrap_or_default();
     Some(match channel {
-        "tags:suggest" => Ok(json!(suggest_tags_for(s(0).unwrap_or_default(), &bodies(app), 3, s(1)))),
-        "tags:auto" => Ok(json!(auto_tags_for(s(0).unwrap_or_default(), &bodies(app), s(1).unwrap_or_default(), s(2)))),
-        "tags:ai" => Ok(pick_tags(app, s(0).unwrap_or_default(), s(1)).map_or_else(|e| json!({ "error": e }), |t| json!(t))),
-        // 메모 창을 닫은 뒤: AI 가 고른 태그를 사용자 태그와 합쳐 3개까지 (설정 › 태그 자동 추가) — 창은 먼저 닫고 뒤에서
-        "tags:ai-auto" => {
-            tagger_add(app, vec![memoking_core::js::string(&arg)]);
-            Ok(Value::Null)
-        }
-        "tags:ai-all" => Ok(tag_all(app)),
-        "tags:ai-stop" => {
-            tag_stop(app);
-            Ok(Value::Null)
-        }
-        "tags:ai-clear" => Ok(tag_clear(app).into()),
-        "tags:ai-status" => Ok(batch_status()),
         "ai:status" => Ok(status(app)),
         "ai:import" => with_status(app, import_model(app, s(0).unwrap_or_default())),
         "ai:remove" => remove_model(app, s(0).unwrap_or_default()),
@@ -1156,19 +831,9 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             job(label, &arg["id"], |cancel| agent(app, label, &arg["id"], &text, cancel))
         }
         "ai:agent-run" => Ok(run_agent_action(app, &arg)),
-        // AI 가 뒤에서 한 일: 메모 창 아래 막대 — 마지막 것부터 보이고, 되돌리거나 닫으면 그 앞의 것
-        "ai:notice" => Ok(last_notice(&memoking_core::js::string(&arg))),
-        "ai:notice-undo" => {
-            let id = memoking_core::js::string(&arg);
-            let mut r = drop_notice(&id).map_or_else(|| json!({ "ok": false, "message": "되돌릴 것이 없어요" }), |n| undo_events(app, &id, &n.reminders));
-            r["next"] = last_notice(&id);
-            Ok(r)
-        }
-        "ai:notice-dismiss" => {
-            let id = memoking_core::js::string(&arg);
-            drop_notice(&id);
-            Ok(last_notice(&id))
-        }
+        // AI 가 뒤에서 한 일 막대 (Electron 판의 MagicKey 다듬기) — 자동 태그 · 일정 자동 등록을 없애 이 판에는 알릴 것이 없다
+        "ai:notice" | "ai:notice-dismiss" => Ok(Value::Null),
+        "ai:notice-undo" => Ok(json!({ "ok": false, "message": "되돌릴 것이 없어요", "next": null })),
         "ai:cancel" => {
             if let Some(c) = JOBS.lock().unwrap().get(&format!("{label}:{}", memoking_core::js::string(&arg))) {
                 c.store(true, Ordering::Relaxed);

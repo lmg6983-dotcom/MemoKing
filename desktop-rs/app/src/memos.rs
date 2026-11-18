@@ -75,10 +75,6 @@ pub fn rescan(app: &AppHandle) {
         (ext, c.removed)
     };
     show_handoff(app, external.iter().map(|(id, _)| id.clone()).collect());
-    // 휴대폰에서 쓴 메모: 정해 둔 PC 한 대만 AI 태그 · 일정 (설정 › AI 도우미 › 휴대폰 메모도 이 PC에서)
-    if st.setting("aiPhone") == true {
-        crate::ai::later(app, external.iter().filter(|(_, m)| m["device"] == "phone").map(|(id, _)| id.clone()).collect());
-    }
     for (id, memo) in external {
         send_to_note(app, &id, "memo:external", [memo]);
     }
@@ -179,10 +175,7 @@ fn app_settings(app: &AppHandle) -> Value {
         "shortcuts": { "quickMemo": quick, "magic": status("magic"), "list": status("list") },
         "fitTables": not_false("fitTables"),
         "linkPreviews": not_false("linkPreviews"),
-        "autoTags": not_false("autoTags"),
         "magicPolish": not_false("magicPolish"),
-        "autoEvents": not_false("autoEvents"),
-        "aiPhone": s("aiPhone") == true,
         // 나눠 쓰지 않으면 늘 Life (Electron viewMode)
         "mode": if s("workLife") == true && s("mode") == "work" { "work" } else { "life" },
         "workLife": s("workLife") == true,
