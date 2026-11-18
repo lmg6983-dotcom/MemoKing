@@ -299,6 +299,11 @@ function saveSnapshot() {
 /** 남긴 스냅샷이 이 글과 같으면 먼저 보인다 → 보였는가 */
 function showSnapshot(body) {
   try {
+    // 잠긴 메모(다른 기기에서 잠갔을 수도): 보이지 않고 남은 것도 지운다
+    if (memo?.locked) {
+      localStorage.removeItem(snapKey(id));
+      return false;
+    }
     const snap = JSON.parse(localStorage.getItem(snapKey(id)) ?? 'null');
     if (!snap?.html || snap.h !== bodyHash(body)) return false;
     el.editorRoot.insertAdjacentHTML('afterbegin', snap.html);
