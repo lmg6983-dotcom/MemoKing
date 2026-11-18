@@ -128,7 +128,7 @@ fn save_cache(dir: &Path, cache: &Map<String, Value>) {
     let mut ser = serde_json::Serializer::with_formatter(&mut text, serde_json::ser::PrettyFormatter::with_indent(b" "));
     if serde::Serialize::serialize(cache, &mut ser).is_ok() {
         if let Err(err) = memoking_core::vault::write_atomic(&dir.join("link-previews.json"), &text) {
-            eprintln!("[링크 미리보기] 저장 실패: {err}");
+            elog!("[링크 미리보기] 저장 실패: {err}");
         }
     }
 }
@@ -265,7 +265,7 @@ fn link_preview(app: &AppHandle, url: &str, refresh: bool) -> Value {
             Some(entry)
         }
         Err(err) => {
-            eprintln!("[링크 미리보기] {url} {err}");
+            elog!("[링크 미리보기] {url} {err}");
             if let Some(p) = p {
                 p.failed.insert(url.to_string(), Instant::now());
             }
@@ -387,7 +387,7 @@ fn share_source(app: &AppHandle, f: &Value) -> Result<PathBuf, String> {
         Ok(file)
     };
     make().map_err(|err| {
-        eprintln!("[share] {err}");
+        elog!("[share] {err}");
         "공유할 파일을 만들지 못했어요. 다시 눌러 주세요".to_string()
     })
 }
@@ -489,8 +489,15 @@ fn share_once(app: &AppHandle, f: &Value) -> Value {
     };
     let title = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     match via {
-        // shortcut: Google Drive 연결은 아직 — Drive 를 옮길 때 올리고 링크 복사 (share-drive.js)
-        "drive" => json!({ "error": "설정에서 Google Drive를 먼저 연결해 주세요" }),
+        "drive" if crate::ipc::smoke() => json!({ "ok": true, "link": "https://drive.google.com/smoke" }),
+        "drive" => match crate::drive::share_link(app, &file, &title) {
+            Ok(link) => {
+                use tauri_plugin_clipboard_manager::ClipboardExt;
+                let _ = app.clipboard().write_text(link.clone());
+                json!({ "ok": true, "link": link })
+            }
+            Err(error) => json!({ "error": error }),
+        },
         "localsend" => {
             let Some(exe) = find_local_send() else {
                 let _ = app.opener().open_url(LOCALSEND_DOWNLOAD, None::<&str>);
@@ -528,33 +535,47 @@ fn problem_mail(to: &str, version: &str, os: &str, lines: &[String]) -> String {
     url(&(head + &if picked.is_empty() { "(기록된 오류 없음)".to_string() } else { picked.join("\n") }))
 }
 
-/// 속도 기록 한 줄 (메모 열기 · 닫기의 단계별 시간) — 오류 기록 파일에 함께 적어 설정 › 문제 보내기로 꺼내 본다.
-///   파일이 200KB 를 넘으면 뒤 절반만 남긴다
-pub fn perf_log(app: &AppHandle, text: &str) {
+// ---------- 기록 (설정 폴더 logs\memoking.log — Electron 의 desktop/error-log.js 와 같은 파일 · 같은 모양) ----------
+//   이 PC 에만 남기고 어디로도 보내지 않는다. 설정 › 문제 보내기가 최근 줄을 붙인 메일을 띄운다 (보낼지는 사용자가)
+
+static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
+const LOG_MAX: u64 = 512 * 1024; // 넘으면 .1 로 옮기고 새로 (둘까지만)
+
+/// 켤 때 한 번 — 기록 파일 자리
+pub fn init_log(app: &AppHandle) {
+    let _ = LOG_FILE.set(state(app).settings_dir.join("logs").join("memoking.log"));
+}
+
+/// 기록 한 줄: "때 [kind] 글" — 줄바꿈은 ⏎ 로, 1000자까지 (오류 · 멈춤 · 화면 · 속도)
+pub fn log(kind: &str, text: &str) {
     use std::io::Write;
-    let dir = state(app).settings_dir.join("logs");
-    let file = dir.join("memoking.log");
-    let _ = std::fs::create_dir_all(&dir);
-    if std::fs::metadata(&file).is_ok_and(|m| m.len() > 200 * 1024) {
-        if let Ok(old) = std::fs::read_to_string(&file) {
-            let half = old.len() / 2;
-            let cut = old[half..].find('\n').map_or(half, |i| half + i + 1);
-            let _ = std::fs::write(&file, &old[cut..]);
-        }
+    static WRITING: Mutex<()> = Mutex::new(()); // 여러 스레드가 함께 써도 줄이 섞이지 않게
+    let Some(file) = LOG_FILE.get() else { return };
+    let _one = WRITING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(dir) = file.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if std::fs::metadata(file).is_ok_and(|m| m.len() > LOG_MAX) {
+        let _ = std::fs::rename(file, file.with_extension("log.1"));
     }
     let at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&file) {
-        let _ = writeln!(f, "{at} [속도] {text}");
+    let text: String = text.split('\n').map(str::trim).filter(|l| !l.is_empty()).collect::<Vec<_>>().join(" ⏎ ").chars().take(1000).collect();
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(file) {
+        let _ = writeln!(f, "{at} [{kind}] {text}");
     }
+}
+
+/// 속도 기록 한 줄 (메모 열기 · 닫기의 단계별 시간)
+pub fn perf_log(text: &str) {
+    log("속도", text);
 }
 
 /// 설정 › 문제 보내기: 최근 기록은 클립보드에, 들어가는 만큼은 새 메일 본문에 (보낼지는 사용자가)
 fn report_problem(app: &AppHandle) -> Value {
     use tauri_plugin_clipboard_manager::ClipboardExt;
-    // 받는 주소는 desktop/support-mail.js 한 곳에만 (개인 메일이라 따로 둔 파일)
-    let to = include_str!("../../../desktop/support-mail.js").split('\'').nth(1).unwrap_or_default();
-    // Electron 이 쓰던 오류 기록 (설정 폴더 logs\memoking.log)
-    // shortcut: Rust 판은 아직 오류를 이 파일에 적지 않는다, 오류 기록을 옮길 때 같은 파일에
+    // 받는 주소는 support-mail.js 한 곳에만 (개인 메일이라 따로 둔 파일)
+    let to = include_str!("../support-mail.js").split('\'').nth(1).unwrap_or_default();
+    // 오류 기록 (설정 폴더 logs\memoking.log — 위 log())
     let log = std::fs::read_to_string(state(app).settings_dir.join("logs").join("memoking.log")).unwrap_or_default();
     let all: Vec<String> = log.split('\n').filter(|l| !l.is_empty()).map(str::to_string).collect();
     let lines = &all[all.len().saturating_sub(300)..];
@@ -603,7 +624,7 @@ pub fn auto_start(app: &AppHandle) -> Value {
     json!({ "available": available, "enabled": available && app.autolaunch().is_enabled().unwrap_or(false) })
 }
 
-pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
+pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let arg = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
     Some(match channel {
         "list:show" => {
@@ -652,8 +673,9 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         "attachment:fetch" => fetch_remote_image(app, &memoking_core::js::string(&arg(0))),
         "share:targets" => {
             let local_send = find_local_send().is_some();
+            let drive = crate::drive::connected();
             Ok(json!([
-                { "id": "drive", "label": "Google Drive 링크", "sub": "아직 연결 전이에요. 눌러서 설정에서 연결하기", "ready": false, "connect": true },
+                { "id": "drive", "label": "Google Drive 링크", "sub": if drive { "올리고 링크를 복사해요 (링크가 있는 사람은 보기)" } else { "아직 연결 전이에요. 눌러서 설정에서 연결하기" }, "ready": drive, "connect": !drive },
                 { "id": "localsend", "label": "LocalSend", "sub": if local_send { "같은 와이파이의 휴대폰, PC로 바로 (오픈소스)" } else { "무료 오픈소스 앱, 누르면 내려받기 페이지를 열어요" }, "ready": true },
                 { "id": "mail", "label": "메일에 첨부", "sub": "기본 메일 앱(Outlook 등)의 새 메일에", "ready": cfg!(windows) || crate::ipc::smoke() },
             ]))
@@ -674,7 +696,7 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             if auto_start(app)["available"] == true {
                 let al = app.autolaunch();
                 if let Err(err) = if crate::settings::truthy(args.first()) { al.enable() } else { al.disable() } {
-                    eprintln!("자동 실행을 바꾸지 못했어요: {err}");
+                    elog!("자동 실행을 바꾸지 못했어요: {err}");
                 }
                 state(app).set_setting("autoStartSet", true.into());
                 crate::os::refresh_tray(app); // 바꾸지 못했어도 알림 영역의 체크를 실제대로
@@ -684,7 +706,12 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         "app:whats-new" => Ok(whats_new(app)),
         "app:report-problem" => Ok(report_problem(app)),
         "perf:log" => {
-            perf_log(app, &arg(0).as_str().unwrap_or_default().chars().take(300).collect::<String>());
+            perf_log(&arg(0).as_str().unwrap_or_default().chars().take(300).collect::<String>());
+            Ok(Value::Null)
+        }
+        // 화면(창)에서 난 잡히지 않은 오류 — 어느 창인지와 함께 (shim.js)
+        "app:log-error" => {
+            log("화면", &format!("{label} {}", arg(0).as_str().unwrap_or_default().chars().take(800).collect::<String>()));
             Ok(Value::Null)
         }
         _ => return None,

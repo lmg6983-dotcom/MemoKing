@@ -2,11 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { caldavIcs } from '../app/js/core/caldav.js';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { prepareFeed, feedEvents, normalizeFeeds, feedCalendars, normalizeCals } from '../app/js/core/calendar-feeds.js';
-import { CalendarFeeds } from '../desktop/calendar-feeds.js';
 
 const TZ = 'BEGIN:VTIMEZONE\nTZID:Asia/Seoul\nBEGIN:STANDARD\nDTSTART:19700101T000000\nTZOFFSETFROM:+0900\nTZOFFSETTO:+0900\nEND:STANDARD\nEND:VTIMEZONE';
 const event = (uid, start, title) => `BEGIN:VCALENDAR\nVERSION:2.0\n${TZ}\nBEGIN:VEVENT\nUID:${uid}\nDTSTART;TZID=Asia/Seoul:${start}\nDURATION:PT1H\nSUMMARY:${title}\nEND:VEVENT\nEND:VCALENDAR\n`;
@@ -79,24 +75,6 @@ test('구독 목록: CalDAV 계정은 아이디 · 비밀번호를 지키고, �
     { url: 'https://caldav.calendar.naver.com', user: 'mk', pass: 'p3' },
   ]);
   assert.deepEqual(list.map((f) => [f.user, f.pass, f.name]), [['mk', 'p1', '네이버 캘린더'], ['other', 'p2', '네이버 캘린더']]);
-});
-
-test('PC: 아이디가 있는 구독은 CalDAV 로 받아 둔다', async () => {
-  const { request } = server();
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memoking-dav-'));
-  const store = new CalendarFeeds({
-    dir,
-    fetch: async (url, init) => {
-      assert.equal(init.redirect, 'manual');
-      const r = await request(url, init);
-      return new Response(r.text || null, { status: r.status, headers: r.location ? { Location: r.location } : {} });
-    },
-    getList: () => [{ id: 'n1', url: 'https://caldav.calendar.naver.com', user: 'mk', pass: '앱비번' }],
-    setList: () => {},
-  });
-  const got = await store.get('n1');
-  assert.equal(got.error, undefined);
-  assert.match(got.text, /SUMMARY:치과/);
 });
 
 test('캘린더별 설정: 켜기 · 색만 남기고 이상한 값은 버린다', () => {

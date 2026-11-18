@@ -436,7 +436,7 @@ fn run(app: &AppHandle, models: &mut Models, sessions: &mut HashMap<String, Sess
                     let s = Session { vad, cond: SpeechConditioner::new(RATE as f64), pending: vec![], hist: VecDeque::new(), fed: 0, last_end: 0, raw: vec![], lines: vec![], speaking: false, label, id, asr, speaker };
                     sessions.insert(key, s);
                 }
-                Err(e) => eprintln!("받아쓰기를 시작하지 못했어요: {e}"),
+                Err(e) => elog!("받아쓰기를 시작하지 못했어요: {e}"),
             }
         }
         Msg::Audio { key, samples } => {
@@ -470,7 +470,7 @@ fn run(app: &AppHandle, models: &mut Models, sessions: &mut HashMap<String, Sess
                         put_speakers(app, &memo, &src, &text);
                     }
                 }
-                Err(e) => eprintln!("받아쓰기: 말한 사람 나누기 {e}"),
+                Err(e) => elog!("받아쓰기: 말한 사람 나누기 {e}"),
             }
         }
         Msg::Close { label } => sessions.retain(|_, s| s.label != label),
@@ -510,7 +510,7 @@ fn drain(app: &AppHandle, models: &mut Models, s: &mut Session) {
         let text = match models.recognizer(&s.asr) {
             Ok(rec) => memoking_core::js::trim(&rec.transcribe(RATE as u32, &samples)).to_string(),
             Err(e) => {
-                eprintln!("받아쓰기: {e}");
+                elog!("받아쓰기: {e}");
                 continue;
             }
         };

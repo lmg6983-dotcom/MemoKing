@@ -1,5 +1,5 @@
 // AI 글쓰기 (메모 창 › 서식 막대 끝 ✦) — 부탁 한 줄(Enter: 초안) + 빠른 작업 칩(맞춤법 · 문체)만 든 작은 창.
-//   모델은 이 PC 안(desktop/ai, 인터넷 없이). 고친 글은 바로 덮지 않는다:
+//   모델은 이 PC 안(desktop-rs/app/src/ai.rs, 인터넷 없이). 고친 글은 바로 덮지 않는다:
 //   맞춤법은 문단마다 바뀐 곳(지운 글 · 새 글)을 보여 주고 하나씩 또는 모두 바꾸고, 문체 · 초안은 다 쓴 뒤 바꾸기 · 메모 끝에 넣기를 고른다.
 import { STYLES, MAX_CHARS, wordDiff, diffEdits, isEditRequest } from './core/ai-write.js';
 

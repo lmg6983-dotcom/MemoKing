@@ -60,7 +60,7 @@ pub fn tick(app: &AppHandle) {
             *key = Some(out.key);
         }
         Err(err) => {
-            eprintln!("색인을 쓰지 못했어요: {err}");
+            elog!("색인을 쓰지 못했어요: {err}");
             mark(); // 다음에 다시
         }
     }

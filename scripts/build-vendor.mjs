@@ -19,8 +19,6 @@ const DEPS = {
   'remark-math': '6.0.0',
   'html-to-image': '1.11.13',
   'chrono-node': '2.10.1',
-  '@modelcontextprotocol/sdk': '1.30.1',
-  zod: '4.6.5',
   '@noble/ciphers': '2.4.0',
   '@noble/hashes': '2.4.0',
   fullcalendar: '7.1.0',
@@ -122,21 +120,6 @@ copyFileSync(join(MODULES, '@embedpdf', 'fonts-kr', 'fonts', 'NotoSansKR-Regular
 // 한글 HWP · HWPX (rhwp — Rust · wasm, MIT): wasm-bindgen 이 만든 모듈 그대로
 copyFileSync(join(MODULES, '@rhwp', 'core', 'rhwp.js'), join(OUT, 'rhwp.js'));
 gz(join(MODULES, '@rhwp', 'core', 'rhwp_bg.wasm'), join(OUT, 'rhwp_bg.wasm.gz'));
-// AI 비서 연결(MCP) 서버는 PC 메인 프로세스(node)에서만 — desktop/vendor 로 따로
-await esbuild.build({
-  entryPoints: { 'mcp-sdk': join(ROOT, 'scripts', 'vendor', 'mcp-sdk.js') },
-  outdir: join(ROOT, 'desktop', 'vendor'),
-  bundle: true,
-  format: 'esm',
-  platform: 'node',
-  target: 'node20',
-  minify: true,
-  legalComments: 'eof',
-  nodePaths: [MODULES],
-  logLevel: 'info',
-  // esm 묶음 안의 require (일부 의존성) 를 위해
-  banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
-});
 copyFileSync(join(MODULES, '@milkdown', 'prose', 'lib', 'style', 'prosemirror.css'), join(OUT, 'prosemirror.css'));
 copyFileSync(join(MODULES, 'plyr', 'dist', 'plyr.css'), join(OUT, 'plyr.css'));
 // 달력(FullCalendar): 뼈대 · 테마 · 색 한 파일로 (색은 list.css 에서 메모킹 색으로 덮는다)
@@ -163,7 +146,7 @@ const licenses = Object.keys(DEPS)
     const repo = typeof pkg.repository === 'string' ? pkg.repository : pkg.repository?.url ?? '';
     return `| ${name} | ${pkg.version} | ${pkg.license} | ${repo.replace(/^git\+/, '').replace(/\.git$/, '')} |`;
   });
-// 따로 넣은 것(canvas-confetti·tesseract.js 등 — 이 스크립트가 묶지 않음)은 손으로 적은 줄을 그대로 둔다
+// 따로 넣은 것(canvas-confetti 등 — 이 스크립트가 묶지 않음)은 손으로 적은 줄을 그대로 둔다
 const bundled = new Set(Object.keys(DEPS));
 const kept = existsSync(join(OUT, 'LICENSES.md'))
   ? readFileSync(join(OUT, 'LICENSES.md'), 'utf8').split('\n').filter((l) => /^\| [^-|]/.test(l) && !l.startsWith('| 패키지') && !bundled.has(l.split('|')[1].trim()))

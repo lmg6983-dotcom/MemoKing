@@ -197,7 +197,7 @@ impl Drive {
     }
 
     // ---------- OAuth 클라이언트 ----------
-    //   설정에 붙여 넣은 것 → 환경 변수 → 빌드 때 넣은 것(release.yml 의 MEMOKING_GOOGLE_CLIENT_ID · SECRET) · %APPDATA%\MemoKing\google-client.json → 예전에 로그인했던 클라이언트
+    //   설정에 붙여 넣은 것 → 환경 변수 → 빌드 때 넣은 것(release-rs.yml 의 MEMOKING_GOOGLE_CLIENT_ID · SECRET) · %APPDATA%\MemoKing\google-client.json → 예전에 로그인했던 클라이언트
 
     fn bundled(&self) -> Option<(String, String)> {
         if let Some(id) = option_env!("MEMOKING_GOOGLE_CLIENT_ID").map(str::trim).filter(|s| !s.is_empty()) {
@@ -295,7 +295,7 @@ fn call(method: &str, url: &str, headers: &[(&str, String)], body: Option<Vec<u8
         None => agent().run(req.body(()).map_err(io::Error::other)?),
     };
     res.map_err(|e| {
-        eprintln!("[Google Drive] {e}");
+        elog!("[Google Drive] {e}");
         io::Error::new(io::ErrorKind::ConnectionAborted, OFFLINE)
     })
 }
@@ -406,6 +406,44 @@ impl Api {
         list.sort_by(|a, b| a.created.cmp(&b.created).then_with(|| a.id.cmp(&b.id)));
         Ok(list)
     }
+}
+
+// ---------- Google Drive 로 공유 (share-drive.js) ----------
+
+const SHARE_FOLDER: &str = "메모킹 공유";
+
+pub fn connected() -> bool {
+    d().connected()
+}
+
+/// 내 드라이브의 "메모킹 공유" 폴더에 올리고, 링크가 있는 사람은 볼 수 있는 링크 (메모킹이 만든 파일만 다루는 drive.file 권한으로 충분).
+///   폴더 id 는 설정에 기억 — 지워졌거나 휴지통이면 같은 이름 폴더를 찾아 쓰고, 없으면 새로 만든다
+pub fn share_link(app: &AppHandle, file: &Path, name: &str) -> Result<String, String> {
+    use drive_sync::Remote;
+    if !d().connected() {
+        return Err("설정에서 Google Drive를 먼저 연결해 주세요".into());
+    }
+    let (api, st) = (Api, app.state::<State>());
+    let alive = |id: &str| api.json("GET", &format!("{API}/files/{}?fields=id,trashed", q(id)), None).is_ok_and(|v| v["trashed"] != true);
+    let folder = match st.setting("driveShareFolderId").as_str().filter(|id| alive(id)) {
+        Some(id) => id.to_string(),
+        None => {
+            let found = api.find_folders(SHARE_FOLDER, "root").map_err(|e| e.to_string())?.into_iter().next();
+            let id = match found {
+                Some(f) => f.id,
+                None => api.create_folder("root", SHARE_FOLDER).map_err(|e| e.to_string())?.id,
+            };
+            st.set_setting("driveShareFolderId", id.clone().into());
+            id
+        }
+    };
+    let fail = |e: io::Error| format!("Google Drive에 올리지 못했어요 ({e})");
+    let up = api.upload(&folder, name, None, file).map_err(fail)?;
+    api.json("POST", &format!("{API}/files/{}/permissions?fields=id", q(&up.id)), Some(json!({ "type": "anyone", "role": "reader" }))).map_err(|e| {
+        if e.to_string().contains("허락하지 않았어요") { "조직 설정 때문에 링크로 공유할 수 없어요. 메일이나 LocalSend를 써 주세요".to_string() } else { fail(e) }
+    })?;
+    let link = api.json("GET", &format!("{API}/files/{}?fields=webViewLink", q(&up.id)), None).ok().and_then(|v| v["webViewLink"].as_str().map(str::to_string));
+    Ok(link.unwrap_or_else(|| format!("https://drive.google.com/file/d/{}/view", up.id)))
 }
 
 fn quote(s: &str) -> String {
@@ -754,7 +792,7 @@ fn run_once(app: &AppHandle, full: bool) {
             }
         }
         Err(err) => {
-            eprintln!("[Google Drive 동기화] {err}");
+            elog!("[Google Drive 동기화] {err}");
             publish(app, json!({ "state": "error", "progress": null, "error": err.to_string() }));
         }
     }

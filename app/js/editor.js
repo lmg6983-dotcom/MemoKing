@@ -1549,9 +1549,13 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       onRotate: !editable ? null : async (i) => {
         const it = images[i];
         if (/\.gif$/i.test(it.src)) throw new Error('움직이는 그림(GIF)은 돌리면 멈춘 그림이 돼서 돌리지 않았어요');
-        const blob = await rotatedBlob(vaultUrl(it.src), it.src);
-        const ext = { 'image/png': 'png', 'image/webp': 'webp' }[blob.type] ?? 'jpg';
-        const src = await saveFile(new File([blob], `${baseName(it.alt || '사진')}.${ext}`, { type: blob.type }));
+        // PC Rust 판은 메인이 뒤에서 돌린다 (큰 사진을 화면에서 풀고 돌리는 동안 창이 멈췄다) — 못 하면(HEIC · 다른 판) 예전처럼 여기서
+        let src = await window.memoking?.attachments?.rotate?.(it.src).catch(() => null);
+        if (!src) {
+          const blob = await rotatedBlob(vaultUrl(it.src), it.src);
+          const ext = { 'image/png': 'png', 'image/webp': 'webp' }[blob.type] ?? 'jpg';
+          src = await saveFile(new File([blob], `${baseName(it.alt || '사진')}.${ext}`, { type: blob.type }));
+        }
         const cur = nodeOf(it);
         if (!cur) return null;
         it.src = src;

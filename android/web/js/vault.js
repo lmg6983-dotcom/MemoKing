@@ -1,4 +1,4 @@
-// 메모 폴더(볼트) — desktop/vault.js 를 휴대폰으로 옮긴 것.
+// 메모 폴더(볼트) — desktop-rs/core/src/vault.rs 를 휴대폰으로 옮긴 것.
 // 규칙(파일 이름·머리말·휴지통·첨부 정리·LLM 인덱스)은 데스크탑과 똑같고, 파일 읽기·쓰기만 앱(fs)에 맡긴다.
 // 그래서 PC 와 휴대폰이 같은 폴더를 동기화해 써도 서로의 메모를 그대로 읽는다.
 import {
@@ -603,7 +603,7 @@ export class Vault extends EventTarget {
 
   // setMeta · link 는 core/vault-locks.js (PC·휴대폰 같음 — 쓰지 못하면 되돌리고 null)
 
-  // ---------- 메모킹 폴더 (core/folders.js, desktop/vault.js 와 같음) ----------
+  // ---------- 메모킹 폴더 (core/folders.js, desktop-rs/core/src/vault.rs 와 같음) ----------
 
   /** 메모 폴더 맨 위의 하위 폴더 중 메모킹 폴더 (빈 폴더도) */
   folders() {
@@ -656,7 +656,7 @@ export class Vault extends EventTarget {
     }
   }
 
-  /** 폴더 이름 바꾸기 → 새 이름 (desktop/vault.js 와 같음: 폴더를 통째로 옮긴 뒤 안의 메모마다 옮긴 때) */
+  /** 폴더 이름 바꾸기 → 새 이름 (desktop-rs/core/src/vault.rs 와 같음: 폴더를 통째로 옮긴 뒤 안의 메모마다 옮긴 때) */
   renameFolder(from, to) {
     const dst = cleanFolderName(to);
     if (!isFolderName(from) || !dst) throw new Error('폴더 이름으로 쓸 수 없어요');

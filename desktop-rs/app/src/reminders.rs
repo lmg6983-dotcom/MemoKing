@@ -121,7 +121,7 @@ fn run(app: &AppHandle, pick: impl Fn(&Value, chrono::DateTime<chrono::Local>) -
             let cur = now_list.iter().find(|x| x["id"] == r["id"])?.clone();
             let due = pick(&cur, now)?;
             let list = now_list.iter().map(|x| if x["id"] == cur["id"] { rem::mark_fired(&cur, now) } else { x.clone() }).collect();
-            v.set_reminders(id, list).map_err(|e| eprintln!("울림 표시를 적지 못했습니다: {e}")).ok().flatten()?; // 이 메모만 건너뛰고 다른 알림은 계속
+            v.set_reminders(id, list).map_err(|e| elog!("울림 표시를 적지 못했습니다: {e}")).ok().flatten()?; // 이 메모만 건너뛰고 다른 알림은 계속
             Some((cur, due))
         })
         .flatten();
@@ -179,14 +179,14 @@ pub(crate) fn toast(app: &AppHandle, id: &str, title: &str, label: &str, preview
         })
         .show();
     if let Err(err) = shown {
-        eprintln!("알림을 울리지 못했습니다: {err}");
+        elog!("알림을 울리지 못했습니다: {err}");
     }
 }
 
 // shortcut: 메모킹은 Windows 판만 내므로 다른 OS 는 알림 창 없이 적기만 — 다른 OS 판을 낼 때 그 OS 알림으로
 #[cfg(not(windows))]
 pub(crate) fn toast(_app: &AppHandle, _id: &str, title: &str, label: &str, preview: &str, _notice: Option<Value>) {
-    eprintln!("[알림] {title} · {label} · {preview}");
+    elog!("[알림] {title} · {label} · {preview}");
 }
 
 // ---------- 다른 캘린더 구독 (.ics 주소 · CalDAV 계정 — 이 PC 설정에만) ----------

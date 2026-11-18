@@ -58,7 +58,7 @@ PC 에 **Google Drive 데스크탑 앱(Google Drive for desktop)을 설치하지
 - 처음 화면(메모 폴더 고르기)에도 **Google 계정으로 로그인해서 동기화하기** 버튼이 있어요.
 - 로그인 정보는 이 PC 에만, Windows 암호화로 감싸서 둡니다 (`%APPDATA%\MemoKing\google-auth.json`). 연결 끊기를 누르면 구글 쪽 권한도 거둡니다.
 - 앱이 **테스트** 상태라면, 쓰는 구글 계정이 **테스트 사용자** 에 들어 있어야 해요 (안드로이드와 같음).
-- 붙여 넣는 대신 미리 넣어 두려면: 환경 변수 `MEMOKING_GOOGLE_CLIENT_ID` / `MEMOKING_GOOGLE_CLIENT_SECRET`, 또는 `desktop/google-client.json` (`{ "id": "…", "secret": "…" }`, git 에는 올라가지 않음).
+- 붙여 넣는 대신 미리 넣어 두려면: 환경 변수 `MEMOKING_GOOGLE_CLIENT_ID` / `MEMOKING_GOOGLE_CLIENT_SECRET`, 또는 `%APPDATA%\MemoKing\google-client.json` (`{ "id": "…", "secret": "…" }`).
 
 ## 다른 캘린더 함께 보기 (Google 캘린더 · 삼성 캘린더)
 

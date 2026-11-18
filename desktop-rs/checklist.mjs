@@ -1,11 +1,11 @@
-// 옮긴 정도 세기: desktop/preload.cjs 의 채널 · 이벤트를 모두 뽑아, Rust 쪽(app/src)에 있는지 본다 → CHECKLIST.md
+// 옮긴 정도 세기: app/preload.cjs 의 채널 · 이벤트를 모두 뽑아, Rust 쪽(app/src)에 있는지 본다 → CHECKLIST.md
 //   node desktop-rs/checklist.mjs
 //   채널은 ipc.rs 의 match 줄 ("채널" =>), 이벤트는 Rust 어디든 "이벤트" 글자가 있으면 옮긴 것으로 센다.
 import fs from 'node:fs';
 import path from 'node:path';
 
 const here = import.meta.dirname;
-const preload = fs.readFileSync(path.join(here, '..', 'desktop', 'preload.cjs'), 'utf8');
+const preload = fs.readFileSync(path.join(here, 'app', 'preload.cjs'), 'utf8');
 const src = path.join(here, 'app', 'src');
 const rust = fs.readdirSync(src, { recursive: true }).filter((f) => f.endsWith('.rs')).map((f) => fs.readFileSync(path.join(src, f), 'utf8')).join('\n');
 

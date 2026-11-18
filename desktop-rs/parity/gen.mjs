@@ -29,11 +29,7 @@ import { noThink, sseText, engineError, chatBody } from '../../app/js/core/llama
 import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibleFix } from '../../app/js/core/ai-write.js';
 import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
 import { chunkMemo, askedPeriod, buildIndex as ragBuildIndex, retrieve as ragRetrieve, expandMessages, expandResult, ragMessages, finishAnswer } from '../../app/js/core/rag.js';
-import { StackStore } from '../../desktop/stacks.js';
-import { dropBounds, isInside } from '../../desktop/placement.js';
-import { placeBubble } from '../../desktop/bubble-place.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
-import { driveCases } from './drive.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
 fs.mkdirSync(out, { recursive: true });
@@ -383,60 +379,8 @@ write('rag', ragQuestions.flatMap((q) => ragWords.map((words) => {
     messages: ragMessages(q, picked, RAG_NOW), finished: ragAnswers.map((a) => finishAnswer(a, q, picked, w)),
   };
 })).concat([{ q: 'expand', expand: ['{"words":["a"," b ",1,null,"","c","d","e","f","g"]}', '{"words":"x"}', 'nope'].map(expandResult), messages: expandMessages('질문') }]));
-// Google Drive 동기화 (desktop/drive/sync-engine.js) — 장면은 drive.mjs
-write('drive_sync', await driveCases());
-// 메모 스택 (desktop/stacks.js): 읽은 그대로 쓴 글 + 차례로 한 일마다의 답과 스택들. 새 스택 id 는 차례 번호 (s1, s2 …)
-{
-  const memos = ['a', 'b', 'c', 'd', 'e', 'f'];
-  const files = [
-    null, 'not json', '{"stacks":[{"memos":["a"]}]}',
-    JSON.stringify({ version: 1, stacks: [{ id: 'x', memos: ['a', 'b', 'gone', 'a'], active: 'gone' }, { memos: ['b', 'c', 'd'], active: 'd' }, { id: 0, memos: ['e', 'f'] }, { id: 7, memos: ['c', 'd', 3] }] }),
-    JSON.stringify({ stacks: [{ id: 's', memos: ['a', 'b', 'c'], active: 'b' }, { id: 't', memos: ['d', 'e'], active: 'e' }] }),
-  ];
-  const scripts = [
-    [['merge', 'a', ['b']], ['merge', 'a', ['c'], 'a'], ['addAfter', 'c', 'd'], ['reorder', 'd', 0], ['reorder', 'd', '2.7'], ['reorder', 'd', 'x'], ['reorder', 'a', -5], ['reorder', 'a', 99], ['neighbor', 'a', 1], ['neighbor', 'a', -1], ['setActive', 'b'], ['remove', 'b'], ['remove', 'c'], ['remove', 'a'], ['remove', 'z']],
-    [['merge', 'a', ['d']], ['merge', 'e', ['b', 'c']], ['merge', 'd', ['e']], ['merge', 'b', ['a', 'f']], ['merge', 'c', []], ['addAfter', 'f', 'b'], ['remove', 'd'], ['neighbor', 'zz', 1]],
-  ];
-  const open = (file) => {
-    let n = 0;
-    const io = { saved: null };
-    const store = new StackStore({ read: () => file, write: (t) => (io.saved = t), newId: () => `s${++n}` }).load((id) => memos.includes(id));
-    return { store, io };
-  };
-  const cases = [];
-  for (const file of files) {
-    const { store: first, io } = open(file);
-    first.save();
-    for (const ops of scripts) {
-      const { store } = open(file);
-      const steps = ops.map(([op, ...args]) => {
-        const r = op === 'merge' ? store.merge(args[0], args[1], args.length > 2 ? { activate: args[2] } : undefined) : store[op](...args);
-        return { ret: r === undefined ? null : structuredClone(r), stacks: structuredClone(store.all()) };
-      });
-      cases.push({ file, loaded: io.saved, ops, steps });
-    }
-  }
-  write('stacks', cases);
-}
-
-// 창 자리: 끌어 놓은 메모 창 (placement.js) · 상태 말풍선 (bubble-place.js)
-{
-  const area = { x: 0, y: 0, width: 1920, height: 1040 };
-  const second = { x: -1280, y: 100, width: 1280, height: 984 };
-  const points = [{ x: 500, y: 300 }, { x: 10, y: 5 }, { x: 1919, y: 1039 }, { x: 40.5, y: 18.5 }, { x: -600, y: 500 }];
-  const sizes = [{ width: 340, height: 380 }, { width: 2000, height: 1200 }];
-  const cases = [];
-  for (const p of points) for (const s of sizes) for (const a of [area, second]) cases.push({ drop: { p, s, a, bounds: dropBounds(p, s, a), inside: isInside(p, a) } });
-  const notes = [{ x: 400, y: 400, width: 340, height: 380 }, { x: 400, y: 50, width: 340, height: 380 }, { x: 1500, y: 50, width: 340, height: 380 }, { x: 0, y: 20, width: 1900, height: 900 }, { x: 10, y: 10, width: 300, height: 300 }];
-  for (const b of notes) {
-    for (const anchor of [b.x + 70, b.x + 2.5, 1910]) {
-      for (const sticker of [null, { x: b.x + 138, y: b.y - 26, width: 64, height: 52 }]) {
-        for (const barH of [36, 45]) cases.push({ bubble: { b, area, anchor, barH, sticker, r: placeBubble(b, area, anchor, barH, sticker) } });
-      }
-    }
-  }
-  write('placement', cases);
-}
+// 굳힌 답 (1.0 에 Electron 판을 지우며): drive_sync · stacks · placement · update 는 JS 원본(desktop/)이 없어 다시 만들지 않는다.
+//   fixtures 의 그 파일들은 Electron 판과 맞춰 본 마지막 답 그대로 — Rust 가 이제 원본이다 (태그 electron-final 에 JS 가 있다)
 // 알림 보관함: Windows 토스트 XML · 앱 이름 · 찾기, 팝업 알림 창의 글 → 보관함 항목, 같은 알림 거르기, 이름 맞추기
 const toasts = [
   '<toast><visual><binding template="ToastGeneric"><text>김대리</text><text>회의 자료 &amp; 일정 &lt;오늘&gt;</text><text></text><image placement="appLogoOverride" src="file:///C:/Temp/a.png"/><image src="b.png"/></binding></visual></toast>',
@@ -492,17 +436,6 @@ write('notify', [
   ...probes.map((e) => ({ kind: 'repeat', recent, e, now, out: recent.indexOf(pn.findRepeat(recent, e, now)) })),
   ...[['ocr', 'uia'], ['uia', 'ocr'], ['ocr', 'ocr'], ['msaa', 'uia'], ['ocr', ''], ['ocr', null]].map(([a, b]) => ({ kind: 'better', a, b, out: pn.betterReading({ via: a }, { via: b }) })),
   ...titles.flatMap((ts) => probeTitles.map((t) => ({ kind: 'title', ts, t, out: pn.correctTitle(t, pn.knownNames(ts)) }))),
-]);
-
-// 자동 업데이트: 오류 글 · "나중에" 숨김 · 릴리스 노트
-const up = await import('../../desktop/updater.js');
-const errs = ['getaddrinfo ENOTFOUND github.com', 'net::ERR_INTERNET_DISCONNECTED', 'New version is not signed by the application owner', 'HttpError: 404', 'Cannot find latest.yml', 'Socket hang up', 'disk full', ''];
-const snoozes = [null, { version: '1.2.0', until: 2000 }, { version: '1.2.0', until: 500 }, { version: '1.3.0', until: 2000 }];
-const notes = ['<h2>바뀐 점</h2><ul><li>알림 &amp; 캡처</li><li>PDF</li></ul><p>둘째<br>줄</p>', '그냥 글\n\n\n  \n다음 &lt;b&gt;', '', '가'.repeat(4100), '  <br/>  '];
-write('update', [
-  ...errs.map((e) => ({ kind: 'error', e, out: up.updateErrorText(new Error(e)) })),
-  ...snoozes.map((s) => ({ kind: 'snooze', s, out: up.isSnoozed(s, '1.2.0', 1000) })),
-  ...notes.map((n) => ({ kind: 'notes', n, out: up.notesText(n) })),
 ]);
 
 // 받아쓰기: 문장부호 · 화자 이름표 · 소리 다듬기 · 말모음으로 고치기 · 음성 카드의 글 바꾸기

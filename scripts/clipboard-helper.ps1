@@ -1,6 +1,6 @@
 ﻿# Windows clipboard helper for MemoKing.
 #   - Quick memo hotkey (Ctrl+Alt+C): capture / serve  -> copies the selection in the foreground app and dumps the clipboard
-#   - Clipboard smoke test (npm run smoke:clipboard): text / html / image / files / backup / restore
+#   - Clipboard test actions: text / html / image / files / backup / restore
 # Puts the same formats real apps put on the clipboard:
 #   text  - Notepad          (Unicode text)
 #   html  - browser / Word   (CF_HTML "HTML Format" + text, optionally an image)

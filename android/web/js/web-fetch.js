@@ -1,4 +1,4 @@
-// 인터넷에서 받아 오는 것 — desktop/link-previews.js 와 같은 규칙, 같은 저장 위치:
+// 인터넷에서 받아 오는 것 — desktop-rs/core/src/link_preview.rs 와 같은 규칙, 같은 저장 위치:
 //   <메모 폴더>/_memoking/link-previews.json   주소별 미리보기 정보
 //   <메모 폴더>/_memoking/link-previews/        사진·아이콘 (주소 SHA-1 앞 16자리 이름)
 // PC 에서 먼저 받아 둔 카드는 휴대폰에서 다시 받지 않고, 그 반대도 마찬가지.

@@ -23,6 +23,11 @@ static AREA: Mutex<Option<Vec<Shot>>> = Mutex::new(None);
 /// 메모 창이 열리며 넣을 캡처 (memo:get 의 capture)
 static CAPTURES: Mutex<Option<HashMap<String, Value>>> = Mutex::new(None);
 
+/// 메모 창이 열릴 때 넣을 캡처를 맡겨 둔다 (매직 카피 · 화면 캡처)
+pub fn put_capture(id: &str, capture: Value) {
+    CAPTURES.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.to_string(), capture);
+}
+
 pub fn take_capture(id: &str) -> Value {
     CAPTURES.lock().unwrap().get_or_insert_with(HashMap::new).remove(id).unwrap_or(Value::Null)
 }
@@ -37,6 +42,11 @@ fn screens() -> Vec<((i32, i32), image::RgbaImage)> {
 #[cfg(not(windows))]
 fn screens() -> Vec<((i32, i32), image::RgbaImage)> {
     Vec::new()
+}
+
+/// 화면 캡처(사각형 고르기)가 떠 있는가
+pub fn area_capturing() -> bool {
+    AREA.lock().unwrap().is_some()
 }
 
 /// 모니터마다 찍은 화면을 띄우고 사각형을 고르게 한다 (capture.html) — 창 만들기라 이벤트 처리 밖의 스레드에서 부른다
@@ -86,7 +96,7 @@ pub fn start_area_capture(app: &AppHandle) -> bool {
     let mut area = AREA.lock().unwrap();
     if area.as_ref().is_none_or(Vec::is_empty) {
         *area = None;
-        eprintln!("[화면 캡처] 화면을 캡처하지 못했어요");
+        elog!("[화면 캡처] 화면을 캡처하지 못했어요");
         return false;
     }
     true
@@ -136,7 +146,7 @@ fn finish_area_capture(app: &AppHandle, label: &str, rect: &Value) -> Result<Val
         "source": { "window": "화면 캡처", "process": "", "url": null, "time": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true), "copied": false },
         "sourceMd": format!("> 출처: 화면 캡처, {}", now.format("%Y.%-m.%-d %H:%M")),
     });
-    CAPTURES.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.clone(), capture);
+    put_capture(&id, capture);
     // shortcut: Electron 은 숨긴 메모 창 + 알림(누르면 보임)이었다 — 알림을 옮기기 전까지 메모 창을 바로 띄운다
     crate::memos::open_note(app, &id)?;
     Ok(id.into())
@@ -200,7 +210,7 @@ fn save_pdf(app: &AppHandle, id: &str, o: &Value) -> Value {
     let made = print_to_pdf(&win, &file, w, h);
     let _ = win.destroy();
     let Some(pdf) = made.then(|| std::fs::read(&file).ok()).flatten() else {
-        eprintln!("PDF 만들기 실패: {}", file.display());
+        elog!("PDF 만들기 실패: {}", file.display());
         return Value::Null;
     };
     let latin1: String = pdf.iter().map(|&b| b as char).collect();
@@ -397,7 +407,7 @@ fn check_update(app: &AppHandle, manual: bool) {
     let app2 = app.clone();
     match wait(async move { app2.updater()?.check().await }) {
         Err(err) => {
-            eprintln!("[update] {err}");
+            elog!("[update] {err}");
             set_update(app, json!({ "status": "error", "message": memoking_core::update::update_error_text(&err.to_string()) }));
         }
         Ok(None) => set_update(app, json!({ "status": "latest" })),

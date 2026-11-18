@@ -88,7 +88,7 @@ fn grab(app: &AppHandle, name: &str, key: &str) -> bool {
         })
         .is_ok();
     if !ok {
-        eprintln!("{}를 다른 프로그램이 쓰고 있어 등록하지 못했어요", acc::display_accelerator(key));
+        elog!("{}를 다른 프로그램이 쓰고 있어 등록하지 못했어요", acc::display_accelerator(key));
     }
     ok
 }
@@ -110,6 +110,9 @@ fn register_global(app: &AppHandle, name: &str) -> bool {
     let ok = grab(app, name, &key);
     if ok {
         KEYS.lock().unwrap().held.insert(name.into(), key);
+        if name == "quickMemo" {
+            crate::capture::warm(app); // 처음 누를 때 PowerShell 이 뜨는 지연 없이
+        }
     }
     ok
 }
@@ -197,12 +200,8 @@ pub fn start(app: &AppHandle) {
 fn pressed(app: &AppHandle, name: &str) {
     match name {
         "list" => crate::os::toggle_list(app),
-        // shortcut: 매직 카피(고른 글 · 파일 담기)와 두 번 눌러 화면 캡처는 아직 — 새 메모만 연다. 매직 카피를 옮길 때 windowManager.quickMemo 로
-        "quickMemo" => {
-            if !matches!(crate::memos::handle(app, "list", "memo:create", &[json!({})]), Some(Ok(_))) {
-                crate::os::show_list(app); // 메모 폴더가 없으면 고르는 화면으로
-            }
-        }
+        // 한 번: 매직 카피 · 두 번: 화면 캡처 (capture.rs)
+        "quickMemo" => crate::capture::pressed(app),
         slot => memo_hotkey_pressed(app, slot),
     }
 }
@@ -230,8 +229,11 @@ fn memo_hotkey_pressed(app: &AppHandle, slot: &str) {
         copied = app.clipboard().write_text(memoking_core::share_text::hotkey_copy_text(&body)).is_ok();
     }
     // 잠긴 메모는 비밀번호를 넣어야 하니 복사 대신 창을 띄운다
-    // shortcut: 복사도 했을 때 포커스를 쓰던 앱에 남기기(inactive)는 아직 — 창을 띄우면 포커스를 가져간다
     if b["show"] == true || (b["copy"] == true && !copied) {
+        // 복사도 했으면 바로 붙여 넣게 포커스는 쓰던 앱에 남긴다 (Electron showInactive)
+        if copied {
+            crate::windows::keep_focus_after_show(app, &id);
+        }
         let _ = crate::memos::open_note(app, &id);
         if let Some(l) = state(app).note_labels.lock().unwrap().get(&id) {
             let _ = app.emit_to(l.as_str(), "memo:highlight", [Value::Null; 0]);

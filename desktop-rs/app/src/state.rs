@@ -88,7 +88,7 @@ impl State {
         let text = serde_json::to_string_pretty(&*self.settings.lock().unwrap()).unwrap();
         let _ = std::fs::create_dir_all(&self.settings_dir);
         if let Err(err) = write_atomic(&self.settings_dir.join("settings.json"), text.as_bytes()) {
-            eprintln!("설정 저장 실패: {err}");
+            elog!("설정 저장 실패: {err}");
         }
     }
 

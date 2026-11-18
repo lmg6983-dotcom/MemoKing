@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' memoking: http://memoking.localhost data: blob: https:; media-src 'self' memoking: http://memoking.localhost blob:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' memoking: http://memoking.localhost blob: data:; script-src 'self'; style-src 'self'; img-src 'self' memoking: http://memoking.localhost data: blob: https:; media-src 'self' memoking: http://memoking.localhost blob:">
   <title>메모킹</title>
   <link rel="stylesheet" href="vendor/fullcalendar.css">
   <link rel="stylesheet" href="styles/base.css">
@@ -165,7 +165,7 @@
       <button type="button" class="btn update-btn" id="update-check" data-state="idle">업데이트 확인</button>
     </div>
     <nav class="set-jump" aria-label="설정 바로가기">
-      <a href="#set-drive">동기화</a><a href="#set-local-ai" data-alt="set-ai">AI</a><a href="#set-view">보기</a><a href="#set-stt">녹음</a><a href="#set-keys">단축키</a><a href="#set-storage">저장</a><a href="#set-phone">설치</a>
+      <a href="#set-drive">동기화</a><a href="#set-local-ai">AI</a><a href="#set-view">보기</a><a href="#set-stt">녹음</a><a href="#set-keys">단축키</a><a href="#set-storage">저장</a><a href="#set-phone">설치</a>
     </nav>
     <section class="set-sec" aria-labelledby="set-daily">
       <h3 class="set-title" id="set-daily">자주 쓰는 기능</h3>
@@ -232,25 +232,6 @@
       </div>
       <p class="set-note">기본 모델: 카카오 카나나2 · Powered by Kanana · <a href="https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/LICENSE" target="_blank" rel="noopener">라이선스 보기</a></p>
     </section>
-    <section class="set-sec" aria-labelledby="set-ai">
-      <h3 class="set-title" id="set-ai">다른 AI 앱과 연결</h3>
-      <details class="drive-adv" id="mcp-adv">
-        <summary>Claude 데스크톱 같은 다른 AI 앱이 내 메모를 찾게 하기 (고급)</summary>
-      <div class="drive-box" id="mcp-box">
-        <svg class="drive-box-icon"><use href="#i-link"/></svg>
-        <div class="drive-box-text"><b id="mcp-title"></b><small id="mcp-sub" role="status"></small></div>
-      </div>
-      <div class="dialog-actions left">
-        <button id="mcp-connect" class="btn">Claude 데스크톱에 연결</button>
-        <button id="mcp-copy" class="link-btn">다른 AI 앱용 설정 복사</button>
-        <button id="mcp-disconnect" class="link-btn danger" hidden>연결 끊기</button>
-      </div>
-      <label class="setting-row sub-row">
-        <input type="checkbox" id="mcp-write" class="switch" role="switch" checked>
-        <span>AI가 메모를 남기도록 허용 <small>끄면 찾기와 읽기만 해요. 잠긴 메모는 언제나 볼 수 없어요</small></span>
-      </label>
-      </details>
-    </section>
     <section class="set-sec" aria-labelledby="set-view">
       <h3 class="set-title" id="set-view">메모 보기</h3>
       <label class="setting-row">
@@ -265,6 +246,14 @@
         <input type="checkbox" id="hold-tune" class="switch" role="switch" checked>
         <span>내 손에 맞추기 <small title="메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려요. 이 PC에만 저장해요">꾹 눌러 줄 옮기기를 손에 맞춰요 <button type="button" class="link-btn inline-link" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button></small></span>
       </label>
+      <!-- 빠르게 열기 · 메모리 기능 — 어떤 PC 에서 문제가 생기면 끈다 (PC Rust 판만, list.js) -->
+      <div id="perf-group" hidden>
+        <p class="label sub">빠르게 열기 <small>이상하면 하나씩 꺼 보세요</small></p>
+        <label class="setting-row"><input type="checkbox" class="switch perf-flag" data-perf="perfPreload" role="switch" checked><span>미리 열기 <small>목록 카드에 마우스를 올려 두면 미리 그려 둬요</small></span></label>
+        <label class="setting-row"><input type="checkbox" class="switch perf-flag" data-perf="perfSnapshot" role="switch" checked><span>지난 모습 먼저 보이기 <small>메모를 열 때 지난번 화면을 먼저 보여요</small></span></label>
+        <label class="setting-row"><input type="checkbox" class="switch perf-flag" data-perf="perfDiscard" role="switch" checked><span>오래 안 본 탭 쉬게 하기 <small>10분 넘게 안 본 탭의 메모리를 비워요</small></span></label>
+        <label class="setting-row"><input type="checkbox" class="switch perf-flag" data-perf="perfTransparent" role="switch" checked><span>부드러운 창 크기 조절 <small>끄면 다음에 여는 창부터 예전 방식 (창 모양이 이상할 때)</small></span></label>
+      </div>
       <div class="setting-row">
         <span>넣을 때 묻기 <small id="choices-note"></small></span>
         <button type="button" class="btn small" id="choices-reset" hidden>다시 묻기</button>

@@ -1,7 +1,17 @@
 // 메모킹 데스크탑 (Rust + Tauri 2) — Electron 의 desktop/ 을 옮기는 중. 화면은 ../../app 그대로.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+/// 오류 한 줄: 콘솔에 더해 오류 기록 파일에도 (설정 › 문제 보내기로 꺼내 본다) — 예전에는 콘솔에만 나가 사용자 PC 에서는 사라졌다
+macro_rules! elog {
+    ($($t:tt)*) => {{
+        let line = format!($($t)*);
+        eprintln!("{line}");
+        crate::files::log("오류", &line);
+    }};
+}
+
 mod ai;
+mod capture;
 mod clipboard;
 mod files;
 mod drive;
@@ -21,9 +31,9 @@ mod windows;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
-// desktop/preload.cjs 를 그대로 끼워 넣는다 (shim.js 가 require('electron') 을 Tauri 로 바꿔 줌)
+// preload.cjs(Electron 판에서 가져온 화면 쪽 API 모양)를 그대로 끼워 넣는다 (shim.js 가 require('electron') 을 Tauri 로 바꿔 줌)
 fn init_script() -> String {
-    let mut s = include_str!("../shim.js").replace("/*PRELOAD*/", include_str!("../../../desktop/preload.cjs"));
+    let mut s = include_str!("../shim.js").replace("/*PRELOAD*/", include_str!("../preload.cjs"));
     if ipc::smoke() {
         s.push_str(include_str!("../smoke.js"));
     }
@@ -141,7 +151,7 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .invoke_handler(tauri::generate_handler![ipc::ipc])
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
-        //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상 · history/<이름>: 알림 보관함 그림
+        //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상 · poster/<경로>: 동영상 첫 장면 · history/<이름>: 알림 보관함 그림
         .register_asynchronous_uri_scheme_protocol("memoking", |ctx, req, responder| {
             // 파일 읽기 · 동기 호출은 화면 스레드 밖에서 — 큰 영상을 읽거나 창을 만드는 호출이 화면을 멈추지 않게
             let (app, label) = (ctx.app_handle().clone(), ctx.webview_label().to_string());
@@ -158,6 +168,13 @@ fn main() {
         .setup(|app| {
             let app = app.handle();
             app.manage(state::State::load(app));
+            files::init_log(app);
+            // 멈추면(패닉) 어디서 왜 멈췄는지 기록에 남긴다 (기본 처리는 그대로)
+            let default = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |info| {
+                files::log("멈춤", &info.to_string());
+                default(info);
+            }));
             memos::start(app);
             drive::start(app);
             history::start(app);
@@ -180,6 +197,7 @@ fn main() {
             // AI 엔진 · 팝업 알림 도우미는 따로 도는 프로세스라 메모킹을 꺼도 남는다
             if let tauri::RunEvent::Exit = e {
                 ai::stop();
+                capture::stop();
                 history::stop_helpers();
                 windows::stop();
             }
@@ -196,6 +214,14 @@ fn memoking_uri(app: &AppHandle, label: &str, req: &http::Request<Vec<u8>>) -> h
         return status(403);
     }
     let allow = origin.clone().unwrap_or_default();
+    // poster/<경로>: 동영상 첫 장면 JPG · 못 뽑으면 204 (화면이 스스로 그린다 — video-poster.js nativeFrame)
+    if let Some(rel) = path.strip_prefix("/poster/") {
+        let shot = memos::serve_vault(app, rel).filter(|(_, mime)| mime.starts_with("video/")).and_then(|(file, _)| video::poster(app, &file));
+        return match shot {
+            Some(jpg) => file_response(&jpg, "image/jpeg", None, allow).unwrap_or_else(|| status(404)),
+            None => http::Response::builder().status(204).header("Access-Control-Allow-Origin", allow).body(Vec::new()).unwrap(),
+        };
+    }
     let served = match (path.strip_prefix("/vault/"), path.strip_prefix("/history/")) {
         (Some(rel), _) => Some(memos::serve_vault(app, rel)),
         (_, Some(name)) => Some(history::serve_image(app, name)),

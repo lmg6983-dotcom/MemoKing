@@ -63,21 +63,13 @@ fn engine_dir(app: &AppHandle) -> PathBuf {
     dir(app).join("engine")
 }
 
-/// llama-server: MEMOKING_LLAMA_SERVER, 받아 둔 설정 폴더 ai\engine, 설치본의 resources\llama(예전 설치 파일), 개발 중이면 desktop/vendor/llama (npm run llama)
+/// llama-server: MEMOKING_LLAMA_SERVER, 그 밖에는 받아 두는 설정 폴더 ai\engine (없으면 ensure_engine 이 받는다)
 fn server_path(app: &AppHandle) -> PathBuf {
     let name = format!("llama-server{}", std::env::consts::EXE_SUFFIX);
     if let Some(p) = std::env::var_os("MEMOKING_LLAMA_SERVER") {
         return p.into();
     }
-    let got = engine_dir(app).join(&name);
-    if got.is_file() {
-        return got;
-    }
-    let bundled = app.path().resource_dir().map(|d| d.join("llama").join(&name)).unwrap_or_default();
-    if bundled.is_file() {
-        return bundled;
-    }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../desktop/vendor/llama").join(name)
+    engine_dir(app).join(name)
 }
 
 /// 엔진이 없으면 받는다 (llama.cpp 릴리스의 Windows Vulkan 묶음에서 llama-server.exe 와 DLL 만) — 받는 동안 진행률은 모델 받기와 같은 칸에
@@ -87,7 +79,7 @@ fn ensure_engine(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
     if !cfg!(windows) {
-        return Err("이 PC에 AI 엔진이 없어요 (npm run llama)".into());
+        return Err("AI 엔진은 Windows 에서만 받을 수 있어요 (MEMOKING_LLAMA_SERVER 로 직접 지정)".into());
     }
     let _one = ENGINE_DL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if server_path(app).is_file() {
@@ -455,7 +447,7 @@ fn watch(app: AppHandle, base: String) {
             let log = s.log.lock().unwrap().join("\n");
             e.server = None;
             if let Some(c) = code.code().filter(|c| *c != 0) {
-                eprintln!("AI chat 꺼짐 {c} {log}");
+                elog!("AI chat 꺼짐 {c} {log}");
                 e.error = engine_error(&log, &c.to_string());
             }
             drop(e);
