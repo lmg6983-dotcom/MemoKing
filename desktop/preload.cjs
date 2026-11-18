@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   memo: {
     open: invoke('memo:open'),
+    preload: invoke('memo:preload'), // 목록 카드에 마우스를 올려 두면 숨긴 채 미리 그려 둔다 (PC Rust 판)
     cardCommand: invoke('card:command'), // 목록 카드 메뉴: 메모 창에서 하는 일 (lock · unlock · versions)
     copyText: invoke('card:copy'), // 목록 카드 메뉴: 글 복사
     shareFile: invoke('card:share-file'), // 목록 카드 메뉴: 공유할 파일 { base64, name, mime } | { error }
@@ -283,6 +284,10 @@ contextBridge.exposeInMainWorld('memoking', {
   // 켤 때 열어 둔 메모 창들을 준비하는 중인가 (목록의 로딩 화면) — 다 되면 app:ready
   app: {
     restoring: invoke('app:restoring'),
+  },
+  // 속도 기록 한 줄 (설정 › 문제 보내기로 꺼내 본다)
+  perf: {
+    log: invoke('perf:log'),
   },
   win: {
     close: invoke('win:close'),

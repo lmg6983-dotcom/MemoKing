@@ -80,9 +80,16 @@ window.addEventListener('mk:notice', (e) => setStatus(e.detail?.text ?? '', Bool
 // 메모 안 사진은 이 화면 폭에 맞게 줄인 그림으로 (원본 사진을 창마다 통째로 풀지 않게 — 크게 보기 · 복사 · 저장은 원본)
 useImageThumbs(Math.min(2048, Math.ceil((screen.width * (devicePixelRatio || 1)) / 256) * 256));
 const params = new URLSearchParams(location.search);
+let handedMemo; // 예비 창이 열 메모와 함께 받은 메모 (다시 묻지 않게 — PC Rust 판)
+// 속도 기록: 메모를 받은 때부터 단계별 (설정 › 문제 보내기로 꺼내 본다 — PC Rust 판)
+const perf = { start: performance.now(), how: '새 창', memo: 0, editor: 0 };
+const perfMs = (t) => Math.round(t - perf.start);
 // 미리 불러 둔 예비 창(window-manager.js makeSpare): 편집기 코드는 다 읽어 두고, 열 메모가 정해질 때까지 기다린다
 if (params.get('spare') === '1') {
   const job = await api.win.spare();
+  handedMemo = job?.memo ?? undefined;
+  perf.start = performance.now();
+  perf.how = '예비 창';
   if (!job?.id) {
     window.close();
     await new Promise(() => {});
@@ -108,6 +115,10 @@ function markPainted() {
     if (done) return;
     done = true;
     api.win.painted?.();
+    if (perf.editor) {
+      const len = memo?.body?.length ?? 0;
+      api.perf?.log(`메모 열기 (${perf.how}): 메모 받기 ${perfMs(perf.memo)}ms · 편집기 ${Math.round(perf.editor - perf.memo)}ms · 다 그림 ${perfMs(performance.now())}ms (글 ${len}자)`)?.catch(() => {});
+    }
   };
   // 숨은 창(미리 만든 탭 · 예비 창)은 그리기가 멈춰 rAF 가 오지 않는다 — 120ms 를 기다리지 말고 바로 (보이는 순간 그린다)
   if (document.visibilityState === 'hidden') return void setTimeout(send, 0);
@@ -172,6 +183,7 @@ let memo = null;
 let current = '';   // 편집기의 최신 마크다운
 let tutBase = null; // 튜토리얼 직접 해 보기 단계가 시작될 때의 본문 수 (core/tutorial.js tutorialCounts)
 let saved = '';     // 마지막으로 저장한 마크다운
+let fileBody = '';  // 파일에 있는 글 그대로 (스냅샷이 다음에 열 때 받을 글과 견준다 — 편집기가 정리한 글과 다를 수 있어서)
 let saveTimer = null;
 let pendingExternal = null;
 
@@ -301,7 +313,7 @@ async function flush() {
       } else setStatus('잠긴 메모라 저장하지 못했어요. 쓰던 글을 복사해 두세요', true);
       return;
     }
-    saved = body;
+    saved = fileBody = body;
     saveFails = 0;
     setStatus('저장했어요');
   } catch (err) {
@@ -315,13 +327,53 @@ async function flush() {
 }
 
 // 창을 닫는 순간 — 남은 내용을 동기 저장 (업데이트 설치로 다시 시작하기 전에도 main 이 부른다: mkFlushSync)
+// ---------- 화면 스냅샷: 닫을 때 그려진 모습을 남겨, 다음에 열 때 편집기를 만드는 동안 그대로 먼저 보인다 ----------
+//   (Chrome 의 Freeze-Dried Tab 과 같은 생각) 메모 글이 그대로일 때만 · 잠긴 메모는 남기지 않는다 · 최근 SNAP_KEEP 개
+const SNAP_KEEP = 20;
+const SNAP_MAX = 300_000; // 글자 — 사진 · 표가 아주 많은 메모는 남기지 않는다
+const snapKey = (memoId) => `memoking.snap.${memoId}`;
+const bodyHash = (text) => {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return `${text.length}.${h}`;
+};
+function saveSnapshot() {
+  try {
+    const html = editor && !memo?.locked ? el.editorRoot.querySelector('.milkdown:not(.mk-snapshot)')?.outerHTML : null;
+    if (!html || html.length > SNAP_MAX) return;
+    localStorage.setItem(snapKey(id), JSON.stringify({ h: bodyHash(fileBody), html }));
+    const order = JSON.parse(localStorage.getItem('memoking.snaps') ?? '[]').filter((x) => x !== id);
+    order.push(id);
+    for (const old of order.splice(0, Math.max(0, order.length - SNAP_KEEP))) localStorage.removeItem(snapKey(old));
+    localStorage.setItem('memoking.snaps', JSON.stringify(order));
+  } catch {
+    // 저장 공간이 차거나 막혀도 닫기는 그대로
+  }
+}
+/** 남긴 스냅샷이 이 글과 같으면 먼저 보인다 → 보였는가 */
+function showSnapshot(body) {
+  try {
+    const snap = JSON.parse(localStorage.getItem(snapKey(id)) ?? 'null');
+    if (!snap?.html || snap.h !== bodyHash(body)) return false;
+    el.editorRoot.insertAdjacentHTML('afterbegin', snap.html);
+    const shot = el.editorRoot.firstElementChild;
+    shot.classList.add('mk-snapshot');
+    shot.setAttribute('aria-hidden', 'true');
+    shot.querySelectorAll('[contenteditable]').forEach((n) => n.setAttribute('contenteditable', 'false'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function flushSync() {
   clearTimeout(saveTimer);
   if (isDirty()) {
     api.memo.saveSync(id, current, { locked: Boolean(memo?.locked) });
-    saved = current;
+    saved = fileBody = current;
   }
   flushTables();
+  saveSnapshot();
 }
 window.mkFlushSync = flushSync;
 window.addEventListener('beforeunload', flushSync);
@@ -329,6 +381,7 @@ window.addEventListener('beforeunload', flushSync);
 // ---------- 다른 곳(다른 PC, 다른 앱)에서 바뀐 경우 ----------
 
 function applyExternal(next) {
+  fileBody = next.body;
   editor.setMarkdown(next.body, next.tables ?? []);
   current = saved = editor.getMarkdown();
   el.banner.hidden = true;
@@ -1791,7 +1844,9 @@ let closingWin = false;
 async function finishClose(hide) {
   if (closingWin) return;
   closingWin = true;
+  const t0 = performance.now();
   await hide?.catch(() => {});
+  const hidden = Math.round(performance.now() - t0);
   try {
     await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
     await annotation?.exit(); // 주석을 그리던 중이면 저장하고 닫는다
@@ -1799,6 +1854,7 @@ async function finishClose(hide) {
     await flush();
     aiTagAfterClose(askAi);
   } finally {
+    api.perf?.log(`메모 닫기: 숨기기 ${hidden}ms · 저장 마무리 ${Math.round(performance.now() - t0)}ms`)?.catch(() => {});
     api.win.close();
   }
 }
@@ -2064,7 +2120,8 @@ coach = setupCoach(api, {
     }
   },
 });
-memo = await api.memo.get(id);
+memo = handedMemo !== undefined ? handedMemo : await api.memo.get(id);
+perf.memo = performance.now();
 // 잠긴 메모: 비밀번호를 넣어야 편집기를 만든다 (풀린 글은 메인 프로세스가 이 창을 닫을 때까지만 기억)
 if (memo?.needsPassword) {
   document.body.dataset.color = memo.color;
@@ -2095,9 +2152,14 @@ if (!memo) {
   applyLayer(memo);
   renderStack(memo.stack);
   document.title = memo.title;
-  current = saved = memo.body;
+  current = saved = fileBody = memo.body;
   // 링크 미리보기 설정 (끄면 카드 대신 링크 글자) — 설정을 바꾸면 바로
   const linkPreviews = memo.linkPreviews !== false; // memo:get이 함께 보낸다 (창을 열 때 설정을 따로 묻지 않게)
+  // 지난번 모습이 남아 있으면 먼저 보이고 창을 띄운다 — 편집기는 그 뒤에 만들어 바꿔 낀다
+  if (showSnapshot(memo.body)) {
+    perf.snap = performance.now();
+    markPainted();
+  }
   editor = await createNoteEditor(el.editorRoot, {
     markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus, linkPreviews,
     tables: memo.tables ?? [], onTables: saveTables,
@@ -2111,6 +2173,11 @@ if (!memo) {
     onDateReminder: (event) => reminderPanel?.addEvent(event) ?? false,
     hasReminderAt: (d) => reminderAt(reminderPanel?.list, d),
   });
+  perf.editor = performance.now();
+  if (el.editorRoot.querySelector('.mk-snapshot')) {
+    el.editorRoot.querySelector('.mk-snapshot').remove();
+    api.perf?.log(`메모 열기 (${perf.how} · 스냅샷): 스냅샷 보임 ${perfMs(perf.snap)}ms · 편집기 완성 ${perfMs(perf.editor)}ms (글 ${memo.body.length}자)`)?.catch(() => {});
+  }
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
   current = saved = editor.getMarkdown();
   // 목록 안 그림을 열며 목록 뒤로 옮겼으면 고친 대로 저장

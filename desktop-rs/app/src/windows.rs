@@ -96,6 +96,10 @@ struct Wm {
     closing: HashSet<String>,
     /// 닫는 중(숨기고 남은 글을 저장하는 중)인 메모 창. 없어질 때 뺀다
     closing_notes: HashSet<String>,
+    /// 숨은 메모 창이 처음 숨은 것으로 보인 때 — 오래 숨은 스택 탭은 거둔다 (discard_tick)
+    hidden_at: HashMap<String, Instant>,
+    /// 예비 창으로 되돌려 다시 쓴 횟수 (창마다 RECYCLE_MAX 까지)
+    recycled: HashMap<String, u32>,
     /// 화면을 다 불러온 덧창 (ghost · hud · bubble-…)
     loaded: HashSet<String>,
     /// 창 옮기기 · 늘이기가 멈췄는지 볼 차례 번호
@@ -296,6 +300,8 @@ pub fn card_flags(app: &AppHandle) -> impl Fn(&str) -> [Value; 3] {
 pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
     let (app, id, label) = (app.clone(), id.to_string(), win.label().to_string());
     win.on_window_event(move |e| match e {
+        // 이 창이 이제 이 메모의 창이 아니다 (예비 창으로 되돌려 다른 메모가 쓴다) — 그 메모 몫의 처리가 맡는다
+        _ if !matches!(e, WindowEvent::Destroyed) && note_label(&app, &id).as_deref() != Some(label.as_str()) => {}
         WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
             sync_sticker(&app, &label);
             bubble_away(&app, &label);
@@ -328,14 +334,14 @@ pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
             hide_note(&app, &w);
             let destroy = {
                 let (app, label) = (app.clone(), label.clone());
-                // 이벤트 처리 · 스크립트 답 안에서 웹뷰를 없애지 않는다
+                let once = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                // 이벤트 처리 · 스크립트 답 안에서 웹뷰를 없애지 않는다. 저장 답 · 3초 중 먼저 온 쪽 한 번만
                 move || {
+                    if once.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                        return;
+                    }
                     let (app, label) = (app.clone(), label.clone());
-                    std::thread::spawn(move || {
-                        if let Some(w) = app.get_webview_window(&label) {
-                            let _ = w.destroy();
-                        }
-                    });
+                    std::thread::spawn(move || retire_note(&app, &label));
                 }
             };
             // 화면이 멈춰 답이 없어도 3초 뒤에는 닫는다
@@ -390,6 +396,7 @@ fn webview_visible(_w: &WebviewWindow, _on: bool) {}
 
 /// 메모 창 보이기 — 웹뷰를 먼저 보이게 해 그리기를 시작시키고 창을 띄운다
 pub fn show_note_win(w: &WebviewWindow) {
+    wm().hidden_at.remove(w.label());
     webview_visible(w, true);
     let _ = w.show();
 }
@@ -447,14 +454,101 @@ fn destroyed(app: &AppHandle, id: &str, label: &str) {
     if let Some(h) = pin {
         pin_send(app, "unpin", h, 0); // 같은 번호를 다른 앱 창이 받아도 건드리지 않게
     }
-    // 비워서 치운 메모 · 휴지통으로 간 메모는 스택에서도 뺀다
+    {
+        let mut g = wm();
+        g.hidden_at.remove(label);
+    }
+    forget_if_gone(app, id);
+    refresh_top_watch(app);
+}
+
+/// 비워서 치운 메모 · 휴지통으로 간 메모는 스택에서도 뺀다 — 창이 없어질 때, 그리고 닫은 메모 정리(finalize)가 끝난 뒤에
+///   (정리는 일꾼 스레드라 창이 없어질 때는 아직 남아 있을 수 있다)
+pub fn forget_if_gone(app: &AppHandle, id: &str) {
     let gone = state(app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(id).is_none());
     if gone {
         if let Some(r) = stacks(app, |s| s.stack_of(id).is_some().then(|| s.remove(id))).flatten() {
             push_stack_to(app, &r.rest.unwrap_or_default());
         }
     }
-    refresh_top_watch(app);
+}
+
+/// 예비 창으로 되돌려 쓰는 횟수 — 창마다 단 이벤트 처리가 쓸 때마다 늘어나 이만큼 쓰면 없앤다
+const RECYCLE_MAX: u32 = 5;
+
+/// 닫은 메모 창을 거둔다: 예비 창 자리가 있으면 닫힌 것처럼 정리한 뒤 예비 창으로 되돌려 다음 메모가 바로 쓰게 (웹뷰를 다시 만들지 않는다 —
+///   만들기가 여는 시간의 대부분), 없으면 없앤다
+pub fn retire_note(app: &AppHandle, label: &str) {
+    let Some(w) = app.get_webview_window(label) else { return };
+    let reuse = {
+        let mut g = wm();
+        let n = g.recycled.entry(label.to_string()).or_default();
+        *n += 1;
+        *n <= RECYCLE_MAX
+    };
+    match note_id(app, label).filter(|_| reuse && !crate::os::quitting() && !crate::ipc::smoke() && crate::memos::spare_room(app)) {
+        Some(id) => {
+            crate::memos::closed_note(app, &id, label);
+            crate::os::note_closed(app, &id);
+            destroyed(app, &id, label);
+            crate::memos::recycle_spare(app, &w);
+        }
+        None => {
+            wm().recycled.remove(label);
+            let _ = w.destroy();
+        }
+    }
+}
+
+/// 오래(DISCARD_AFTER) 숨은 스택 탭은 거둔다 (브라우저의 탭 버리기) — 숨은 탭도 하나에 수십 MB.
+///   보이는 탭의 바로 옆(Ctrl+Tab 으로 갈 곳) · 빈 메모(거두면 정리가 휴지통으로 보낸다)는 남긴다. 다시 누르면 예비 창으로 되살린다 (show_tab)
+const DISCARD_AFTER: Duration = Duration::from_secs(10 * 60);
+pub fn discard_tick(app: &AppHandle) {
+    static LAST: Mutex<Option<Instant>> = Mutex::new(None);
+    {
+        let mut last = LAST.lock().unwrap();
+        if last.is_some_and(|t| t.elapsed() < Duration::from_secs(30)) {
+            return;
+        }
+        *last = Some(Instant::now());
+    }
+    let labels: Vec<(String, String)> = state(app).note_labels.lock().unwrap().iter().map(|(i, l)| (i.clone(), l.clone())).collect();
+    for (id, label) in labels {
+        let Some(w) = app.get_webview_window(&label).filter(|w| !is_shown(w) && !is_closing(&label)) else { continue };
+        let Some(s) = stack_of(app, &id) else { continue };
+        let Some(active) = s.active.clone().filter(|a| *a != id) else { continue };
+        let since = *wm().hidden_at.entry(label.clone()).or_insert_with(Instant::now);
+        if since.elapsed() < DISCARD_AFTER {
+            continue;
+        }
+        let (n, i, a) = (s.memos.len(), s.memos.iter().position(|m| *m == id), s.memos.iter().position(|m| *m == active));
+        if let (Some(i), Some(a)) = (i, a) {
+            if (i + 1) % n == a || (a + 1) % n == i {
+                continue; // 바로 옆 탭
+            }
+        }
+        let blank = state(app).vault.lock().unwrap().as_ref().and_then(|v| v.entry(&id).map(|e| e.body.trim().is_empty())).unwrap_or(true);
+        if blank {
+            continue;
+        }
+        // 남은 글을 동기 저장한 뒤 (답이 없어도 3초 뒤) 거둔다 — 닫기와 달리 스택은 그대로
+        wm().closing_notes.insert(label.clone());
+        let once = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let go = {
+            let (app, label) = (app.clone(), label.clone());
+            move || {
+                if !once.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                    let (app, label) = (app.clone(), label.clone());
+                    std::thread::spawn(move || retire_note(&app, &label));
+                }
+            }
+        };
+        later(3000, go.clone());
+        let fail = go.clone();
+        if w.eval_with_callback("window.mkFlushSync?.()", move |_| go()).is_err() {
+            fail();
+        }
+    }
 }
 
 /// 메모 창이 움직였다: 사람이 끄는 중이면 아래 메모와 합칠지 보고, 멈추면 스택 탭 모두 그 자리로
@@ -649,7 +743,7 @@ pub fn show_tab(app: &AppHandle, id: &str, at: Option<Rect>, focus: bool) -> boo
 }
 
 /// 미리 만들어 둘 탭 창 수 (보이는 탭 빼고) — 넘는 탭은 누를 때 만든다 (창마다 웹뷰 메모리)
-const PREWARM_MAX: usize = 4; // 숨은 탭도 하나에 수십 MB — 메모리와 맞바꿔 4 (숨은 동안은 memory_low)
+const PREWARM_MAX: usize = 2; // 숨은 탭도 하나에 수십 MB — 바로 옆 둘만 (그 밖은 누르면 예비 창으로, 오래 숨은 탭은 discard_tick 이 거둔다)
 
 /// 스택의 다른 탭들을 숨긴 창으로 미리 만들어 둔다 (Electron prewarmStack) — 가까운 탭(Ctrl+Tab 으로 갈 곳)부터
 ///   바꿀 때 창을 새로 만들며 기다리지 않게. PREWARM_MAX 개까지, 하나씩 조금 쉬었다가 (보이는 탭을 그리는 데 방해되지 않게)
