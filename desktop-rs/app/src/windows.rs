@@ -1520,6 +1520,11 @@ fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) 
         return false;
     }
     let (a, b) = (from.label(), to.label());
+    // 아직 화면을 불러오는 스티커 창은 다 불러와도 옛 탭 것이 아니면 뜨지 않는다 (open_sticker_win). 넘기지 않고 새로 띄우게
+    let from_sticker = wm().stickers.get(a).and_then(|s| s.win.clone());
+    if !from_sticker.and_then(|l| app.get_webview_window(&l)).is_some_and(|w| is_shown(&w)) {
+        return false;
+    }
     let moved = {
         let mut g = wm();
         let kind = g.stickers.get(a).filter(|s| s.win.is_some()).map(|s| s.kind);
