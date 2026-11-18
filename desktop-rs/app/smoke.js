@@ -27,6 +27,38 @@ window.addEventListener('load', () => setTimeout(async () => {
     tick();
   });
 
+  // 끌어 놓기 재현 (MEMOKING_DROPTEST=1 · .github/workflows/droptest-rs.yml): 새 메모 창 하나를 정해진 자리에 두고,
+  //   바깥 도우미가 탐색기처럼 OLE 로 파일을 두 번 끌어다 놓는다 → 창이 받은 이벤트와 들어간 파일 수를 시간과 함께 남긴다
+  const invoke = (channel, args = []) => window.__TAURI_INTERNALS__.invoke('ipc', { channel, args });
+  if (await invoke('smoke:droptest')) {
+    if (label === 'list') {
+      let noteDone = false;
+      window.__TAURI__.event.listen('smoke:note-done', () => (noteDone = true));
+      await check('끌어 놓기 시험 창 열기', async () => typeof (await mk.memo.create({})) === 'string');
+      await until(() => noteDone, 90000).catch(() => {});
+      return done();
+    }
+    const t0 = performance.now();
+    const log = [];
+    const at = () => Math.round((performance.now() - t0) / 100) / 10;
+    let overs = 0;
+    for (const t of ['dragenter', 'dragleave', 'drop']) window.addEventListener(t, (e) => log.push(`${at()}s ${t}${t === 'drop' ? `(files=${e.dataTransfer?.files?.length})` : ''}`), true);
+    window.addEventListener('dragover', () => overs++, true);
+    const chips = () => document.querySelectorAll('.mk-doc a[href^="attachments/"]').length;
+    await until(() => document.querySelector('.mk-doc .ProseMirror, .mk-doc[contenteditable]'), 15000).catch(() => {});
+    log.push(`${at()}s 편집기 준비 · 준비 알림`);
+    await invoke('smoke:droptest-ready');
+    let last = 0;
+    const tEnd = Date.now() + 45000;
+    while (Date.now() < tEnd && chips() < 2) {
+      await new Promise((r) => setTimeout(r, 200));
+      if (chips() !== last) log.push(`${at()}s 파일 ${(last = chips())}개 들어감`);
+    }
+    log.push(`dragover ${overs}번`);
+    await check(`끌어 놓기 두 번 → 두 번 다 들어감 [${log.join(' | ')}]`, () => chips() >= 2);
+    return done();
+  }
+
   if (label === 'list') {
     // 이벤트를 받을 준비는 미리 (Tauri 의 listen 은 비동기로 자리 잡는다)
     let trashed = null;

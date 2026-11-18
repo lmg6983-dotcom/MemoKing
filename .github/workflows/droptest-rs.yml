@@ -1,0 +1,61 @@
+# 끌어 놓기 재현: 새 메모 창에 탐색기처럼(OLE) 파일을 두 번 끌어다 놓고, 놓을 때마다 받았는지 · 창이 받은 이벤트 · 들어간 파일 수를 본다
+#   (desktop-rs/app/smoke.js 의 MEMOKING_DROPTEST · desktop-rs/scripts/drop-driver.ps1)
+name: PC 끌어 놓기 재현
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/droptest-rs.yml
+      - desktop-rs/scripts/drop-driver.ps1
+      - app/js/file-drop.js
+
+permissions:
+  contents: read
+
+concurrency:
+  group: droptest-rs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drop:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: desktop-rs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-rs
+      - run: cargo build
+      - name: 새 메모 창에 두 번 끌어 놓기
+        run: |
+          $ready = Join-Path $env:TEMP 'memoking-droptest-ready.txt'
+          Remove-Item $ready -ErrorAction SilentlyContinue
+          $sample = Join-Path $env:TEMP 'drop-sample.txt'
+          Set-Content $sample '끌어 놓기 시험 파일' -Encoding utf8
+          $env:MEMOKING_DROPTEST = '1'
+          $p = Start-Process target/debug/memoking.exe -ArgumentList '--smoke' -RedirectStandardOutput smoke.txt -PassThru
+          $t = 0
+          while (-not (Test-Path $ready) -and $t -lt 120) { Start-Sleep -Milliseconds 500; $t++ }
+          if (-not (Test-Path $ready)) { Get-Content smoke.txt -Encoding utf8; throw '메모 창이 준비되지 않았어요' }
+          $xy = (Get-Content $ready).Split(' ')
+          "놓을 곳: $($xy -join ', ')"
+          $log = & powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File scripts/drop-driver.ps1 -File $sample -X $xy[0] -Y $xy[1] -Times 2
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $img = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($img).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $img.Save("$PWD/drop-screen.png")
+          "--- 도우미 (OLE 결과) ---"; $log
+          if (-not $p.WaitForExit(90000)) { Stop-Process $p; '앱이 끝나지 않았어요' }
+          "--- 앱 ---"; Get-Content smoke.txt -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drop-screen
+          path: desktop-rs/drop-screen.png

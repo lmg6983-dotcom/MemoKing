@@ -60,6 +60,21 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
     match channel {
         // 매직 카피 도우미가 지금 클립보드를 읽어 오는지 (Ctrl+C 는 보내지 않는다 — 점검 PC 의 다른 앱에 키가 가지 않게)
         "smoke:clipboard-dump" if smoke() => crate::capture::smoke_dump(app),
+        // 끌어 놓기 재현 (droptest-rs.yml): 켜졌나 · 창을 정해진 자리에 두고 바깥 도우미에게 놓을 곳(화면 좌표)을 알린다
+        "smoke:droptest" if smoke() => Ok(std::env::var_os("MEMOKING_DROPTEST").is_some().into()),
+        "smoke:droptest-ready" if smoke() => {
+            use tauri::Manager;
+            let w = app.get_webview_window(label).ok_or("창 없음")?;
+            let _ = w.set_size(tauri::PhysicalSize::new(420u32, 460u32));
+            let _ = w.set_position(tauri::PhysicalPosition::new(480i32, 120i32));
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            let (p, s) = (w.outer_position().map_err(|e| e.to_string())?, w.outer_size().map_err(|e| e.to_string())?);
+            // 글 아래 빈 곳이 아니라 창 가운데보다 조금 위 (편집기 안)
+            let line = format!("{} {}", p.x + s.width as i32 / 2, p.y + 150);
+            std::fs::write(std::env::temp_dir().join("memoking-droptest-ready.txt"), &line).map_err(|e| e.to_string())?;
+            println!("[droptest] 놓을 곳 {line} (창 {}x{} @ {},{})", s.width, s.height, p.x, p.y);
+            Ok(Value::Null)
+        }
         "smoke:emit" if smoke() => app.emit_to(label, args[0].as_str().unwrap_or_default(), [42]).map(|_| Value::Null).map_err(|e| e.to_string()),
         "smoke:done" if smoke() => {
             // 목록 · 메모 창이 다 알려 오면 찍고, 화면 사진을 찍을 틈(6초)을 두고 끝낸다
