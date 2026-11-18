@@ -6,9 +6,9 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder, WindowEvent, Wry};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow, WebviewWindowBuilder, WindowEvent, Wry};
 
 type Builder<'a> = WebviewWindowBuilder<'a, Wry, AppHandle>;
 
@@ -172,36 +172,155 @@ fn quit(app: &AppHandle) {
     });
 }
 
-// shortcut: Electron 트레이의 최근 메모 · 일정 · 자동 실행 등은 아직 — 그 기능을 옮길 때 메뉴에 더하기
+/// Electron shorten: 28자(UTF-16)가 넘으면 27자 + …
+fn shorten(t: &str) -> String {
+    if t.encode_utf16().count() > 28 {
+        format!("{}…", memoking_core::js::slice16(t, 27))
+    } else {
+        t.to_string()
+    }
+}
+
+/// 목록 창을 그 탭으로 (Electron createListWindow(tab))
+fn show_list_tab(app: &AppHandle, tab: &str) {
+    show_list(app);
+    let _ = app.emit_to("list", "list:tab", [tab]);
+}
+
+/// 열린 메모 모두 앞으로 (Electron showAllNotes). 숨은 창(스택의 다른 탭)은 그대로
+fn show_all_notes(app: &AppHandle) {
+    let labels: Vec<String> = state(app).note_labels.lock().unwrap().values().cloned().collect();
+    for w in labels.iter().filter_map(|l| app.get_webview_window(l)).filter(|w| w.is_visible().unwrap_or(false)) {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+/// 알림 영역 메뉴 (Electron updateTrayMenu)
+fn tray_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+    let st = state(app);
+    let recent: Option<Vec<(String, String)>> = st.vault.lock().unwrap().as_ref().map(|v| {
+        let s = |m: &Value, k: &str| m[k].as_str().unwrap_or_default().to_string();
+        v.list().iter().take(5).map(|m| (s(m, "id"), s(m, "title"))).collect()
+    });
+    let has_vault = recent.is_some();
+    let item = |id: &str, text: &str, on: bool| MenuItem::with_id(app, format!("tray:{id}"), text, on, None::<&str>);
+    let sep = || PredefinedMenuItem::separator(app);
+    let recent: Vec<MenuItem<Wry>> = match recent.unwrap_or_default() {
+        r if r.is_empty() => vec![MenuItem::new(app, "없음", false, None::<&str>)?],
+        r => r.iter().map(|(id, title)| item(&format!("memo:{id}"), &shorten(title), true)).collect::<tauri::Result<_>>()?,
+    };
+    let recent: Vec<&dyn IsMenuItem<Wry>> = recent.iter().map(|i| i as &dyn IsMenuItem<Wry>).collect();
+    let quick = crate::shortcuts::status(app, "quickMemo");
+    let quick_on = quick["enabled"] == true;
+    let quick_held = quick_on && quick["registered"] == true;
+    let quick_label = format!("매직 카피 {} (두 번: 화면 캡처){}", quick["label"].as_str().unwrap_or_default(), if quick_on && !quick_held { ", 다른 앱이 쓰는 중" } else { "" });
+    let auto = crate::files::auto_start(app);
+    let auto_ok = auto["available"] == true;
+    let auto_label = if auto_ok { "PC를 켜면 메모킹도 함께 켜기" } else { "PC를 켜면 메모킹도 함께 켜기 (설치한 메모킹에서)" };
+    let has_notes = !st.note_labels.lock().unwrap().is_empty();
+    Menu::with_items(
+        app,
+        &[
+            &item("list", "메모 목록 열기", true)?,
+            &item("new", "새 메모", has_vault)?,
+            &item("capture", "화면 캡처로 새 메모", has_vault)?,
+            &item("clipboard", "복사해 둔 내용으로 새 메모", has_vault)?,
+            &sep()?,
+            // 들여 쓴 흐린 머리말 대신 하위 메뉴 (Windows 메뉴의 "최근 항목" 처럼)
+            &Submenu::with_items(app, "최근 메모", true, &recent)?,
+            &sep()?,
+            &item("reminders", "일정", true)?,
+            &item("history", "알림 보관함", true)?,
+            &item("show-all", "열린 메모 모두 앞으로", has_notes)?,
+            &item("folder", "메모 폴더 열기", has_vault)?,
+            &sep()?,
+            &CheckMenuItem::with_id(app, "tray:quick", quick_label, true, quick_held, None::<&str>)?,
+            &CheckMenuItem::with_id(app, "tray:auto", auto_label, auto_ok, auto["enabled"] == true, None::<&str>)?,
+            &sep()?,
+            &item("tutorial", "사용법 둘러보기", has_vault)?,
+            &item("quit", "메모킹 종료", true)?,
+        ],
+    )
+}
+
+/// 메모 · 열린 창 · 단축키 · 설정이 바뀌면 알림 영역 메뉴를 다시 만든다. 잇달아 불리면 0.3초 뒤 한 번만
+pub fn refresh_tray(app: &AppHandle) {
+    static GEN: AtomicU64 = AtomicU64::new(0);
+    let n = GEN.fetch_add(1, Ordering::SeqCst) + 1;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(300));
+        if GEN.load(Ordering::SeqCst) != n {
+            return;
+        }
+        if let (Some(tray), Ok(menu)) = (app.tray_by_id("main"), tray_menu(&app)) {
+            let _ = tray.set_menu(Some(menu));
+        }
+    });
+}
+
+fn tray_chosen(app: &AppHandle, id: &str) {
+    match id {
+        "list" => show_list(app),
+        "new" => {
+            if !new_memo(app) {
+                show_list(app); // 메모 폴더가 없으면 고르는 화면으로
+            }
+        }
+        "capture" => {
+            crate::services::start_area_capture(app);
+        }
+        // shortcut: 클립보드의 글만 (Electron 매직 카피는 파일 · 그림도), 매직 카피를 옮길 때 그것으로
+        "clipboard" => {
+            use tauri_plugin_clipboard_manager::ClipboardExt;
+            let text = app.clipboard().read_text().unwrap_or_default();
+            if text.trim().is_empty() {
+                crate::windows::show_hud(app, "가져올 내용이 없어요", "글을 복사한 뒤 다시 눌러 주세요.", "warn");
+            } else {
+                let _ = memos::handle(app, "list", "memo:import", &[text.into(), json!({ "open": true })]);
+            }
+        }
+        "reminders" | "history" => show_list_tab(app, id),
+        "show-all" => show_all_notes(app),
+        "folder" => {
+            let _ = crate::files::handle(app, "list", "vault:reveal", &[]);
+        }
+        // 누르기 전의 체크를 뒤집는다 (Electron item.checked)
+        "quick" => {
+            let s = crate::shortcuts::status(app, "quickMemo");
+            let _ = crate::shortcuts::handle(app, "list", "app:set-quick-memo", &[(!(s["enabled"] == true && s["registered"] == true)).into()]);
+        }
+        "auto" => {
+            let on = crate::files::auto_start(app)["enabled"] != true;
+            let _ = crate::files::handle(app, "list", "app:set-auto-start", &[on.into()]);
+        }
+        "tutorial" => {
+            crate::shortcuts::start_tutorial(app);
+        }
+        "quit" => quit(app),
+        _ => {
+            if let Some(memo) = id.strip_prefix("memo:") {
+                let _ = memos::open_note(app, memo);
+            }
+        }
+    }
+}
+
 fn tray(app: &AppHandle) -> tauri::Result<()> {
     let Some(icon) = app.default_window_icon().cloned() else { return Ok(()) };
-    let list = MenuItem::with_id(app, "list", "메모 목록", true, None::<&str>)?;
-    let new = MenuItem::with_id(app, "new", "새 메모", true, None::<&str>)?;
-    let capture = MenuItem::with_id(app, "capture", "화면 캡처로 새 메모", true, None::<&str>)?;
-    let quit_item = MenuItem::with_id(app, "quit", "끝내기", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&list, &new, &capture, &PredefinedMenuItem::separator(app)?, &quit_item])?;
     TrayIconBuilder::with_id("main")
         .icon(icon)
         .tooltip("메모킹")
-        .menu(&menu)
+        .menu(&tray_menu(app)?)
         .show_menu_on_left_click(false)
-        .on_menu_event(|app, e| match e.id.as_ref() {
-            "list" => show_list(app),
-            // 창 만들기는 이벤트 처리 안에서 하면 Windows 에서 멈춘다 — 다른 스레드에서
-            "new" => {
+        .on_menu_event(|app, e| {
+            // 창 만들기 · 단축키 잡기는 이벤트 처리(메인 스레드) 안에서 하면 Windows 에서 멈춘다. 다른 스레드에서
+            if let Some(id) = e.id.as_ref().strip_prefix("tray:").map(str::to_string) {
                 let app = app.clone();
-                std::thread::spawn(move || {
-                    if !new_memo(&app) {
-                        show_list(&app); // 메모 폴더가 없으면 고르는 화면으로
-                    }
-                });
+                std::thread::spawn(move || tray_chosen(&app, &id));
             }
-            "capture" => {
-                let app = app.clone();
-                std::thread::spawn(move || crate::services::start_area_capture(&app));
-            }
-            "quit" => quit(app),
-            _ => {}
         })
         .on_tray_icon_event(|tray, e| {
             if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
@@ -315,6 +434,13 @@ mod tests {
         let b = json!({ "x": -1500, "y": 100, "width": 340, "height": 380 });
         assert_eq!(on_screen(&b, &screen), None);
         assert!(on_screen(&b, &[screen[0], [-1920.0, 0.0, 1920.0, 1040.0]]).is_some());
+    }
+
+    #[test]
+    fn tray_titles_like_electron_shorten() {
+        assert_eq!(shorten("짧은 제목"), "짧은 제목");
+        assert_eq!(shorten(&"가".repeat(28)), "가".repeat(28));
+        assert_eq!(shorten(&"가".repeat(29)), format!("{}…", "가".repeat(27)));
     }
 
     #[test]
