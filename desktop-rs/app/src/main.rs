@@ -44,7 +44,7 @@ fn is_app_origin(origin: &str) -> bool {
 ///   앱 화면 밖으로는 넘어가지 않는다 — 웹 주소는 브라우저로 (Electron guardWindow 와 같게)
 pub fn window<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
     let opener = app.clone();
-    WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.into()))
+    no_window_drop(WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.into()))
         .decorations(false)
         .initialization_script(init_script())
         // 사진 · 파일 끌어 넣기를 Tauri 가 가로채지 않게 (화면의 drop 이벤트가 받는다)
@@ -58,10 +58,28 @@ pub fn window<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWindowB
                 let _ = opener.opener().open_url(url.as_str(), None::<&str>);
             }
             false
-        })
+        }))
+}
+
+type Builder<'a> = WebviewWindowBuilder<'a, tauri::Wry, AppHandle>;
+
+/// 바깥 창(tao)의 끌어 놓기 받개도 끈다. 켜 두면 WebView2 가 받기 전의 첫 끌기를 그쪽이 "복사" 로 받아 버리고, Tauri 는 그 소식을 아무 데도 보내지 않는다
+///   (그래서 파일을 처음 놓을 때는 아무 일이 없고 두 번째부터 들어갔다). OLE 초기화는 main 이 먼저 한다
+#[cfg(windows)]
+fn no_window_drop(b: Builder) -> Builder {
+    b.drag_and_drop(false)
+}
+#[cfg(not(windows))]
+fn no_window_drop(b: Builder) -> Builder {
+    b
 }
 
 fn main() {
+    // 바깥 창의 끌어 놓기를 끄면 tao 가 OLE 를 초기화하지 않는다. WebView2 의 끌어 놓기 · 첨부 끌어내기(DoDragDrop)에 필요해 여기서 한 번
+    #[cfg(windows)]
+    unsafe {
+        let _ = windows::Win32::System::Ole::OleInitialize(None);
+    }
     let mut builder = tauri::Builder::default();
     // 두 번 켜면 이미 켜진 메모킹이 그 인자를 받는다 (점검 --smoke 는 켜 둔 메모킹과 상관없이 따로)
     if !ipc::smoke() {
