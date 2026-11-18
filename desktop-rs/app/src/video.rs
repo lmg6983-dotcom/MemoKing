@@ -42,7 +42,7 @@ pub fn playable(app: &AppHandle, rel: &str, file: PathBuf) -> Option<PathBuf> {
             let _one = ONE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             // 소리를 mp4 에 담지 못하면(아이폰 공간 음향 APAC 등) 소리 없이 한 번 더
             if let Err(e) = convert(&ffmpeg, &file, &out, true).or_else(|_| convert(&ffmpeg, &file, &out, false)) {
-                eprintln!("[video] {rel}: {e}");
+                elog!("[video] {rel}: {e}");
                 FAILED.lock().unwrap().insert(out.clone());
             }
             RUNNING.lock().unwrap().remove(&out);

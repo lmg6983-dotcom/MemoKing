@@ -1,6 +1,15 @@
 // 메모킹 데스크탑 (Rust + Tauri 2) — Electron 의 desktop/ 을 옮기는 중. 화면은 ../../app 그대로.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+/// 오류 한 줄: 콘솔에 더해 오류 기록 파일에도 (설정 › 문제 보내기로 꺼내 본다) — 예전에는 콘솔에만 나가 사용자 PC 에서는 사라졌다
+macro_rules! elog {
+    ($($t:tt)*) => {{
+        let line = format!($($t)*);
+        eprintln!("{line}");
+        crate::files::log("오류", &line);
+    }};
+}
+
 mod ai;
 mod clipboard;
 mod files;
@@ -158,6 +167,13 @@ fn main() {
         .setup(|app| {
             let app = app.handle();
             app.manage(state::State::load(app));
+            files::init_log(app);
+            // 멈추면(패닉) 어디서 왜 멈췄는지 기록에 남긴다 (기본 처리는 그대로)
+            let default = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |info| {
+                files::log("멈춤", &info.to_string());
+                default(info);
+            }));
             memos::start(app);
             drive::start(app);
             history::start(app);

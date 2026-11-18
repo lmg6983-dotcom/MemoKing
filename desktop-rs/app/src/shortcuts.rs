@@ -88,7 +88,7 @@ fn grab(app: &AppHandle, name: &str, key: &str) -> bool {
         })
         .is_ok();
     if !ok {
-        eprintln!("{}를 다른 프로그램이 쓰고 있어 등록하지 못했어요", acc::display_accelerator(key));
+        elog!("{}를 다른 프로그램이 쓰고 있어 등록하지 못했어요", acc::display_accelerator(key));
     }
     ok
 }

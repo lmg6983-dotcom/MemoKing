@@ -86,7 +86,7 @@ pub fn start_area_capture(app: &AppHandle) -> bool {
     let mut area = AREA.lock().unwrap();
     if area.as_ref().is_none_or(Vec::is_empty) {
         *area = None;
-        eprintln!("[화면 캡처] 화면을 캡처하지 못했어요");
+        elog!("[화면 캡처] 화면을 캡처하지 못했어요");
         return false;
     }
     true
@@ -200,7 +200,7 @@ fn save_pdf(app: &AppHandle, id: &str, o: &Value) -> Value {
     let made = print_to_pdf(&win, &file, w, h);
     let _ = win.destroy();
     let Some(pdf) = made.then(|| std::fs::read(&file).ok()).flatten() else {
-        eprintln!("PDF 만들기 실패: {}", file.display());
+        elog!("PDF 만들기 실패: {}", file.display());
         return Value::Null;
     };
     let latin1: String = pdf.iter().map(|&b| b as char).collect();
@@ -397,7 +397,7 @@ fn check_update(app: &AppHandle, manual: bool) {
     let app2 = app.clone();
     match wait(async move { app2.updater()?.check().await }) {
         Err(err) => {
-            eprintln!("[update] {err}");
+            elog!("[update] {err}");
             set_update(app, json!({ "status": "error", "message": memoking_core::update::update_error_text(&err.to_string()) }));
         }
         Ok(None) => set_update(app, json!({ "status": "latest" })),

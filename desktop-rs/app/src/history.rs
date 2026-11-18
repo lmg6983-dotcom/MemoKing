@@ -78,7 +78,7 @@ impl History {
         let _ = std::fs::create_dir_all(&self.dir);
         // 디스크가 가득 참 등 — 다음 알림 때 다시 쓴다
         if let Err(err) = write_atomic(&self.file(), text.as_bytes()) {
-            eprintln!("[알림 보관함] {err}");
+            elog!("[알림 보관함] {err}");
         }
     }
 
@@ -365,7 +365,7 @@ fn poll(app: &AppHandle) {
                 ((), added > 0)
             }
             Err(err) => {
-                eprintln!("[알림 보관함] {err}");
+                elog!("[알림 보관함] {err}");
                 ((), false)
             }
         }
@@ -403,7 +403,7 @@ fn watch_popups(app: &AppHandle, run: usize) {
             .spawn();
         // PowerShell 을 띄우지 못하면(보안 프로그램이 막음 등) 적고 잠시 뒤 다시
         match child {
-            Err(err) => eprintln!("[팝업 알림] {err}"),
+            Err(err) => elog!("[팝업 알림] {err}"),
             Ok(mut c) => {
                 let out = c.stdout.take().unwrap();
                 let pid = c.id();
@@ -419,7 +419,7 @@ fn watch_popups(app: &AppHandle, run: usize) {
                 drop(slot);
                 for line in std::io::BufReader::new(out).lines().map_while(Result::ok) {
                     match serde_json::from_str::<Value>(line.trim_start_matches('\u{feff}')) {
-                        Ok(msg) if msg["error"].is_string() => eprintln!("[팝업 알림] {}", msg["error"]),
+                        Ok(msg) if msg["error"].is_string() => elog!("[팝업 알림] {}", msg["error"]),
                         Ok(msg) if msg.is_object() => add_popup(app, msg),
                         _ => {}
                     }

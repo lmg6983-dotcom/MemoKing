@@ -416,7 +416,7 @@ pub fn second_launch(app: &AppHandle, argv: Vec<String>, _cwd: String) {
 /// 켤 때 (setup, 메모 폴더를 연 뒤): 알림 영역 · 목록 창 닫기 = 숨기기 · 열려 있던 메모 · 실행 인자
 pub fn start(app: &AppHandle, list: &WebviewWindow) {
     if let Err(err) = tray(app) {
-        eprintln!("알림 영역 아이콘을 만들지 못했어요: {err}");
+        elog!("알림 영역 아이콘을 만들지 못했어요: {err}");
     }
     let app2 = app.clone();
     list.on_window_event(move |e| match e {

@@ -58,6 +58,15 @@
 
   /*PRELOAD*/
 
+  // 화면에서 난 잡히지 않은 오류를 오류 기록에 (설정 › 문제 보내기) — Electron 은 메인이 창의 오류를 받아 적었다. 창마다 20줄까지
+  let logged = 0;
+  const logError = (text) => {
+    if (++logged > 20) return;
+    call('app:log-error', [String(text).slice(0, 800)]).catch(() => {});
+  };
+  window.addEventListener('error', (e) => logError(`${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno}:${e.colno})`));
+  window.addEventListener('unhandledrejection', (e) => logError(`처리 안 된 거부: ${e.reason?.stack || e.reason?.message || e.reason}`));
+
   // CSS 의 -webkit-app-region: drag 는 Electron 만 알아듣는다 — 그 자리를 누르면 Tauri 로 창을 끈다 (no-drag 가 가까우면 그대로)
   //   shortcut: ::before 같은 가상 요소에 단 drag(회상 앨범 머리줄)는 못 본다 — 그 화면을 옮길 때 실제 요소로
   const regionOf = (el) => { const s = getComputedStyle(el); return s.webkitAppRegion || s.appRegion || ''; };

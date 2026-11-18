@@ -379,7 +379,7 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
     };
     let label = win.label().to_string();
     let how = if spare.is_some() { "예비 창" } else if show { "새 창" } else { "숨겨 만든 창" };
-    crate::files::perf_log(app, &format!("창 준비 {}ms ({how})", started.elapsed().as_millis()));
+    crate::files::perf_log(&format!("창 준비 {}ms ({how})", started.elapsed().as_millis()));
     st.note_labels.lock().unwrap().insert(id.to_string(), label.clone());
     drop(one);
     let (app2, id2, label2) = (app.clone(), id.to_string(), label.clone());
@@ -924,7 +924,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "attachment:save-as" => save_attachment_as(app, args.first().unwrap_or(&Value::Null)),
         "attachment:drag-out" => {
             if drag_out(app, args.first().unwrap_or(&Value::Null)).is_none() {
-                eprintln!("[drag-out] 끌어낼 파일을 만들지 못했어요");
+                elog!("[drag-out] 끌어낼 파일을 만들지 못했어요");
             }
             Ok(Value::Null)
         }

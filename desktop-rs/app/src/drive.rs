@@ -295,7 +295,7 @@ fn call(method: &str, url: &str, headers: &[(&str, String)], body: Option<Vec<u8
         None => agent().run(req.body(()).map_err(io::Error::other)?),
     };
     res.map_err(|e| {
-        eprintln!("[Google Drive] {e}");
+        elog!("[Google Drive] {e}");
         io::Error::new(io::ErrorKind::ConnectionAborted, OFFLINE)
     })
 }
@@ -754,7 +754,7 @@ fn run_once(app: &AppHandle, full: bool) {
             }
         }
         Err(err) => {
-            eprintln!("[Google Drive 동기화] {err}");
+            elog!("[Google Drive 동기화] {err}");
             publish(app, json!({ "state": "error", "progress": null, "error": err.to_string() }));
         }
     }

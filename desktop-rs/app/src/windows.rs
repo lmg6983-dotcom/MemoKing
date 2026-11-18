@@ -239,7 +239,7 @@ fn stacks<T>(app: &AppHandle, f: impl FnOnce(&mut Stacks) -> T) -> Option<T> {
     let after = s.text();
     if after != before {
         if let Err(err) = memoking_core::vault::write_atomic(&file, after.as_bytes()) {
-            eprintln!("스택 저장 실패: {err}");
+            elog!("스택 저장 실패: {err}");
         }
     }
     Some(r)
@@ -1403,7 +1403,7 @@ fn start_pin_helper(app: &AppHandle, g: &mut Wm) -> bool {
     std::thread::spawn(move || {
         for line in std::io::BufReader::new(out).lines().map_while(Result::ok) {
             if line.starts_with("err ") {
-                eprintln!("메모 창을 바탕화면 층에 붙이지 못했어요 {line}");
+                elog!("메모 창을 바탕화면 층에 붙이지 못했어요 {line}");
             }
         }
         let _ = child.wait();

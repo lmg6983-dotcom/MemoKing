@@ -90,7 +90,7 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
 fn unported(channel: &str) -> String {
     static SEEN: Mutex<Option<HashSet<String>>> = Mutex::new(None);
     if SEEN.lock().unwrap().get_or_insert_with(HashSet::new).insert(channel.to_string()) {
-        eprintln!("[ipc] 아직 옮기지 않음: {channel}");
+        elog!("[ipc] 아직 옮기지 않음: {channel}");
     }
     format!("아직 옮기지 않은 기능이에요 ({channel})")
 }

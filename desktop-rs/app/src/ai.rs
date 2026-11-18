@@ -455,7 +455,7 @@ fn watch(app: AppHandle, base: String) {
             let log = s.log.lock().unwrap().join("\n");
             e.server = None;
             if let Some(c) = code.code().filter(|c| *c != 0) {
-                eprintln!("AI chat 꺼짐 {c} {log}");
+                elog!("AI chat 꺼짐 {c} {log}");
                 e.error = engine_error(&log, &c.to_string());
             }
             drop(e);
