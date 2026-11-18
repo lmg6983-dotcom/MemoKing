@@ -2611,3 +2611,11 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 /* 문서 칩 + 썸네일 한 문단: 그림이 블록이라 줄바꿈 · 편집기 보조 그림이 빈 줄만 더한다 (묶음 사진과 같게) */
 .mk-doc p:has(> img.mk-pdf-thumb) > :is(img.ProseMirror-separator, br) { display: none !important; }
 .mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF"; position: absolute; right: 8px; bottom: 10px; padding: 2px 7px; border-radius: 6px; background: #c4282e; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; }
+/* 문서 칩 + PDF 첫 쪽(바꾸는 동안은 임시 칸): 동영상처럼 한 덩어리 카드. 위는 이름 줄(칩), 아래는 첫 쪽, 테두리 · 둥글기 · 그림자는 카드 하나에 */
+.mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { display: flex; flex-direction: column; width: min(100%, 360px); margin: 6px 0; overflow: hidden; border-radius: var(--radius-lg); box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12); }
+.mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) > a[href^="attachments/"] { display: flex; max-width: none; padding: 7px 12px 7px 10px; border-radius: 0; }
+.mk-doc p:has(> img.mk-pdf-thumb) > img.mk-pdf-thumb { width: 100%; margin: 0; border-radius: 0; outline: 0; box-shadow: none; }
+.mk-doc p:has(> .mk-doc-pending) > .mk-doc-pending { width: 100%; margin: 0; }
+.mk-doc p:has(> .mk-doc-pending) .mk-doc-pending-page { border-radius: 0; box-shadow: none; }
+.mk-doc p:has(> .mk-doc-pending) :is(.mk-doc-pending-bar, .mk-doc-pending-label) { margin-left: 12px; margin-right: 12px; }
+.mk-doc p:has(> .mk-doc-pending) .mk-doc-pending-label { margin-bottom: 8px; }

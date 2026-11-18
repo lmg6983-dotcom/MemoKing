@@ -16,6 +16,7 @@ mod settings;
 mod shortcuts;
 mod state;
 mod stt;
+mod video;
 mod windows;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -43,7 +44,7 @@ fn is_app_origin(origin: &str) -> bool {
 ///   앱 화면 밖으로는 넘어가지 않는다 — 웹 주소는 브라우저로 (Electron guardWindow 와 같게)
 pub fn window<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
     let opener = app.clone();
-    WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.into()))
+    no_window_drop(WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.into()))
         .decorations(false)
         .initialization_script(init_script())
         // 사진 · 파일 끌어 넣기를 Tauri 가 가로채지 않게 (화면의 drop 이벤트가 받는다)
@@ -57,10 +58,28 @@ pub fn window<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWindowB
                 let _ = opener.opener().open_url(url.as_str(), None::<&str>);
             }
             false
-        })
+        }))
+}
+
+type Builder<'a> = WebviewWindowBuilder<'a, tauri::Wry, AppHandle>;
+
+/// 바깥 창(tao)의 끌어 놓기 받개도 끈다. 켜 두면 WebView2 가 받기 전의 첫 끌기를 그쪽이 "복사" 로 받아 버리고, Tauri 는 그 소식을 아무 데도 보내지 않는다
+///   (그래서 파일을 처음 놓을 때는 아무 일이 없고 두 번째부터 들어갔다). OLE 초기화는 main 이 먼저 한다
+#[cfg(windows)]
+fn no_window_drop(b: Builder) -> Builder {
+    b.drag_and_drop(false)
+}
+#[cfg(not(windows))]
+fn no_window_drop(b: Builder) -> Builder {
+    b
 }
 
 fn main() {
+    // 바깥 창의 끌어 놓기를 끄면 tao 가 OLE 를 초기화하지 않는다. WebView2 의 끌어 놓기 · 첨부 끌어내기(DoDragDrop)에 필요해 여기서 한 번
+    #[cfg(windows)]
+    unsafe {
+        let _ = ::windows::Win32::System::Ole::OleInitialize(None);
+    }
     let mut builder = tauri::Builder::default();
     // 두 번 켜면 이미 켜진 메모킹이 그 인자를 받는다 (점검 --smoke 는 켜 둔 메모킹과 상관없이 따로)
     if !ipc::smoke() {
@@ -72,13 +91,23 @@ fn main() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // 로그인 때는 창 없이 알림 영역에서 (Electron LOGIN_ARGS)
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .invoke_handler(tauri::generate_handler![ipc::ipc])
         // memoking://localhost/… (Windows: http://memoking.localhost/…) — Electron 의 memoking:// 자리
         //   sync/<채널>: 동기 호출 (shim.js sendSync) · vault/<경로>: 메모 폴더의 그림 · 소리 · 영상 · history/<이름>: 알림 보관함 그림
         .register_asynchronous_uri_scheme_protocol("memoking", |ctx, req, responder| {
             // 파일 읽기 · 동기 호출은 화면 스레드 밖에서 — 큰 영상을 읽거나 창을 만드는 호출이 화면을 멈추지 않게
             let (app, label) = (ctx.app_handle().clone(), ctx.webview_label().to_string());
-            std::thread::spawn(move || responder.respond(memoking_uri(&app, &label, &req)));
+            std::thread::spawn(move || {
+                let res = memoking_uri(&app, &label, &req);
+                // 점검 때는 오간 것을 남긴다 (WebView2 가 동영상을 어떻게 청하는지 CI 로그에서 보려고)
+                if ipc::smoke() && !req.uri().path().starts_with("/sync/") {
+                    let h = |m: &http::HeaderMap, k: &str| m.get(k).and_then(|v| v.to_str().ok()).unwrap_or("-").to_string();
+                    println!("[memoking] {} {} range={} origin={} -> {} type={} len={} content-range={}", req.method(), req.uri().path(), h(req.headers(), "range"), h(req.headers(), "origin"), res.status().as_u16(), h(res.headers(), "content-type"), res.body().len(), h(res.headers(), "content-range"));
+                }
+                responder.respond(res)
+            });
         })
         .setup(|app| {
             let app = app.handle();
@@ -96,9 +125,10 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("메모킹을 켜지 못했어요")
         .run(|_, e| {
-            // AI 엔진은 따로 도는 프로세스라 메모킹을 꺼도 남는다
+            // AI 엔진 · 팝업 알림 도우미는 따로 도는 프로세스라 메모킹을 꺼도 남는다
             if let tauri::RunEvent::Exit = e {
                 ai::stop();
+                history::stop_helpers();
                 windows::stop();
             }
         });
@@ -121,7 +151,14 @@ fn memoking_uri(app: &AppHandle, label: &str, req: &http::Request<Vec<u8>>) -> h
     };
     if let Some(served) = served {
         let range = req.headers().get("range").and_then(|r| r.to_str().ok());
-        return served.and_then(|(file, mime)| file_response(&file, mime, range, allow)).unwrap_or_else(|| status(404));
+        let Some((file, mime)) = served else { return status(404) };
+        // HEVC 사본을 만드는 중이면 영상이 바로 실패하게 (다 되면 media:ready 로 다시 부른다, video.rs)
+        let file = match path.strip_prefix("/vault/") {
+            Some(rel) if mime.starts_with("video/") => video::playable(app, &percent_decode(rel), file),
+            _ => Some(file),
+        };
+        let Some(file) = file else { return status(503) };
+        return file_response(&file, mime, range, allow).unwrap_or_else(|| status(404));
     }
     // 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
     let (Some(channel), Some(_)) = (path.strip_prefix("/sync/"), &origin) else { return status(404) };

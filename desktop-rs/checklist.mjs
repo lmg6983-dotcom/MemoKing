@@ -11,10 +11,12 @@ const rust = fs.readdirSync(src, { recursive: true }).filter((f) => f.endsWith('
 
 const channels = [...new Set([...preload.matchAll(/(?:invoke|send|sendSync)\('([^']+)'/g)].map((m) => m[1]))].sort();
 const events = [...preload.match(/const EVENTS = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
-const ported = (ch) => rust.includes(`"${ch}" =>`) || rust.includes(`"${ch}" |`);
+// Rust 판에 일부러 두지 않는 채널: AI 비서 연결(MCP). AI 는 Google Drive 의 메모 폴더를 직접 읽고 쓴다
+const DROPPED = new Set(['mcp:connect', 'mcp:copy', 'mcp:set-write']);
+const ported = (ch) => DROPPED.has(ch) || rust.includes(`"${ch}" =>`) || rust.includes(`"${ch}" |`);
 const emitted = (ev) => rust.includes(`"${ev}"`);
 
-const row = (name, done) => `| ${done ? '✅' : '⬜'} | \`${name}\` |`;
+const row = (name, done) => `| ${DROPPED.has(name) ? '➖' : done ? '✅' : '⬜'} | \`${name}\` |`;
 const count = (list, fn) => `${list.filter(fn).length} / ${list.length}`;
 const out = `# 데스크탑 Rust 옮기기 체크리스트
 
@@ -22,6 +24,8 @@ const out = `# 데스크탑 Rust 옮기기 체크리스트
 
 - 채널 (화면 → Rust): **${count(channels, ported)}**
 - 이벤트 (Rust → 화면): **${count(events, emitted)}**
+
+➖ 는 Rust 판에 일부러 두지 않은 것 (AI 비서 연결 MCP: AI 는 Google Drive 의 메모 폴더를 직접 읽고 쓴다)
 
 ## 채널
 

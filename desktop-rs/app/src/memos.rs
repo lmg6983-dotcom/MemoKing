@@ -3,6 +3,7 @@ use crate::state::{state, State};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 
@@ -42,12 +43,15 @@ pub fn start(app: &AppHandle) {
         let _ = std::fs::create_dir_all(dir.join("attachments"));
         let _ = std::fs::write(dir.join("시험 메모.md"), "---\nid: smoke-seed\ncolor: green\n---\n# 시험 메모\n\n#점검 ![점](attachments/dot.png)\n");
         let _ = std::fs::write(dir.join("attachments/dot.png"), DOT_PNG);
+        let _ = std::fs::write(dir.join("attachments/clip.mp4"), include_bytes!("../smoke-clip.mp4")); // 동영상 점검 (96x64 H.264 2초)
+        let _ = std::fs::write(dir.join("attachments/clip-hevc.mp4"), include_bytes!("../smoke-clip-hevc.mp4")); // 같은 크기 HEVC 10비트 + 소리 (video.rs)
         st.open_vault(app, dir);
     }
     // 앱을 켤 때: 가장 최근에 고친 5개 중 다른 기기에서 방금 고친 것
     let recent: Vec<String> = st.vault.lock().unwrap().as_ref().map(|v| v.list()).unwrap_or_default().iter().take(5).filter_map(|m| m["id"].as_str().map(str::to_string)).collect();
     show_handoff(app, recent);
     // 다른 기기 · 탐색기에서 바뀐 메모 — 2초마다 다시 읽는다
+    schedule_spare(app, 3000);
     // shortcut: 파일 감시(fs.watch)는 아직 — 다시 읽기는 파일 시각만 보므로 가볍다. 늦다는 말이 나오면 notify 로
     let app = app.clone();
     std::thread::spawn(move || loop {
@@ -136,6 +140,19 @@ fn with_open_flag(app: &AppHandle, list: Vec<Value>) -> Value {
     )
 }
 
+/// 곧 push_list: 창을 열고 닫고 탭을 바꿀 때 몇 번씩 불러도 목록은 한 번만 새로, 부른 스레드(메인 스레드일 수 있다)를 붙잡지 않고 (Electron pushList 처럼 80ms 모아서)
+pub fn push_list_soon(app: &AppHandle) {
+    static GEN: AtomicU64 = AtomicU64::new(0);
+    let n = GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(80));
+        if GEN.load(Ordering::Relaxed) == n {
+            push_list(&app);
+        }
+    });
+}
+
 // 폴더가 바뀌었다 — 열린 메모 창의 폴더 표시도 새로
 fn refresh_note_files(app: &AppHandle) {
     let labels: Vec<(String, String)> = state(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -155,7 +172,7 @@ fn app_settings(app: &AppHandle) -> Value {
     json!({
         "trashDays": s("trashDays").as_u64().unwrap_or(30),
         "trashCount": with_vault(app, |v| Ok(v.trash_list().len())).unwrap_or(0),
-        "autoStart": { "available": false, "enabled": false },
+        "autoStart": crate::files::auto_start(app),
         "historyEnabled": s("historyEnabled") == true,
         "quickMemo": { "enabled": not_false("quickMemo"), "registered": quick["registered"], "key": quick["label"] },
         "shortcuts": { "quickMemo": quick, "magic": status("magic"), "list": status("list") },
@@ -170,7 +187,6 @@ fn app_settings(app: &AppHandle) -> Value {
         "workLife": s("workLife") == true,
         "workHours": crate::settings::normalize_hours(&s("workHours")),
         "keymap": Value::Object(crate::settings::clean_overrides(&s("keymap"))),
-        "mcp": crate::services::mcp_status(app),
         "version": app.package_info().version.to_string(),
     })
 }
@@ -180,6 +196,7 @@ pub fn push_list(app: &AppHandle) {
     crate::drive::request(1000); // Google Drive 에도 (메모 저장은 이미 0.6초 모아서 오므로 1초면 충분)
     let _ = app.emit_to("list", "memos:changed", [list_memos(app)]);
     crate::windows::push_all_stacks(app);
+    crate::os::refresh_tray(app); // 알림 영역의 최근 메모 · 열린 메모 (메모 창을 열고 닫을 때도 여기로 온다)
 }
 
 // 창 이름에 쓸 수 있는 글자만 — 메모 id 는 다른 앱이 쓴 아무 글자일 수 있다
@@ -199,64 +216,172 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
         return Ok(crate::windows::show_tab(app, id, None, true));
     }
     let label = st.note_labels.lock().unwrap().get(id).cloned();
-    if let Some(w) = label.and_then(|l| app.get_webview_window(&l)) {
+    if let Some(w) = label.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
         crate::windows::shown(app, id, &w);
         return Ok(true);
     }
-    let win = create_note_window(app, id, None, true)?;
+    let win = create_note_window(app, id, None, true, None)?;
     crate::windows::shown(app, id, &win);
     Ok(true)
 }
 
-/// 메모 창 만들기 — bounds 가 없으면 기억한 자리, show 가 false 면 숨겨서 (스택 탭: windows.rs 가 다 그린 뒤 보인다)
-// shortcut: 예비 창은 아직 — 기억한 자리(noteBounds)가 없으면 기본 크기로 화면 가운데쯤
-pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, show: bool) -> Result<tauri::WebviewWindow, String> {
+/// 미리 불러 둔 메모 창 (Electron makeSpare): 편집기를 다 읽어 두고 열 메모를 기다린다
+struct Spare {
+    label: String,
+    /// 화면이 메모를 기다리는 중이면(win:spare) 메모를 건넬 곳
+    assign: Option<std::sync::mpsc::Sender<Value>>,
+}
+
+static SPARE: Mutex<Option<Spare>> = Mutex::new(None);
+static SPARE_GEN: AtomicU64 = AtomicU64::new(0);
+
+/// ms 뒤 예비 창을 하나 만들어 둔다 (그사이 또 부르면 그 뒤로 미룬다)
+fn schedule_spare(app: &AppHandle, ms: u64) {
+    let n = SPARE_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(ms));
+        if SPARE_GEN.load(Ordering::Relaxed) == n {
+            make_spare(&app);
+        }
+    });
+}
+
+fn make_spare(app: &AppHandle) {
+    // 점검(smoke)은 창마다 점검을 돌려 알려 온 창 수를 센다. 예비 창을 섞지 않는다
+    if crate::ipc::smoke() || state(app).vault.lock().unwrap().is_none() {
+        return;
+    }
+    let label = format!("note-{}", NEXT_NOTE.fetch_add(1, Ordering::Relaxed));
+    {
+        let mut g = SPARE.lock().unwrap();
+        if g.is_some() {
+            return;
+        }
+        *g = Some(Spare { label: label.clone(), assign: None });
+    }
+    let forget = move |label: &str| {
+        let mut g = SPARE.lock().unwrap();
+        if g.as_ref().is_some_and(|s| s.label == label) {
+            *g = None; // 기다리던 win:spare 는 null 을 받고 창을 닫는다
+        }
+    };
+    match crate::window(app, &label, "note.html?spare=1").inner_size(340.0, 380.0).min_inner_size(240.0, 200.0).visible(false).build() {
+        Ok(w) => {
+            let l = label.clone();
+            w.on_window_event(move |e| {
+                if let WindowEvent::Destroyed = e {
+                    forget(&l);
+                }
+            });
+        }
+        Err(_) => forget(&label),
+    }
+}
+
+/// 쓸 수 있는 예비 창 (화면이 메모를 기다리는 중일 때만). 가져가면 다음 것은 새로
+fn take_spare(app: &AppHandle) -> Option<(tauri::WebviewWindow, std::sync::mpsc::Sender<Value>)> {
+    let mut g = SPARE.lock().unwrap();
+    let w = g.as_ref().filter(|s| s.assign.is_some()).and_then(|s| app.get_webview_window(&s.label))?;
+    Some((w, g.take()?.assign?))
+}
+
+/// 메모 창 만들기: bounds 가 없으면 기억한 자리, show 가 false 면 숨겨서. ready: 메모를 다 그리면 (스택 탭: windows.rs 가 그때 보인다)
+///   보이거나 ready 가 있는 창은 예비 창을 쓴다 (편집기를 새로 읽지 않아 바로 뜬다). 둘 다 없으면(옆 탭 미리 만들기) 예비 창은 남겨 둔다
+// shortcut: 기억한 자리(noteBounds)가 없으면 기본 크기로 화면 가운데쯤 (예비 창이면 그 창이 만들어진 자리)
+pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, show: bool, ready: Option<crate::windows::Action>) -> Result<tauri::WebviewWindow, String> {
     // memo:open 이 둘 겹치면(채널은 spawn_blocking) 둘 다 창이 없다고 보고 하나씩 만든다 — 확인부터 note_labels 넣기까지 한 번에 하나만
     static CREATING: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let one = CREATING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let st = state(app);
     let open = st.note_labels.lock().unwrap().get(id).cloned();
-    if let Some(w) = open.and_then(|l| app.get_webview_window(&l)) {
+    if let Some(w) = open.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         return Ok(w);
     }
-    let label = format!("note-{}", NEXT_NOTE.fetch_add(1, Ordering::Relaxed));
     let title = with_vault(app, |v| Ok(v.get(id).and_then(|m| m["title"].as_str().map(str::to_string)).unwrap_or_default()))?;
-    let b = crate::window(app, &label, &format!("note.html?id={}", query_escape(id)))
-        .title(title)
-        .inner_size(340.0, 380.0)
-        .min_inner_size(240.0, 200.0)
-        .visible(show)
-        .always_on_top(st.setting("onTop")[id] == true);
-    let b = match bounds {
-        Some([x, y, w, h]) => b.position(x, y).inner_size(w, h),
-        None => crate::os::place_note(app, id, b),
+    let on_top = st.setting("onTop")[id] == true;
+    let spare = if show || ready.is_some() { take_spare(app) } else { None };
+    let win = match &spare {
+        Some((w, _)) => {
+            if let Some(b) = bounds.or_else(|| crate::windows::saved_bounds(app, id)) {
+                crate::windows::set_bounds(w, b);
+            }
+            let _ = w.set_title(&title);
+            if on_top {
+                let _ = w.set_always_on_top(true);
+            }
+            w.clone()
+        }
+        None => {
+            let label = format!("note-{}", NEXT_NOTE.fetch_add(1, Ordering::Relaxed));
+            let b = crate::window(app, &label, &format!("note.html?id={}", query_escape(id)))
+                .title(title)
+                .inner_size(340.0, 380.0)
+                .min_inner_size(240.0, 200.0)
+                .visible(show)
+                .always_on_top(on_top);
+            let b = match bounds {
+                Some([x, y, w, h]) => b.position(x, y).inner_size(w, h),
+                None => crate::os::place_note(app, id, b),
+            };
+            b.build().map_err(|e| e.to_string())?
+        }
     };
-    let win = b.build().map_err(|e| e.to_string())?;
-    st.note_labels.lock().unwrap().insert(id.to_string(), label);
+    let label = win.label().to_string();
+    st.note_labels.lock().unwrap().insert(id.to_string(), label.clone());
     drop(one);
-    let (app2, id2) = (app.clone(), id.to_string());
+    let (app2, id2, label2) = (app.clone(), id.to_string(), label.clone());
     win.on_window_event(move |e| {
         if let WindowEvent::Destroyed = e {
-            closed_note(&app2, &id2);
+            closed_note(&app2, &id2, &label2);
         }
     });
     crate::os::track_note(app, id, &win);
     crate::windows::track(app, id, &win);
-    push_list(app);
+    // 예비 창은 이미 한 번 그린 창이라 숨겨 두었다가 메모를 다 그리면 보인다. 메모를 건네기 전에 걸어 둔다 (그리기가 먼저 끝나지 않게)
+    let ready = match spare {
+        Some(_) if show => {
+            let id = id.to_string();
+            Some(Box::new(move |app: &AppHandle| {
+                if let Some(w) = app.get_webview_window(&label) {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                    crate::windows::shown(app, &id, &w);
+                }
+            }) as crate::windows::Action)
+        }
+        _ => ready,
+    };
+    if let Some(f) = ready {
+        crate::windows::when_painted(app, win.label(), f);
+    }
+    if let Some((_, assign)) = spare {
+        let _ = assign.send(json!({ "id": id }));
+    }
+    push_list_soon(app);
+    schedule_spare(app, 3000);
     Ok(win)
 }
 
 // 메모 창이 닫혔다: 빈 메모는 치우고 제목에 맞춰 파일 이름을
-fn closed_note(app: &AppHandle, id: &str) {
-    state(app).note_labels.lock().unwrap().remove(id);
+fn closed_note(app: &AppHandle, id: &str, label: &str) {
+    let st = state(app);
+    {
+        let mut labels = st.note_labels.lock().unwrap();
+        // 닫는 사이 다시 열어 새 창이 이어받았다: 마무리는 그 창이 닫힐 때
+        if labels.get(id).is_some_and(|l| l != label) {
+            return;
+        }
+        labels.remove(id);
+    }
     let _ = with_vault(app, |v| {
         v.close_lock(id); // 닫은 잠긴 메모의 열쇠를 남기지 않는다
         v.finalize(id).map_err(|e| e.to_string())
     });
-    push_list(app);
+    push_list_soon(app);
 }
 
 fn create_memo(app: &AppHandle, opts: &Value) -> Result<Value, String> {
@@ -654,7 +779,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
                 }
                 Ok(())
             });
-            push_list(app);
+            push_list_soon(app);
             r.map(|()| true.into())
         }
         // 잠그기 · 열기: 열쇠 만들기(PBKDF2)는 일부러 느리다 — 메모 폴더를 붙잡지 않고 먼저 만든다
@@ -845,8 +970,15 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             }
             Ok(Value::Null)
         }
-        // 예비 창은 아직 — 메모 창은 늘 주소의 id 로 연다
-        "win:spare" => Ok(Value::Null),
+        // 예비 창의 화면이 다 불러졌다 → 열 메모가 정해질 때까지 이 일꾼 스레드에서 기다린다 (Electron spareWaiting). 예비 창이 아니면 null
+        "win:spare" => {
+            let (tx, rx) = std::sync::mpsc::channel();
+            match SPARE.lock().unwrap().as_mut().filter(|s| s.label == label) {
+                Some(s) => s.assign = Some(tx),
+                None => return Some(Ok(Value::Null)),
+            }
+            Ok(rx.recv().unwrap_or(Value::Null))
+        }
         "win:painted" => {
             crate::windows::painted(app, label);
             Ok(Value::Null)

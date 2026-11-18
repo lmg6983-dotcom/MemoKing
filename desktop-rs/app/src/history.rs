@@ -12,13 +12,15 @@ use std::collections::HashMap;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
 const MAX_ENTRIES: usize = 10_000;
 const MAX_IMAGE_BYTES: u64 = 2 * 1024 * 1024;
+// 한 번에 읽는 알림 수. 처음 켜면 알림 DB 의 모든 알림을 읽으므로 나머지는 다음 차례에
+const ROWS_PER_POLL: usize = 500;
 
 #[derive(Default)]
 pub struct History {
@@ -35,6 +37,8 @@ pub struct History {
 
 static ON: AtomicBool = AtomicBool::new(false);
 static WATCHER: Mutex<Option<Child>> = Mutex::new(None);
+// 켤 때마다 하나씩: 껐다 바로 켜면 앞의 지켜보기(5초 쉬는 중)가 도우미를 하나 더 띄우지 않게
+static RUN: AtomicUsize = AtomicUsize::new(0);
 
 fn iso(ms: i64) -> String {
     chrono::DateTime::from_timestamp_millis(ms).unwrap_or_default().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
@@ -106,8 +110,10 @@ impl History {
         if (blocked.contains_key(&app_id) && item["source"] != "memoking") || self.entries.iter().any(|e| e["id"] == item["id"]) {
             return None;
         }
-        self.entries.insert(0, item.clone());
-        self.entries.sort_by(|a, b| time_ms(b).total_cmp(&time_ms(a)));
+        // 기록은 늘 새것부터라 통째로 다시 정렬하지 않고 제자리에 (같은 시각이면 앞에)
+        let t = time_ms(&item);
+        let at = self.entries.partition_point(|e| time_ms(e).total_cmp(&t).is_gt());
+        self.entries.insert(at, item.clone());
         for old in self.entries.split_off(self.entries.len().min(MAX_ENTRIES)) {
             self.remove_image(&old);
         }
@@ -161,16 +167,18 @@ impl History {
         self.app_names.get(&app_id.to_lowercase()).cloned().unwrap_or_else(|| notify::fallback_app_name(app_id))
     }
 
-    /// 알림 DB 복사본에서 지난번 이후 새 토스트 → 넣은 개수
-    fn read_copy(&mut self, file: &Path, self_id: &str, blocked: &Map<String, Value>) -> rusqlite::Result<usize> {
+    /// 알림 DB 복사본에서 지난번 이후 새 토스트 → (넣은 개수, 다 읽었나)
+    fn read_copy(&mut self, file: &Path, self_id: &str, blocked: &Map<String, Value>) -> rusqlite::Result<(usize, bool)> {
         let db = rusqlite::Connection::open_with_flags(file, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         let mut stmt = db.prepare(
             "select n.Id, n.Payload, n.ArrivalTime, h.PrimaryId from Notification n join NotificationHandler h on h.RecordId = n.HandlerId
-             where n.ArrivalTime > ? and n.Type in ('toast', 'toastCondensed') order by n.ArrivalTime asc",
+             where n.ArrivalTime > ? and n.Type in ('toast', 'toastCondensed') order by n.ArrivalTime asc limit ?",
         )?;
         let rows: Vec<(i64, Vec<u8>, i64, String)> = stmt
-            .query_map([self.last_arrival], |r| Ok((r.get(0)?, r.get::<_, Option<Vec<u8>>>(1)?.unwrap_or_default(), r.get(2)?, r.get::<_, Option<String>>(3)?.unwrap_or_default())))?
+            .query_map([self.last_arrival, ROWS_PER_POLL as i64], |r| Ok((r.get(0)?, r.get::<_, Option<Vec<u8>>>(1)?.unwrap_or_default(), r.get(2)?, r.get::<_, Option<String>>(3)?.unwrap_or_default())))?
             .collect::<Result<_, _>>()?;
+        let done = rows.len() < ROWS_PER_POLL;
+        let one_time = rows.first().map(|r| r.2) == rows.last().map(|r| r.2);
         let mut added = 0;
         for (id, payload, arrival, app_id) in rows {
             self.last_arrival = self.last_arrival.max(arrival);
@@ -191,7 +199,12 @@ impl History {
             });
             added += usize::from(self.add(blocked, entry).is_some());
         }
-        Ok(added)
+        // 모두 같은 시각이면 되돌려도 같은 줄만 다시 읽어 끝나지 않으니 넘어간다
+        if !done && !one_time {
+            // 잘린 자리와 같은 시각의 알림이 뒤에 더 있을 수 있어 그 시각부터 다시 (이미 넣은 것은 id 로 걸러진다)
+            self.last_arrival -= 1;
+        }
+        Ok((added, done))
     }
 }
 
@@ -272,9 +285,10 @@ fn set_on(app: &AppHandle, on: bool) {
     }
     if on {
         let app = app.clone();
+        let run = RUN.fetch_add(1, Ordering::SeqCst) + 1;
         std::thread::spawn(move || {
             poll(&app);
-            watch_popups(&app);
+            watch_popups(&app, run);
         });
     } else if let Some(mut c) = WATCHER.lock().unwrap().take() {
         let _ = c.kill();
@@ -324,24 +338,30 @@ fn poll(app: &AppHandle) {
     let sig = ["wpndatabase.db", "wpndatabase.db-wal"]
         .map(|n| std::fs::metadata(src.join(n)).map_or("-".into(), |m| format!("{:?}:{}", m.modified().ok(), m.len())))
         .join("|");
-    update(app, |h, blocked| {
-        if sig == h.last_sig {
-            return ((), false);
-        }
-        let tmp = std::env::temp_dir().join(format!("memoking-wpn-{}-{}", std::process::id(), rand24()));
-        let r = std::fs::create_dir_all(&tmp).map_err(|e| e.to_string()).and_then(|()| {
-            for name in ["wpndatabase.db", "wpndatabase.db-wal", "wpndatabase.db-shm"] {
-                if src.join(name).exists() {
-                    std::fs::copy(src.join(name), tmp.join(name)).map_err(|e| e.to_string())?;
-                }
+    if app.state::<Mutex<History>>().lock().unwrap().last_sig == sig {
+        return;
+    }
+    // 복사는 보관함을 잠그지 않고 (수십 MB 를 복사하는 동안 목록 열기 · 팝업 알림 넣기가 기다리지 않게)
+    let tmp = std::env::temp_dir().join(format!("memoking-wpn-{}-{}", std::process::id(), rand24()));
+    let copied = std::fs::create_dir_all(&tmp).and_then(|()| {
+        for name in ["wpndatabase.db", "wpndatabase.db-wal", "wpndatabase.db-shm"] {
+            if src.join(name).exists() {
+                std::fs::copy(src.join(name), tmp.join(name))?;
             }
-            h.read_copy(&tmp.join("wpndatabase.db"), &self_id, blocked).map_err(|e| e.to_string())
-        });
-        let _ = std::fs::remove_dir_all(&tmp);
+        }
+        Ok(())
+    });
+    update(app, |h, blocked| {
+        let before = h.last_arrival;
+        let r = copied.map_err(|e| e.to_string()).and_then(|()| h.read_copy(&tmp.join("wpndatabase.db"), &self_id, blocked).map_err(|e| e.to_string()));
         match r {
-            Ok(added) => {
-                h.last_sig = sig; // 다 읽은 뒤에만 (읽다 실패하면 다음에 다시)
-                h.save(); // 읽은 자리(lastArrival)는 새 알림이 없어도
+            Ok((added, done)) => {
+                if done {
+                    h.last_sig = sig; // 다 읽은 뒤에만 (읽다 실패하거나 남았으면 다음에 다시)
+                }
+                if added == 0 && h.last_arrival != before {
+                    h.save(); // 읽은 자리(lastArrival)만 옮겨졌으면(메모킹 자신의 알림 등) 저장만
+                }
                 ((), added > 0)
             }
             Err(err) => {
@@ -350,6 +370,7 @@ fn poll(app: &AppHandle) {
             }
         }
     });
+    let _ = std::fs::remove_dir_all(&tmp);
 }
 
 // ---------- 팝업 알림 지켜보기 ----------
@@ -359,7 +380,7 @@ fn popup_dir() -> PathBuf {
 }
 
 // 도우미를 띄워 두고 한 줄씩 읽는다. 멈추면 잠시 뒤 다시 (끄는 중이 아니면)
-fn watch_popups(app: &AppHandle) {
+fn watch_popups(app: &AppHandle, run: usize) {
     if !cfg!(windows) {
         return;
     }
@@ -368,7 +389,7 @@ fn watch_popups(app: &AppHandle) {
     let _ = std::fs::write(&script, include_str!("../../../scripts/popup-watch.ps1"));
     let log = state(app).settings_dir.join("popup-debug.log");
     let processes = notify::POPUP_APPS.map(|a| a.0).join(",");
-    while ON.load(Ordering::SeqCst) {
+    while ON.load(Ordering::SeqCst) && RUN.load(Ordering::SeqCst) == run {
         let child = powershell(true)
             .arg("-File")
             .arg(&script)
@@ -385,7 +406,17 @@ fn watch_popups(app: &AppHandle) {
             Err(err) => eprintln!("[팝업 알림] {err}"),
             Ok(mut c) => {
                 let out = c.stdout.take().unwrap();
-                *WATCHER.lock().unwrap() = Some(c);
+                let pid = c.id();
+                let mut slot = WATCHER.lock().unwrap();
+                // 띄우는 사이에 껐거나 껐다 켰으면 바로 끈다 (끄는 쪽은 ON 을 내린 뒤 이 자리를 비운다). 새 차례의 도우미를 덮어 놓치지 않게 넣지 않는다
+                if !ON.load(Ordering::SeqCst) || RUN.load(Ordering::SeqCst) != run {
+                    drop(slot);
+                    let _ = c.kill();
+                    let _ = c.wait();
+                    break;
+                }
+                *slot = Some(c);
+                drop(slot);
                 for line in std::io::BufReader::new(out).lines().map_while(Result::ok) {
                     match serde_json::from_str::<Value>(line.trim_start_matches('\u{feff}')) {
                         Ok(msg) if msg["error"].is_string() => eprintln!("[팝업 알림] {}", msg["error"]),
@@ -393,7 +424,9 @@ fn watch_popups(app: &AppHandle) {
                         _ => {}
                     }
                 }
-                if let Some(mut c) = WATCHER.lock().unwrap().take() {
+                // 자기 도우미만 거둔다 (껐다 켜서 새로 띄운 도우미는 그대로)
+                let mine = WATCHER.lock().unwrap().take_if(|c| c.id() == pid);
+                if let Some(mut c) = mine {
                     let _ = c.wait();
                 }
             }
@@ -468,7 +501,7 @@ fn add_popup(app: &AppHandle, mut p: Value) {
             let image = image.as_ref().and_then(|f| h.keep_image(&f.to_string_lossy()));
             let item = h.add(blocked, json!({ "source": "popup", "appId": process, "app": app_name, "title": entry["title"], "body": entry["body"], "image": image, "via": via }));
             h.recent.push(json!({ "app": app_name, "hwnd": p["hwnd"], "title": entry["title"], "body": entry["body"], "via": via, "id": item.as_ref().map(|i| i["id"].clone()), "at": now }));
-            ((), true)
+            ((), item.is_some() || prev.is_some())
         });
     }
     for f in files {
@@ -627,16 +660,51 @@ mod tests {
         .unwrap();
         drop(db);
         let mut h = History { dir: dir.clone(), ..Default::default() };
-        assert_eq!(h.read_copy(&file, "com.memoking.desktop", &Map::new()).unwrap(), 1);
+        assert_eq!(h.read_copy(&file, "com.memoking.desktop", &Map::new()).unwrap(), (1, true));
         assert_eq!(h.last_arrival, 133000000000000001);
         let e = &h.entries[0];
         assert_eq!((e["id"].as_str(), e["app"].as_str(), e["title"].as_str(), e["body"].as_str()), (Some("w10-133000000000000000"), Some("MSTeams"), Some("김대리"), Some("회의 & 점심")));
         assert_eq!(e["time"], "2022-06-18T04:26:40.000Z");
         // 다시 읽어도 지난번 뒤의 것만 — 막아 둔 앱은 넣지 않는다
-        assert_eq!(h.read_copy(&file, "com.memoking.desktop", &Map::new()).unwrap(), 0);
+        assert_eq!(h.read_copy(&file, "com.memoking.desktop", &Map::new()).unwrap(), (0, true));
         let blocked: Map<String, Value> = [("x".to_string(), json!("X"))].into_iter().collect();
         assert!(h.add(&blocked, json!({ "appId": "x", "title": "막힘" })).is_none());
         assert!(h.add(&blocked, json!({ "appId": "x", "source": "memoking" })).is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn reads_a_big_db_in_parts_and_keeps_newest_first() {
+        let dir = std::env::temp_dir().join(format!("memoking-history-cap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("wpn.db");
+        let db = rusqlite::Connection::open(&file).unwrap();
+        // 600개, 마지막 둘은 같은 시각 (잘린 자리에 걸쳐도 빠지지 않게)
+        db.execute_batch(
+            "create table NotificationHandler (RecordId integer, PrimaryId text);
+             create table Notification (Id integer, HandlerId integer, Type text, Payload blob, ArrivalTime integer);
+             insert into NotificationHandler values (1, 'App');
+             with recursive n(i) as (select 1 union all select i + 1 from n where i < 600)
+               insert into Notification select i, 1, 'toast', cast('<toast><text>t' || i || '</text></toast>' as blob), 133000000000000000 + min(i, 500) from n;",
+        )
+        .unwrap();
+        drop(db);
+        let mut h = History { dir: dir.clone(), ..Default::default() };
+        assert_eq!(h.read_copy(&file, "self", &Map::new()).unwrap(), (500, false));
+        assert_eq!(h.read_copy(&file, "self", &Map::new()).unwrap(), (100, true));
+        assert_eq!(h.entries.len(), 600);
+        assert!(h.entries.windows(2).all(|w| time_ms(&w[0]) >= time_ms(&w[1])));
+        // 한 번에 읽는 줄이 모두 같은 시각이어도 같은 자리를 맴돌지 않는다
+        let db = rusqlite::Connection::open(&file).unwrap();
+        db.execute_batch(
+            "with recursive n(i) as (select 1 union all select i + 1 from n where i < 500)
+               insert into Notification select 1000 + i, 1, 'toast', cast('<toast><text>s' || i || '</text></toast>' as blob), 133000000000001000 from n;",
+        )
+        .unwrap();
+        drop(db);
+        assert_eq!(h.read_copy(&file, "self", &Map::new()).unwrap(), (500, false));
+        assert_eq!(h.read_copy(&file, "self", &Map::new()).unwrap(), (0, true));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

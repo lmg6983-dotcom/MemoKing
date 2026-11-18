@@ -17,6 +17,8 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-updater = "2"
+# 로그인 때 자동 실행 (Electron setLoginItemSettings 자리, MagicKey 와 같은 플러그인)
+tauri-plugin-autostart = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.23"
@@ -42,13 +44,13 @@ sherpa-rs = { version = "0.6.8", default-features = false, features = ["download
 [target.'cfg(windows)'.dependencies]
 # 알림 창 (누르면 그 메모를 연다)
 tauri-winrt-notification = "0.8"
-# Google 로그인 토큰을 Electron safeStorage 와 같게 감싼다 (DPAPI 로 감싼 열쇠 + AES-256-GCM) · AI 엔진을 앱과 함께 끈다 (작업 개체)
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_JobObjects", "Win32_System_Threading"] }
+# Google 로그인 토큰을 Electron safeStorage 와 같게 감싼다 (DPAPI 로 감싼 열쇠 + AES-256-GCM) · AI 엔진을 앱과 함께 끈다 (작업 개체) · 탭을 바꿀 때 스티커 창의 주인 바꾸기
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 aes-gcm = "0.10"
 # PDF로 저장 (WebView2 PrintToPdf) — Tauri(wry)가 쓰는 판 그대로
 webview2-com = "0.39"
-# 첨부를 메모 밖으로 끌어내기 (OLE DoDragDrop) · PDF 의 COM 형식 — webview2-com 이 쓰는 판 그대로 (implement 매크로는 windows_core 이름을 찾는다)
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_System_SystemServices", "Win32_UI_Shell"] }
+# 첨부를 메모 밖으로 끌어내기 (OLE DoDragDrop) · PDF 의 COM 형식 · HEVC 디코더가 있는지 (Media Foundation) — webview2-com 이 쓰는 판 그대로 (implement 매크로는 windows_core 이름을 찾는다)
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_System_SystemServices", "Win32_UI_Shell", "Win32_Media_MediaFoundation"] }
 windows-core = "0.62"
 # 화면 캡처 메모 (Linux 빌드에는 pipewire 가 있어야 해 Windows 만)
 xcap = "0.9"

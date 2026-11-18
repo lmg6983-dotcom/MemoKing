@@ -671,5 +671,6 @@ while ($true) {
   } catch {
     [Console]::Out.WriteLine((@{ error = $_.Exception.Message } | ConvertTo-Json -Compress))
   }
-  Start-Sleep -Milliseconds $IntervalMs
+  # 지켜볼 앱(카카오톡)이 꺼져 있으면 드문드문 찾는다 (Get-Process 가 0.7초마다 모든 프로세스를 훑지 않게)
+  Start-Sleep -Milliseconds $(if ($pids.Count) { $IntervalMs } else { 3000 })
 }

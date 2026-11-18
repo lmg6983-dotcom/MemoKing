@@ -85,6 +85,20 @@ async function nativeFrame(src) {
   return res?.status === 200 ? res.blob() : null;
 }
 
+// PC(Rust 판): 이 PC 가 못 푸는 HEVC 영상은 H.264 사본을 만드는 동안 실패하고, 다 되면 media:ready (desktop-rs/app/src/video.rs).
+//   휴대폰 · Electron 판은 이 이벤트를 보내지 않는다
+const samePath = (src, path) => {
+  try {
+    return decodeURI(src) === path;
+  } catch {
+    return src === path;
+  }
+};
+/** 이 첨부 경로의 media:ready · media:converting 을 받는다 → 끄기 함수 */
+export function onMedia(event, src, fn) {
+  return globalThis.memoking?.on?.(event, (path) => { if (samePath(src, path)) fn(); }) ?? (() => {});
+}
+
 const urls = new Map(); // 첨부 경로 → 그림 주소 (이 창에서 한 번만 만든다)
 let queue = Promise.resolve(); // 동영상은 한 번에 하나씩 연다 (목록에 영상이 많아도 한꺼번에 열지 않게)
 
@@ -116,13 +130,20 @@ function watch(box, src) {
       const { src: s, img } = e.target.__poster;
       videoPoster(s).then((url) => {
         if (url) img.src = url;
-        else e.target.remove(); // 못 그리면 칸을 지운다 (카드 아래 동영상 아이콘은 그대로)
+        else e.target.hidden = true; // 못 그리면 칸을 숨긴다 (카드 아래 동영상 아이콘은 그대로). 사본이 다 되면 다시 그린다
       });
     }
   }, { rootMargin: '300px 0px' });
   box.__poster = { src, img: box.firstChild };
   seen.observe(box);
 }
+globalThis.memoking?.on?.('media:ready', (path) => {
+  for (const box of document.querySelectorAll('.card-video[hidden]')) {
+    if (!samePath(box.__poster.src, path)) continue;
+    box.hidden = false;
+    seen.observe(box);
+  }
+});
 
 /** 목록 카드에 넣을 동영상 첫 장면 칸 (사진 썸네일과 같은 자리 · 크기, 가운데 ▶) */
 export function videoThumb(src) {

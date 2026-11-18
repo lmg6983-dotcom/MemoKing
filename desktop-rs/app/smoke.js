@@ -31,6 +31,8 @@ window.addEventListener('load', () => setTimeout(async () => {
     // 이벤트를 받을 준비는 미리 (Tauri 의 listen 은 비동기로 자리 잡는다)
     let trashed = null;
     mk.on('memo:trashed', (t) => (trashed = t));
+    const ready = new Set(); // HEVC 사본이 다 된 영상 (video.rs)
+    mk.on('media:ready', (path) => ready.add(path));
     await check('window.memoking (preload.cjs 그대로)', () => mk?.platform === 'desktop');
     await check('메모 폴더 열림', async () => Boolean((await mk.info()).vaultPath));
     await check('모르는 채널은 실패로', () => window.__TAURI_INTERNALS__.invoke('ipc', { channel: 'smoke:nope', args: [] }).then(() => false, (e) => /smoke:nope/.test(String(e))));
@@ -43,6 +45,35 @@ window.addEventListener('load', () => setTimeout(async () => {
       img.onerror = () => reject(new Error(`못 읽음 ${img.src}`));
       img.src = `${mk.vaultBase}attachments/dot.png`;
     }));
+    // 동영상: 메모 속 재생기처럼(출처 허락 없이) 한 장면이 나오는지, 목록 첫 장면처럼(crossOrigin) 캔버스에 그려 꺼낼 수 있는지
+    const clip = (cors, name = 'clip.mp4') => new Promise((resolve, reject) => {
+      const v = document.createElement('video');
+      v.muted = true;
+      v.preload = 'auto';
+      if (cors) v.crossOrigin = 'anonymous';
+      v.onerror = () => reject(new Error(`재생 못 함 code=${v.error?.code} ${v.error?.message ?? ''}`));
+      v.onloadeddata = () => {
+        v.currentTime = 1;
+        v.onseeked = () => {
+          if (!cors) return resolve(v.videoWidth === 96);
+          const c = document.createElement('canvas');
+          c.width = v.videoWidth;
+          c.height = v.videoHeight;
+          c.getContext('2d').drawImage(v, 0, 0);
+          resolve(c.toDataURL('image/jpeg').length > 100);
+        };
+      };
+      setTimeout(() => reject(new Error(`10초 안에 못 읽음 readyState=${v.readyState} network=${v.networkState}`)), 10000);
+      v.src = `${mk.vaultBase}attachments/${name}`;
+    });
+    await check('동영상 재생 (메모 속 재생기)', () => clip(false));
+    await check('동영상 첫 장면 그리기 (목록 카드)', () => clip(true));
+    // HEVC 10비트: 이 PC 가 풀면 원본 그대로, 못 풀면 처음엔 503 으로 실패하고 H.264 사본이 다 되면(media:ready) 다시
+    await check('HEVC 동영상 재생 (풀 수 없으면 H.264 사본)', () => clip(false, 'clip-hevc.mp4').catch(async () => {
+      await until(() => ready.has('attachments/clip-hevc.mp4'), 20000);
+      return clip(false, 'clip-hevc.mp4');
+    }));
+    await check('HEVC 동영상 첫 장면 그리기', () => clip(true, 'clip-hevc.mp4'));
     await check('CSS app-region 읽힘 (창 끌기)', () => dragRegion('.titlebar'));
     await check('창 단추 셋 (CSP 아래에서도 모양)', () => {
       const b = document.querySelectorAll('.mk-caption button');

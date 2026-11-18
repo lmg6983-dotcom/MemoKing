@@ -29,3 +29,4 @@
 | tesseract.js (+ tesseract.js-core, kor tessdata_best) | 7.0.0 | Apache-2.0 | https://github.com/naptha/tesseract.js |
 | qrcode-generator | 1.4.4 | MIT | https://github.com/kazuhikoarase/qrcode-generator |
 | perfect-freehand | 1.2.3 | MIT | https://github.com/steveruizok/perfect-freehand |
+| FFmpeg (ffmpeg.exe, PC Rust 판 HEVC 변환기 · 빌드 방법 desktop-rs/scripts/build-ffmpeg-min.sh) | 8.0.1 | LGPL-2.1-or-later | https://ffmpeg.org/releases/ffmpeg-8.0.1.tar.xz |

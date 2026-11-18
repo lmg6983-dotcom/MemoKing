@@ -239,7 +239,7 @@ pub fn stop() {
 /// 엔진을 띄워(이미 떠 있으면 그대로) 주소와 열쇠
 /// 메모킹이 충돌하거나 작업 관리자로 꺼져도 엔진(몇 GB 메모리)이 남지 않게: 엔진을 작업 개체에 넣으면 앱이 끝나 그 핸들이 닫힐 때 Windows 가 함께 끈다
 #[cfg(windows)]
-fn kill_with_app(child: &Child) {
+pub(crate) fn kill_with_app(child: &Child) {
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::System::JobObjects::*;
     // 핸들은 일부러 닫지 않는다 (닫히는 때가 엔진을 끄는 때)

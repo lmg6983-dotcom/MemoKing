@@ -97,9 +97,11 @@ export function findController(view) {
   const state = () => findKey.getState(view().state) ?? { query: '', matches: [], current: -1 };
   let lastAll = null; // 마지막 모두 바꾸기 (되돌리기 단추)
   // 지금 자리를 보이게: 고른 글로 두고(편집기에 포커스를 주지 않아도) 화면을 그곳으로
-  const reveal = (tr, m) => {
+  //   찾기 칸에 포커스가 있으면 ProseMirror 의 scrollIntoView 는 움직이지 않는다 (DOM 선택이 편집기 밖). 그려진 지금 자리를 직접 보이게
+  const reveal = (v, tr, m) => {
     if (m) tr.setSelection(TextSelection.create(tr.doc, m.from, m.to)).scrollIntoView();
-    return tr;
+    v.dispatch(tr);
+    if (m) v.dom.querySelector('.mk-find-current')?.scrollIntoView({ block: 'nearest' });
   };
   return {
     state,
@@ -109,7 +111,7 @@ export function findController(view) {
       const tr = v.state.tr.setMeta(findKey, { query, opts });
       v.dispatch(tr);
       const f = state();
-      if (f.current >= 0) v.dispatch(reveal(v.state.tr, f.matches[f.current]));
+      if (f.current >= 0) reveal(v, v.state.tr, f.matches[f.current]);
       return state();
     },
     /** 다음(1) · 이전(-1) 자리로 — 끝에서는 처음으로 */
@@ -120,7 +122,7 @@ export function findController(view) {
       const cur = f.matches[f.current];
       const pos = cur ? (dir > 0 ? cur.from + 1 : cur.from) : v.state.selection.from;
       const i = stepMatch(f.matches, pos, dir);
-      v.dispatch(reveal(v.state.tr.setMeta(findKey, { current: i }), f.matches[i]));
+      reveal(v, v.state.tr.setMeta(findKey, { current: i }), f.matches[i]);
       return state();
     },
     /** 지금 자리 하나를 바꾸고(fmt: 바꿀 서식) 다음으로 → 바꿨으면 true */
@@ -136,7 +138,7 @@ export function findController(view) {
       const after = end;
       const next = state();
       const i = next.matches.length ? stepMatch(next.matches, after, 1) : -1;
-      v.dispatch(reveal(v.state.tr.setMeta(findKey, { current: i }), next.matches[i]));
+      reveal(v, v.state.tr.setMeta(findKey, { current: i }), next.matches[i]);
       return true;
     },
     /** 모두 바꾸기 → 바꾼 개수 (한 번에 되돌릴 수 있게 한 번의 고침으로) */
@@ -168,7 +170,7 @@ export function findController(view) {
       const f = state();
       const m = f.matches[i];
       if (!m) return f;
-      v.dispatch(reveal(v.state.tr.setMeta(findKey, { current: i }), m));
+      reveal(v, v.state.tr.setMeta(findKey, { current: i }), m);
       if (focus) {
         if (v.editable) v.focus();
         else {

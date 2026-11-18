@@ -1162,6 +1162,7 @@ function showQuickMemo(q) {
 
 // ---------- AI 비서 연결 (MCP) ----------
 function showMcp(m, message = '') {
+  $('mcp-adv').closest('section').hidden = !m; // PC Rust 판은 MCP 가 없어 칸째 숨긴다
   if (!m) return;
   $('mcp-title').textContent = m.connected && !m.stale ? 'Claude 데스크톱에 연결됨' : m.stale ? '다시 연결이 필요해요' : UI.notConnected;
   $('mcp-sub').textContent = message || (m.broken
