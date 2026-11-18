@@ -55,14 +55,30 @@ pub fn place_note<'a>(app: &AppHandle, id: &str, b: Builder<'a>) -> Builder<'a> 
 }
 
 // 창을 끄는 동안 Moved 가 줄줄이 온다 — 멈추고 잠깐 뒤에 한 번만 쓴다
+//   기다리는 스레드는 하나만 (예전: 창을 끄는 동안 이벤트마다 스레드를 새로 띄웠다)
 fn save_soon(app: &AppHandle) {
     static GEN: AtomicU64 = AtomicU64::new(0);
-    let n = GEN.fetch_add(1, Ordering::SeqCst) + 1;
+    static WAITING: AtomicBool = AtomicBool::new(false);
+    GEN.fetch_add(1, Ordering::SeqCst);
+    if WAITING.swap(true, Ordering::SeqCst) {
+        return;
+    }
     let app = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(400));
-        if GEN.load(Ordering::SeqCst) == n {
-            state(&app).save_settings();
+        let mut seen = GEN.load(Ordering::SeqCst);
+        loop {
+            std::thread::sleep(Duration::from_millis(400));
+            let now = GEN.load(Ordering::SeqCst);
+            if now == seen {
+                break;
+            }
+            seen = now;
+        }
+        WAITING.store(false, Ordering::SeqCst);
+        state(&app).save_settings();
+        // 쓰는 사이 또 바뀌었으면 한 번 더
+        if GEN.load(Ordering::SeqCst) != seen {
+            save_soon(&app);
         }
     });
 }

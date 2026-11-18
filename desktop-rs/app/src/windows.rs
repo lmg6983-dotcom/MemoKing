@@ -572,14 +572,26 @@ fn moving(app: &AppHandle, id: &str, label: &str, moved: bool) {
             track_hover(app, Who::Window, p, id);
         }
     }
+    // 끄는 동안 이벤트가 줄줄이 온다 — 기다리는 스레드는 창마다 하나만 두고, 300ms 동안 더 오지 않으면 (예전: 이벤트마다 스레드를 새로 띄웠다)
     let gen = next_seq();
-    wm().settle.insert(label.to_string(), gen);
+    if wm().settle.insert(label.to_string(), gen).is_some() {
+        return;
+    }
     let (app, id, label) = (app.clone(), id.to_string(), label.to_string());
-    later(300, move || {
-        if wm().settle.get(&label) != Some(&gen) {
-            return;
+    std::thread::spawn(move || {
+        let mut seen = gen;
+        loop {
+            std::thread::sleep(Duration::from_millis(300));
+            let mut g = wm();
+            match g.settle.get(&label).copied() {
+                None => return, // 창이 없어졌다
+                Some(now) if now != seen => seen = now,
+                Some(_) => {
+                    g.settle.remove(&label);
+                    break;
+                }
+            }
         }
-        wm().settle.remove(&label);
         end_window_drag(&app, &id);
         // 숨은 탭 창이 따라 움직이며 또 부르지 않게 보이는 창만
         let Some(w) = app.get_webview_window(&label).filter(is_shown) else { return };
