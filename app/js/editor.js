@@ -23,7 +23,7 @@ import { remarkEmptyTasks } from './core/empty-tasks.js';
 import { remarkInlineHtmlMarks, stringifyHandlers, safeColor, DEFAULT_HIGHLIGHT } from './core/html-marks.js';
 import { needsLocalCopy, pickImageSource } from './core/remote-images.js';
 import { vaultUrl, mediaKind, baseName } from './media.js';
-import { videoPoster } from './video-poster.js';
+import { onMedia, videoPoster } from './video-poster.js';
 import { openAlbumViewer } from './album-viewer.js';
 import { touchMode } from './keyboard-guard.js';
 import { promptChoice } from './rename-content.js';
@@ -195,7 +195,19 @@ function mediaView(node, view, getPos) {
     const player = new Plyr(el, playerOptions(kind));
     // 재생 전 그림: 1초쯤의 장면 (휴대폰 WebView 는 그대로 두면 회색 기본 그림만 보인다)
     let gone = false;
-    if (kind === 'video') videoPoster(src).then((url) => { if (url && !gone) player.poster = url; });
+    const poster = () => videoPoster(src).then((url) => { if (url && !gone) player.poster = url; });
+    if (kind === 'video') poster();
+    // PC: 이 PC 가 못 푸는 HEVC 영상은 H.264 사본이 다 되면 다시 연다 (video-poster.js onMedia)
+    const name = label.textContent;
+    const stops = kind === 'video' ? [
+      onMedia('media:converting', src, () => { label.textContent = '이 PC 에서 재생하도록 바꾸는 중…'; }),
+      onMedia('media:ready', src, () => {
+        label.textContent = name;
+        el.src = vaultUrl(src);
+        el.load();
+        poster();
+      }),
+    ] : [];
     // 재생할 수 없을 때(파일이 없거나 읽지 못함 · 형식을 못 읽음) 조용히 멈춰 있지 않고 알린다 — 휴대폰은 다른 앱으로 열기 안내 (note-view.js).
     //   메모를 열기만 해도 뜨면 귀찮으니 재생 단추를 누른 뒤에만 (이미 오류 상태면 누르는 즉시)
     let tried = 0;
@@ -221,6 +233,7 @@ function mediaView(node, view, getPos) {
       ignoreMutation: () => true,
       destroy: () => {
         gone = true;
+        for (const stop of stops) stop();
         player.destroy();
       },
     };
