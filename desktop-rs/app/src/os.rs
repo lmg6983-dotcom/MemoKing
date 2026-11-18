@@ -409,19 +409,26 @@ pub fn start(app: &AppHandle, list: &WebviewWindow) {
     if state(app).setting("listOnTop") == true {
         crate::windows::set_list_crown(app, true, false);
     }
-    // 못 여는 메모(지웠거나 메모 폴더가 없음)는 기억에서 뺀다
-    let open = state(app).setting("openNotes").as_array().cloned().unwrap_or_default();
-    for id in open.iter().filter_map(Value::as_str) {
-        if !memos::open_note(app, id).unwrap_or(false) {
-            set_open(app, id, false);
-        }
-    }
     let args: Vec<String> = std::env::args().collect();
     let has_vault = state(app).vault.lock().unwrap().is_some();
     // --hidden: 로그인 때 자동 실행 — 창 없이 알림 영역에서 (메모 폴더가 없으면 고르게 띄운다)
     if !launch(app, &args) && !(has_vault && args.iter().any(|a| a == "--hidden")) {
         show_list(app);
     }
+    // 지난번 열어 둔 메모는 목록을 먼저 띄운 뒤 하나씩 — 예전에는 메모 창을 모두 만든 뒤에야 목록이 떠 켜기가 굼떴다
+    //   (창 만들기는 화면 스레드 일이라 한꺼번에 만들면 그동안 아무 창도 그려지지 않는다)
+    let open = state(app).setting("openNotes").as_array().cloned().unwrap_or_default();
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        for id in open.iter().filter_map(Value::as_str) {
+            // 못 여는 메모(지웠거나 메모 폴더가 없음)는 기억에서 뺀다
+            if !memos::open_note(&app, id).unwrap_or(false) {
+                set_open(&app, id, false);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(120));
+        }
+    });
 }
 
 #[cfg(test)]

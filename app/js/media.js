@@ -21,6 +21,8 @@ let imageThumb = 0;
 export const useImageThumbs = (w) => void (imageThumb = Math.round(w));
 /** 메모 안에 보일 사진 주소 */
 export const shownUrl = (src) => (imageThumb && /\.(jpe?g|png|webp|bmp)$/i.test(src) ? `${vaultUrl(src)}?thumb=${imageThumb}` : vaultUrl(src));
+/** 작은 자리(사진 줄의 썸네일 등)에 보일 주소 — 줄인 그림을 쓰는 창이면 폭 w 로 */
+export const smallUrl = (url, src, w) => (imageThumb && /\.(jpe?g|png|webp|bmp)$/i.test(src) ? `${url}?thumb=${w}` : url);
 /** 줄인 그림 주소 → 원본 주소 */
 export const fullUrl = (url) => String(url).replace(/\?thumb=\d+$/, '');
 

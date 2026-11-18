@@ -162,6 +162,10 @@ fn main() {
             drive::start(app);
             history::start(app);
             services::start(app);
+            std::thread::spawn({
+                let app = app.clone();
+                move || prune_thumbs(&app)
+            });
             let list = os::place_list(app, window(app, "list", "index.html").title("메모킹").inner_size(440.0, 680.0).min_inner_size(440.0, 380.0)).build()?;
             os::start(app, &list);
             reminders::start(app);
@@ -271,6 +275,19 @@ fn thumb_file(app: &AppHandle, file: &std::path::Path, mime: &str, w: u32) -> Op
     small.save_with_format(&tmp, fmt).ok()?;
     std::fs::rename(&tmp, &out).ok()?;
     Some((out, m))
+}
+
+/// 60일 넘게 다시 만들지 않은 썸네일은 지운다 (켤 때 한 번, 일꾼 스레드에서) — 원본이 바뀌거나 지워진 사진의 썸네일이 쌓이지 않게.
+///   아직 쓰는 것도 지워질 수 있지만 다음에 볼 때 다시 만든다
+fn prune_thumbs(app: &AppHandle) {
+    let Ok(dir) = app.path().app_cache_dir().map(|d| d.join("thumbs")) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let old = std::time::Duration::from_secs(60 * 24 * 3600);
+    for e in entries.flatten() {
+        if e.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|age| age > old) {
+            let _ = std::fs::remove_file(e.path());
+        }
+    }
 }
 
 /// 파일 하나 — Range 가 있으면 그 조각만 206 (영상 · 소리를 끝까지 다 읽지 않고 넘겨 보게)
