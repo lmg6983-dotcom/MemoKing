@@ -76,7 +76,7 @@ struct TopWatch {
     gen: u64,
 }
 
-type Action = Box<dyn FnOnce(&AppHandle) + Send>;
+pub type Action = Box<dyn FnOnce(&AppHandle) + Send>;
 
 #[derive(Default)]
 struct Wm {
@@ -158,7 +158,7 @@ pub fn bounds(w: &WebviewWindow) -> Option<Rect> {
     Some([p.x, p.y, z.width, z.height])
 }
 
-fn set_bounds(w: &WebviewWindow, [x, y, width, height]: Rect) {
+pub fn set_bounds(w: &WebviewWindow, [x, y, width, height]: Rect) {
     let _ = w.set_position(LogicalPosition::new(x, y));
     let _ = w.set_size(LogicalSize::new(width, height));
 }
@@ -184,7 +184,7 @@ fn cursor(app: &AppHandle) -> Option<(f64, f64)> {
 }
 
 /// 기억한 이 메모 창 자리 (지금 있는 화면 안일 때만)
-fn saved_bounds(app: &AppHandle, id: &str) -> Option<Rect> {
+pub fn saved_bounds(app: &AppHandle, id: &str) -> Option<Rect> {
     crate::os::on_screen(&state(app).setting("noteBounds")[id], &crate::os::work_areas(app))
 }
 
@@ -303,7 +303,30 @@ pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
             }
         }
         // 스택의 탭 창 하나를 닫으면 스택 모두 (Electron 'close')
-        WindowEvent::CloseRequested { .. } => close_stack(&app, &id),
+        //   창은 바로 숨기고, 남은 글을 동기 저장(mkFlushSync)한 뒤에 없앤다. 웹뷰를 닫는 동안의 beforeunload 저장을 기다리며 멈추지 않게
+        WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            close_stack(&app, &id);
+            let Some(w) = app.get_webview_window(&label) else { return };
+            hide_note(&app, &w);
+            let destroy = {
+                let (app, label) = (app.clone(), label.clone());
+                // 이벤트 처리 · 스크립트 답 안에서 웹뷰를 없애지 않는다
+                move || {
+                    let (app, label) = (app.clone(), label.clone());
+                    std::thread::spawn(move || {
+                        if let Some(w) = app.get_webview_window(&label) {
+                            let _ = w.destroy();
+                        }
+                    });
+                }
+            };
+            // 화면이 멈춰 답이 없어도 3초 뒤에는 닫는다
+            later(3000, destroy.clone());
+            if w.eval_with_callback("window.mkFlushSync?.()", move |_| destroy()).is_err() {
+                let _ = w.destroy();
+            }
+        }
         WindowEvent::Destroyed => destroyed(&app, &id, &label),
         _ => {}
     });
@@ -507,12 +530,14 @@ fn clear_hover(app: &AppHandle, h: &Hover) {
 
 /// 숨겨 만든 메모 창 — 메모를 다 그리면(win:painted, 늦어도 1.5초) then
 fn create_hidden(app: &AppHandle, id: &str, b: Option<Rect>, then: impl FnOnce(&AppHandle) + Send + 'static) -> Option<WebviewWindow> {
-    let w = crate::memos::create_note_window(app, id, b, false).ok()?;
-    let label = w.label().to_string();
-    wm().reveal.insert(label.clone(), Box::new(then));
-    let app = app.clone();
+    crate::memos::create_note_window(app, id, b, false, Some(Box::new(then))).ok()
+}
+
+/// 이 메모 창이 메모를 다 그리면(win:painted, 늦어도 1.5초) then
+pub fn when_painted(app: &AppHandle, label: &str, then: Action) {
+    wm().reveal.insert(label.to_string(), then);
+    let (app, label) = (app.clone(), label.to_string());
     later(1500, move || painted(&app, &label));
-    Some(w)
 }
 
 /// 메모 창이 메모를 그렸다 (win:painted)
@@ -547,11 +572,30 @@ pub fn show_tab(app: &AppHandle, id: &str, at: Option<Rect>, focus: bool) -> boo
         create_hidden(app, id, b, move |app| reveal_tab(app, &id2, b, focus)).is_some()
     };
     push_stack_to(app, &s.memos);
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
+    prewarm(app, id);
     ok
 }
 
-// shortcut: Electron 은 같은 색 탭은 바로, 다른 색 탭은 겹쳐 흐려지게 바꾸고 스티커 창을 새 탭에 넘겨준다 — 여기서는 새 탭을 보이고 30ms 뒤 옛 탭을 숨긴다 (스티커는 다시 띄움). 깜빡임이 보이면 투명도를 옮길 때
+/// 지금 탭의 바로 앞 · 뒤 탭(Ctrl+Tab 으로 갈 곳)을 숨긴 창으로 미리 만들어 둔다 (Electron prewarmStack).
+///   바꿀 때 창을 새로 만들며 기다리지 않게, 둘까지만, 하나씩 조금 쉬었다가 (보이는 탭을 그리는 데 방해되지 않게)
+fn prewarm(app: &AppHandle, id: &str) {
+    let (app, id) = (app.clone(), id.to_string());
+    later(700, move || {
+        // 그사이 다른 탭으로 바꿨거나 스택을 닫았으면 그만
+        let Some(s) = stack_of(&app, &id).filter(|s| s.active.as_deref() == Some(id.as_str())) else { return };
+        let Some(b) = visible_stack_win(&app, &s, None).and_then(|w| bounds(&w)) else { return };
+        let near = stacks(&app, |s| [s.neighbor(&id, 1), s.neighbor(&id, -1)]).unwrap_or_default();
+        let exists = |m: &str| state(&app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(m).is_some());
+        let Some(m) = near.into_iter().flatten().find(|m| note_win(&app, m).is_none() && exists(m)) else { return };
+        // 예비 창은 남겨 둔다 (지금 열려는 다른 메모가 가져가게)
+        if crate::memos::create_note_window(&app, &m, Some(b), false, None).is_ok() {
+            prewarm(&app, &id);
+        }
+    });
+}
+
+// shortcut: Electron 은 다른 색 탭은 겹쳐 흐려지게 바꾼다. 여기서는 새 탭을 보이고 30ms 뒤 옛 탭을 숨긴다, 깜빡임이 보이면 투명도를 옮길 때
 fn reveal_tab(app: &AppHandle, id: &str, b: Option<Rect>, focus: bool) {
     let Some(win) = note_win(app, id) else { return };
     let now = stack_of(app, id);
@@ -567,11 +611,16 @@ fn reveal_tab(app: &AppHandle, id: &str, b: Option<Rect>, focus: bool) {
         }
     }
     emit(app, win.label(), "stack:activating", Value::Null);
+    // 층은 보이기 전에, 스티커는 보이던 탭에서 넘겨받는다 (다시 만들지 않게)
+    shown(app, id, &win);
+    if let Some(from) = &shown_win {
+        hand_over_sticker(app, from, &win);
+    }
     let _ = win.show();
     if focus {
         let _ = win.set_focus();
     }
-    shown(app, id, &win);
+    sync_sticker(app, win.label()); // 넘겨받지 못했으면 이제 띄운다
     emit(app, win.label(), "memo:layer", layer_state(app, id));
     if let Some(s) = &shown_win {
         emit(app, s.label(), "stack:leaving", Value::Null);
@@ -634,7 +683,7 @@ fn stack_into(app: &AppHandle, target: &str, moving: &str) -> bool {
         }
     }
     push_stack_to(app, &s.memos);
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
     true
 }
 
@@ -693,7 +742,7 @@ pub fn remove_from_stack(app: &AppHandle, id: &str, mode: &str) -> bool {
                     shown(app, id, &w);
                 }
                 None => {
-                    if let Ok(w) = crate::memos::create_note_window(app, id, b, true) {
+                    if let Ok(w) = crate::memos::create_note_window(app, id, b, true, None) {
                         shown(app, id, &w);
                     }
                 }
@@ -701,7 +750,7 @@ pub fn remove_from_stack(app: &AppHandle, id: &str, mode: &str) -> bool {
         }
         _ => {}
     }
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
     true
 }
 
@@ -780,7 +829,7 @@ fn tear_end(app: &AppHandle, p: Option<(f64, f64)>) -> bool {
         remember_bounds(app, &[t.id], b);
     }
     let _ = w.set_focus();
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
     true
 }
 
@@ -949,7 +998,7 @@ fn set_note_layer(app: &AppHandle, id: &str, layer: Option<&str>, note: &str) ->
         }
         emit(app, w.label(), "memo:layer", state);
     }
-    crate::memos::push_list(app); // 목록 카드의 바탕화면 표시
+    crate::memos::push_list_soon(app); // 목록 카드의 바탕화면 표시
     layer_state(app, id)
 }
 
@@ -1123,7 +1172,7 @@ fn pin_failed(app: &AppHandle) {
         apply_layer(app, &id, &w, false);
         emit(app, &label, "memo:layer", layer_state(app, &id));
     }
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
 }
 
 fn reassert_top(w: &WebviewWindow) {
@@ -1461,6 +1510,36 @@ fn open_sticker_win(app: &AppHandle, owner: &str, animate: bool) {
             s.win = None;
         }
     }
+}
+
+/// 보이던 탭의 스티커 창을 새 탭으로 옮긴다 (Electron handOverSticker): 새 탭에 같은 스티커가 창 없이 걸려 있을 때만
+fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) -> bool {
+    if !cfg!(windows) {
+        return false;
+    }
+    let (a, b) = (from.label(), to.label());
+    let moved = {
+        let mut g = wm();
+        let kind = g.stickers.get(a).filter(|s| s.win.is_some()).map(|s| s.kind);
+        if kind.is_none() || g.stickers.get(b).is_none_or(|s| s.win.is_some() || Some(s.kind) != kind) {
+            return false;
+        }
+        let l = g.stickers.get_mut(a).and_then(|s| s.win.take());
+        g.stickers.get_mut(b).unwrap().win = l.clone();
+        l
+    };
+    let Some(sw) = moved.and_then(|l| app.get_webview_window(&l)) else { return false };
+    // 주인 창(owner)을 바꾼다: 새 탭 위에 있고, 옛 탭과 함께 숨거나 닫히지 않게
+    #[cfg(windows)]
+    unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(hwnd(&sw) as _, windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT, hwnd(to) as _);
+    }
+    if let Some(o) = bounds(to) {
+        set_bounds(&sw, sticker_bounds(o, wm().stickers.get(b).map_or("crown", |s| s.kind), false));
+    }
+    sync_tape_pair(app, a);
+    sync_tape_pair(app, b);
+    true
 }
 
 /// 스티커 창 거두기 — how: 떼어지는(sticker:peel) · 작은 왕관으로 들어가는(sticker:dock) 모습 뒤에
