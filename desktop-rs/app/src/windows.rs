@@ -550,10 +550,29 @@ pub fn show_tab(app: &AppHandle, id: &str, at: Option<Rect>, focus: bool) -> boo
     };
     push_stack_to(app, &s.memos);
     crate::memos::push_list(app);
+    prewarm(app, id);
     ok
 }
 
-// shortcut: Electron 은 같은 색 탭은 바로, 다른 색 탭은 겹쳐 흐려지게 바꾸고 스티커 창을 새 탭에 넘겨준다 — 여기서는 새 탭을 보이고 30ms 뒤 옛 탭을 숨긴다 (스티커는 다시 띄움). 깜빡임이 보이면 투명도를 옮길 때
+/// 지금 탭의 바로 앞 · 뒤 탭(Ctrl+Tab 으로 갈 곳)을 숨긴 창으로 미리 만들어 둔다 (Electron prewarmStack).
+///   바꿀 때 창을 새로 만들며 기다리지 않게, 둘까지만, 하나씩 조금 쉬었다가 (보이는 탭을 그리는 데 방해되지 않게)
+fn prewarm(app: &AppHandle, id: &str) {
+    let (app, id) = (app.clone(), id.to_string());
+    later(700, move || {
+        // 그사이 다른 탭으로 바꿨거나 스택을 닫았으면 그만
+        let Some(s) = stack_of(&app, &id).filter(|s| s.active.as_deref() == Some(id.as_str())) else { return };
+        let Some(b) = visible_stack_win(&app, &s, None).and_then(|w| bounds(&w)) else { return };
+        let near = stacks(&app, |s| [s.neighbor(&id, 1), s.neighbor(&id, -1)]).unwrap_or_default();
+        let exists = |m: &str| state(&app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(m).is_some());
+        let Some(m) = near.into_iter().flatten().find(|m| note_win(&app, m).is_none() && exists(m)) else { return };
+        // 예비 창은 남겨 둔다 (지금 열려는 다른 메모가 가져가게)
+        if crate::memos::create_note_window(&app, &m, Some(b), false, None).is_ok() {
+            prewarm(&app, &id);
+        }
+    });
+}
+
+// shortcut: Electron 은 다른 색 탭은 겹쳐 흐려지게 바꾼다. 여기서는 새 탭을 보이고 30ms 뒤 옛 탭을 숨긴다, 깜빡임이 보이면 투명도를 옮길 때
 fn reveal_tab(app: &AppHandle, id: &str, b: Option<Rect>, focus: bool) {
     let Some(win) = note_win(app, id) else { return };
     let now = stack_of(app, id);
@@ -569,11 +588,16 @@ fn reveal_tab(app: &AppHandle, id: &str, b: Option<Rect>, focus: bool) {
         }
     }
     emit(app, win.label(), "stack:activating", Value::Null);
+    // 층은 보이기 전에, 스티커는 보이던 탭에서 넘겨받는다 (다시 만들지 않게)
+    shown(app, id, &win);
+    if let Some(from) = &shown_win {
+        hand_over_sticker(app, from, &win);
+    }
     let _ = win.show();
     if focus {
         let _ = win.set_focus();
     }
-    shown(app, id, &win);
+    sync_sticker(app, win.label()); // 넘겨받지 못했으면 이제 띄운다
     emit(app, win.label(), "memo:layer", layer_state(app, id));
     if let Some(s) = &shown_win {
         emit(app, s.label(), "stack:leaving", Value::Null);
@@ -1463,6 +1487,36 @@ fn open_sticker_win(app: &AppHandle, owner: &str, animate: bool) {
             s.win = None;
         }
     }
+}
+
+/// 보이던 탭의 스티커 창을 새 탭으로 옮긴다 (Electron handOverSticker): 새 탭에 같은 스티커가 창 없이 걸려 있을 때만
+fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) -> bool {
+    if !cfg!(windows) {
+        return false;
+    }
+    let (a, b) = (from.label(), to.label());
+    let moved = {
+        let mut g = wm();
+        let kind = g.stickers.get(a).filter(|s| s.win.is_some()).map(|s| s.kind);
+        if kind.is_none() || g.stickers.get(b).is_none_or(|s| s.win.is_some() || Some(s.kind) != kind) {
+            return false;
+        }
+        let l = g.stickers.get_mut(a).and_then(|s| s.win.take());
+        g.stickers.get_mut(b).unwrap().win = l.clone();
+        l
+    };
+    let Some(sw) = moved.and_then(|l| app.get_webview_window(&l)) else { return false };
+    // 주인 창(owner)을 바꾼다: 새 탭 위에 있고, 옛 탭과 함께 숨거나 닫히지 않게
+    #[cfg(windows)]
+    unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(hwnd(&sw) as _, windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT, hwnd(to) as _);
+    }
+    if let Some(o) = bounds(to) {
+        set_bounds(&sw, sticker_bounds(o, wm().stickers.get(b).map_or("crown", |s| s.kind), false));
+    }
+    sync_tape_pair(app, a);
+    sync_tape_pair(app, b);
+    true
 }
 
 /// 스티커 창 거두기 — how: 떼어지는(sticker:peel) · 작은 왕관으로 들어가는(sticker:dock) 모습 뒤에
