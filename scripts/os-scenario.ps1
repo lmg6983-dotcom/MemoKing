@@ -166,8 +166,9 @@ try {
     Start-Sleep 1
     $m = Test-WindowDrag $p '.options h1' 60 40
     Click-El $p '#cancel'
-    # 취소하면 창이 닫혀야 한다 (예전: window.close() 를 받는 곳이 없어 흰 창이 남았다 — shim.js)
-    $closed = [bool](Wait-Until 5 { -not (Get-Pages | Where-Object { $_.url -match 'pdf\.html' }) })
+    # 취소하면 창이 닫혀야 한다 (예전: window.close() 를 받는 곳이 없어 화면만 사라진 흰 창이 남았다 — shim.js)
+    #   화면 목록에서 사라져도 Windows 창이 남을 수 있어 창 제목으로 본다
+    $closed = [bool](Wait-Until 5 { -not ([W]::Windows((Get-TestPids)) | Where-Object { [W]::Title($_) -eq 'PDF로 저장' }) })
     @(($m[0] -and $closed), "$($m[1]) · 취소로 닫힘=$closed")
   }
   Step '단축키 목록: 메뉴에서 열고 닫기' {

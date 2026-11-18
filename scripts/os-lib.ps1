@@ -211,11 +211,12 @@ function Find-Page($urlPattern, $exclude = @()) {
   }
   return $null
 }
-# 그 화면의 창을 맨 앞으로 — 사람처럼 창 위쪽의 빈 막대(창 끌기 영역)를 한 번 누른다. 이미 초점이 있으면 그대로
-#   (Alt 를 눌러 Windows 의 앞으로 가져오기 제한을 푸는 방법은 앞에 있던 창이 Alt 를 받아 메뉴 모드에 들어가 화면 연결까지 막혔다)
+# 그 화면의 창을 맨 앞으로 — 사람처럼 그 창의 빈 여백(누를 것도 창 끌기 영역도 아닌 곳)을 한 번 누른다. 이미 초점이 있거나 빈 곳이 없으면 그대로
+#   (Alt 로 Windows 의 앞으로 가져오기 제한을 풀면 앞 창이 메뉴 모드에 들어가 화면 연결까지 막혔고,
+#    창 끌기 영역을 누르면 앱이 창 옮기기를 늦게 시작해 손을 뗀 뒤에도 창이 마우스를 따라다녔다)
 function Show-Page($page) {
   if (Test-Js $page 'document.hasFocus()') { return }
-  $js = "(() => { const at = (x, y) => { for (let e = document.elementFromPoint(x, y); e instanceof Element; e = e.parentElement) { const s = getComputedStyle(e); const r = s.webkitAppRegion || s.appRegion; if (r === 'no-drag') return false; if (r === 'drag') return true; } return false; }; for (let y = 4; y < Math.min(60, innerHeight); y += 8) for (const f of [0.5, 0.35, 0.65, 0.2, 0.8]) { const x = innerWidth * f; if (at(x, y)) { const d = devicePixelRatio; return { x: Math.round((screenX + x) * d), y: Math.round((screenY + y) * d) }; } } return null; })()"
+  $js = "(() => { const busy = 'button,a,input,textarea,select,label,[role=button],img,canvas,svg,video,audio,.card,[contenteditable=""true""],.mk-album-stage,.mk-pdf-page,dialog'; const quiet = (x, y) => { const t = document.elementFromPoint(x, y); if (!t || t.closest(busy)) return false; for (let e = t; e instanceof Element; e = e.parentElement) { const s = getComputedStyle(e); const r = s.webkitAppRegion || s.appRegion; if (r === 'no-drag') return true; if (r === 'drag') return false; } return true; }; const xs = [6, 10, innerWidth - 12, innerWidth / 2]; for (let fy = 0.2; fy < 0.96; fy += 0.1) for (const x of xs) { const y = innerHeight * fy; if (quiet(x, y)) { const d = devicePixelRatio; return { x: Math.round((screenX + x) * d), y: Math.round((screenY + y) * d) }; } } return null; })()"
   $s = Invoke-Js $page $js
   if (-not $s) { return }
   [W]::Click($s.x, $s.y)
@@ -238,8 +239,7 @@ function Test-Js($page, [string]$expr) { [bool](Invoke-Js $page "Boolean($expr)"
 function Get-WinPos($page) { Invoke-Js $page '({ x: Math.round(screenX * devicePixelRatio), y: Math.round(screenY * devicePixelRatio) })' }
 # 그 요소를 잡고 끌어 창이 그만큼 옮겨지는가 → @(맞음, "옮긴 만큼")
 function Test-WindowDrag($page, [string]$sel, $dx = 60, $dy = 40, $fx = 0.5, $fy = 0.5) {
-  Show-Page $page
-  $s = Get-Spot $page $sel $fx $fy
+  $s = Get-Spot $page $sel $fx $fy # 앞으로 가져오지 않는다 — 사람도 뒤에 있는 창의 막대를 바로 잡아 끈다
   if (-not $s) { return @($false, "잡을 곳 없음: $sel") }
   $a = Get-WinPos $page
   [W]::Drag($s.x, $s.y, $s.x + $dx, $s.y + $dy); Start-Sleep -Milliseconds 500
