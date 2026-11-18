@@ -94,6 +94,8 @@ struct Wm {
     tear: Option<Tear>,
     inking: HashSet<String>,
     closing: HashSet<String>,
+    /// 닫는 중(숨기고 남은 글을 저장하는 중)인 메모 창. 없어질 때 뺀다
+    closing_notes: HashSet<String>,
     /// 화면을 다 불러온 덧창 (ghost · hud · bubble-…)
     loaded: HashSet<String>,
     /// 창 옮기기 · 늘이기가 멈췄는지 볼 차례 번호
@@ -136,7 +138,12 @@ fn note_label(app: &AppHandle, id: &str) -> Option<String> {
 }
 
 fn note_win(app: &AppHandle, id: &str) -> Option<WebviewWindow> {
-    note_label(app, id).and_then(|l| app.get_webview_window(&l))
+    note_label(app, id).filter(|l| !is_closing(l)).and_then(|l| app.get_webview_window(&l))
+}
+
+/// 닫는 중인 메모 창은 곧 없어지니 없는 셈 친다 (다시 열면 새 창으로)
+pub fn is_closing(label: &str) -> bool {
+    wm().closing_notes.contains(label)
 }
 
 fn note_id(app: &AppHandle, label: &str) -> Option<String> {
@@ -306,6 +313,7 @@ pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
         //   창은 바로 숨기고, 남은 글을 동기 저장(mkFlushSync)한 뒤에 없앤다. 웹뷰를 닫는 동안의 beforeunload 저장을 기다리며 멈추지 않게
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
+            wm().closing_notes.insert(label.clone());
             close_stack(&app, &id);
             let Some(w) = app.get_webview_window(&label) else { return };
             hide_note(&app, &w);
@@ -323,8 +331,9 @@ pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
             };
             // 화면이 멈춰 답이 없어도 3초 뒤에는 닫는다
             later(3000, destroy.clone());
+            let fail = destroy.clone();
             if w.eval_with_callback("window.mkFlushSync?.()", move |_| destroy()).is_err() {
-                let _ = w.destroy();
+                fail();
             }
         }
         WindowEvent::Destroyed => destroyed(&app, &id, &label),
@@ -334,6 +343,8 @@ pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
 
 /// 메모 창이 보이게 됐다: 그 메모의 층(왕관 · 테이프)과 스티커
 pub fn shown(app: &AppHandle, id: &str, win: &WebviewWindow) {
+    // 미리 만든 숨은 탭이 아니라 보인 메모를 열린 메모로 (맨 뒤가 다음에 켤 때 보일 탭, Electron 처럼 show 때)
+    crate::os::set_open(app, id, true);
     apply_layer(app, id, win, false);
 }
 
@@ -362,6 +373,7 @@ fn close_stack(app: &AppHandle, id: &str) {
 fn destroyed(app: &AppHandle, id: &str, label: &str) {
     let (sticker, pin) = {
         let mut g = wm();
+        g.closing_notes.remove(label);
         g.inking.remove(label);
         g.reveal.remove(label);
         g.settle.remove(label);
@@ -1518,7 +1530,12 @@ fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) 
         return false;
     }
     let (a, b) = (from.label(), to.label());
-    let moved = {
+    // 아직 화면을 불러오는 스티커 창은 다 불러와도 옛 탭 것이 아니면 뜨지 않는다 (open_sticker_win). 넘기지 않고 새로 띄우게
+    let from_sticker = wm().stickers.get(a).and_then(|s| s.win.clone());
+    if !from_sticker.and_then(|l| app.get_webview_window(&l)).is_some_and(|w| is_shown(&w)) {
+        return false;
+    }
+    let (moved, kind) = {
         let mut g = wm();
         let kind = g.stickers.get(a).filter(|s| s.win.is_some()).map(|s| s.kind);
         if kind.is_none() || g.stickers.get(b).is_none_or(|s| s.win.is_some() || Some(s.kind) != kind) {
@@ -1526,7 +1543,7 @@ fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) 
         }
         let l = g.stickers.get_mut(a).and_then(|s| s.win.take());
         g.stickers.get_mut(b).unwrap().win = l.clone();
-        l
+        (l, kind)
     };
     let Some(sw) = moved.and_then(|l| app.get_webview_window(&l)) else { return false };
     // 주인 창(owner)을 바꾼다: 새 탭 위에 있고, 옛 탭과 함께 숨거나 닫히지 않게
@@ -1535,7 +1552,7 @@ fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) 
         windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(hwnd(&sw) as _, windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT, hwnd(to) as _);
     }
     if let Some(o) = bounds(to) {
-        set_bounds(&sw, sticker_bounds(o, wm().stickers.get(b).map_or("crown", |s| s.kind), false));
+        set_bounds(&sw, sticker_bounds(o, kind.unwrap_or("crown"), false));
     }
     sync_tape_pair(app, a);
     sync_tape_pair(app, b);

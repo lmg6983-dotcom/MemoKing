@@ -95,7 +95,7 @@ fn remember(app: &AppHandle, label: &str, id: Option<&str>) {
     save_soon(app);
 }
 
-fn set_open(app: &AppHandle, id: &str, open: bool) {
+pub fn set_open(app: &AppHandle, id: &str, open: bool) {
     let st = state(app);
     let mut list = st.setting("openNotes").as_array().cloned().unwrap_or_default();
     list.retain(|x| x != id);
@@ -106,14 +106,17 @@ fn set_open(app: &AppHandle, id: &str, open: bool) {
     save_soon(app); // 메모 창을 닫을 때(메인 스레드) 설정 파일 쓰기를 기다리지 않게
 }
 
-/// 메모 창이 열렸다 (memos::open_note): 열린 메모로 기억하고, 옮기면 자리를 기억한다
+/// 메모 창을 만들었다 (memos::create_note_window): 옮기면 자리를 기억한다. 열린 메모로는 보일 때 기억한다 (windows::shown)
 pub fn track_note(app: &AppHandle, id: &str, win: &WebviewWindow) {
-    set_open(app, id, true);
     let (app, id, label) = (app.clone(), id.to_string(), win.label().to_string());
     win.on_window_event(move |e| match e {
         WindowEvent::Moved(_) | WindowEvent::Resized(_) => remember(&app, &label, Some(&id)),
         // memos::closed_note 다음에 온다 (먼저 단 것이 먼저) — 비워서 치운 메모 · 휴지통으로 간 메모는 자리도 잊는다
         WindowEvent::Destroyed if !QUITTING.load(Ordering::SeqCst) => {
+            // 닫는 사이 다시 열어 새 창이 이어받았다 (memos::closed_note 가 그 창을 남겨 둔다)
+            if state(&app).note_labels.lock().unwrap().contains_key(&id) {
+                return;
+            }
             let gone = state(&app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(&id).is_none());
             if gone {
                 if let Some(Value::Object(m)) = state(&app).settings.lock().unwrap().get_mut("noteBounds") {
@@ -155,9 +158,10 @@ fn new_memo(app: &AppHandle) -> bool {
 fn quit(app: &AppHandle) {
     QUITTING.store(true, Ordering::SeqCst);
     let labels: Vec<String> = state(app).note_labels.lock().unwrap().values().cloned().collect();
+    // 닫기 길로 (windows::track: 숨기고 남은 글을 저장한 뒤 없앤다, 늦어도 3초). 자동 저장 전의 마지막 글을 잃지 않게
     for l in labels {
         if let Some(w) = app.get_webview_window(&l) {
-            let _ = w.destroy();
+            let _ = w.close();
         }
     }
     let app = app.clone();

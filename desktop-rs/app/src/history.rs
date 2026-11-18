@@ -178,6 +178,7 @@ impl History {
             .query_map([self.last_arrival, ROWS_PER_POLL as i64], |r| Ok((r.get(0)?, r.get::<_, Option<Vec<u8>>>(1)?.unwrap_or_default(), r.get(2)?, r.get::<_, Option<String>>(3)?.unwrap_or_default())))?
             .collect::<Result<_, _>>()?;
         let done = rows.len() < ROWS_PER_POLL;
+        let one_time = rows.first().map(|r| r.2) == rows.last().map(|r| r.2);
         let mut added = 0;
         for (id, payload, arrival, app_id) in rows {
             self.last_arrival = self.last_arrival.max(arrival);
@@ -198,7 +199,8 @@ impl History {
             });
             added += usize::from(self.add(blocked, entry).is_some());
         }
-        if !done {
+        // 모두 같은 시각이면 되돌려도 같은 줄만 다시 읽어 끝나지 않으니 넘어간다
+        if !done && !one_time {
             // 잘린 자리와 같은 시각의 알림이 뒤에 더 있을 수 있어 그 시각부터 다시 (이미 넣은 것은 id 로 걸러진다)
             self.last_arrival -= 1;
         }
@@ -406,9 +408,12 @@ fn watch_popups(app: &AppHandle, run: usize) {
                 let out = c.stdout.take().unwrap();
                 let pid = c.id();
                 let mut slot = WATCHER.lock().unwrap();
-                // 띄우는 사이에 껐으면 바로 끈다 (끄는 쪽은 ON 을 내린 뒤 이 자리를 비운다)
-                if !ON.load(Ordering::SeqCst) {
+                // 띄우는 사이에 껐거나 껐다 켰으면 바로 끈다 (끄는 쪽은 ON 을 내린 뒤 이 자리를 비운다). 새 차례의 도우미를 덮어 놓치지 않게 넣지 않는다
+                if !ON.load(Ordering::SeqCst) || RUN.load(Ordering::SeqCst) != run {
+                    drop(slot);
                     let _ = c.kill();
+                    let _ = c.wait();
+                    break;
                 }
                 *slot = Some(c);
                 drop(slot);
@@ -690,6 +695,16 @@ mod tests {
         assert_eq!(h.read_copy(&file, "self", &Map::new()).unwrap(), (100, true));
         assert_eq!(h.entries.len(), 600);
         assert!(h.entries.windows(2).all(|w| time_ms(&w[0]) >= time_ms(&w[1])));
+        // 한 번에 읽는 줄이 모두 같은 시각이어도 같은 자리를 맴돌지 않는다
+        let db = rusqlite::Connection::open(&file).unwrap();
+        db.execute_batch(
+            "with recursive n(i) as (select 1 union all select i + 1 from n where i < 500)
+               insert into Notification select 1000 + i, 1, 'toast', cast('<toast><text>s' || i || '</text></toast>' as blob), 133000000000001000 from n;",
+        )
+        .unwrap();
+        drop(db);
+        assert_eq!(h.read_copy(&file, "self", &Map::new()).unwrap(), (500, false));
+        assert_eq!(h.read_copy(&file, "self", &Map::new()).unwrap(), (0, true));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

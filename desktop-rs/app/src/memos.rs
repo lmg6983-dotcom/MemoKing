@@ -216,7 +216,7 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
         return Ok(crate::windows::show_tab(app, id, None, true));
     }
     let label = st.note_labels.lock().unwrap().get(id).cloned();
-    if let Some(w) = label.and_then(|l| app.get_webview_window(&l)) {
+    if let Some(w) = label.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
@@ -298,7 +298,7 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
     let one = CREATING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let st = state(app);
     let open = st.note_labels.lock().unwrap().get(id).cloned();
-    if let Some(w) = open.and_then(|l| app.get_webview_window(&l)) {
+    if let Some(w) = open.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         return Ok(w);
     }
     let title = with_vault(app, |v| Ok(v.get(id).and_then(|m| m["title"].as_str().map(str::to_string)).unwrap_or_default()))?;
@@ -333,10 +333,10 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
     let label = win.label().to_string();
     st.note_labels.lock().unwrap().insert(id.to_string(), label.clone());
     drop(one);
-    let (app2, id2) = (app.clone(), id.to_string());
+    let (app2, id2, label2) = (app.clone(), id.to_string(), label.clone());
     win.on_window_event(move |e| {
         if let WindowEvent::Destroyed = e {
-            closed_note(&app2, &id2);
+            closed_note(&app2, &id2, &label2);
         }
     });
     crate::os::track_note(app, id, &win);
@@ -367,8 +367,16 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
 }
 
 // 메모 창이 닫혔다: 빈 메모는 치우고 제목에 맞춰 파일 이름을
-fn closed_note(app: &AppHandle, id: &str) {
-    state(app).note_labels.lock().unwrap().remove(id);
+fn closed_note(app: &AppHandle, id: &str, label: &str) {
+    let st = state(app);
+    {
+        let mut labels = st.note_labels.lock().unwrap();
+        // 닫는 사이 다시 열어 새 창이 이어받았다: 마무리는 그 창이 닫힐 때
+        if labels.get(id).is_some_and(|l| l != label) {
+            return;
+        }
+        labels.remove(id);
+    }
     let _ = with_vault(app, |v| {
         v.close_lock(id); // 닫은 잠긴 메모의 열쇠를 남기지 않는다
         v.finalize(id).map_err(|e| e.to_string())
