@@ -212,7 +212,8 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
     let label = st.note_labels.lock().unwrap().get(id).cloned();
     if let Some(w) = label.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         // 마우스를 올려 미리 그리는 중인 창: 다 그리면 보인다 (그리기 전에 보이면 빈 투명 창 — 두 번 눌러야 열렸다)
-        if crate::windows::reveal_when_painted(app, w.label(), id) {
+        PRELOADED.lock().unwrap().retain(|l| l != w.label()); // 미리 그린 창을 연다 — 거두지 않게
+        if crate::windows::reveal_when_painted(w.label(), id) {
             return Ok(true);
         }
         let _ = w.unminimize();
@@ -301,7 +302,7 @@ pub fn spare_room(app: &AppHandle) -> bool {
 }
 
 /// 닫은 메모 창을 예비 창으로: 화면을 예비 창 모드로 다시 읽는다 (웹뷰 · 창은 그대로 — 다시 만드는 것이 여는 시간의 대부분)
-pub fn recycle_spare(app: &AppHandle, w: &tauri::WebviewWindow) {
+pub fn recycle_spare(w: &tauri::WebviewWindow) {
     let label = w.label().to_string();
     {
         let mut g = SPARE.lock().unwrap();
@@ -322,9 +323,7 @@ pub fn recycle_spare(app: &AppHandle, w: &tauri::WebviewWindow) {
     if url.is_none_or(|u| w.navigate(u).is_err()) {
         SPARE.lock().unwrap().retain(|s| s.label != label);
         let _ = w.destroy();
-        return;
     }
-    let _ = app;
 }
 
 /// 쓸 수 있는 예비 창 (화면이 메모를 기다리는 중일 때만). 가져가면 다음 것은 새로
@@ -412,7 +411,10 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
         let memo = handle(app, win.label(), "memo:get", &[id.into()]).and_then(Result::ok).unwrap_or(Value::Null);
         let _ = assign.send(json!({ "id": id, "memo": memo }));
     }
-    push_list_soon(app);
+    // 숨겨 만드는 창(미리 열기 · 옆 탭 · 다시 켤 때)은 목록에 알릴 것이 없다 — 보일 때 shown() 이 열림을 알린다 (마우스를 올릴 때마다 목록을 다시 그렸다)
+    if show {
+        push_list_soon(app);
+    }
     schedule_spare(app, SPARE_REFILL_MS);
     Ok(win)
 }
@@ -759,6 +761,8 @@ fn note_command(app: &AppHandle, id: &str, command: Value) -> Result<Value, Stri
 ///   PRELOAD_KEEP 안에 열지 않으면 다시 예비 창으로. 예비 창이 준비돼 있을 때만 (새 창을 만들지는 않는다).
 ///   이미 열린 메모 · 스택 탭(show_tab 이 따로 연다) · 잠긴 메모 · 빈 메모(거둘 때 정리가 휴지통으로 보낸다)는 하지 않는다
 const PRELOAD_KEEP: Duration = Duration::from_secs(4);
+/// 미리 그려 두기만 한 창 — 열면(open_note) 빠진다. 남아 있으면 PRELOAD_KEEP 뒤에 거둔다
+static PRELOADED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 fn preload_note(app: &AppHandle, id: &str) {
     if id.is_empty() || state(app).note_labels.lock().unwrap().contains_key(id) || crate::windows::in_stack(app, id) {
         return;
@@ -770,9 +774,17 @@ fn preload_note(app: &AppHandle, id: &str) {
     }
     let Ok(win) = create_note_window(app, id, None, false, Some(Box::new(|_: &AppHandle| {}))) else { return };
     let (app, label) = (app.clone(), win.label().to_string());
+    PRELOADED.lock().unwrap().push(label.clone());
     std::thread::spawn(move || {
         std::thread::sleep(PRELOAD_KEEP);
-        if app.get_webview_window(&label).is_some_and(|w| !w.is_visible().unwrap_or(true)) && !crate::windows::is_closing(&label) {
+        // 열지 않은 것만 — 누른 창은 아직 그리는 중이라 숨어 있어도 거두지 않는다
+        let unopened = {
+            let mut p = PRELOADED.lock().unwrap();
+            let had = p.contains(&label);
+            p.retain(|l| *l != label);
+            had
+        };
+        if unopened && !crate::windows::is_closing(&label) {
             crate::windows::retire_note(&app, &label);
         }
     });

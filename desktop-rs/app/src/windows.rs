@@ -365,6 +365,7 @@ pub fn shown(app: &AppHandle, id: &str, win: &WebviewWindow) {
     // 미리 만든 숨은 탭이 아니라 보인 메모를 열린 메모로 (맨 뒤가 다음에 켤 때 보일 탭, Electron 처럼 show 때)
     crate::os::set_open(app, id, true);
     apply_layer(app, id, win, false);
+    crate::memos::push_list_soon(app); // 목록의 열린 메모 표시 (숨겨 만든 창은 만들 때 알리지 않는다)
 }
 
 /// 이 창의 WebView2 에 메모리를 덜 쓰라고(low) · 보통으로 — 숨거나 포커스가 없는 창은 덜 (캐시 · 풀어 둔 그림을 놓는다).
@@ -424,7 +425,7 @@ pub fn hide_deep_later(w: &WebviewWindow) {
 
 /// 아직 그리는 중인 창(미리 열기 · 숨겨 만든 창)을 열면: 바로 보이지 않고 다 그리면 보이게 바꿔 둔다 → 바꿨는가.
 ///   그리기 전에 보이면 투명 창이라 아무것도 없어 보여 한 번 더 눌러야 했다 (늦어도 when_painted 의 1.5초)
-pub fn reveal_when_painted(app: &AppHandle, label: &str, id: &str) -> bool {
+pub fn reveal_when_painted(label: &str, id: &str) -> bool {
     let mut g = wm();
     if !g.reveal.contains_key(label) {
         return false;
@@ -441,7 +442,6 @@ pub fn reveal_when_painted(app: &AppHandle, label: &str, id: &str) -> bool {
             }
         }),
     );
-    let _ = app;
     true
 }
 
@@ -566,7 +566,7 @@ pub fn retire_note(app: &AppHandle, label: &str) {
             crate::memos::closed_note(app, &id, label);
             crate::os::note_closed(app, &id);
             destroyed(app, &id, label);
-            crate::memos::recycle_spare(app, &w);
+            crate::memos::recycle_spare(&w);
         }
         None => {
             wm().recycled.remove(label);

@@ -247,6 +247,10 @@ fn thumb_file(app: &AppHandle, file: &std::path::Path, mime: &str, w: u32) -> Op
     if meta.len() < 150 * 1024 {
         return None; // 작은 그림은 원본이 더 싸다
     }
+    // 원본이 이미 w 이하면 원본 그대로 — 머리만 읽어 크기를 본다 (예전: 끝까지 풀어 본 뒤에야 알아 열 때마다 사진을 통째로 풀었다)
+    if image::image_dimensions(file).is_ok_and(|(iw, ih)| iw.max(ih) <= w) {
+        return None;
+    }
     let mut h = std::collections::hash_map::DefaultHasher::new();
     (file, meta.len(), meta.modified().ok(), w).hash(&mut h);
     let dir = app.path().app_cache_dir().ok()?.join("thumbs");

@@ -283,7 +283,9 @@ const bodyHash = (text) => {
 };
 function saveSnapshot() {
   try {
-    const html = editor && !memo?.locked ? el.editorRoot.querySelector('.milkdown:not(.mk-snapshot)')?.outerHTML : null;
+    // 잠긴 메모: 남기지 않고, 잠그기 전에 남긴 것도 지운다 (잠근 글이 평문으로 남지 않게)
+    if (memo?.locked) return void localStorage.removeItem(snapKey(id));
+    const html = editor ? el.editorRoot.querySelector('.milkdown:not(.mk-snapshot)')?.outerHTML : null;
     if (!html || html.length > SNAP_MAX) return;
     localStorage.setItem(snapKey(id), JSON.stringify({ h: bodyHash(fileBody), html }));
     const order = JSON.parse(localStorage.getItem('memoking.snaps') ?? '[]').filter((x) => x !== id);
