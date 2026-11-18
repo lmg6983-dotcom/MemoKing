@@ -187,6 +187,7 @@ pub fn start(app: &AppHandle) {
         }
         if names.iter().map(|n| status(&app, n)["registered"].clone()).collect::<Vec<_>>() != before {
             let _ = app.emit_to("list", "shortcuts:changed", [Value::Null; 0]);
+            crate::os::refresh_tray(&app);
         }
     });
 }
@@ -291,6 +292,7 @@ fn set_shortcut(app: &AppHandle, name: &str, wanted: Option<String>) -> Value {
     register_memo(app); // 놓아 준 Ctrl+Alt+숫자를 메모 단축키가 다시 쓰게
     // 설정 창 · 단축키 설정 창 어디서 바꿨든 둘 다 바로
     let _ = app.emit("shortcuts:changed", [Value::Null; 0]);
+    crate::os::refresh_tray(app);
     json!({ "ok": true, "status": status(app, name) })
 }
 
@@ -621,6 +623,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "app:set-quick-memo" => {
             state(app).set_setting("quickMemo", crate::settings::truthy(args.first()).into());
             register_global(app, "quickMemo");
+            crate::os::refresh_tray(app);
             return Some(crate::memos::handle(app, label, "app:settings", &[]).unwrap_or(Ok(Value::Null)).map(|s| s["quickMemo"].clone()));
         }
         "hotkey:state" => hotkey_state(app, &js::string(&arg(0))),

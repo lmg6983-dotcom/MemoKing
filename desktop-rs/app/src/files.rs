@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, Url};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 
 fn vault_root(app: &AppHandle) -> Option<PathBuf> {
@@ -576,6 +577,12 @@ fn list_on_top(app: &AppHandle) -> bool {
     app.get_webview_window("list").is_some_and(|w| w.is_always_on_top().unwrap_or(false))
 }
 
+/// 로그인 때 자동 실행 (Electron autoStartAvailable · getAutoStart), 설치한 Windows 메모킹에서만
+pub fn auto_start(app: &AppHandle) -> Value {
+    let available = cfg!(windows) && !cfg!(debug_assertions) && !crate::ipc::smoke();
+    json!({ "available": available, "enabled": available && app.autolaunch().is_enabled().unwrap_or(false) })
+}
+
 pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let arg = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
     Some(match channel {
@@ -643,8 +650,17 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
             }
             Ok(r)
         }
-        // shortcut: 로그인 때 자동 실행은 아직 — 설정 화면이 "쓸 수 없음" 으로 보이므로 Electron 의 그때처럼 false. 옮길 때 app:settings 의 autoStart 도
-        "app:set-auto-start" => Ok(false.into()),
+        "app:set-auto-start" => {
+            if auto_start(app)["available"] == true {
+                let al = app.autolaunch();
+                if let Err(err) = if crate::settings::truthy(args.first()) { al.enable() } else { al.disable() } {
+                    eprintln!("자동 실행을 바꾸지 못했어요: {err}");
+                }
+                state(app).set_setting("autoStartSet", true.into());
+                crate::os::refresh_tray(app); // 바꾸지 못했어도 알림 영역의 체크를 실제대로
+            }
+            Ok(auto_start(app)["enabled"].clone())
+        }
         "app:whats-new" => Ok(whats_new(app)),
         "app:report-problem" => Ok(report_problem(app)),
         _ => return None,

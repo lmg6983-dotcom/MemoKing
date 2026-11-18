@@ -155,7 +155,7 @@ fn app_settings(app: &AppHandle) -> Value {
     json!({
         "trashDays": s("trashDays").as_u64().unwrap_or(30),
         "trashCount": with_vault(app, |v| Ok(v.trash_list().len())).unwrap_or(0),
-        "autoStart": { "available": false, "enabled": false },
+        "autoStart": crate::files::auto_start(app),
         "historyEnabled": s("historyEnabled") == true,
         "quickMemo": { "enabled": not_false("quickMemo"), "registered": quick["registered"], "key": quick["label"] },
         "shortcuts": { "quickMemo": quick, "magic": status("magic"), "list": status("list") },
@@ -179,6 +179,7 @@ pub fn push_list(app: &AppHandle) {
     crate::drive::request(1000); // Google Drive 에도 (메모 저장은 이미 0.6초 모아서 오므로 1초면 충분)
     let _ = app.emit_to("list", "memos:changed", [list_memos(app)]);
     crate::windows::push_all_stacks(app);
+    crate::os::refresh_tray(app); // 알림 영역의 최근 메모 · 열린 메모 (메모 창을 열고 닫을 때도 여기로 온다)
 }
 
 // 창 이름에 쓸 수 있는 글자만 — 메모 id 는 다른 앱이 쓴 아무 글자일 수 있다

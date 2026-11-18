@@ -17,6 +17,8 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-updater = "2"
+# 로그인 때 자동 실행 (Electron setLoginItemSettings 자리, MagicKey 와 같은 플러그인)
+tauri-plugin-autostart = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.23"
