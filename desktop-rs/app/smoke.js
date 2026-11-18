@@ -41,8 +41,8 @@ window.addEventListener('load', () => setTimeout(async () => {
         else localStorage.removeItem('memoking.noFileDrop');
       } catch {}
       await new Promise((r) => setTimeout(r, 4000)); // 예비 창이 다 만들어지게 (실제처럼 예비 창으로 열린다)
-      const lines = Array.from({ length: 24 }, (_, i) => `${i + 1}번째 줄 — 끌어 놓을 자리`).join('\n\n');
-      await check(`끌어 놓기 시험 창 열기 (${dropMode})`, async () => typeof (await mk.memo.import(`# 끌어 놓기 시험\n\n${lines}`, { open: true })) === 'string');
+      // 새 빈 메모 (Ctrl+N 과 같은 길) — 사용자 보고: 새 메모에 바탕화면 파일을 놓으면 첫 번째는 + 커서인데 들어가지 않는다
+      await check(`끌어 놓기 시험 창 열기 (${dropMode}, 새 빈 메모)`, async () => typeof (await mk.memo.create({})) === 'string');
       await until(() => noteDone, 90000).catch(() => {});
       return done();
     }
@@ -55,10 +55,26 @@ window.addEventListener('load', () => setTimeout(async () => {
     let overs = 0;
     for (const t of ['dragenter', 'dragleave', 'drop']) window.addEventListener(t, (e) => log.push(`${at()}s ${t}${t === 'drop' ? `(files=${e.dataTransfer?.files?.length})` : ''}`), true);
     window.addEventListener('dragover', () => overs++, true);
-    const chips = () => document.querySelectorAll('.mk-doc a[href^="attachments/"]').length;
+    const chips = () => document.querySelectorAll('.mk-doc a[href^="attachments/"], .mk-doc img[src*="attachments/"]').length;
+    window.addEventListener('error', (e) => log.push(`${at()}s 오류 ${e.message}`));
+    window.addEventListener('unhandledrejection', (e) => log.push(`${at()}s 거부 ${e.reason?.message ?? e.reason}`));
+    for (const k of ['error', 'warn']) {
+      const orig = console[k].bind(console);
+      console[k] = (...a) => {
+        log.push(`${at()}s console.${k} ${a.map((x) => x?.message ?? String(x)).join(' ').slice(0, 160)}`);
+        orig(...a);
+      };
+    }
+    let lastMd = '';
+    setInterval(() => {
+      const md = document.querySelector('.mk-doc')?.innerText.replace(/\s+/g, ' ').trim().slice(0, 60) ?? '';
+      if (md !== lastMd) log.push(`${at()}s 본문 「${(lastMd = md)}」`);
+    }, 150);
     await until(() => document.querySelector('.mk-doc .ProseMirror, .mk-doc[contenteditable]'), 15000).catch(() => {});
     log.push(`${at()}s 편집기 준비 (${new URLSearchParams(location.search).get('id') ? '' : 'id 없음 '}${performance.getEntriesByType('navigation')[0]?.name.includes('spare') ? '예비 창' : '새 창'}) · 준비 알림`);
-    await invoke('smoke:droptest-ready');
+    // 놓을 곳: 첫 줄 가운데 (창 안 CSS 좌표 → 메인이 화면 좌표로)
+    const first = document.querySelector('.mk-doc > *')?.getBoundingClientRect() ?? document.querySelector('.mk-doc').getBoundingClientRect();
+    await invoke('smoke:droptest-ready', [first.left + Math.min(first.width, 300) / 2, first.top + first.height / 2]);
     let last = 0;
     const tEnd = Date.now() + 45000;
     while (Date.now() < tEnd && chips() < 2) {

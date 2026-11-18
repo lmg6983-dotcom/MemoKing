@@ -73,9 +73,11 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
             let _ = w.set_size(tauri::PhysicalSize::new(420u32, 460u32));
             let _ = w.set_position(tauri::PhysicalPosition::new(480i32, 120i32));
             std::thread::sleep(std::time::Duration::from_millis(300));
-            let (p, s) = (w.outer_position().map_err(|e| e.to_string())?, w.outer_size().map_err(|e| e.to_string())?);
-            // 글 아래 빈 곳이 아니라 창 가운데보다 조금 위 (편집기 안)
-            let line = format!("{} {}", p.x + s.width as i32 / 2, p.y + 150);
+            let (p, s) = (w.inner_position().map_err(|e| e.to_string())?, w.inner_size().map_err(|e| e.to_string())?);
+            // 화면이 준 창 안 자리(CSS px, 크기를 바꾸기 전 — 폭이 늘어도 첫 줄 높이는 같다)를 화면 좌표로
+            let k = w.scale_factor().unwrap_or(1.0);
+            let (cx, cy) = (args.first().and_then(Value::as_f64).unwrap_or(150.0), args.get(1).and_then(Value::as_f64).unwrap_or(60.0));
+            let line = format!("{} {}", p.x + (cx * k) as i32, p.y + (cy * k) as i32);
             std::fs::write(std::env::temp_dir().join("memoking-droptest-ready.txt"), &line).map_err(|e| e.to_string())?;
             println!("[droptest] 놓을 곳 {line} (창 {}x{} @ {},{})", s.width, s.height, p.x, p.y);
             Ok(Value::Null)
