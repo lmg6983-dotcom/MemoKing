@@ -2413,7 +2413,8 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 
 /* 묶음 사진 크게 보기 (album-viewer.js) — 테두리 없이 전체 화면, 헤더·테일은 이미지 위에 활성 상태에서만 표시(2초 뒤 숨김) */
 .mk-album-view { position: fixed; inset: 0; z-index: 100000; background: #000; color: #fff; animation: mk-fade-in 0.15s ease-out; -webkit-app-region: no-drag; } /* PC: 메모 창 위 막대의 창 끌기 영역이 덮은 사진 보기 위에서도 살아 있어 위 단추가 눌리지 않았다 */
-.mk-album-head { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 10px 12px; padding-top: calc(10px + env(safe-area-inset-top)); background: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), transparent); transition: opacity 0.2s ease-out; }
+.mk-album-head { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 10px 12px; padding-top: calc(10px + env(safe-area-inset-top)); background: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), transparent); transition: opacity 0.2s ease-out; -webkit-app-region: drag; }
+.mk-album-head button { -webkit-app-region: no-drag; } /* PC: 머리줄의 빈 곳으로 창을 옮긴다 (보기가 메모 창 위 막대를 덮는다) — 단추는 그대로 */
 .mk-album-count { font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.9; white-space: nowrap; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
 .mk-album-gap { flex: 1; }
 .mk-album-inked { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(255, 204, 0, 0.22); color: #ffd84d; font-size: 12px; }
