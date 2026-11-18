@@ -1145,6 +1145,9 @@ body > :is(.mem-album, .mem-preview)::before { content: ''; position: absolute; 
   transition: opacity 0.24s ease-out;
 }
 .boot.done { opacity: 0; pointer-events: none; }
+/* 안전망: 목록 코드가 중간에 멈춰도(오류) 6초 뒤에는 저절로 걷힌다 — JS 없이 CSS 만으로 (로딩 화면이 앱을 덮은 채 남지 않게) */
+.boot { animation: boot-out 0.3s ease-out 6s forwards; }
+@keyframes boot-out { to { opacity: 0; visibility: hidden; } }
 .boot-mark { width: 56px; height: 56px; animation: boot-bob 1.4s ease-in-out infinite; }
 .boot-dots { display: flex; gap: 7px; }
 .boot-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-yellow); animation: boot-dot 1.1s ease-in-out infinite; }

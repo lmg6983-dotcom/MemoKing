@@ -175,9 +175,9 @@ fn fetch_engine_soon(app: &AppHandle) {
     }
     let app = app.clone();
     std::thread::spawn(move || {
+        // 못 받았어도 다시 돌리지 않는다 — 실패 → 상태 알림(emit → status) → 다시 받기로 끝없이 돌았다. 다음은 AI 를 쓸 때(start) 받는다
         if let Err(e) = ensure_engine(&app) {
             ENGINE.lock().unwrap().error = e;
-            ASKED.store(false, Ordering::SeqCst); // 다음에 다시
         }
         emit(&app);
     });

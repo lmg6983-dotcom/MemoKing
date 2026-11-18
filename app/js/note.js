@@ -283,7 +283,9 @@ const bodyHash = (text) => {
 };
 function saveSnapshot() {
   try {
-    const html = editor && !memo?.locked ? el.editorRoot.querySelector('.milkdown:not(.mk-snapshot)')?.outerHTML : null;
+    // 잠긴 메모: 남기지 않고, 잠그기 전에 남긴 것도 지운다 (잠근 글이 평문으로 남지 않게)
+    if (memo?.locked) return void localStorage.removeItem(snapKey(id));
+    const html = editor ? el.editorRoot.querySelector('.milkdown:not(.mk-snapshot)')?.outerHTML : null;
     if (!html || html.length > SNAP_MAX) return;
     localStorage.setItem(snapKey(id), JSON.stringify({ h: bodyHash(fileBody), html }));
     const order = JSON.parse(localStorage.getItem('memoking.snaps') ?? '[]').filter((x) => x !== id);
@@ -297,6 +299,11 @@ function saveSnapshot() {
 /** 남긴 스냅샷이 이 글과 같으면 먼저 보인다 → 보였는가 */
 function showSnapshot(body) {
   try {
+    // 잠긴 메모(다른 기기에서 잠갔을 수도): 보이지 않고 남은 것도 지운다
+    if (memo?.locked) {
+      localStorage.removeItem(snapKey(id));
+      return false;
+    }
     const snap = JSON.parse(localStorage.getItem(snapKey(id)) ?? 'null');
     if (!snap?.html || snap.h !== bodyHash(body)) return false;
     el.editorRoot.insertAdjacentHTML('afterbegin', snap.html);
