@@ -67,6 +67,10 @@
   window.addEventListener('error', (e) => logError(`${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno}:${e.colno})`));
   window.addEventListener('unhandledrejection', (e) => logError(`처리 안 된 거부: ${e.reason?.stack || e.reason?.message || e.reason}`));
 
+  // 화면의 window.close() 는 Electron 에서 창을 닫았지만 WebView2 는 받는 곳이 없어 화면만 비운 흰 창이 남았다
+  //   (PDF로 저장 · 단축키 창의 취소 · 닫기 · Esc, 메모 창의 잠금 화면 취소 — scripts/os-scenario.ps1 이 찾음) → 그 창 닫기(win:close)로
+  window.close = () => { call('win:close', []).catch((e) => logError(`창 닫기: ${e.message}`)); };
+
   // CSS 의 -webkit-app-region: drag 는 Electron 만 알아듣는다 — 그 자리를 누르면 Tauri 로 창을 끈다 (no-drag 가 가까우면 그대로)
   //   shortcut: ::before 같은 가상 요소에 단 drag(회상 앨범 머리줄)는 못 본다 — 그 화면을 옮길 때 실제 요소로
   const regionOf = (el) => { const s = getComputedStyle(el); return s.webkitAppRegion || s.appRegion || ''; };

@@ -110,8 +110,17 @@ fn shared_env<'a>(app: &AppHandle, b: Builder<'a>) -> Builder<'a> {
         Some(env) => b.with_environment(env),
         None => {
             webview_env::learn(app);
-            b.additional_browser_args(BROWSER_ARGS)
+            b.additional_browser_args(&browser_args())
         }
+    }
+}
+/// 개발판(디버그 빌드)만: MEMOKING_DEBUG_PORT 가 있으면 원격 디버깅 — 시나리오 시험(scripts/os-scenario.ps1)이 화면 요소 자리를 묻는다.
+///   정식판은 환경 변수가 있어도 열지 않는다 (다른 프로그램이 메모를 읽지 못하게)
+#[cfg(windows)]
+fn browser_args() -> String {
+    match std::env::var("MEMOKING_DEBUG_PORT").ok().filter(|p| cfg!(debug_assertions) && p.parse::<u16>().is_ok()) {
+        Some(port) => format!("{BROWSER_ARGS} --remote-debugging-port={port}"),
+        None => BROWSER_ARGS.to_string(),
     }
 }
 #[cfg(not(windows))]
