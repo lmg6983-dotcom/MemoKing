@@ -1,19 +1,28 @@
 // 색인 _memoking/index.json — AI 비서 · 다른 앱이 읽는다 (desktop/vault.js writeIndex · putIndex).
-//   메모가 바뀌면 표시만 해 두고(mark), 2초마다의 다시 읽기가 한 번에 쓴다 (JS: 바뀐 뒤 1.5초).
+//   메모가 바뀌면 표시만 해 두고(mark), 8초 동안 더 바뀌지 않으면 2초마다의 다시 읽기가 한 번에 쓴다 (JS: 바뀐 뒤 1.5초).
 //   메모 폴더 잠금은 글을 복사하는 동안만 — 색인 만들기(메모 2,000개면 몇백 ms)는 잠금 밖에서 (JS 는 작업 스레드)
 use crate::state::State;
 use memoking_core::indexer::{index_key, index_output, IndexMemo, AGENT_GUIDE};
 use memoking_core::vault::write_atomic;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
 static PENDING: AtomicBool = AtomicBool::new(true);
+/// 마지막으로 바뀐 때 (앱을 켠 뒤 ms) — 쓰는 동안은 기다렸다가 멈추면 한 번에
+static MARKED_AT: AtomicU64 = AtomicU64::new(0);
+/// 바뀐 뒤 이만큼 조용하면 만든다 — 예전에는 쓰는 동안 2초마다 모든 메모 본문을 복사해 색인을 다시 만들었다 (메모리 · CPU)
+const QUIET_MS: u64 = 8_000;
+static START: std::sync::LazyLock<std::time::Instant> = std::sync::LazyLock::new(std::time::Instant::now);
+fn now_ms() -> u64 {
+    START.elapsed().as_millis() as u64
+}
 // 마지막으로 쓴 색인의 열쇠 (generatedAt 만 다르면 같은 색인 — Drive 가 매번 올리지 않게)
 static KEY: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn mark() {
+    MARKED_AT.store(now_ms(), Ordering::Relaxed);
     PENDING.store(true, Ordering::Relaxed);
 }
 
@@ -30,9 +39,10 @@ pub fn opened(root: &Path) {
 
 /// 바뀐 것이 있으면 색인을 다시 만들어, 내용이 다를 때만 쓴다
 pub fn tick(app: &AppHandle) {
-    if !PENDING.swap(false, Ordering::Relaxed) {
+    if !PENDING.load(Ordering::Relaxed) || now_ms().saturating_sub(MARKED_AT.load(Ordering::Relaxed)) < QUIET_MS {
         return;
     }
+    PENDING.store(false, Ordering::Relaxed);
     let copied = app.state::<State>().vault.lock().unwrap().as_ref().map(|v| {
         (v.root.clone(), v.files().map(|e| (e.id.clone(), e.file.clone().unwrap_or_default(), e.meta.clone(), e.body.clone())).collect::<Vec<_>>())
     });

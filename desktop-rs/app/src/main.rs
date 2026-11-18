@@ -204,6 +204,12 @@ fn memoking_uri(app: &AppHandle, label: &str, req: &http::Request<Vec<u8>>) -> h
             _ => Some(file),
         };
         let Some(file) = file else { return status(503) };
+        // ?thumb=폭: 목록 카드 썸네일 — 줄인 그림 (못 만들면 원본)
+        let thumb = req.uri().query().and_then(|q| q.split('&').find_map(|kv| kv.strip_prefix("thumb="))).and_then(|w| w.parse::<u32>().ok());
+        let (file, mime) = match thumb.filter(|_| path.starts_with("/vault/")).and_then(|w| thumb_file(app, &file, mime, w)) {
+            Some((t, m)) => (t, m),
+            None => (file, mime),
+        };
         return file_response(&file, mime, range, allow).unwrap_or_else(|| status(404));
     }
     // 채널 이름은 영문 · ':' · '-' 뿐이라 주소에 그대로 싣는다
@@ -218,6 +224,53 @@ fn memoking_uri(app: &AppHandle, label: &str, req: &http::Request<Vec<u8>>) -> h
         .header("Access-Control-Allow-Origin", allow)
         .body(body.to_string().into_bytes())
         .unwrap()
+}
+
+/// 목록 카드 썸네일: 긴 변 w 이하로 줄인 그림 → (캐시 파일, 형식). 줄일 것이 없거나 못 읽으면 None (원본 그대로)
+///   카드마다 원본 사진(휴대폰 사진 1,200만 화소 → 풀면 48MB)을 통째로 풀어 목록 창 메모리가 수백 MB 로 불었다.
+///   캐시 폴더에 남겨 다음부터는 읽기만 (원본이 바뀌면 크기 · 시각이 달라 새로)
+// shortcut: 지난 썸네일은 지우지 않는다 (한 장 수십 KB) — 캐시가 커졌다는 말이 나오면 오래된 것부터 지우기
+fn thumb_file(app: &AppHandle, file: &std::path::Path, mime: &str, w: u32) -> Option<(std::path::PathBuf, &'static str)> {
+    use image::ImageDecoder;
+    use std::hash::{Hash, Hasher};
+    // 움직이는 그림(gif) · 벡터(svg)는 그대로
+    if !matches!(mime, "image/jpeg" | "image/png" | "image/webp" | "image/bmp") || !(64..=2048).contains(&w) {
+        return None;
+    }
+    let meta = std::fs::metadata(file).ok()?;
+    if meta.len() < 150 * 1024 {
+        return None; // 작은 그림은 원본이 더 싸다
+    }
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    (file, meta.len(), meta.modified().ok(), w).hash(&mut h);
+    let dir = app.path().app_cache_dir().ok()?.join("thumbs");
+    let key = format!("{:016x}", h.finish());
+    for (ext, m) in [("jpg", "image/jpeg"), ("png", "image/png")] {
+        let p = dir.join(format!("{key}.{ext}"));
+        if p.exists() {
+            return Some((p, m));
+        }
+    }
+    // 큰 사진을 한꺼번에 여럿 풀면 그 순간 메모리가 튄다 — 하나씩
+    static ONE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _one = ONE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut dec = image::ImageReader::open(file).ok()?.with_guessed_format().ok()?.into_decoder().ok()?;
+    let turn = dec.orientation().unwrap_or(image::metadata::Orientation::NoTransforms); // 휴대폰 사진의 돌림 (원본 <img> 처럼)
+    let mut img = image::DynamicImage::from_decoder(dec).ok()?;
+    if img.width().max(img.height()) <= w {
+        return None;
+    }
+    img.apply_orientation(turn);
+    let small = img.thumbnail(w, w);
+    drop(img);
+    std::fs::create_dir_all(&dir).ok()?;
+    let (ext, m, fmt) = if small.color().has_alpha() { ("png", "image/png", image::ImageFormat::Png) } else { ("jpg", "image/jpeg", image::ImageFormat::Jpeg) };
+    let out = dir.join(format!("{key}.{ext}"));
+    let tmp = dir.join(format!("{key}.tmp"));
+    let small = if fmt == image::ImageFormat::Jpeg { image::DynamicImage::ImageRgb8(small.to_rgb8()) } else { small };
+    small.save_with_format(&tmp, fmt).ok()?;
+    std::fs::rename(&tmp, &out).ok()?;
+    Some((out, m))
 }
 
 /// 파일 하나 — Range 가 있으면 그 조각만 206 (영상 · 소리를 끝까지 다 읽지 않고 넘겨 보게)

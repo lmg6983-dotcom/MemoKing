@@ -699,7 +699,7 @@ function renderCard(memo) {
   if (memo.thumb) {
     const img = document.createElement('img');
     img.className = 'card-thumb';
-    img.src = vaultUrl(memo.thumb);
+    img.src = `${vaultUrl(memo.thumb)}?thumb=480`; // 줄인 그림 (원본 사진을 카드마다 통째로 풀지 않게 — PC Rust 판, 다른 판은 원본)
     img.alt = '';
     img.loading = 'lazy';
     img.decoding = 'async'; // 큰 사진을 푸는 동안 스크롤이 멈추지 않게
