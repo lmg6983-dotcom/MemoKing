@@ -46,5 +46,6 @@ cd "$WORK/ffmpeg-$VER"
 make -j"$(nproc)" ffmpeg.exe
 x86_64-w64-mingw32-strip ffmpeg.exe
 cp ffmpeg.exe "$OUT/ffmpeg.exe"
+cp COPYING.LGPLv2.1 "$OUT/" # LGPL: 설치 파일에 사용 허락 글도 함께
 echo "$STAMP" > "$OUT/VERSION"
 ls -l "$OUT/ffmpeg.exe"

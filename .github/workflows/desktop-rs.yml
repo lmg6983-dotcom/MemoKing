@@ -44,10 +44,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
+        id: cache
         with:
           path: desktop/vendor/ffmpeg
           key: ffmpeg-min-${{ hashFiles('desktop-rs/scripts/build-ffmpeg-min.sh') }}
-      - run: sudo apt-get update && sudo apt-get install -y mingw-w64 nasm
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo apt-get update && sudo apt-get install -y mingw-w64 nasm
       - run: bash desktop-rs/scripts/build-ffmpeg-min.sh
       - uses: actions/upload-artifact@v4
         with:

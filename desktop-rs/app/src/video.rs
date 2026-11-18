@@ -24,6 +24,11 @@ pub fn playable(app: &AppHandle, rel: &str, file: PathBuf) -> Option<PathBuf> {
     // 사본은 RUNNING 에서 빠지기 전에 제 이름이 되므로, 이 잠금 안에서는 "있음" 과 "만드는 중" 이 함께 틀리지 않는다
     let mut running = RUNNING.lock().unwrap();
     if out.is_file() {
+        // 볼 때마다 시각을 새로 (한 시간에 한 번): 한도를 넘어 지울 때 오래 안 본 사본부터 지우게
+        let now = std::time::SystemTime::now();
+        if out.metadata().and_then(|m| m.modified()).is_ok_and(|t| now.duration_since(t).is_ok_and(|d| d.as_secs() > 3600)) {
+            let _ = std::fs::File::options().write(true).open(&out).and_then(|f| f.set_modified(now));
+        }
         return Some(out);
     }
     if FAILED.lock().unwrap().contains(&out) {
@@ -32,7 +37,11 @@ pub fn playable(app: &AppHandle, rel: &str, file: PathBuf) -> Option<PathBuf> {
     if running.insert(out.clone()) {
         let (app, rel) = (app.clone(), rel.to_string());
         std::thread::spawn(move || {
-            if let Err(e) = convert(&ffmpeg, &file, &out) {
+            // 한 번에 하나만: 동영상 많은 목록이 한꺼번에 청해도 ffmpeg 가 여럿 돌지 않게 (기다리는 것은 RUNNING 에 남아 503 을 받는다)
+            static ONE: Mutex<()> = Mutex::new(());
+            let _one = ONE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            // 소리를 mp4 에 담지 못하면(아이폰 공간 음향 APAC 등) 소리 없이 한 번 더
+            if let Err(e) = convert(&ffmpeg, &file, &out, true).or_else(|_| convert(&ffmpeg, &file, &out, false)) {
                 eprintln!("[video] {rel}: {e}");
                 FAILED.lock().unwrap().insert(out.clone());
             }
@@ -72,7 +81,7 @@ fn ffmpeg_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 /// 다른 이름으로 만들고 다 되면 바꾼다: 반쯤 만든 사본을 보내지 않게
-fn convert(ffmpeg: &Path, src: &Path, out: &Path) -> Result<(), String> {
+fn convert(ffmpeg: &Path, src: &Path, out: &Path, audio: bool) -> Result<(), String> {
     let dir = out.parent().ok_or("사본 폴더 없음")?;
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     trim_cache(dir);
@@ -80,7 +89,7 @@ fn convert(ffmpeg: &Path, src: &Path, out: &Path) -> Result<(), String> {
     let mut cmd = std::process::Command::new(ffmpeg);
     // h264_mf: Windows 에 든 H.264 인코더. 10비트(HDR) 영상은 그 인코더가 받는 nv12 로, 4K 는 1920 안으로 줄인다 (메모 속 재생에 넉넉)
     cmd.args(["-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i"]).arg(src);
-    cmd.args(["-map", "0:v:0", "-map", "0:a?", "-vf", "scale='min(iw,1920)':'min(ih,1920)':force_original_aspect_ratio=decrease:force_divisible_by=2,format=nv12"]);
+    cmd.args(["-map", "0:v:0", "-map", if audio { "0:a:0?" } else { "-0:a" }, "-vf", "scale='min(iw,1920)':'min(ih,1920)':force_original_aspect_ratio=decrease:force_divisible_by=2,format=nv12"]);
     cmd.args(["-c:v", "h264_mf", "-b:v", "8M", "-c:a", "copy", "-movflags", "+faststart", "-f", "mp4"]).arg(&part);
     cmd.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
     #[cfg(windows)]
