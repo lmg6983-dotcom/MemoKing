@@ -1077,12 +1077,18 @@ const noFileDrop = (() => {
 if (!noFileDrop) setupFileDrop({
   dropAt: (x, y) => (editor && !memo?.needsPassword ? editor.dropAt(x, y) : null),
   isOwn: isOwnDragOut,
+  trace: (text) => api.perf?.log?.(`[끌기] ${text}`)?.catch?.(() => {}),
   onDrop: (pos, files) => {
     if (!files.length) return setStatus('폴더는 넣을 수 없어요. 폴더 안의 파일을 골라 끌어다 놓아 주세요', true);
-    editor.insertFilesAt(pos, files).catch((err) => {
-      console.error(err);
-      setStatus(UI.fileAddFail, true);
-    });
+    const t0 = performance.now();
+    editor.insertFilesAt(pos, files).then(
+      () => api.perf?.log?.(`[끌기] 넣음 (${Math.round(performance.now() - t0)}ms · ${files.map((f) => f.name.split('.').pop()).join(', ')})`)?.catch?.(() => {}),
+      (err) => {
+        console.error(err);
+        api.perf?.log?.(`[끌기] 넣지 못함: ${err?.message ?? err}`)?.catch?.(() => {});
+        setStatus(UI.fileAddFail, true);
+      },
+    );
   },
 });
 
