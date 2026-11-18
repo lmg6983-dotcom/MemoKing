@@ -40,6 +40,8 @@ import { UI } from './core/ui-text.js';
 import { pickFolder } from './folder-ui.js';
 import { folderOf, UNFILED_LABEL } from './core/folders.js';
 import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from './note-shared.js';
+import { setupFileDrop } from './file-drop.js';
+import { isOwnDragOut } from './copy-content.js';
 
 const SAVE_DELAY = 600;
 
@@ -1062,6 +1064,19 @@ async function insertFiles(files) {
     setStatus(UI.fileAddFail, true);
   }
 }
+
+// 파일 끌어 놓기: 창 어디에 놓아도 (글 아래 빈 곳 · 여백 · 머리줄) 놓은 높이의 줄 아래에 — 끄는 동안 놓을 자리를 보인다 (file-drop.js)
+setupFileDrop({
+  dropAt: (x, y) => (editor && !memo?.needsPassword ? editor.dropAt(x, y) : null),
+  isOwn: isOwnDragOut,
+  onDrop: (pos, files) => {
+    if (!files.length) return setStatus('폴더는 넣을 수 없어요. 폴더 안의 파일을 골라 끌어다 놓아 주세요', true);
+    editor.insertFilesAt(pos, files).catch((err) => {
+      console.error(err);
+      setStatus(UI.fileAddFail, true);
+    });
+  },
+});
 
 el.fileInput.addEventListener('change', () => {
   insertFiles([...el.fileInput.files]);

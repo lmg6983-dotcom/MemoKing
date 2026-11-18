@@ -348,12 +348,21 @@ export async function dragOutBlock(view, pos, node, target, name = '') {
   if (!host.dragOut) return false;
   const { text: _text, mime: _mime, ...f } = await blockPayload(view, pos, node, target);
   if (!f.rel && /\.txt$/i.test(f.name ?? '')) return false;
-  host.dragOut({ ...f, name: name || f.name });
+  lastDragOut = { name: name || f.name, at: Date.now() };
+  host.dragOut(lastDragOut.name ? { ...f, name: lastDragOut.name } : f);
   return true;
 }
 
+let lastDragOut = null; // 방금 끌어낸 것 { name, at } — 경로를 모르는 판(PC Rust: File 에 경로가 없다)은 이름과 때로 알아본다
+const DRAG_OUT_MS = 60_000;
+
 /** 방금 끌어낸 임시 파일이 메모에 도로 떨어졌는가 (그러면 파일이 하나 더 생기지 않게 무시) */
 export function isOwnDragOut(dataTransfer) {
-  if (!host.pathOf || !dataTransfer?.files?.length) return false;
-  return [...dataTransfer.files].some((file) => /[\\/]memoking-drag[\\/]/.test(host.pathOf(file)));
+  const files = [...(dataTransfer?.files ?? [])];
+  if (!files.length) return false;
+  const path = host.pathOf ? files.map((file) => host.pathOf(file)).find(Boolean) : '';
+  if (path) return /[\\/]memoking-drag[\\/]/.test(path);
+  // 메인이 이름을 다듬고(쓸 수 없는 글자) 확장자를 붙일 수 있어 확장자 앞까지 같은 글자로 본다 (memos.rs drag_out)
+  const stem = (n) => String(n ?? '').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|\s]+/g, ' ').trim();
+  return Boolean(lastDragOut && Date.now() - lastDragOut.at < DRAG_OUT_MS && files.length === 1 && stem(files[0].name) === stem(lastDragOut.name));
 }

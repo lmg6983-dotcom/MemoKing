@@ -1800,3 +1800,50 @@ body.picking .card.picked::after {
 /* 밀거나 끌거나 날아가는 카드(.mk-live — 휴대폰 list-view.js 가 붙인다)는 칸 밖으로 나가므로 건너뛰지 않는다.
    :has() 로 카드의 상태를 보면 손가락이 움직일 때마다 목록 전체의 모양을 다시 따져 밀기가 버벅였다 */
 .cards .item.mk-measure, .cards .item.mk-live, .cards .item:hover, .cards .item:focus-within { content-visibility: visible; }
+
+/* ---------- 파일 끌어 놓기 표시 (file-drop.js · 목록 창 .file-drop) ----------
+   놓을 수 있는 곳: 가장자리를 따라 흐르는 점선(marching ants) + 옅은 칠 · 놓일 자리: 점 달린 삽입선 (Notion · 원노트 · VS Code 와 같은 방식)
+   파란색은 메모 색(노랑 · 분홍 …)과 겹치지 않는 "놓기" 색 */
+:root { --drop: #2f7bf5; --drop-soft: color-mix(in srgb, var(--drop) 9%, transparent); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --drop: #5b9bff; } }
+:root[data-theme="dark"] { --drop: #5b9bff; }
+.mk-dropzone {
+  --ant: var(--drop);
+  position: fixed; inset: 5px; z-index: 950; pointer-events: none; border-radius: 10px;
+  background:
+    linear-gradient(90deg, var(--ant) 55%, transparent 0) repeat-x top left / 14px 2px,
+    linear-gradient(90deg, var(--ant) 55%, transparent 0) repeat-x bottom left / 14px 2px,
+    linear-gradient(0deg, var(--ant) 55%, transparent 0) repeat-y top left / 2px 14px,
+    linear-gradient(0deg, var(--ant) 55%, transparent 0) repeat-y top right / 2px 14px,
+    var(--drop-soft);
+  animation: mk-drop-in 0.14s ease-out, mk-ants 0.7s linear infinite;
+}
+.mk-dropzone[hidden], .mk-dropline[hidden] { display: none; }
+.mk-dropzone.no { --ant: color-mix(in srgb, var(--text, #888) 45%, transparent); background-color: transparent; }
+.mk-drop-pill {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  padding: 6px 12px; border-radius: 999px; white-space: nowrap;
+  background: var(--drop); color: #fff; font-size: 12.5px; font-weight: 600;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--drop) 35%, transparent);
+  animation: mk-pill-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.mk-dropzone.no .mk-drop-pill { background: color-mix(in srgb, var(--text, #555) 70%, transparent); box-shadow: none; }
+.mk-dropline {
+  position: fixed; left: 0; top: 0; z-index: 951; height: 3px; border-radius: 2px; pointer-events: none;
+  background: var(--drop); box-shadow: 0 0 0 3px color-mix(in srgb, var(--drop) 18%, transparent);
+  transition: transform 0.09s ease-out, width 0.09s ease-out;
+}
+.mk-dropline::before {
+  content: ''; position: absolute; left: -6px; top: -4.5px; width: 8px; height: 8px; border-radius: 50%;
+  border: 2px solid var(--drop); background: var(--note-bg, var(--bg, #fff));
+  animation: mk-drop-pulse 1s ease-in-out infinite;
+}
+body.mk-file-dragging .mk-doc { caret-color: transparent; } /* 깜빡이는 커서가 놓일 자리처럼 보이지 않게 */
+@keyframes mk-ants { to { background-position: 14px 0, -14px 100%, 0 -14px, 100% 14px, 0 0; } }
+@keyframes mk-drop-in { from { opacity: 0; transform: scale(0.985); } }
+@keyframes mk-pill-in { from { opacity: 0; transform: translate(-50%, 6px) scale(0.96); } }
+@keyframes mk-drop-pulse { 50% { transform: scale(1.35); } }
+@media (prefers-reduced-motion: reduce) {
+  .mk-dropzone, .mk-drop-pill, .mk-dropline::before { animation: none; }
+  .mk-dropline { transition: none; }
+}

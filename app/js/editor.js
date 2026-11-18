@@ -3253,6 +3253,39 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     editInk: (pos) => editInk(view(), pos),
     // 커서 자리에 파일들을 넣는다.
     insertFiles: (files) => insertFilesAt(view().state.selection.from, files),
+    // 끌어 놓은 파일: dropAt 이 고른 자리에 넣는다
+    insertFilesAt: (pos, files) => insertFilesAt(pos, files),
+    /**
+     * 창의 (x, y) 에 파일을 놓으면 들어갈 자리 → { pos, line: { top, left, width } } (line: 놓일 자리 표시줄) · 읽기 전용이면 null
+     *   글자 줄 위만이 아니라 창 어디든: 글 아래 빈 곳 · 여백이면 맨 끝 (맨 끝 빈 줄은 그 줄을 바꾼다), 글 옆이면 그 높이의 줄 아래
+     *   insertBlocks 처럼 그 줄(글 덩어리) 바로 아래에 들어간다
+     */
+    dropAt: (x, y) => {
+      const v = view();
+      if (readOnly || v.isDestroyed) return null;
+      const { doc } = v.state;
+      const box = v.dom.getBoundingClientRect();
+      const lastDom = v.dom.lastElementChild;
+      const bottom = lastDom ? lastDom.getBoundingClientRect().bottom : box.top;
+      let pos;
+      if (y >= bottom || !doc.childCount) {
+        const last = doc.lastChild;
+        pos = last?.isTextblock && !last.content.size ? doc.content.size - 1 : doc.content.size;
+      } else {
+        const at = v.posAtCoords({ left: Math.min(Math.max(x, box.left + 2), box.right - 2), top: Math.max(y, box.top + 1) });
+        pos = at ? at.pos : doc.content.size;
+        // 덩어리 사이(줄 간격 · 머리줄 · 글 위 여백)는 위 덩어리 아래로 — 맨 위면 첫 덩어리(제목) 아래 (제목 위에 끼지 않게)
+        if (!doc.resolve(pos).parent.isTextblock) pos = Math.max(1, Math.min(pos - 1, doc.content.size));
+      }
+      const $p = doc.resolve(Math.min(pos, doc.content.size));
+      const blockDom = $p.depth > 0 && $p.parent.isTextblock ? v.nodeDOM($p.before()) : null;
+      const r = (blockDom instanceof Element ? blockDom : lastDom)?.getBoundingClientRect();
+      const empty = $p.depth > 0 && $p.parent.isTextblock && !$p.parent.content.size; // 빈 줄은 그 줄을 바꾼다 → 그 줄 가운데에
+      // 줄은 편집기 폭 전체로 (글 덩어리 요소는 글자 폭만큼일 수 있다), 높이는 그 덩어리 바로 아래
+      const pad = parseFloat(getComputedStyle(v.dom).paddingLeft) || 0;
+      const line = { top: r ? (empty ? r.top + r.height / 2 : r.bottom + 2) : box.top, left: box.left + pad, width: box.width - pad * 2 };
+      return { pos, line };
+    },
     focus: () => view().focus(),
     /** 서식 없이 붙여넣기 (오른쪽 클릭 메뉴 › 서식 없이 붙여넣기 — 클립보드의 글자) → 편집기에 넣었는가 */
     pastePlain: (text) => {
