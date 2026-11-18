@@ -1670,7 +1670,7 @@ body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-sha
   background: color-mix(in srgb, var(--brand-yellow, #ffcc00) 7%, transparent);
   animation: mk-file-drop-in 0.15s ease-out;
 }
-.mk-file-drop[hidden], .mk-file-drop-slot[hidden] { display: none; }
+.mk-file-drop[hidden] { display: none; }
 @keyframes mk-file-drop-in { from { opacity: 0; } }
 .mk-file-drop svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .mk-file-drop rect {

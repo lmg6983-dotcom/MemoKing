@@ -26,7 +26,6 @@ export function setupFileDrop(box, getEditor, onError) {
   const hide = () => {
     clearTimeout(timer);
     zone.hidden = true;
-    slot.hidden = true;
   };
 
   const show = (x, y) => {
@@ -36,7 +35,6 @@ export function setupFileDrop(box, getEditor, onError) {
     Object.assign(zone.style, { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` });
     const first = zone.hidden;
     zone.hidden = false;
-    slot.hidden = false;
     const r = target.rect;
     // 폭은 줄마다 다르지 않게 글 칸 전체에 (사진 · 칩 · 목록 줄 폭을 따르면 들쭉날쭉해 창과 안 맞아 보였다) — 둘레 점선 틀 안쪽으로
     const left = Math.max(target.doc.left - 6, b.left + 8) - b.left;

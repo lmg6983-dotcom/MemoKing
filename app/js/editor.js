@@ -642,7 +642,7 @@ const tagHighlight = $prose(() => new Plugin({
 // 칩 아래, 첫 쪽 썸네일이 들어갈 자리에 종이 모양 + 진행 막대 (화면에만 — 파일에 저장되지 않는 꾸밈).
 //   상태: id → { pos(칩 문단 끝), name, pdf, done, total } — 글이 바뀌면 자리도 따라간다. meta: { id, set } · { id, remove }
 const pendingDocKey = new PluginKey('memoking-doc-pending');
-function pendingDocDom(p) {
+function pendingDocDom(p, id) {
   if (p.uploading) { // 붙여 넣은 · 고른 파일을 저장하는 동안: 끌어다 놓을 때(Milkdown 업로드)와 같은 "넣는 중"
     const el = document.createElement('span');
     el.className = 'mk-uploading';
@@ -651,6 +651,7 @@ function pendingDocDom(p) {
   }
   const box = document.createElement('span');
   box.className = 'mk-doc-pending';
+  box.dataset.id = id; // 넣은 문서마다 제 칸으로 스크롤 (pairDocument)
   box.contentEditable = 'false';
   const page = document.createElement('span');
   page.className = 'mk-doc-pending-page';
@@ -685,7 +686,7 @@ const pendingDocs = $prose(() => new Plugin({
     decorations(state) {
       const map = pendingDocKey.getState(state);
       if (!map?.size) return null;
-      return DecorationSet.create(state.doc, [...map].filter(([, p]) => !p.uploading || p.shown).map(([id, p]) => Decoration.widget(p.pos, () => pendingDocDom(p), { key: `doc-pending-${id}-${p.done}-${p.total}-${p.shown}`, side: 1, ignoreSelection: true })));
+      return DecorationSet.create(state.doc, [...map].filter(([, p]) => !p.uploading || p.shown).map(([id, p]) => Decoration.widget(p.pos, () => pendingDocDom(p, id), { key: `doc-pending-${id}-${p.done}-${p.total}-${p.shown}`, side: 1, ignoreSelection: true })));
     },
   },
 }));
@@ -1320,10 +1321,21 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   // 문서 칩과 PDF 첫 쪽 썸네일은 한 문단 (칩 · 줄바꿈 · 썸네일) — 옮기기 · 지우기를 함께
   const pdfPairNodes = (schema, thumb) => [schema.nodes.hardbreak.create(), schema.nodes.image.create({ src: thumb.src, alt: thumb.alt, title: thumb.title })];
 
+  // 넣은 줄이 들어갈 범위 — insertBlocks 와 끌어 넣기 표시(dropTarget)가 함께 쓴다 (둘이 어긋나지 않게).
+  //   from === to 면 그 자리에 넣고, 아니면 [from, to) 의 빈 줄을 바꾼다. 음성 카드 안이면 카드 아래,
+  //   표 칸에는 글 한 줄만 들어가니 칸 안이면 표 바로 아래 (표가 둘로 쪼개지지 않게)
+  function insertRange(state, pos) {
+    const $pos = state.doc.resolve(Math.min(afterVoiceCard(state, pos), state.doc.content.size));
+    let depth = $pos.depth;
+    while (depth > 1 && !$pos.node(depth - 1).canReplaceWith($pos.index(depth - 1) + 1, $pos.index(depth - 1) + 1, state.schema.nodes.paragraph)) depth--;
+    if (depth < $pos.depth) return { from: $pos.after(depth), to: $pos.after(depth) };
+    if ($pos.depth > 0 && $pos.parent.isTextblock && $pos.parent.content.size === 0) return { from: $pos.before(), to: $pos.after() };
+    if ($pos.depth > 0 && $pos.parent.isTextblock) return { from: $pos.after(), to: $pos.after() };
+    return { from: $pos.pos, to: $pos.pos };
+  }
   function insertBlocks(pos, items) {
     const v = view();
     const { schema } = v.state;
-    pos = afterVoiceCard(v.state, pos);
     const paragraphs = items.map((item) => {
       if (item.kind === 'album') {
         return schema.nodes.paragraph.create(null, item.images.map((im) => schema.nodes.image.create({ src: im.src, alt: im.alt, title: im.page ? ALBUM_PAGE_TITLE : ALBUM_TITLE })));
@@ -1333,26 +1345,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       }
       return schema.nodes.paragraph.create(null, schema.nodes.image.create({ src: item.src, alt: item.alt, title: item.title ?? '' })); // title: PDF 썸네일이면 "pdf <경로>"
     });
-    const $pos = v.state.doc.resolve(Math.min(pos, v.state.doc.content.size));
     const size = paragraphs.reduce((sum, p) => sum + p.nodeSize, 0);
-    // 표 칸에는 글 한 줄만 들어간다 — 칸 안이면 표 바로 아래에 (표가 둘로 쪼개지지 않게)
-    let depth = $pos.depth;
-    while (depth > 1 && !$pos.node(depth - 1).canReplaceWith($pos.index(depth - 1) + 1, $pos.index(depth - 1) + 1, schema.nodes.paragraph)) depth--;
-    let tr = v.state.tr;
-    let end;
-    if (depth < $pos.depth) {
-      tr = tr.insert($pos.after(depth), paragraphs);
-      end = $pos.after(depth) + size;
-    } else if ($pos.depth > 0 && $pos.parent.isTextblock && $pos.parent.content.size === 0) {
-      tr = tr.replaceWith($pos.before(), $pos.after(), paragraphs);
-      end = $pos.before() + size;
-    } else if ($pos.depth > 0 && $pos.parent.isTextblock) {
-      tr = tr.insert($pos.after(), paragraphs);
-      end = $pos.after() + size;
-    } else {
-      tr = tr.insert($pos.pos, paragraphs);
-      end = $pos.pos + size;
-    }
+    const { from, to } = insertRange(v.state, pos);
+    let tr = to > from ? v.state.tr.replaceWith(from, to, paragraphs) : v.state.tr.insert(from, paragraphs);
+    const end = from + size;
     // 넣은 뒤 바로 이어서 쓸 수 있게 커서를 다음 줄로
     if (end >= tr.doc.content.size) tr = tr.insert(end, schema.nodes.paragraph.create());
     tr = tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(end + 1, tr.doc.content.size))));
@@ -1725,8 +1721,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     send({ set: { pos, name: it.name, pdf: extOf(it.name) === 'pdf', done: 0, total: 0 } });
     // 칩을 넣으며 커서 줄로 스크롤한 뒤에 생긴 칸(종이 한 장 높이)이라, 작은 메모 창에서는 창 아래로 밀려 안 보였다 — 보이게
     requestAnimationFrame(() => {
-      const box = [...view().dom.querySelectorAll('.mk-doc-pending')].pop();
-      box?.closest('p')?.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+      view().dom.querySelector(`.mk-doc-pending[data-id="${id}"]`)?.closest('p')?.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
     });
     const thumb = await documentPdfItem(it, (done, total) => send({ set: { done, total } }));
     const v = view();
@@ -3268,25 +3263,31 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     // 끌어다 놓은 파일: 놓은 자리에 (글 밖 · 여백이라 자리를 모르면 커서 자리) — file-drop.js
     dropFiles: (files, x, y) => (readOnly ? Promise.resolve() : insertFilesAt(dropPos(x, y), files)),
     /**
-     * 놓으면 들어갈 곳 { rect, replace, above } — insertBlocks 와 같게: 빈 줄이면 그 줄을 바꾸고(replace), 글 줄이면 그 줄 아래,
-     * 줄과 줄 사이면 앞 줄 아래 (맨 앞이면 첫 줄 위 — above). doc: 글 칸 전체 (표시 폭은 이것에 맞춘다). 놓을 수 없으면 null
+     * 놓으면 들어갈 곳 { rect, replace, above } — insertRange 그대로: 빈 줄을 바꾸면(replace) 그 줄 칸, 넣으면 앞 줄 아래
+     * (맨 앞이면 첫 줄 위 — above). 목록 안이면 맨 바깥 목록 뒤 (list-content-guard.js 가 옮길 자리).
+     * doc: 글 칸 전체 (표시 폭은 이것에 맞춘다). 놓을 수 없으면 null
      */
     dropTarget: (x, y) => {
       if (readOnly) return null;
       const v = view();
       const doc = v.dom.getBoundingClientRect();
-      const $p = v.state.doc.resolve(dropPos(x, y));
       const rectOf = (pos) => {
-        const dom = pos >= 0 ? v.nodeDOM(pos) : null;
+        const dom = v.nodeDOM(pos);
         return dom instanceof Element ? dom.getBoundingClientRect() : null;
       };
-      if ($p.depth > 0) {
-        const rect = rectOf($p.before());
-        if (rect) return { rect, doc, replace: $p.parent.isTextblock && $p.parent.content.size === 0 };
+      const { from, to } = insertRange(v.state, dropPos(x, y));
+      const $f = v.state.doc.resolve(from);
+      for (let d = $f.depth; d > 0; d--) {
+        if ($f.node(d).type.name !== 'list_item') continue;
+        const list = rectOf($f.before(1));
+        if (list) return { rect: list, doc, replace: false };
+        break;
       }
-      const before = $p.nodeBefore ? rectOf($p.pos - $p.nodeBefore.nodeSize) : null;
+      const replaced = to > from ? rectOf(from) : null;
+      if (replaced) return { rect: replaced, doc, replace: true };
+      const before = $f.nodeBefore ? rectOf(from - $f.nodeBefore.nodeSize) : null;
       if (before) return { rect: before, doc, replace: false };
-      const after = $p.nodeAfter ? rectOf($p.pos) : null;
+      const after = $f.nodeAfter ? rectOf(from) : null;
       return { rect: after ?? doc, doc, replace: false, above: Boolean(after) };
     },
     focus: () => view().focus(),
