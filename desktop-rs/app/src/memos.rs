@@ -211,6 +211,10 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
     }
     let label = st.note_labels.lock().unwrap().get(id).cloned();
     if let Some(w) = label.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
+        // 마우스를 올려 미리 그리는 중인 창: 다 그리면 보인다 (그리기 전에 보이면 빈 투명 창 — 두 번 눌러야 열렸다)
+        if crate::windows::reveal_when_painted(app, w.label(), id) {
+            return Ok(true);
+        }
         let _ = w.unminimize();
         crate::windows::show_note_win(&w);
         let _ = w.set_focus();

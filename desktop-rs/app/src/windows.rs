@@ -100,6 +100,8 @@ struct Wm {
     hidden_at: HashMap<String, Instant>,
     /// 예비 창으로 되돌려 다시 쓴 횟수 (창마다 RECYCLE_MAX 까지)
     recycled: HashMap<String, u32>,
+    /// 오래 숨어 웹뷰에도 안 보임을 알린 창 (보일 때 되돌린다)
+    deep: HashSet<String>,
     /// 화면을 다 불러온 덧창 (ghost · hud · bubble-…)
     loaded: HashSet<String>,
     /// 창 옮기기 · 늘이기가 멈췄는지 볼 차례 번호
@@ -298,6 +300,7 @@ pub fn card_flags(app: &AppHandle) -> impl Fn(&str) -> [Value; 3] {
 
 /// 메모 창을 만들었다 (memos::create_note_window): 옮기기 · 포커스 · 닫기를 본다
 pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
+    sync_resize(win); // 같은 창을 다시 쓰면 같은 처리기를 다시 단다 (Windows 가 하나로 둔다)
     let (app, id, label) = (app.clone(), id.to_string(), win.label().to_string());
     win.on_window_event(move |e| match e {
         // 이 창이 이제 이 메모의 창이 아니다 (예비 창으로 되돌려 다른 메모가 쓴다) — 그 메모 몫의 처리가 맡는다
@@ -307,17 +310,18 @@ pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
             bubble_away(&app, &label);
             moving(&app, &id, &label, matches!(e, WindowEvent::Moved(_)));
         }
+        // 포커스가 바뀔 때는 웹뷰를 건드리지 않는다 — 포커스를 받는 순간(첫 클릭)에 메모리 단계를 바꾸면 그 클릭이 먹혀
+        //   닫기 · 단추를 두 번 눌러야 했다. 오래 숨어 안 보임으로 둔 창이 다른 길로 보였을 때만 되돌린다 (안전망)
         WindowEvent::Focused(true) => {
-            if let Some(w) = app.get_webview_window(&label) {
-                webview_visible(&w, true); // 다른 길로 보인 창이어도 (안전망)
-                memory_low(&w, false);
+            if wm().deep.remove(&label) {
+                if let Some(w) = app.get_webview_window(&label) {
+                    webview_visible(&w, true);
+                    memory_low(&w, false);
+                }
             }
         }
         WindowEvent::Focused(false) => {
             bubble_away(&app, &label);
-            if let Some(w) = app.get_webview_window(&label) {
-                memory_low(&w, true); // 바탕화면에 붙여 둔 메모는 대개 보기만 한다 — 다시 누르면 보통으로
-            }
             // 테이프 메모: 쓰고 나서 다른 데를 누르면 다시 바탕화면 층으로
             let h = wm().pinned.get(&label).copied();
             if let Some(h) = h {
@@ -396,7 +400,12 @@ fn webview_visible(_w: &WebviewWindow, _on: bool) {}
 
 /// 메모 창 보이기 — 웹뷰를 먼저 보이게 해 그리기를 시작시키고 창을 띄운다
 pub fn show_note_win(w: &WebviewWindow) {
-    wm().hidden_at.remove(w.label());
+    {
+        let mut g = wm();
+        g.hidden_at.remove(w.label());
+        g.deep.remove(w.label());
+    }
+    memory_low(w, false); // 숨는 동안 낮춰 둔 메모리 단계를 보통으로 (포커스 때가 아니라 보일 때)
     webview_visible(w, true);
     let _ = w.show();
 }
@@ -407,10 +416,76 @@ pub fn hide_deep_later(w: &WebviewWindow) {
     let w = w.clone();
     later(DEEP_HIDE_MS, move || {
         if !is_shown(&w) {
+            wm().deep.insert(w.label().to_string());
             webview_visible(&w, false);
         }
     });
 }
+
+/// 아직 그리는 중인 창(미리 열기 · 숨겨 만든 창)을 열면: 바로 보이지 않고 다 그리면 보이게 바꿔 둔다 → 바꿨는가.
+///   그리기 전에 보이면 투명 창이라 아무것도 없어 보여 한 번 더 눌러야 했다 (늦어도 when_painted 의 1.5초)
+pub fn reveal_when_painted(app: &AppHandle, label: &str, id: &str) -> bool {
+    let mut g = wm();
+    if !g.reveal.contains_key(label) {
+        return false;
+    }
+    let (label2, id2) = (label.to_string(), id.to_string());
+    g.reveal.insert(
+        label.to_string(),
+        Box::new(move |app: &AppHandle| {
+            if let Some(w) = app.get_webview_window(&label2) {
+                let _ = w.unminimize();
+                show_note_win(&w);
+                let _ = w.set_focus();
+                shown(app, &id2, &w);
+            }
+        }),
+    );
+    let _ = app;
+    true
+}
+
+/// 창 크기를 바꿀 때 웹뷰를 같은 박자로 — wry 는 WM_SIZE 에서 웹뷰를 담은 안쪽 창을 비동기(SWP_ASYNCWINDOWPOS)로 늘려,
+///   바깥 창 · 안쪽 창 · 웹뷰가 따로 커지며 끈적이고 가장자리가 비었다 (tauri-apps/tauri#13270). wry 다음에 안쪽 창을 바로 맞추고
+///   화면 합성 한 번을 기다린다 (DwmFlush — 끄는 동안 화면 주기에 맞춰 커진다)
+#[cfg(windows)]
+pub fn sync_resize(w: &WebviewWindow) {
+    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
+    use windows_sys::Win32::Graphics::Dwm::DwmFlush;
+    use windows_sys::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetClientRect, SetWindowPos, SIZE_MINIMIZED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER, WM_NCDESTROY, WM_SIZE};
+    const ID: usize = 0x4d4b_5253; // "MKRS"
+    unsafe extern "system" fn on_msg(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM, _id: usize, inner: usize) -> LRESULT {
+        // SAFETY: Windows 가 부르는 창 처리기 — hwnd 는 살아 있는 이 창, inner 는 같은 스레드의 안쪽 창
+        unsafe {
+            let r = DefSubclassProc(hwnd, msg, wp, lp); // wry 먼저 (웹뷰 크기 · 안쪽 창 비동기)
+            if msg == WM_SIZE && wp != SIZE_MINIMIZED as usize {
+                let mut rc: RECT = std::mem::zeroed();
+                if GetClientRect(hwnd, &mut rc) != 0 {
+                    SetWindowPos(inner as HWND, std::ptr::null_mut(), 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOMOVE);
+                    DwmFlush();
+                }
+            } else if msg == WM_NCDESTROY {
+                RemoveWindowSubclass(hwnd, Some(on_msg), ID);
+            }
+            r
+        }
+    }
+    let top = hwnd(w);
+    if top == 0 {
+        return;
+    }
+    let _ = w.with_webview(move |wv| unsafe {
+        let mut inner = windows::Win32::Foundation::HWND::default();
+        // 안쪽 창이 바깥 창 그 자체면 (wry 가 안쪽 창 없이 띄웠으면) 할 일이 없다 — 제 크기를 또 바꾸면 끝없이 돈다
+        if wv.controller().ParentWindow(&mut inner).is_err() || inner.0.is_null() || inner.0 as isize as i64 == top {
+            return;
+        }
+        SetWindowSubclass(top as isize as HWND, Some(on_msg), ID, inner.0 as usize);
+    });
+}
+#[cfg(not(windows))]
+pub fn sync_resize(_w: &WebviewWindow) {}
 
 fn hide_note(app: &AppHandle, w: &WebviewWindow) {
     memory_low(w, true);
