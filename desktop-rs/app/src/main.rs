@@ -78,7 +78,7 @@ fn main() {
     // 바깥 창의 끌어 놓기를 끄면 tao 가 OLE 를 초기화하지 않는다. WebView2 의 끌어 놓기 · 첨부 끌어내기(DoDragDrop)에 필요해 여기서 한 번
     #[cfg(windows)]
     unsafe {
-        let _ = windows::Win32::System::Ole::OleInitialize(None);
+        let _ = ::windows::Win32::System::Ole::OleInitialize(None);
     }
     let mut builder = tauri::Builder::default();
     // 두 번 켜면 이미 켜진 메모킹이 그 인자를 받는다 (점검 --smoke 는 켜 둔 메모킹과 상관없이 따로)
