@@ -95,6 +95,29 @@ function playerOptions(kind) {
   };
 }
 
+// 반복 재생 단추 (Plyr 에는 없다): 동영상은 음소거 옆, 소리는 이름 줄 오른쪽 끝. 누를 때마다 켜고 끈다
+const LOOP_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
+function addLoopButton(player, el, kind) {
+  const controls = player.elements?.controls;
+  if (!controls) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'plyr__control mk-loop';
+  btn.innerHTML = LOOP_ICON;
+  const show = () => {
+    btn.setAttribute('aria-pressed', String(el.loop));
+    btn.setAttribute('aria-label', el.loop ? '반복 재생 끄기' : '반복 재생');
+    btn.title = el.loop ? '반복 재생 끄기' : '반복 재생';
+  };
+  show();
+  btn.addEventListener('click', () => {
+    el.loop = !el.loop;
+    show();
+  });
+  const before = kind === 'video' ? controls.querySelector('[data-plyr="settings"], .plyr__menu, [data-plyr="fullscreen"]') : null;
+  controls.insertBefore(btn, before);
+}
+
 // 플레이어에서 누르면 그 기능이 되는 곳 (재생 막대·단추). 그중 MEDIA_SCRUB(설정 메뉴)은 꾹 눌러도 옮기지 않음
 const MEDIA_CONTROL = `${MEDIA_SCRUB}, .plyr__progress, input, [role="slider"], .plyr__control, button`;
 
@@ -193,6 +216,7 @@ function mediaView(node, view, getPos) {
     if (kind === 'video') el.setAttribute('playsinline', '');
     dom.append(el);
     const player = new Plyr(el, playerOptions(kind));
+    addLoopButton(player, el, kind);
     // 재생 전 그림: 1초쯤의 장면 (휴대폰 WebView 는 그대로 두면 회색 기본 그림만 보인다)
     let gone = false;
     const poster = () => videoPoster(src).then((url) => { if (url && !gone) player.poster = url; });
