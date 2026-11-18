@@ -290,6 +290,9 @@ contextBridge.exposeInMainWorld('memoking', {
     inking: invoke('win:inking'),
     showList: invoke('list:show'),
     growWidth: invoke('win:grow-width'),
+    // PDF 미리보기: 문서를 100% 로 볼 만큼 창 키우기 → 키우기 전 자리 | null · 닫을 때 그 자리로
+    fitSize: invoke('win:fit-size'),
+    restoreBounds: invoke('win:restore-bounds'),
     // 미리 불러 둔 예비 메모 창: 열 메모를 기다림 → { id, record, ink } | null · 그 메모를 그렸다고 알림
     spare: invoke('win:spare'),
     painted: () => ipcRenderer.send('win:painted'),

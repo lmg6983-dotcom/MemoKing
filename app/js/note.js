@@ -1080,6 +1080,19 @@ async function openAttachment(rel) {
   return openAttachmentOutside(rel);
 }
 
+// PDF 미리보기: 처음 열 때 문서를 100%(실제 크기)로 볼 만큼 창을 키우고, 닫으면 원래 크기로
+let pdfBounds = null; // 키우기 전 창 자리 (Promise — 키우는 사이에 닫아도 되돌리게)
+window.addEventListener('mk:pdf-opened', (e) => {
+  const { width, height } = e.detail ?? {};
+  pdfBounds ??= api.win.fitSize?.(width + 48 + 16, height + 52 + 96).catch(() => null) ?? null; // 쪽 둘레 여백 · 스크롤바 · 위아래 막대 자리
+});
+window.addEventListener('mk:pdf-closed', async () => {
+  const before = pdfBounds;
+  pdfBounds = null;
+  const old = await before;
+  if (old) api.win.restoreBounds?.(old).catch(() => {});
+});
+
 function openHref(href) {
   if (/^https?:/i.test(href)) api.links.open(href);
   else if (href.startsWith('attachments/')) openAttachment(href);
@@ -1091,7 +1104,7 @@ el.editorRoot.addEventListener('click', (e) => {
   if (!a || !el.editorRoot.contains(a)) return;
   e.preventDefault();
   const href = a.getAttribute('href') || '';
-  if (href.startsWith('attachments/') && !e.mkOpen) return;
+  if (e.detail > 1) return; // 파일 칩 (PDF 등): 한 번 누르면 연다 — 빠르게 두 번 눌러도 한 번만 (끌어 옮긴 뒤 · 오래 누른 click 은 block-move 가 막는다)
   // 글자를 끌어서 고르던 중이면 열지 않는다
   if (!e.mkOpen && !window.getSelection()?.isCollapsed) return; // "열기" 단추로 연 것은 고른 글자와 상관없이
   openHref(href);
@@ -1099,16 +1112,7 @@ el.editorRoot.addEventListener('click', (e) => {
 
 // memoking://vault/attachments/a.png → attachments/a.png
 
-el.editorRoot.addEventListener('dblclick', (e) => {
-  const fileChip = e.target.closest?.('a[href^="attachments/"]');
-  if (fileChip && el.editorRoot.contains(fileChip)) {
-    e.preventDefault();
-    openHref(fileChip.getAttribute('href'));
-    return;
-  }
-});
-
-// 파일 칩에 마우스를 올리면 이름·크기 안내 (PC · 휴대폰 모두 두 번 눌러 열기, 휴대폰은 눌러서 나오는 단추 줄의 "열기"도 — block-move.js)
+// 파일 칩에 마우스를 올리면 이름·크기 안내 (PC 는 한 번 눌러 열기, 휴대폰은 눌러서 나오는 단추 줄의 "열기"도 — block-move.js)
 const hint = document.createElement('div');
 hint.className = 'hover-hint';
 hint.hidden = true;
@@ -1124,7 +1128,7 @@ el.editorRoot.addEventListener('mouseover', async (e) => {
   const program = a.dataset.file === 'program';
   hint.textContent = !info?.exists
     ? '이 PC의 메모 폴더에 파일이 아직 없어요'
-    : `${a.textContent} (${formatBytes(info.size)}). ${program ? '두 번 누르면 실행할지 물어볼게요' : '두 번 누르면 열려요'}`;
+    : `${a.textContent} (${formatBytes(info.size)}). ${program ? '누르면 실행할지 물어볼게요' : '누르면 열려요'}`;
   const r = a.getBoundingClientRect();
   hint.hidden = false;
   const left = Math.max(6, Math.min(r.left, window.innerWidth - hint.offsetWidth - 6));

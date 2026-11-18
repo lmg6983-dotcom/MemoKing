@@ -2,7 +2,8 @@
 //   - 위 막대(반투명): 닫기 · 제목(쪽 수) · 주석 · 다른 앱으로 열기
 //   - 쪽은 화면에 보일 때만, 가운데에 가까운 쪽부터 한 프레임에 하나씩 그린다 (긴 PDF 도 바로 열림 · 멀리 지나간 쪽은 놓는다)
 //   - 아래 쪽 번호 알약: 넘기는 동안 보이고 멈추면 사라진다 · 누르면 쪽 번호로 가기
-//   - 확대: 두 손가락 · Ctrl+휠 · 두 번 누르기(100% ↔ 200%) · PC 는 오른쪽 아래 확대 막대
+//   - 확대: 두 손가락 · Ctrl+휠 · 두 번 누르기(100% ↔ 200%) · PC 는 오른쪽 아래 확대 막대. 100% = 종이 실제 크기 (화면이 좁으면 폭에 맞춤)
+//   - Ctrl+Z · Ctrl+Y: 형광펜 · 테두리 되돌리기 · 다시 하기 (주석 중에는 주석 도구의 되돌리기)
 //   - 주석(onSave 가 있을 때): 쪽 위에 펜 · 형광펜 · 지우개 (메모 주석과 같은 도구 막대) — 완료하면 PDF 안에 잉크 주석으로 저장
 //     (원본은 그대로, 주석을 넣은 새 PDF 를 onSave 로 넘긴다). 손가락 하나는 그리기, 두 손가락은 넘기기
 //   - 글자 고르기: PC 는 끌기 · 두 번 눌러 낱말, 휴대폰은 꾹 눌러 낱말 → 그대로 끌어 늘리기
@@ -96,7 +97,8 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   let toolbar = null;
   let saving = null;
   const inkOf = (i) => hist.get()[i] ?? base.get(i) ?? [];
-  const dirty = () => hist.changed();
+  let savedState = hist.get(); // 마지막으로 PDF 에 넣은 주석 상태 — 저장 뒤에도 되돌리기 기록은 남긴다 (Ctrl+Z)
+  const dirty = () => hist.get() !== savedState;
 
   function paintInk(i) {
     const p = pages[i];
@@ -182,11 +184,12 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
       const ink = new Map();
       for (const i of new Set([...base.keys(), ...Object.keys(hist.get()).map(Number)])) ink.set(i, inkOf(i));
       showToast('주석을 저장하는 중이에요', true);
+      const snap = hist.get();
       let out = null;
       try {
         out = pdf.save(ink); // 이 문서에 주석이 다시 들어간다 — 저장이 되든 안 되든 아래에서 out 으로 다시 연다 (두 번 그려지지 않게)
         await onSave(out);
-        hist = inkHistory({}); // 저장됨 — 못 했으면 고친 기록을 남겨 다음에 다시 저장한다
+        savedState = snap; // 저장됨 — 못 했으면 dirty 로 남아 다음에 다시 저장한다
         showToast('주석을 저장했어요');
       } catch (err) {
         console.warn('[PDF 주석]', err);
@@ -249,7 +252,8 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   }
   const want = (p) => Math.min(4096, Math.round(p.box.clientWidth * Math.min(2.5, window.devicePixelRatio || 1))); // 크게 확대해도 캔버스는 4096px 까지 (메모리)
   const stale = (p) => !p.failed && !(p.drawnAt && Math.abs(p.drawnAt - want(p)) < 8);
-  const baseWidth = () => Math.min(scroller.clientWidth - (scroller.clientWidth < 600 ? 16 : 48), 920); // 쪽 폭 (확대 1) — 화면 폭에 맞추되 PC 는 920px 까지
+  const PT = 96 / 72; // PDF 1pt → 화면 px (100% = 종이 실제 크기)
+  const baseWidth = () => Math.min(scroller.clientWidth - (scroller.clientWidth < 600 ? 16 : 48), Math.round((pages[0]?.w ?? 690) * PT)); // 쪽 폭 (확대 1) — 실제 크기, 화면이 좁으면 폭에 맞춘다
   const layout = () => {
     const w = Math.round(baseWidth() * zoom);
     for (const p of pages) {
@@ -647,7 +651,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   }
   function addStrokes(i, strokes) {
     if (!strokes.length) return;
-    hist.set({ ...hist.get(), [i]: [...inkOf(i), ...strokes] });
+    hist.set({ ...hist.get(), [i]: [...inkOf(i), ...strokes] }, { before: { ...hist.get(), [i]: inkOf(i) } });
     setSel(null);
     paintInk(i);
     clearTimeout(hlTimer);
@@ -678,6 +682,19 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
       return;
     }
     const mod = e.ctrlKey || e.metaKey;
+    // 보기 중 되돌리기 · 다시 하기 (형광펜 · 테두리) — 뒤에 있는 메모 글이 되돌려지지 않게 늘 여기서 받는다
+    if (mod && (e.code === 'KeyZ' || e.code === 'KeyY')) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!saving && (e.code === 'KeyY' || e.shiftKey ? hist.redo() : hist.undo())) {
+        setSel(null);
+        repaintAll();
+        clearTimeout(hlTimer);
+        hlTimer = setTimeout(() => dirty() && persist(), 600);
+        showToast(e.code === 'KeyY' || e.shiftKey ? '다시 했어요' : '되돌렸어요');
+      } else if (!saving) showToast(e.code === 'KeyY' || e.shiftKey ? '다시 할 것이 없어요' : '되돌릴 것이 없어요');
+      return;
+    }
     if (mod && e.code === 'KeyC' && sel) {
       e.preventDefault();
       copySel();
@@ -755,6 +772,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
     io.observe(box);
   }
   view.classList.add('ready');
+  if (pages[0]) window.dispatchEvent(new CustomEvent('mk:pdf-opened', { detail: { width: Math.round(pages[0].w * PT), height: Math.round(pages[0].h * PT) } }));
   layout();
   showCount();
   flashPill();

@@ -375,12 +375,6 @@ export function createBlockMove({ readOnly = false } = {}) {
         return moved;
       },
       handleDOMEvents: readOnly ? {} : {
-        mousedown(view, event) {
-          if (!canDrag()) return false; // 글 고치기 방식: 내용을 눌러도 옮기지 않는다
-          if (onScrollbar(event)) return false; // 표의 가로 스크롤바를 잡는 중에는 옮기지 않는다
-          if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) mover?.press(event, 'mouse');
-          return false; // 그냥 누르면 지금처럼 (고르기·열기)
-        },
         touchstart(view, event) {
           keyboardFor(view, event.target);
           // 짧게 눌렀다 떼면(탭) 그림 · 손 메모에 저장 · 복사 · 지우기 단추 — 글 고치기 방식에서도 (touchend)
@@ -484,6 +478,14 @@ class Mover {
       e.detail.ok = this.liftAt(pos, x, y, kind);
     };
     view.dom.addEventListener('mk-lift-block', this.onLiftRequest);
+    // 마우스 누르기는 편집기 플러그인 차례보다 먼저 받는다 — 파일 칩 가드처럼 mousedown 을 preventDefault 하는 플러그인이
+    //   앞에 있으면 ProseMirror 가 뒤 플러그인에 넘기지 않아 칩을 끌 수 없었다
+    this.onMouseDown = (event) => {
+      if (!canDrag()) return; // 글 고치기 방식: 내용을 눌러도 옮기지 않는다
+      if (onScrollbar(event)) return; // 표의 가로 스크롤바를 잡는 중에는 옮기지 않는다
+      if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) this.press(event, 'mouse');
+    };
+    view.dom.addEventListener('mousedown', this.onMouseDown, true);
     // 휴대폰: 누르면 바로 열리던 내용(파일 칩 · 링크 카드 · 수식 — 한 줄을 차지하는 것)은 눌러도 열지 않고 단추 줄을 띄운다
     //   여는 것은 단추 줄의 "열기"로 (짧게 누르면). 글 사이에 낀 파일 링크는 그대로 열린다.
     //   PC 는 단추 줄이 없으니(오른쪽 클릭 메뉴) 눌러서 바로 열린다 — 메뉴에도 "열기"
@@ -507,13 +509,14 @@ class Mover {
     if (canContentMenu()) {
       let downAt = 0;
       this.onOpenDown = (e) => {
+        this.lifted = false;
         downAt = e.button === 0 && e.target instanceof Element && e.target.closest(LONG_TARGET) ? Date.now() : 0;
       };
       this.onLongClick = (e) => {
         if (e.mkOpen || e.button !== 0 || !downAt) return;
         const held = Date.now() - downAt;
         downAt = 0;
-        if (held <= CLICK_MAX_MS || !(e.target instanceof Element) || !e.target.closest(LONG_TARGET)) return;
+        if ((held <= CLICK_MAX_MS && !this.lifted) || !(e.target instanceof Element) || !e.target.closest(LONG_TARGET)) return;
         e.preventDefault();
         e.stopPropagation();
       };
@@ -691,6 +694,7 @@ class Mover {
   }
 
   lift(p) {
+    this.lifted = true; // PC: 끌어 옮긴 뒤 떼며 오는 click 으로 열지 않게 (onLongClick)
     holdKeyboard(this.view); // 옮기는 동안 키보드는 절대 뜨지 않게
     hideDeleteButton(true); // (표를 고치는 동안 떠 있던 단추도 옮기는 동안은 거둔다 — 놓으면 update 가 다시 띄운다)
     const { view } = this;
@@ -1251,6 +1255,7 @@ class Mover {
   destroy() {
     this.view.dom.removeEventListener('touchstart', this.onScrubTouch, true);
     this.view.dom.removeEventListener('mk-lift-block', this.onLiftRequest);
+    this.view.dom.removeEventListener('mousedown', this.onMouseDown, true);
     if (this.onOpenClick) this.view.dom.removeEventListener('click', this.onOpenClick, true);
     if (this.onOpenDown) {
       this.view.dom.removeEventListener('mousedown', this.onOpenDown, true);

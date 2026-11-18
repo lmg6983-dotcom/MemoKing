@@ -1862,6 +1862,34 @@ fn grow_width(app: &AppHandle, label: &str, extra: &Value) -> Value {
     (want - w).into()
 }
 
+/// PDF 미리보기: 문서를 100% 로 볼 만큼 창을 키운다 (작업 영역 안, 줄이지는 않음) → 키우기 전 자리 (그대로면 null)
+fn fit_size(app: &AppHandle, label: &str, w: &Value, h: &Value) -> Value {
+    let (want_w, want_h) = (memoking_core::js::number(w).ceil(), memoking_core::js::number(h).ceil());
+    let Some(win) = app.get_webview_window(label) else { return Value::Null };
+    let Some(old @ [x, y, cw, ch]) = bounds(&win) else { return Value::Null };
+    let [ax, ay, aw, ah] = area_at(app, (x + cw / 2.0, y + ch / 2.0));
+    let nw = want_w.min(aw - 24.0).max(cw);
+    let nh = want_h.min(ah - 24.0).max(ch);
+    if nw <= cw && nh <= ch {
+        return Value::Null;
+    }
+    // 넘치면 화면 안으로 옮긴다
+    let nx = x.min(ax + aw - nw).max(ax);
+    let ny = y.min(ay + ah - nh).max(ay);
+    set_bounds(&win, [nx, ny, nw, nh]);
+    rect_json(old)
+}
+
+/// fit_size 가 돌려준 자리로 되돌린다 (미리보기를 닫을 때)
+fn restore_bounds(app: &AppHandle, label: &str, b: &Value) {
+    let n = |k: &str| b[k].as_f64();
+    if let (Some(win), Some(x), Some(y), Some(w), Some(h)) = (app.get_webview_window(label), n("x"), n("y"), n("width"), n("height")) {
+        if w >= 100.0 && h >= 100.0 {
+            set_bounds(&win, [x, y, w, h]);
+        }
+    }
+}
+
 pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let arg = |i: usize| args.get(i).map(|v| v.as_str().map_or_else(|| memoking_core::js::string(v), str::to_string)).unwrap_or_default();
     let at = |i: usize| args.get(i).and_then(point);
@@ -1920,6 +1948,11 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         // 목록 창 제목 줄 어둡게(대화 상자 · 안내 뒤): Electron 은 Windows 가 그린 창 단추 색을 바꿨다. Tauri 는 화면이 단추를 그려(shim.js) 막이 함께 덮는다
         "win:dim-titlebar" => Value::Null,
         "win:grow-width" => grow_width(app, label, args.first().unwrap_or(&Value::Null)),
+        "win:fit-size" => fit_size(app, label, args.first().unwrap_or(&Value::Null), args.get(1).unwrap_or(&Value::Null)),
+        "win:restore-bounds" => {
+            restore_bounds(app, label, args.first().unwrap_or(&Value::Null));
+            Value::Null
+        }
         // 손글씨를 쓰는 동안은 창을 끌어도 다른 메모와 합치지 않는다
         "win:inking" => {
             let on = args.first().is_some_and(|v| v == true);
