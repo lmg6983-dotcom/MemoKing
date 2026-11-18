@@ -25,6 +25,7 @@ import { setupAnnotation } from './ink-annotate.js';
 import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups, swipeDismiss, EASE_OUT, busyWhile, busyUntilBlur } from './dom.js';
 import { createClearStamp } from './clear-stamp.js';
 import { trackPlaceholder } from './suggest-chips.js';
+import { setupFileDrop } from './file-drop.js';
 import { renderVersions } from './versions-view.js';
 import { hintOnce } from './hints.js';
 import { toggleShortcutSheet } from './shortcut-sheet.js';
@@ -1062,6 +1063,11 @@ async function insertFiles(files) {
     setStatus(UI.fileAddFail, true);
   }
 }
+
+setupFileDrop(el.editorRoot, () => editor, (err) => {
+  console.error(err);
+  setStatus(UI.fileAddFail, true);
+});
 
 el.fileInput.addEventListener('change', () => {
   insertFiles([...el.fileInput.files]);

@@ -1663,6 +1663,34 @@ body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-sha
 .mk-drop-slot.line { border-radius: 4px; border-style: solid; border-color: var(--note-text, #111); background: var(--brand-yellow, #ffcc00); }
 @keyframes mk-slot-in { from { opacity: 0; transform: scale(0.96); } }
 @keyframes mk-slot-breathe { 50% { border-color: color-mix(in srgb, var(--note-text, #111) 30%, transparent); } }
+/* 파일 끌어 넣기 (file-drop.js): 편집기 둘레에 흐르는 점선 틀(놓을 수 있는 곳) + 들어갈 자리 (위 넣을 자리와 같은 모양) */
+.mk-file-drop {
+  position: fixed; z-index: 60; pointer-events: none;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand-yellow, #ffcc00) 7%, transparent);
+  animation: mk-file-drop-in 0.15s ease-out;
+}
+.mk-file-drop[hidden] { display: none; }
+@keyframes mk-file-drop-in { from { opacity: 0; } }
+.mk-file-drop svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.mk-file-drop rect {
+  x: 3px; y: 3px; width: calc(100% - 6px); height: calc(100% - 6px); rx: 10px;
+  fill: none; stroke: color-mix(in srgb, var(--note-text, #111) 45%, transparent); stroke-width: 2; stroke-dasharray: 8 6;
+  animation: mk-ants 0.6s linear infinite;
+}
+@keyframes mk-ants { to { stroke-dashoffset: -14; } }
+.mk-file-drop-slot {
+  position: absolute; box-sizing: border-box;
+  border: 2px dashed color-mix(in srgb, var(--note-text, #111) 55%, transparent); border-radius: 10px;
+  background: color-mix(in srgb, var(--brand-yellow, #ffcc00) 18%, transparent);
+  transition: left 0.12s var(--ease-out), top 0.12s var(--ease-out), width 0.12s var(--ease-out), height 0.12s var(--ease-out);
+  animation: mk-slot-in 0.18s ease-out, mk-slot-breathe 1.4s ease-in-out 0.18s infinite;
+}
+.mk-file-drop-slot.line { border-radius: 4px; border-style: solid; border-color: var(--note-text, #111); background: var(--brand-yellow, #ffcc00); }
+.mk-file-drop .mk-drag-badge { position: absolute; right: 14px; margin-top: -11px; transition: top 0.12s var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .mk-file-drop, .mk-file-drop rect, .mk-file-drop-slot, .mk-file-drop .mk-drag-badge { animation: none; transition: none; }
+}
 /* 안내 캡슐: 틀의 오른쪽에 같은 색으로 (꼭지가 틀을 가리킴), 틀이 움직이면 미끄러지듯 */
 .mk-drag-badge[data-side] { transition: left 0.16s var(--ease-out), top 0.16s var(--ease-out); }
 .mk-drag-badge[data-side="right"]::before {

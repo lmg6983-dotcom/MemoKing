@@ -203,6 +203,26 @@ window.addEventListener('load', () => setTimeout(async () => {
   await check('첨부 정보', async () => (await mk.attachments.info(rel)).size === 256);
   await check('다른 이름으로 저장', async () => (await mk.attachments.saveAs({ name: '내/보내기:파일.bin', rel })).name === '보내기 파일.bin'); // Electron safeName 처럼 경로 앞은 뗀다
   await check('CSS app-region 읽힘 (창 끌기)', () => dragRegion('.bar'));
+  // 파일 끌어 놓기 (file-drop.js): 글 밖 아래 여백에 놓아도 들어간다 — 예전에는 편집기가 자리를 못 찾아 말없이 끝났다.
+  //   끄는 동안 놓을 자리 표시 → 놓으면 파일 칩 → 되돌리기 (목록 쪽 점검이 이 메모의 제목 "새 메모" 를 본다)
+  await check('파일 끌어 놓기 (글 밖 여백에)', async () => {
+    const doc = await until(() => document.querySelector('.mk-doc'));
+    const r = document.getElementById('editor').getBoundingClientRect();
+    const at = { clientX: r.left + r.width / 2, clientY: r.bottom - 6, bubbles: true, cancelable: true };
+    const dt = new DataTransfer();
+    dt.items.add(new File([bytes], '끌어 넣기.bin'));
+    const target = document.elementFromPoint(at.clientX, at.clientY) ?? document.body;
+    const stage = (name, p) => p.catch(() => { throw new Error(name); }); // 실패하면 어느 단계인지
+    target.dispatchEvent(new DragEvent('dragover', { ...at, dataTransfer: dt }));
+    if (document.querySelector('.mk-file-drop')?.hidden !== false) throw new Error('끄는 동안 놓을 자리 표시가 안 보임');
+    target.dispatchEvent(new DragEvent('drop', { ...at, dataTransfer: dt }));
+    const chip = () => [...doc.querySelectorAll('a[href^="attachments/"]')].some((a) => a.textContent.includes('끌어 넣기.bin'));
+    await stage('놓은 파일이 메모에 안 들어감', until(chip));
+    doc.focus();
+    doc.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true }));
+    await stage('되돌리기가 안 됨', until(() => !chip()));
+    return document.querySelector('.mk-file-drop').hidden;
+  });
   await check('닫을 때 화면 스냅샷이 남음', () => {
     window.mkFlushSync?.();
     return JSON.parse(localStorage.getItem(`memoking.snap.${id}`) ?? 'null')?.html?.includes('milkdown');
