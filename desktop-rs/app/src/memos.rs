@@ -235,7 +235,11 @@ struct Spare {
     assign: Option<std::sync::mpsc::Sender<Value>>,
 }
 
-static SPARE: Mutex<Option<Spare>> = Mutex::new(None);
+static SPARE: Mutex<Vec<Spare>> = Mutex::new(Vec::new());
+/// 예비 창 수 — 메모를 연달아 열어도(목록에서 둘 · 셋) 매번 창을 새로 만들며 기다리지 않게
+const SPARE_MAX: usize = 2;
+/// 예비 창을 쓴 뒤 다음 것을 만들기까지 — 방금 연 메모를 그리는 동안은 비켜 준다 (예전 3초: 그 안에 또 열면 새 창을 처음부터 만들었다)
+const SPARE_REFILL_MS: u64 = 600;
 static SPARE_GEN: AtomicU64 = AtomicU64::new(0);
 
 /// ms 뒤 예비 창을 하나 만들어 둔다 (그사이 또 부르면 그 뒤로 미룬다)
@@ -256,18 +260,16 @@ fn make_spare(app: &AppHandle) {
         return;
     }
     let label = format!("note-{}", NEXT_NOTE.fetch_add(1, Ordering::Relaxed));
-    {
+    let more = {
         let mut g = SPARE.lock().unwrap();
-        if g.is_some() {
+        if g.len() >= SPARE_MAX {
             return;
         }
-        *g = Some(Spare { label: label.clone(), assign: None });
-    }
+        g.push(Spare { label: label.clone(), assign: None });
+        g.len() < SPARE_MAX
+    };
     let forget = move |label: &str| {
-        let mut g = SPARE.lock().unwrap();
-        if g.as_ref().is_some_and(|s| s.label == label) {
-            *g = None; // 기다리던 win:spare 는 null 을 받고 창을 닫는다
-        }
+        SPARE.lock().unwrap().retain(|s| s.label != label); // 기다리던 win:spare 는 null 을 받고 창을 닫는다
     };
     match crate::window(app, &label, "note.html?spare=1").inner_size(340.0, 380.0).min_inner_size(240.0, 200.0).visible(false).build() {
         Ok(w) => {
@@ -280,13 +282,18 @@ fn make_spare(app: &AppHandle) {
         }
         Err(_) => forget(&label),
     }
+    // 둘째 예비 창은 첫 창이 편집기를 다 읽은 뒤에 (동시에 만들면 둘 다 늦다)
+    if more {
+        schedule_spare(app, 1500);
+    }
 }
 
 /// 쓸 수 있는 예비 창 (화면이 메모를 기다리는 중일 때만). 가져가면 다음 것은 새로
 fn take_spare(app: &AppHandle) -> Option<(tauri::WebviewWindow, std::sync::mpsc::Sender<Value>)> {
     let mut g = SPARE.lock().unwrap();
-    let w = g.as_ref().filter(|s| s.assign.is_some()).and_then(|s| app.get_webview_window(&s.label))?;
-    Some((w, g.take()?.assign?))
+    let i = g.iter().position(|s| s.assign.is_some() && app.get_webview_window(&s.label).is_some())?;
+    let s = g.remove(i);
+    Some((app.get_webview_window(&s.label)?, s.assign?))
 }
 
 /// 메모 창 만들기: bounds 가 없으면 기억한 자리, show 가 false 면 숨겨서. ready: 메모를 다 그리면 (스택 탭: windows.rs 가 그때 보인다)
@@ -362,7 +369,7 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
         let _ = assign.send(json!({ "id": id }));
     }
     push_list_soon(app);
-    schedule_spare(app, 3000);
+    schedule_spare(app, SPARE_REFILL_MS);
     Ok(win)
 }
 
@@ -377,11 +384,16 @@ fn closed_note(app: &AppHandle, id: &str, label: &str) {
         }
         labels.remove(id);
     }
-    let _ = with_vault(app, |v| {
-        v.close_lock(id); // 닫은 잠긴 메모의 열쇠를 남기지 않는다
-        v.finalize(id).map_err(|e| e.to_string())
+    // 정리(빈 메모 치우기 · 제목에 맞춰 파일 이름)는 일꾼 스레드에서 — 이 함수는 창 이벤트(UI 스레드)에서 불려,
+    //   메모 폴더 잠금 · 파일 이름 바꾸기를 기다리는 동안 다른 창 그리기 · 탭 전환이 멈췄다
+    let (app, id) = (app.clone(), id.to_string());
+    std::thread::spawn(move || {
+        let _ = with_vault(&app, |v| {
+            v.close_lock(&id); // 닫은 잠긴 메모의 열쇠를 남기지 않는다
+            v.finalize(&id).map_err(|e| e.to_string())
+        });
+        push_list_soon(&app);
     });
-    push_list_soon(app);
 }
 
 fn create_memo(app: &AppHandle, opts: &Value) -> Result<Value, String> {
@@ -973,7 +985,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         // 예비 창의 화면이 다 불러졌다 → 열 메모가 정해질 때까지 이 일꾼 스레드에서 기다린다 (Electron spareWaiting). 예비 창이 아니면 null
         "win:spare" => {
             let (tx, rx) = std::sync::mpsc::channel();
-            match SPARE.lock().unwrap().as_mut().filter(|s| s.label == label) {
+            match SPARE.lock().unwrap().iter_mut().find(|s| s.label == label) {
                 Some(s) => s.assign = Some(tx),
                 None => return Some(Ok(Value::Null)),
             }

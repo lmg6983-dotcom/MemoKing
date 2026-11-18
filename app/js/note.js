@@ -107,8 +107,10 @@ function markPainted() {
     done = true;
     api.win.painted?.();
   };
+  // 숨은 창(미리 만든 탭 · 예비 창)은 그리기가 멈춰 rAF 가 오지 않는다 — 120ms 를 기다리지 말고 바로 (보이는 순간 그린다)
+  if (document.visibilityState === 'hidden') return void setTimeout(send, 0);
   requestAnimationFrame(() => requestAnimationFrame(send));
-  setTimeout(send, 120); // 숨은 창이라 그리기가 멈춰 있어도
+  setTimeout(send, 120); // 숨었다고 알려 주지 않는 웹뷰도
 }
 const $ = (x) => document.getElementById(x);
 const el = {
@@ -1763,12 +1765,12 @@ function showTasks(tasks, opts) {
 async function autoTagOnClose() {
   if (!editor || tagDismissed || memo?.locked) return false; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
   try {
-    const s = await api.settings.get();
-    const tagsOn = s?.autoTags !== false;
     const body = editor.getMarkdown();
     if (isBlankBody(body)) return false;
+    const [s, ai] = await Promise.all([api.settings.get(), api.ai?.status().catch(() => null)]); // 차례로 묻지 않고 함께
+    const tagsOn = s?.autoTags !== false;
     // 일정 자동 등록(설정 › AI 도우미)도 같은 길로 — 메인이 새로 쓴 줄의 일정 · 태그를 차례로
-    if ((tagsOn || s?.autoEvents !== false) && ['ready', 'running'].includes((await api.ai?.status())?.chat.state)) return true;
+    if ((tagsOn || s?.autoEvents !== false) && ['ready', 'running'].includes(ai?.chat.state)) return true;
     if (!tagsOn || extractTags(body).length) return false;
     const list = (await api.tags.suggest?.(body, id)) ?? [];
     const sure = list.filter((t) => t.sure && t.existing).slice(0, 2);
@@ -1780,24 +1782,28 @@ async function autoTagOnClose() {
 }
 const aiTagAfterClose = (ask) => ask && api.tags.aiAuto?.(id).catch(() => {}); // 기다리지 않는다 (저장한 뒤에 부름)
 
-async function closeWindow() {
-  await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
-  await annotation?.exit(); // 주석을 그리던 중이면 저장하고 닫는다
-  const askAi = await autoTagOnClose();
-  await flush();
-  aiTagAfterClose(askAi);
-  api.win.close();
+// 닫기: 창(스택이면 탭)부터 숨기고, 남은 일(녹음 마무리 · 태그 · 저장)은 숨은 채 마친 뒤 없앤다
+//   (예전: 설정 · AI 상태 · 태그 추천 · 저장을 차례로 기다린 뒤에야 창이 사라져 닫기가 굼떴다)
+//   숨은 동안 같은 메모를 다시 열면 새 창이 뜬다 (메인이 닫는 중으로 적어 둔다). 남은 글은 창을 없앨 때도 동기 저장(flushSync)
+let closingWin = false;
+async function finishClose(hide) {
+  if (closingWin) return;
+  closingWin = true;
+  await hide?.catch(() => {});
+  try {
+    await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
+    await annotation?.exit(); // 주석을 그리던 중이면 저장하고 닫는다
+    const askAi = await autoTagOnClose();
+    await flush();
+    aiTagAfterClose(askAi);
+  } finally {
+    api.win.close();
+  }
 }
+const closeWindow = () => finishClose(api.win.hideForClose?.());
 
-// Ctrl+W: 스택이면 보이는 탭만 닫는다 (탭의 × 와 같음). 스택이 아니면 창을 닫는다.
-async function closeTabOrWindow() {
-  if (tabsEl.hidden) return closeWindow();
-  await recorder?.finish();
-  const askAi = await autoTagOnClose();
-  await flush();
-  aiTagAfterClose(askAi);
-  api.stack.remove(id);
-}
+// Ctrl+W: 스택이면 보이는 탭만 닫는다 (탭의 × 와 같음 — 옆 탭이 바로 보인다). 스택이 아니면 창을 닫는다.
+const closeTabOrWindow = () => (tabsEl.hidden ? closeWindow() : finishClose(api.stack.removeHidden(id)));
 
 // 윗막대 + : 새 메모를 이 창의 새 탭으로 (스택이 아니면 스택이 된다). 따로 새 창은 Ctrl+N
 // 빠르게 두 번 눌러도 새 메모는 하나만 (예전: 빈 메모 탭이 두 개 생겼다)
@@ -1881,7 +1887,7 @@ function renderStack(state) {
 tabsEl.addEventListener('click', async (e) => {
   const close = e.target.closest('[data-close-tab]');
   if (close) {
-    if (close.dataset.closeTab === id) await flush();
+    if (close.dataset.closeTab === id) return closeTabOrWindow(); // 이 탭: 옆 탭부터 보이고 저장은 숨은 채 (Ctrl+W 와 같게)
     return api.stack.remove(close.dataset.closeTab);
   }
   if (e.target.closest('.stack-add')) return newTab();

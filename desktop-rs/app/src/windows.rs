@@ -589,17 +589,28 @@ pub fn show_tab(app: &AppHandle, id: &str, at: Option<Rect>, focus: bool) -> boo
     ok
 }
 
-/// 지금 탭의 바로 앞 · 뒤 탭(Ctrl+Tab 으로 갈 곳)을 숨긴 창으로 미리 만들어 둔다 (Electron prewarmStack).
-///   바꿀 때 창을 새로 만들며 기다리지 않게, 둘까지만, 하나씩 조금 쉬었다가 (보이는 탭을 그리는 데 방해되지 않게)
+/// 미리 만들어 둘 탭 창 수 (보이는 탭 빼고) — 넘는 탭은 누를 때 만든다 (창마다 웹뷰 메모리)
+const PREWARM_MAX: usize = 6;
+
+/// 스택의 다른 탭들을 숨긴 창으로 미리 만들어 둔다 (Electron prewarmStack) — 가까운 탭(Ctrl+Tab 으로 갈 곳)부터
+///   바꿀 때 창을 새로 만들며 기다리지 않게. PREWARM_MAX 개까지, 하나씩 조금 쉬었다가 (보이는 탭을 그리는 데 방해되지 않게)
+///   (예전: 앞 · 뒤 둘만 — 그 밖의 탭은 누르면 창을 새로 만들고 다 그릴 때까지 기다렸다)
 fn prewarm(app: &AppHandle, id: &str) {
     let (app, id) = (app.clone(), id.to_string());
-    later(700, move || {
+    later(400, move || {
         // 그사이 다른 탭으로 바꿨거나 스택을 닫았으면 그만
         let Some(s) = stack_of(&app, &id).filter(|s| s.active.as_deref() == Some(id.as_str())) else { return };
         let Some(b) = visible_stack_win(&app, &s, None).and_then(|w| bounds(&w)) else { return };
-        let near = stacks(&app, |s| [s.neighbor(&id, 1), s.neighbor(&id, -1)]).unwrap_or_default();
+        let n = s.memos.len();
+        let Some(i) = s.memos.iter().position(|m| *m == id) else { return };
+        let warm = s.memos.iter().filter(|m| **m != id && note_win(&app, m).is_some()).count();
+        if warm >= PREWARM_MAX {
+            return;
+        }
+        // 오른쪽 · 왼쪽 번갈아 가까운 차례로
+        let near = (1..n).flat_map(|k| [(i + k) % n, (i + n - k) % n]).map(|j| s.memos[j].clone());
         let exists = |m: &str| state(&app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(m).is_some());
-        let Some(m) = near.into_iter().flatten().find(|m| note_win(&app, m).is_none() && exists(m)) else { return };
+        let Some(m) = near.into_iter().find(|m| *m != id && note_win(&app, m).is_none() && exists(m)) else { return };
         // 예비 창은 남겨 둔다 (지금 열려는 다른 메모가 가져가게)
         if crate::memos::create_note_window(&app, &m, Some(b), false, None).is_ok() {
             prewarm(&app, &id);
@@ -737,6 +748,12 @@ pub fn remove_from_stack(app: &AppHandle, id: &str, mode: &str) -> bool {
         "close" => {
             if let Some(w) = &win {
                 let _ = w.close();
+            }
+        }
+        // 화면이 저장 · 태그를 마저 하고 win:close 로 닫는다 — 그동안 숨겨 두고 닫는 중으로 (다시 열면 새 창)
+        "hide" => {
+            if let Some(w) = &win {
+                hide_closing(app, w);
             }
         }
         "detach" => {
@@ -1862,6 +1879,26 @@ fn grow_width(app: &AppHandle, label: &str, extra: &Value) -> Value {
     (want - w).into()
 }
 
+/// 닫는 중인 메모 창을 먼저 숨긴다 — 화면은 남은 일(녹음 마무리 · 태그 · 저장)을 숨은 채 마치고 win:close.
+///   닫는 중으로 적어 두어 그사이 같은 메모를 열면 이 창 대신 새 창이 뜬다
+fn hide_closing(app: &AppHandle, w: &WebviewWindow) {
+    wm().closing_notes.insert(w.label().to_string());
+    hide_note(app, w);
+}
+
+/// 메모 창 × · Ctrl+W: 스택이면 탭 모두 함께 숨긴다 (CloseRequested 가 스택을 모두 닫으므로)
+fn hide_for_close(app: &AppHandle, label: &str) {
+    let Some(w) = app.get_webview_window(label) else { return };
+    if let Some(s) = note_id(app, label).and_then(|id| stack_of(app, &id)) {
+        for m in &s.memos {
+            if let Some(t) = note_win(app, m).filter(|t| t.label() != label && is_shown(t)) {
+                hide_note(app, &t);
+            }
+        }
+    }
+    hide_closing(app, &w);
+}
+
 /// PDF 미리보기: 문서를 100% 로 볼 만큼 창을 키운다 (작업 영역 안, 줄이지는 않음) → 키우기 전 자리 (그대로면 null)
 fn fit_size(app: &AppHandle, label: &str, w: &Value, h: &Value) -> Value {
     let (want_w, want_h) = (memoking_core::js::number(w).ceil(), memoking_core::js::number(h).ceil());
@@ -1904,6 +1941,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         "stack:new-tab" => new_tab_after(app, &arg(0)),
         "stack:remove" => remove_from_stack(app, &arg(0), "close").into(),
+        "stack:remove-hidden" => remove_from_stack(app, &arg(0), "hide").into(),
         "stack:detach" => remove_from_stack(app, &arg(0), "detach").into(),
         "stack:tear-start" => at(2).is_some_and(|p| tear_start(app, &arg(0), args.get(1).unwrap_or(&Value::Null), p)).into(),
         "stack:tear-move" => {
@@ -1948,6 +1986,10 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         // 목록 창 제목 줄 어둡게(대화 상자 · 안내 뒤): Electron 은 Windows 가 그린 창 단추 색을 바꿨다. Tauri 는 화면이 단추를 그려(shim.js) 막이 함께 덮는다
         "win:dim-titlebar" => Value::Null,
         "win:grow-width" => grow_width(app, label, args.first().unwrap_or(&Value::Null)),
+        "win:hide-closing" => {
+            hide_for_close(app, label);
+            Value::Null
+        }
         "win:fit-size" => fit_size(app, label, args.first().unwrap_or(&Value::Null), args.get(1).unwrap_or(&Value::Null)),
         "win:restore-bounds" => {
             restore_bounds(app, label, args.first().unwrap_or(&Value::Null));

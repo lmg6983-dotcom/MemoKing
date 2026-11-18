@@ -1247,6 +1247,15 @@ export function registerIpc(ctx) {
 
   // ---------- 스택 (탭) ----------
   ipcMain.handle('win:close', (event) => senderWindow(event)?.close());
+  // 닫기 전에 숨긴다 (화면이 저장을 마치면 win:close) — 스택이면 탭 모두 (close 가 스택을 모두 닫는다)
+  ipcMain.handle('win:hide-closing', (event) => {
+    const win = senderWindow(event);
+    if (!win) return;
+    const id = [...wm.noteWins].find(([, w]) => w === win)?.[0];
+    const stack = id ? wm.stacks?.stackOf(id) : null;
+    for (const m of stack?.memos ?? []) wm.noteWins.get(m)?.hide();
+    win.hide();
+  });
   // 탭 줄 안에서 끌어 순서 바꾸기
   ipcMain.handle('stack:reorder', (_e, id, index) => {
     const stack = wm.stacks?.reorder(String(id), index);
@@ -1264,6 +1273,7 @@ export function registerIpc(ctx) {
   };
   ipcMain.handle('stack:new-tab', (_e, fromId) => newTabAfter(fromId));
   ipcMain.handle('stack:remove', (_e, id) => wm.removeFromStack(String(id), 'close'));
+  ipcMain.handle('stack:remove-hidden', (_e, id) => wm.removeFromStack(String(id), 'hide'));
   ipcMain.handle('stack:detach', (_e, id) => wm.removeFromStack(String(id), 'detach'));
   ipcMain.handle('stack:tear-start', (_e, id, offset, point) => {
     const p = asPoint(point);

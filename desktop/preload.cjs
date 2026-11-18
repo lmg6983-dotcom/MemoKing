@@ -262,6 +262,7 @@ contextBridge.exposeInMainWorld('memoking', {
     reorder: invoke('stack:reorder'), // 탭을 끌어 순서 바꾸기 (id, 새 자리)
     newTab: invoke('stack:new-tab'),
     remove: invoke('stack:remove'),
+    removeHidden: invoke('stack:remove-hidden'), // 탭 닫기: 옆 탭을 보이고 이 창은 숨긴다 (저장을 마치면 win:close)
     detach: invoke('stack:detach'),
     tearStart: invoke('stack:tear-start'),
     tearMove: (x, y) => ipcRenderer.send('stack:tear-move', { x, y }),
@@ -280,6 +281,7 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   win: {
     close: invoke('win:close'),
+    hideForClose: invoke('win:hide-closing'), // 닫기 전에 창(스택이면 탭 모두)부터 숨긴다
     dimTitlebar: invoke('win:dim-titlebar'),
     toggleListTop: invoke('list:toggle-top'),
     listOnTop: invoke('list:on-top'),

@@ -44,7 +44,7 @@ fn is_app_origin(origin: &str) -> bool {
 ///   앱 화면 밖으로는 넘어가지 않는다 — 웹 주소는 브라우저로 (Electron guardWindow 와 같게)
 pub fn window<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
     let opener = app.clone();
-    no_window_drop(WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.into()))
+    no_window_drop(shared_env(app, WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.into())))
         .decorations(false)
         .initialization_script(init_script())
         // 사진 · 파일 끌어 넣기를 Tauri 가 가로채지 않게 (화면의 drop 이벤트가 받는다)
@@ -62,6 +62,52 @@ pub fn window<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWindowB
 }
 
 type Builder<'a> = WebviewWindowBuilder<'a, tauri::Wry, AppHandle>;
+
+/// 모든 창이 WebView2 환경 하나를 함께 쓴다 — wry 는 창마다 환경을 새로 만든다 (만들 때마다 기다림 · 창이 늘수록 프로세스도).
+///   첫 창은 환경을 만들며 렌더러 프로세스 수를 묶는다: 숨겨 둔 탭 · 예비 창 · 스티커 창이 저마다 프로세스를 띄워
+///   작업 관리자에 WebView2 가 여럿 흩어져 보였다. 같은 메모킹 화면끼리는 넘치면 한 프로세스를 나눠 쓴다
+#[cfg(windows)]
+mod webview_env {
+    use std::sync::Mutex;
+    use tauri::{AppHandle, Manager};
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Environment;
+    struct Env(ICoreWebView2Environment);
+    // 환경은 wry 가 UI 스레드에서만 쓴다 — 여기서는 담아 두고 넘겨 줄 뿐 (AddRef · Release 만)
+    unsafe impl Send for Env {}
+    static ENV: Mutex<Option<Env>> = Mutex::new(None);
+    pub fn get() -> Option<ICoreWebView2Environment> {
+        ENV.lock().unwrap().as_ref().map(|e| e.0.clone())
+    }
+    /// 이미 있는 창에서 환경을 배운다 (UI 스레드에서 나중에 — 기다리지 않는다. 그 전에 만드는 창은 같은 설정의 새 환경)
+    pub fn learn(app: &AppHandle) {
+        if ENV.lock().unwrap().is_some() {
+            return;
+        }
+        if let Some(w) = app.webview_windows().into_values().next() {
+            let _ = w.with_webview(|wv| {
+                let env = wv.environment();
+                ENV.lock().unwrap().get_or_insert(Env(env));
+            });
+        }
+    }
+}
+/// wry 의 기본 인자(미니 메뉴 · 스마트스크린 끄기)에 렌더러 프로세스 수 묶기를 더한다 — 인자를 주면 기본 인자를 대신하므로 그대로 옮겨 적는다
+#[cfg(windows)]
+const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=4";
+#[cfg(windows)]
+fn shared_env<'a>(app: &AppHandle, b: Builder<'a>) -> Builder<'a> {
+    match webview_env::get() {
+        Some(env) => b.with_environment(env),
+        None => {
+            webview_env::learn(app);
+            b.additional_browser_args(BROWSER_ARGS)
+        }
+    }
+}
+#[cfg(not(windows))]
+fn shared_env<'a>(_app: &AppHandle, b: Builder<'a>) -> Builder<'a> {
+    b
+}
 
 /// 바깥 창(tao)의 끌어 놓기 받개도 끈다. 켜 두면 WebView2 가 받기 전의 첫 끌기를 그쪽이 "복사" 로 받아 버리고, Tauri 는 그 소식을 아무 데도 보내지 않는다
 ///   (그래서 파일을 처음 놓을 때는 아무 일이 없고 두 번째부터 들어갔다). OLE 초기화는 main 이 먼저 한다

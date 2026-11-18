@@ -1019,6 +1019,7 @@ export class WindowManager {
     }
     this.pushStackTo([...(r.rest ?? []), id]);
     if (mode === 'close') win?.close();
+    else if (mode === 'hide') win?.hide(); // 화면이 저장을 마치면 win:close
     else if (mode === 'detach') {
       const b = { ...bounds, x: bounds.x + 28, y: bounds.y + 28 };
       settings.noteBounds[id] = b;
