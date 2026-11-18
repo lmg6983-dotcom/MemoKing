@@ -2548,6 +2548,7 @@ api.recovered?.count().then((n) => {
 await remindersTab.refresh();
 showTab(new URLSearchParams(location.search).get('tab') ?? 'memos');
 document.documentElement.dataset.ready = 'true';
+liftBoot();
 
 // 고르기 칸(role=radiogroup): 칸마다 radio, 화살표로 고르기 (dom.js)
 radioGroups();
@@ -2664,3 +2665,19 @@ updateEl.later.addEventListener('click', async () => {
 });
 // 목록 창을 열 때: 숨기지 않은 새 버전 · 받아 둔 업데이트가 있으면 (알림을 눌러 열었을 때 등)
 api.update.state().then((st) => onUpdate(st, { open: st.ask }), () => {});
+
+// 켤 때 로딩 화면 (index.html #boot): 목록이 준비됐고, 열어 둔 메모 창들도 함께 뜰 때(메인의 app:ready) 걷는다 — 기다릴 것이 없으면 바로
+function liftBoot() {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+  let off = () => {};
+  const done = () => {
+    if (!boot.isConnected || boot.classList.contains('done')) return;
+    off();
+    boot.classList.add('done');
+    setTimeout(() => boot.remove(), 300);
+  };
+  off = api.on?.('app:ready', done) ?? off;
+  Promise.resolve(api.app?.restoring?.()).then((r) => !r && done(), done);
+  setTimeout(done, 4000); // 안전망 (메인이 알리지 못해도 목록은 쓸 수 있게)
+}

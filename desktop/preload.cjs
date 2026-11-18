@@ -3,6 +3,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const EVENTS = [
+  'app:ready',
   'memos:changed', 'shortcuts:changed', 'memo:external', 'memo:removed', 'memo:trashed', 'memo:meta', 'memo:links-changed', 'vault:opened',
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
@@ -278,6 +279,10 @@ contextBridge.exposeInMainWorld('memoking', {
   // 화면이 정한 오른쪽 클릭 메뉴 (알림 보관함 줄) → 고른 id | null
   menu: {
     choose: invoke('menu:choose'),
+  },
+  // 켤 때 열어 둔 메모 창들을 준비하는 중인가 (목록의 로딩 화면) — 다 되면 app:ready
+  app: {
+    restoring: invoke('app:restoring'),
   },
   win: {
     close: invoke('win:close'),

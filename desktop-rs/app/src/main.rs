@@ -167,6 +167,7 @@ fn main() {
                 move || prune_thumbs(&app)
             });
             let list = os::place_list(app, window(app, "list", "index.html").title("메모킹").inner_size(440.0, 680.0).min_inner_size(440.0, 380.0)).build()?;
+            os::paint_bg(&list);
             os::start(app, &list);
             reminders::start(app);
             shortcuts::start(app);

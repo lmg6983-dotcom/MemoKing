@@ -1247,6 +1247,7 @@ export function registerIpc(ctx) {
 
   // ---------- 스택 (탭) ----------
   ipcMain.handle('win:close', (event) => senderWindow(event)?.close());
+  ipcMain.handle('app:restoring', () => false); // Electron 은 열어 둔 메모를 기다리지 않는다 — 로딩 화면은 목록이 준비되면 바로 걷힌다
   // 닫기 전에 숨긴다 (화면이 저장을 마치면 win:close) — 스택이면 탭 모두 (close 가 스택을 모두 닫는다)
   ipcMain.handle('win:hide-closing', (event) => {
     const win = senderWindow(event);

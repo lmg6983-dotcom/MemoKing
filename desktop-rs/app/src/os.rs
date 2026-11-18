@@ -414,22 +414,24 @@ pub fn start(app: &AppHandle, list: &WebviewWindow) {
     // --hidden: 로그인 때 자동 실행 — 창 없이 알림 영역에서 (메모 폴더가 없으면 고르게 띄운다)
     let show = !launch(app, &args) && !(has_vault && args.iter().any(|a| a == "--hidden"));
     let open: Vec<String> = state(app).setting("openNotes").as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
+    RESTORING.store(!open.is_empty(), Ordering::SeqCst);
+    // 목록은 바로 — 앱 바탕색에 로딩 화면(index.html #boot)을 보이다가, 열어 둔 메모가 함께 뜰 때(app:ready) 걷는다
+    if show {
+        show_list(app);
+    }
     if open.is_empty() {
-        if show {
-            show_list(app);
-        }
         return;
     }
     // 지난번 열어 둔 메모: 숨긴 채 모두 만들어 다 그리면(늦어도 RESTORE_WAIT) 목록과 함께 한꺼번에 보인다 — 하나씩 뜨면 굼떠 보였다.
     //   창 만들기는 이벤트 처리 안에서 하면 Windows 에서 멈춘다 — 다른 스레드에서
     let app = app.clone();
-    std::thread::spawn(move || restore_notes(&app, &open, show));
+    std::thread::spawn(move || restore_notes(&app, &open));
 }
 
 /// 다시 켤 때 메모 창들을 기다리는 최대 시간 — 넘으면 다 그리지 못한 창도 함께 보인다
 const RESTORE_WAIT: Duration = Duration::from_millis(2500);
 
-fn restore_notes(app: &AppHandle, open: &[String], show: bool) {
+fn restore_notes(app: &AppHandle, open: &[String]) {
     let (tx, rx) = std::sync::mpsc::channel::<()>();
     let mut made = 0;
     for id in open {
@@ -453,15 +455,24 @@ fn restore_notes(app: &AppHandle, open: &[String], show: bool) {
             break;
         }
     }
-    // 이제 한꺼번에: 목록 → 메모들 (이미 만든 창을 보이기만 해서 거의 같은 순간에 뜬다 · 스택 탭은 그 자리 · 스티커와 함께)
-    if show {
-        show_list(app);
-    }
+    // 이제 한꺼번에: 메모들을 보이고 목록의 로딩 화면을 걷는다 (이미 만든 창을 보이기만 해서 거의 같은 순간에 뜬다 · 스택 탭은 그 자리 · 스티커와 함께)
     for id in open {
         if !memos::open_note(app, id).unwrap_or(false) {
             set_open(app, id, false);
         }
     }
+    RESTORING.store(false, Ordering::SeqCst);
+    let _ = app.emit_to("list", "app:ready", [Value::Null]);
+}
+
+/// 켤 때 열어 둔 메모 창들을 준비하는 중인가 — 목록의 로딩 화면이 묻는다 (app:restoring)
+pub static RESTORING: AtomicBool = AtomicBool::new(false);
+
+/// 창 바탕을 앱 바탕색으로 (base.css --surface-0) — 화면을 읽기 전부터 흰 창이 아니라 메모킹 색이 보이게
+pub fn paint_bg(w: &WebviewWindow) {
+    let dark = matches!(w.theme(), Ok(tauri::Theme::Dark));
+    let c = if dark { tauri::window::Color(0x0e, 0x0e, 0x0d, 0xff) } else { tauri::window::Color(0xf6, 0xf5, 0xf1, 0xff) };
+    let _ = w.set_background_color(Some(c));
 }
 
 #[cfg(test)]
