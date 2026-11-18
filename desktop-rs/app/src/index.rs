@@ -39,7 +39,9 @@ pub fn opened(root: &Path) {
 
 /// 바뀐 것이 있으면 색인을 다시 만들어, 내용이 다를 때만 쓴다
 pub fn tick(app: &AppHandle) {
-    if !PENDING.load(Ordering::Relaxed) || now_ms().saturating_sub(MARKED_AT.load(Ordering::Relaxed)) < QUIET_MS {
+    // 자동 점검(smoke)은 색인이 몇 초 안에 생기는지 본다 — 점검 때는 짧게
+    let quiet = if crate::ipc::smoke() { 1_500 } else { QUIET_MS };
+    if !PENDING.load(Ordering::Relaxed) || now_ms().saturating_sub(MARKED_AT.load(Ordering::Relaxed)) < quiet {
         return;
     }
     PENDING.store(false, Ordering::Relaxed);

@@ -2640,3 +2640,7 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
   .mk-pdf-zoomval { min-width: 44px; height: 28px; border-radius: 7px; font-size: 12px; }
   .mk-pdf-pill { bottom: 12px; padding: 5px 12px; font-size: 12px; }
 }
+/* 화면 스냅샷 (note.js showSnapshot): 편집기를 만드는 동안 지난번 모습을 먼저 — 만드는 중인 편집기는 그 뒤에 감춰 둔다 */
+.editor > .mk-snapshot { pointer-events: none; }
+.editor > .mk-snapshot ~ .milkdown { position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; }
+

@@ -3,6 +3,7 @@ Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 public static class MkDeskPin {
   delegate void WinEventProc(IntPtr hook, uint ev, IntPtr hwnd, int idObject, int idChild, uint thread, uint time);
@@ -14,6 +15,8 @@ public static class MkDeskPin {
   [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
+  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder name, int max);
   [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr mod, WinEventProc proc, uint pid, uint tid, uint flags);
   [DllImport("user32.dll")] static extern int GetMessage(out MSG m, IntPtr h, uint a, uint b);
   [DllImport("user32.dll")] static extern bool TranslateMessage(ref MSG m);
@@ -34,6 +37,29 @@ public static class MkDeskPin {
     if (desk == IntPtr.Zero) return false;
     if (GetLongPtr(h, GWLP_HWNDPARENT) != desk) SetOwner(h, GWLP_HWNDPARENT, desk);
     return true;
+  }
+  const uint GW_HWNDNEXT = 2;
+  // 이미 맨 아래 무리에 있나: 아래로 보이는 창이 붙인 창 · 그 테이프 · 바탕화면(Progman · WorkerW)뿐이면 그대로 둔다.
+  //   이미 아래인 창을 또 내리면 창이 다시 그려지며 반짝였다 (메모 탭을 바꿀 때마다 앞 창이 바뀌어 테이프 메모가 모두 반짝)
+  static bool AtBottom(IntPtr h) {
+    HashSet<long> group;
+    lock (gate) {
+      group = new HashSet<long>(pinned);
+      foreach (long c in companions.Values) group.Add(c);
+    }
+    StringBuilder cls = new StringBuilder(32);
+    IntPtr n = GetWindow(h, GW_HWNDNEXT);
+    for (int i = 0; n != IntPtr.Zero && i < 512; i++) {
+      if (IsWindowVisible(n) && !group.Contains(n.ToInt64())) {
+        cls.Length = 0;
+        GetClassName(n, cls, 32);
+        string c = cls.ToString();
+        if (c == "Progman" || c == "WorkerW") return true;
+        return false;
+      }
+      n = GetWindow(n, GW_HWNDNEXT);
+    }
+    return n == IntPtr.Zero;
   }
   static void Bottom(IntPtr h) {
     long c = 0;
@@ -88,7 +114,11 @@ public static class MkDeskPin {
       IntPtr h = new IntPtr(w);
       if (!IsWindow(h)) { lock (gate) { pinned.Remove(w); companions.Remove(w); } continue; }
       if (!down) { Own(h); continue; }
-      if (!InUse(h, fg)) Bottom(h);
+      if (InUse(h, fg)) continue;
+      long c = 0;
+      lock (gate) { companions.TryGetValue(w, out c); }
+      if (AtBottom(h) && (c == 0 || !IsWindow(new IntPtr(c)) || AtBottom(new IntPtr(c)))) continue; // 이미 아래 — 건드리지 않는다
+      Bottom(h);
     }
   }
   static void ReadCommands() {

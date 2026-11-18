@@ -715,6 +715,7 @@ export function registerIpc(ctx) {
   });
 
   // ---------- 개별 메모 조작 ----------
+  ipcMain.handle('memo:preload', () => {}); // 미리 그려 두기는 PC Rust 판만
   ipcMain.handle('memo:open', (e, id, opts) => {
     // 목록에서 찾던 말 (그 말로 찾아 첫 자리로 — note.js runCommand)
     const find = typeof opts?.find === 'string' ? opts.find.trim().slice(0, 200) : '';
@@ -1247,7 +1248,8 @@ export function registerIpc(ctx) {
 
   // ---------- 스택 (탭) ----------
   ipcMain.handle('win:close', (event) => senderWindow(event)?.close());
-  ipcMain.handle('app:restoring', () => false); // Electron 은 열어 둔 메모를 기다리지 않는다 — 로딩 화면은 목록이 준비되면 바로 걷힌다
+  ipcMain.handle('app:restoring', () => false);
+  ipcMain.handle('perf:log', () => {}); // 속도 기록은 PC Rust 판만 // Electron 은 열어 둔 메모를 기다리지 않는다 — 로딩 화면은 목록이 준비되면 바로 걷힌다
   // 닫기 전에 숨긴다 (화면이 저장을 마치면 win:close) — 스택이면 탭 모두 (close 가 스택을 모두 닫는다)
   ipcMain.handle('win:hide-closing', (event) => {
     const win = senderWindow(event);

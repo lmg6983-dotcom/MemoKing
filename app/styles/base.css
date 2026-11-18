@@ -1707,6 +1707,7 @@ dialog.folder-pop::backdrop { background: rgba(0, 0, 0, 0.18); }
   border: 0; border-radius: 999px; background: color-mix(in srgb, currentColor 9%, transparent); color: inherit; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
 }
 .folder-tag[hidden] { display: none; }
+.folder-tag.unfiled { opacity: 0.62; font-weight: 600; } /* 미분류: 폴더 이름보다 흐리게 (누르면 폴더에 넣기) */
 .folder-tag svg { flex: none; width: 12px; height: 12px; }
 .folder-tag span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .folder-tag:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }

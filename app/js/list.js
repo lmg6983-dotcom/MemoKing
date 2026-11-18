@@ -1710,6 +1710,19 @@ el.cards.addEventListener('keydown', (e) => {
   e.preventDefault();
   deleteMemo(card.dataset.id);
 });
+// 카드에 마우스를 잠깐(0.2초) 올려 두면 그 메모를 숨긴 창에 미리 그려 둔다 — 누르면 바로 뜨게 (PC Rust 판, 메인이 조건을 본다)
+let preloadTimer = 0;
+el.cards.addEventListener('pointerover', (e) => {
+  if (e.pointerType !== 'mouse' || state.picking) return;
+  const card = e.target.closest?.('.card');
+  if (!card || card.contains(e.relatedTarget)) return;
+  clearTimeout(preloadTimer);
+  preloadTimer = setTimeout(() => api.memo.preload?.(card.dataset.id)?.catch(() => {}), 200);
+});
+el.cards.addEventListener('pointerout', (e) => {
+  const card = e.target.closest?.('.card');
+  if (card && !card.contains(e.relatedTarget)) clearTimeout(preloadTimer);
+});
 el.cards.addEventListener('click', async (e) => {
   if (suppressClick) {
     suppressClick = false; // 끌기가 끝난 직후의 클릭은 무시

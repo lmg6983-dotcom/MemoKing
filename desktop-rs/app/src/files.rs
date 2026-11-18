@@ -528,6 +528,26 @@ fn problem_mail(to: &str, version: &str, os: &str, lines: &[String]) -> String {
     url(&(head + &if picked.is_empty() { "(기록된 오류 없음)".to_string() } else { picked.join("\n") }))
 }
 
+/// 속도 기록 한 줄 (메모 열기 · 닫기의 단계별 시간) — 오류 기록 파일에 함께 적어 설정 › 문제 보내기로 꺼내 본다.
+///   파일이 200KB 를 넘으면 뒤 절반만 남긴다
+pub fn perf_log(app: &AppHandle, text: &str) {
+    use std::io::Write;
+    let dir = state(app).settings_dir.join("logs");
+    let file = dir.join("memoking.log");
+    let _ = std::fs::create_dir_all(&dir);
+    if std::fs::metadata(&file).is_ok_and(|m| m.len() > 200 * 1024) {
+        if let Ok(old) = std::fs::read_to_string(&file) {
+            let half = old.len() / 2;
+            let cut = old[half..].find('\n').map_or(half, |i| half + i + 1);
+            let _ = std::fs::write(&file, &old[cut..]);
+        }
+    }
+    let at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&file) {
+        let _ = writeln!(f, "{at} [속도] {text}");
+    }
+}
+
 /// 설정 › 문제 보내기: 최근 기록은 클립보드에, 들어가는 만큼은 새 메일 본문에 (보낼지는 사용자가)
 fn report_problem(app: &AppHandle) -> Value {
     use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -663,6 +683,10 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         }
         "app:whats-new" => Ok(whats_new(app)),
         "app:report-problem" => Ok(report_problem(app)),
+        "perf:log" => {
+            perf_log(app, &arg(0).as_str().unwrap_or_default().chars().take(300).collect::<String>());
+            Ok(Value::Null)
+        }
         _ => return None,
     })
 }

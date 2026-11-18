@@ -55,14 +55,30 @@ pub fn place_note<'a>(app: &AppHandle, id: &str, b: Builder<'a>) -> Builder<'a> 
 }
 
 // 창을 끄는 동안 Moved 가 줄줄이 온다 — 멈추고 잠깐 뒤에 한 번만 쓴다
+//   기다리는 스레드는 하나만 (예전: 창을 끄는 동안 이벤트마다 스레드를 새로 띄웠다)
 fn save_soon(app: &AppHandle) {
     static GEN: AtomicU64 = AtomicU64::new(0);
-    let n = GEN.fetch_add(1, Ordering::SeqCst) + 1;
+    static WAITING: AtomicBool = AtomicBool::new(false);
+    GEN.fetch_add(1, Ordering::SeqCst);
+    if WAITING.swap(true, Ordering::SeqCst) {
+        return;
+    }
     let app = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(400));
-        if GEN.load(Ordering::SeqCst) == n {
-            state(&app).save_settings();
+        let mut seen = GEN.load(Ordering::SeqCst);
+        loop {
+            std::thread::sleep(Duration::from_millis(400));
+            let now = GEN.load(Ordering::SeqCst);
+            if now == seen {
+                break;
+            }
+            seen = now;
+        }
+        WAITING.store(false, Ordering::SeqCst);
+        state(&app).save_settings();
+        // 쓰는 사이 또 바뀌었으면 한 번 더
+        if GEN.load(Ordering::SeqCst) != seen {
+            save_soon(&app);
         }
     });
 }
@@ -110,23 +126,36 @@ pub fn set_open(app: &AppHandle, id: &str, open: bool) {
 pub fn track_note(app: &AppHandle, id: &str, win: &WebviewWindow) {
     let (app, id, label) = (app.clone(), id.to_string(), win.label().to_string());
     win.on_window_event(move |e| match e {
-        WindowEvent::Moved(_) | WindowEvent::Resized(_) => remember(&app, &label, Some(&id)),
+        // 예비 창으로 되돌려 이제 다른 메모의 창이면 그 메모 몫의 처리가 맡는다
+        WindowEvent::Moved(_) | WindowEvent::Resized(_) if state(&app).note_labels.lock().unwrap().get(&id) == Some(&label) => remember(&app, &label, Some(&id)),
         // memos::closed_note 다음에 온다 (먼저 단 것이 먼저) — 비워서 치운 메모 · 휴지통으로 간 메모는 자리도 잊는다
-        WindowEvent::Destroyed if !QUITTING.load(Ordering::SeqCst) => {
-            // 닫는 사이 다시 열어 새 창이 이어받았다 (memos::closed_note 가 그 창을 남겨 둔다)
-            if state(&app).note_labels.lock().unwrap().contains_key(&id) {
-                return;
-            }
-            let gone = state(&app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(&id).is_none());
-            if gone {
-                if let Some(Value::Object(m)) = state(&app).settings.lock().unwrap().get_mut("noteBounds") {
-                    m.remove(&id);
-                }
-            }
-            set_open(&app, &id, false);
-        }
+        WindowEvent::Destroyed if !QUITTING.load(Ordering::SeqCst) => note_closed(&app, &id),
         _ => {}
     });
+}
+
+pub fn quitting() -> bool {
+    QUITTING.load(Ordering::SeqCst)
+}
+
+/// 메모 창이 닫혔다 (없어졌거나 예비 창으로 되돌렸다): 열린 메모에서 빼고, 비워서 치운 메모면 자리도 잊는다
+pub fn note_closed(app: &AppHandle, id: &str) {
+    // 닫는 사이 다시 열어 새 창이 이어받았다 (memos::closed_note 가 그 창을 남겨 둔다)
+    if state(app).note_labels.lock().unwrap().contains_key(id) {
+        return;
+    }
+    forget_bounds_if_gone(app, id);
+    set_open(app, id, false);
+}
+
+/// 비워서 치운 메모 · 휴지통으로 간 메모의 창 자리를 잊는다 (닫은 메모 정리가 끝난 뒤에도 다시 본다)
+pub fn forget_bounds_if_gone(app: &AppHandle, id: &str) {
+    let gone = state(app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(id).is_none());
+    if gone {
+        if let Some(Value::Object(m)) = state(app).settings.lock().unwrap().get_mut("noteBounds") {
+            m.remove(id);
+        }
+    }
 }
 
 // ---------- 목록 창 · 알림 영역 ----------
@@ -442,7 +471,7 @@ fn restore_notes(app: &AppHandle, open: &[String]) {
             continue;
         }
         let tx = tx.clone();
-        let ready: crate::windows::Action = Box::new(move |_| {
+        let ready: crate::windows::Action = Box::new(move |_: &AppHandle| {
             let _ = tx.send(());
         });
         if memos::create_note_window(app, id, None, false, Some(ready)).is_ok() {
