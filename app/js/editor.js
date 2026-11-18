@@ -1623,6 +1623,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }
 
   // 파일들을 저장해 pos 에 넣는다. 저장이 길어지면(큰 사진 · 여러 장) 그 자리에 "넣는 중" — 그사이 친 글만큼 자리를 따라간다
+  function dropPos(x, y) {
+    const v = view();
+    return v.posAtCoords({ left: x, top: y })?.pos ?? v.state.selection.from;
+  }
   async function insertFilesAt(pos, files) {
     const id = String(++pendingSeq);
     sendPending(id, { set: { pos, uploading: true } });
@@ -3253,6 +3257,29 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     editInk: (pos) => editInk(view(), pos),
     // 커서 자리에 파일들을 넣는다.
     insertFiles: (files) => insertFilesAt(view().state.selection.from, files),
+    // 끌어다 놓은 파일: 놓은 자리에 (글 밖 · 여백이라 자리를 모르면 커서 자리) — file-drop.js
+    dropFiles: (files, x, y) => (readOnly ? Promise.resolve() : insertFilesAt(dropPos(x, y), files)),
+    /**
+     * 놓으면 들어갈 곳 { rect, replace, above } — insertBlocks 와 같게: 빈 줄이면 그 줄을 바꾸고(replace), 글 줄이면 그 줄 아래,
+     * 줄과 줄 사이면 앞 줄 아래 (맨 앞이면 첫 줄 위 — above). 놓을 수 없으면 null
+     */
+    dropTarget: (x, y) => {
+      if (readOnly) return null;
+      const v = view();
+      const $p = v.state.doc.resolve(dropPos(x, y));
+      const rectOf = (pos) => {
+        const dom = pos >= 0 ? v.nodeDOM(pos) : null;
+        return dom instanceof Element ? dom.getBoundingClientRect() : null;
+      };
+      if ($p.depth > 0) {
+        const rect = rectOf($p.before());
+        if (rect) return { rect, replace: $p.parent.isTextblock && $p.parent.content.size === 0 };
+      }
+      const before = $p.nodeBefore ? rectOf($p.pos - $p.nodeBefore.nodeSize) : null;
+      if (before) return { rect: before, replace: false };
+      const after = $p.nodeAfter ? rectOf($p.pos) : null;
+      return { rect: after ?? v.dom.getBoundingClientRect(), replace: false, above: Boolean(after) };
+    },
     focus: () => view().focus(),
     /** 서식 없이 붙여넣기 (오른쪽 클릭 메뉴 › 서식 없이 붙여넣기 — 클립보드의 글자) → 편집기에 넣었는가 */
     pastePlain: (text) => {
