@@ -113,6 +113,10 @@ pub fn track_note(app: &AppHandle, id: &str, win: &WebviewWindow) {
         WindowEvent::Moved(_) | WindowEvent::Resized(_) => remember(&app, &label, Some(&id)),
         // memos::closed_note 다음에 온다 (먼저 단 것이 먼저) — 비워서 치운 메모 · 휴지통으로 간 메모는 자리도 잊는다
         WindowEvent::Destroyed if !QUITTING.load(Ordering::SeqCst) => {
+            // 닫는 사이 다시 열어 새 창이 이어받았다 (memos::closed_note 가 그 창을 남겨 둔다)
+            if state(&app).note_labels.lock().unwrap().contains_key(&id) {
+                return;
+            }
             let gone = state(&app).vault.lock().unwrap().as_ref().is_some_and(|v| v.entry(&id).is_none());
             if gone {
                 if let Some(Value::Object(m)) = state(&app).settings.lock().unwrap().get_mut("noteBounds") {
