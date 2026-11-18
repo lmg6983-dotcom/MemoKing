@@ -1,7 +1,8 @@
 # PC Rust 판 베타 배포 (desktop-rs/). Actions 탭 › Run workflow 로만 돈다.
 #   올라가는 곳: 이 저장소의 사전 배포 `desktop-rs` (안드로이드의 `android` 와 같은 방식, 정식 Release 와 따로)
 #   올라가는 것: MemoKing-Rust-Setup-<버전>.exe, MemoKing-Rust-Setup.exe (늘 같은 이름), latest-tauri.json (자동 업데이트)
-#   설치 파일에 함께 넣는 것: AI 엔진 llama-server (npm run llama) · HEVC 영상 변환기 ffmpeg (desktop-rs/scripts/build-ffmpeg-min.sh)
+#   설치 파일에 함께 넣는 것: HEVC 영상 변환기 ffmpeg (desktop-rs/scripts/build-ffmpeg-min.sh)
+#   AI 엔진 llama-server 는 넣지 않는다 — 앱이 AI 를 처음 쓸 때 llama.cpp 릴리스에서 받는다 (ai.rs ensure_engine, 설치 파일 48MB 중 32MB 였다)
 #   버전은 desktop-rs/app/tauri.conf.json 의 version. 올려야 자동 업데이트가 새 버전으로 알아본다
 #   처음 한 번 준비: guides/RELEASE.md 의 "PC Rust 판 베타"
 name: Release (PC Rust 베타)
@@ -55,11 +56,6 @@ jobs:
         with:
           workspaces: desktop-rs
 
-      - name: AI 엔진 받기 (desktop/vendor/llama)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/get-llama.mjs
-
       - name: HEVC 영상 변환기 받기 (desktop/vendor/ffmpeg)
         uses: actions/download-artifact@v4
         with:
@@ -78,7 +74,7 @@ jobs:
             const conf = {
               productName: "MemoKing Beta",
               bundle: {
-                resources: { "../../desktop/vendor/llama/": "llama/", "../../desktop/vendor/ffmpeg/": "ffmpeg/" },
+                resources: { "../../desktop/vendor/ffmpeg/": "ffmpeg/" },
                 createUpdaterArtifacts: signed,
               },
             };

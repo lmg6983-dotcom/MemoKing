@@ -1844,10 +1844,13 @@ const aiTagAfterClose = (ask) => ask && api.tags.aiAuto?.(id).catch(() => {}); /
 //   (예전: 설정 · AI 상태 · 태그 추천 · 저장을 차례로 기다린 뒤에야 창이 사라져 닫기가 굼떴다)
 //   숨은 동안 같은 메모를 다시 열면 새 창이 뜬다 (메인이 닫는 중으로 적어 둔다). 남은 글은 창을 없앨 때도 동기 저장(flushSync)
 let closingWin = false;
-async function finishClose(hide) {
+async function finishClose(hide, vanish = false) {
   if (closingWin) return;
   closingWin = true;
   const t0 = performance.now();
+  // PC Rust 판의 메모 창은 투명 창 — 화면을 바로 투명하게 해 누르는 순간 사라져 보이게 (창을 숨기는 데는 100~300ms 가 걸린다).
+  //   스택 탭 하나만 닫을 때는 옆 탭이 이 자리에 뜨니 그대로 둔다 (vanish 없음)
+  if (vanish && globalThis.__TAURI_INTERNALS__) document.documentElement.style.opacity = '0';
   await hide?.catch(() => {});
   const hidden = Math.round(performance.now() - t0);
   try {
@@ -1861,7 +1864,7 @@ async function finishClose(hide) {
     api.win.close();
   }
 }
-const closeWindow = () => finishClose(api.win.hideForClose?.());
+const closeWindow = () => finishClose(api.win.hideForClose?.(), true);
 
 // Ctrl+W: 스택이면 보이는 탭만 닫는다 (탭의 × 와 같음 — 옆 탭이 바로 보인다). 스택이 아니면 창을 닫는다.
 const closeTabOrWindow = () => (tabsEl.hidden ? closeWindow() : finishClose(api.stack.removeHidden(id)));

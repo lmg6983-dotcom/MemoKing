@@ -23,6 +23,11 @@ const MODEL_REPO: &str = "mradermacher/kanana-2-3b-instruct-i1-GGUF";
 const MODEL_FILE_END: &str = ".i1-q4_k_m.gguf";
 const LICENSE_URL: &str = "https://huggingface.co/kakaocorp/kanana-2-3b-instruct/raw/main/LICENSE";
 
+// AI 엔진 (llama.cpp llama-server, Vulkan) — 설치 파일에 넣지 않고 처음 쓸 때 받는다 (설치 파일 48MB 중 32MB 였다 — 업데이트마다 받던 것).
+//   scripts/get-llama.mjs 와 같은 판. GitHub 가 알려 준 SHA-256 과 맞을 때만 넣는다
+const LLAMA_TAG: &str = "b11400";
+const LLAMA_ASSET: &str = "llama-b11400-bin-win-vulkan-x64.zip";
+
 struct Server {
     child: Child,
     base: String,
@@ -43,6 +48,7 @@ struct Engine {
 static ENGINE: LazyLock<Mutex<Engine>> = LazyLock::new(Default::default);
 static STARTING: Mutex<()> = Mutex::new(()); // 둘이 함께 불러도 엔진은 하나만 띄운다
 static STOP_DOWNLOAD: AtomicBool = AtomicBool::new(false);
+static ENGINE_DL: Mutex<()> = Mutex::new(()); // 엔진 받기는 한 번에 하나
 static JOBS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> = LazyLock::new(Default::default); // "창:작업" → 멈추기
 // 이 PC 의 엔진 — 프록시를 거치지 않는다
 static LOCAL: LazyLock<ureq::Agent> = LazyLock::new(|| ureq::Agent::config_builder().proxy(None).http_status_as_error(false).build().into());
@@ -55,17 +61,128 @@ fn model(app: &AppHandle) -> PathBuf {
     dir(app).join("chat.gguf")
 }
 
-/// llama-server: MEMOKING_LLAMA_SERVER, 설치본의 resources\llama, 개발 중이면 desktop/vendor/llama (npm run llama)
+fn engine_dir(app: &AppHandle) -> PathBuf {
+    dir(app).join("engine")
+}
+
+/// llama-server: MEMOKING_LLAMA_SERVER, 받아 둔 설정 폴더 ai\engine, 설치본의 resources\llama(예전 설치 파일), 개발 중이면 desktop/vendor/llama (npm run llama)
 fn server_path(app: &AppHandle) -> PathBuf {
     let name = format!("llama-server{}", std::env::consts::EXE_SUFFIX);
     if let Some(p) = std::env::var_os("MEMOKING_LLAMA_SERVER") {
         return p.into();
+    }
+    let got = engine_dir(app).join(&name);
+    if got.is_file() {
+        return got;
     }
     let bundled = app.path().resource_dir().map(|d| d.join("llama").join(&name)).unwrap_or_default();
     if bundled.is_file() {
         return bundled;
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../desktop/vendor/llama").join(name)
+}
+
+/// 엔진이 없으면 받는다 (llama.cpp 릴리스의 Windows Vulkan 묶음에서 llama-server.exe 와 DLL 만) — 받는 동안 진행률은 모델 받기와 같은 칸에
+fn ensure_engine(app: &AppHandle) -> Result<(), String> {
+    use sha2::{Digest, Sha256};
+    if server_path(app).is_file() {
+        return Ok(());
+    }
+    if !cfg!(windows) {
+        return Err("이 PC에 AI 엔진이 없어요 (npm run llama)".into());
+    }
+    let _one = ENGINE_DL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if server_path(app).is_file() {
+        return Ok(()); // 기다리는 사이 다른 쪽이 받았다
+    }
+    let offline = "AI 엔진을 받지 못했어요. 인터넷에 연결한 뒤 다시 해 주세요";
+    let rel = crate::stt::WEB.get(format!("https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/{LLAMA_TAG}")).header("Accept", "application/vnd.github+json").call().map_err(|_| offline.to_string())?;
+    let info: Value = rel.into_body().read_to_string().ok().and_then(|t| serde_json::from_str(&t).ok()).ok_or(offline)?;
+    let asset = info["assets"].as_array().into_iter().flatten().find(|a| a["name"] == LLAMA_ASSET).ok_or(offline)?;
+    let sha = asset["digest"].as_str().and_then(|d| d.strip_prefix("sha256:")).filter(|d| d.len() == 64).ok_or(offline)?.to_string();
+    let url = asset["browser_download_url"].as_str().ok_or(offline)?.to_string();
+    let size = asset["size"].as_u64().unwrap_or(0);
+    std::fs::create_dir_all(dir(app)).map_err(|e| e.to_string())?;
+    let zip = dir(app).join("engine.zip.part");
+    let res = crate::stt::WEB.get(url).call().map_err(|_| offline.to_string())?;
+    if !res.status().is_success() {
+        return Err(offline.into());
+    }
+    let mut hash = Sha256::new();
+    let (mut got, mut shown) = (0u64, 0.0);
+    let saved = crate::stt::save_to(res, &zip, &mut |b| {
+        if STOP_DOWNLOAD.load(Ordering::Relaxed) {
+            return Err("받기를 멈췄어요. 다시 누르면 처음부터 받아요".into());
+        }
+        hash.update(b);
+        got += b.len() as u64;
+        if size > 0 && got as f64 / size as f64 - shown >= 0.02 {
+            shown = got as f64 / size as f64;
+            ENGINE.lock().unwrap().progress = Some(shown);
+            emit(app);
+        }
+        Ok(())
+    });
+    let digest: String = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    let r = saved.and_then(|()| if digest == sha { Ok(()) } else { Err("받은 AI 엔진이 맞지 않아요. 다시 해 주세요".into()) }).and_then(|()| unpack_engine(app, &zip));
+    let _ = std::fs::remove_file(&zip);
+    ENGINE.lock().unwrap().progress = None;
+    r
+}
+
+/// 받은 zip 에서 llama-server.exe 와 DLL 만 ai\engine 으로 (다 꺼낸 뒤에 바꿔 넣는다 — 도중에 끊겨도 반쯤 든 엔진이 남지 않게)
+fn unpack_engine(app: &AppHandle, zip: &std::path::Path) -> Result<(), String> {
+    let tmp = dir(app).join("engine.unpack");
+    let new = dir(app).join("engine.new");
+    let _ = std::fs::remove_dir_all(&tmp);
+    let _ = std::fs::remove_dir_all(&new);
+    std::fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&new).map_err(|e| e.to_string())?;
+    // Windows 10 이상의 tar(bsdtar)는 zip 도 푼다 (받아쓰기 모델과 같게)
+    let mut cmd = Command::new("tar");
+    cmd.arg("-xf").arg(zip).arg("-C").arg(&tmp);
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW
+    let _ = cmd.status();
+    fn walk(d: &std::path::Path, out: &mut Vec<PathBuf>) {
+        for e in std::fs::read_dir(d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk(&p, out);
+            } else {
+                out.push(p);
+            }
+        }
+    }
+    let mut files = Vec::new();
+    walk(&tmp, &mut files);
+    let pick: Vec<&PathBuf> = files.iter().filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.eq_ignore_ascii_case("llama-server.exe") || n.to_ascii_lowercase().ends_with(".dll"))).collect();
+    if !pick.iter().any(|p| p.file_name().is_some_and(|n| n.eq_ignore_ascii_case("llama-server.exe"))) {
+        let _ = std::fs::remove_dir_all(&tmp);
+        return Err("AI 엔진 묶음을 풀지 못했어요. 다시 해 주세요".into());
+    }
+    for p in pick {
+        std::fs::copy(p, new.join(p.file_name().unwrap())).map_err(|e| e.to_string())?;
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+    let _ = std::fs::remove_dir_all(engine_dir(app));
+    std::fs::rename(&new, engine_dir(app)).map_err(|e| e.to_string())
+}
+
+/// 모델은 있는데 엔진이 없으면(엔진을 빼고 만든 설치 파일로 업데이트한 PC) 뒤에서 받아 둔다 — 한 번만
+fn fetch_engine_soon(app: &AppHandle) {
+    static ASKED: AtomicBool = AtomicBool::new(false);
+    if !cfg!(windows) || server_path(app).is_file() || !model(app).is_file() || ASKED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if let Err(e) = ensure_engine(&app) {
+            ENGINE.lock().unwrap().error = e;
+            ASKED.store(false, Ordering::SeqCst); // 다음에 다시
+        }
+        emit(&app);
+    });
 }
 
 /// 화면이 묻는 상태 { engine, chat: { state, name, size, error, progress } }
@@ -82,7 +199,12 @@ fn status(app: &AppHandle) -> Value {
         "ready"
     };
     let name = if size > 0 { app.state::<State>().setting("ai")["chat"].as_str().unwrap_or_default().to_string() } else { String::new() };
-    json!({ "engine": server_path(app).is_file(), "chat": { "state": state, "name": name, "size": size, "error": e.error, "progress": e.progress } })
+    // engine: 쓸 수 있다 — 엔진이 있거나, 없어도 받을 수 있다 (Windows: 모델을 받거나 처음 켤 때 받는다)
+    let engine = cfg!(windows) || server_path(app).is_file();
+    drop(e);
+    fetch_engine_soon(app);
+    let e = ENGINE.lock().unwrap();
+    json!({ "engine": engine, "chat": { "state": state, "name": name, "size": size, "error": e.error, "progress": e.progress } })
 }
 
 fn emit(app: &AppHandle) {
@@ -114,7 +236,8 @@ fn bring_in(app: &AppHandle, fill: impl FnOnce(&PathBuf) -> Result<String, Strin
     }
     emit(app);
     let part = dir(app).join("chat.gguf.part");
-    let r = std::fs::create_dir_all(dir(app)).map_err(|e| e.to_string()).and_then(|_| fill(&part)).and_then(|name| {
+    // 엔진부터 (없으면 받는다 — 모델만 있고 엔진이 없으면 쓸 수 없으니 함께)
+    let r = ensure_engine(app).and_then(|()| std::fs::create_dir_all(dir(app)).map_err(|e| e.to_string())).and_then(|_| fill(&part)).and_then(|name| {
         stop();
         std::fs::rename(&part, model(app)).map_err(|e| e.to_string())?;
         set_name(app, &name);
@@ -262,9 +385,11 @@ fn start(app: &AppHandle) -> Result<(String, String), String> {
     if let Some(s) = &ENGINE.lock().unwrap().server {
         return Ok((s.base.clone(), s.key.clone()));
     }
+    // 엔진이 없으면 지금 받는다 (처음 켤 때 한 번)
+    ensure_engine(app)?;
     let exe = server_path(app);
     if !exe.is_file() {
-        return Err("이 PC에 AI 엔진이 없어요. 메모킹을 다시 설치해 주세요".into());
+        return Err("이 PC에 AI 엔진이 없어요. 인터넷에 연결한 뒤 다시 해 주세요".into());
     }
     if !model(app).is_file() {
         return Err("AI 모델 파일을 먼저 넣어 주세요 (설정의 AI 도우미)".into());

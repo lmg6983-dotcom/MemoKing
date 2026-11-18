@@ -31,7 +31,7 @@ Rust + Tauri 로 다시 만든 PC 판은 정식 Release 와 따로, 사전 배�
 
 ```
 Actions › Release (PC Rust 베타) › Run workflow   (.github/workflows/release-rs.yml, windows-latest)
-      │  ① AI 엔진 받기 (npm run llama) ② tauri build (Google 연결 정보 · 업데이트 서명)
+      │  tauri build (Google 연결 정보 · 업데이트 서명)
       ▼
 사전 배포 desktop-rs: MemoKing-Rust-Setup-<버전>.exe, MemoKing-Rust-Setup.exe, latest-tauri.json
       ▲  latest-tauri.json 확인 (tauri-plugin-updater, 서명이 맞을 때만 설치)
@@ -41,7 +41,7 @@ Actions › Release (PC Rust 베타) › Run workflow   (.github/workflows/relea
 - 받기: `https://github.com/lmg6983-dotcom/MemoKing/releases/download/desktop-rs/MemoKing-Rust-Setup.exe`
 - 버전: `desktop-rs/app/tauri.conf.json` 의 `version` 을 올린 뒤 Run workflow. 같은 버전이면 업데이트로 알리지 않아요.
 - 이름이 **MemoKing Beta** 라 Electron 판과 설치 폴더, 시작 메뉴 바로가기가 겹치지 않아요. 메모 폴더와 설정(`%APPDATA%\MemoKing`)은 같이 써서, 시험할 때는 Electron 판을 끄고 켜요 (둘 다 켜면 알림이 두 번 울려요).
-- 설치 파일에 AI 엔진(`llama\llama-server.exe`)이 함께 들어가요. 받아쓰기 엔진은 실행 파일 안에 있어요.
+- AI 엔진(llama-server)은 설치 파일에 넣지 않아요. AI를 처음 쓸 때(모델 받기 · 넣기 · 처음 켜기) 앱이 llama.cpp 릴리스에서 받아 설정 폴더 `ai\engine` 에 둬요 (`desktop-rs/app/src/ai.rs` 의 `LLAMA_TAG` — `scripts/get-llama.mjs` 와 같은 판으로). 받아쓰기 엔진은 실행 파일 안에 있어요.
 - AI 비서 연결(MCP)은 Rust 판에 없어요. Gemini 같은 AI 는 Google Drive 의 메모킹 동기화 폴더를 직접 읽고 써요. 설정 화면의 "다른 AI 앱과 연결" 칸도 보이지 않아요.
 
 **자동 업데이트 서명**
