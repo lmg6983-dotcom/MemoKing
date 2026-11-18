@@ -23,6 +23,11 @@ static AREA: Mutex<Option<Vec<Shot>>> = Mutex::new(None);
 /// 메모 창이 열리며 넣을 캡처 (memo:get 의 capture)
 static CAPTURES: Mutex<Option<HashMap<String, Value>>> = Mutex::new(None);
 
+/// 메모 창이 열릴 때 넣을 캡처를 맡겨 둔다 (매직 카피 · 화면 캡처)
+pub fn put_capture(id: &str, capture: Value) {
+    CAPTURES.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.to_string(), capture);
+}
+
 pub fn take_capture(id: &str) -> Value {
     CAPTURES.lock().unwrap().get_or_insert_with(HashMap::new).remove(id).unwrap_or(Value::Null)
 }
@@ -136,7 +141,7 @@ fn finish_area_capture(app: &AppHandle, label: &str, rect: &Value) -> Result<Val
         "source": { "window": "화면 캡처", "process": "", "url": null, "time": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true), "copied": false },
         "sourceMd": format!("> 출처: 화면 캡처, {}", now.format("%Y.%-m.%-d %H:%M")),
     });
-    CAPTURES.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.clone(), capture);
+    put_capture(&id, capture);
     // shortcut: Electron 은 숨긴 메모 창 + 알림(누르면 보임)이었다 — 알림을 옮기기 전까지 메모 창을 바로 띄운다
     crate::memos::open_note(app, &id)?;
     Ok(id.into())

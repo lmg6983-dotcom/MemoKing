@@ -58,6 +58,8 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
         return r;
     }
     match channel {
+        // 매직 카피 도우미가 지금 클립보드를 읽어 오는지 (Ctrl+C 는 보내지 않는다 — 점검 PC 의 다른 앱에 키가 가지 않게)
+        "smoke:clipboard-dump" if smoke() => crate::capture::smoke_dump(app),
         "smoke:emit" if smoke() => app.emit_to(label, args[0].as_str().unwrap_or_default(), [42]).map(|_| Value::Null).map_err(|e| e.to_string()),
         "smoke:done" if smoke() => {
             // 목록 · 메모 창이 다 알려 오면 찍고, 화면 사진을 찍을 틈(6초)을 두고 끝낸다

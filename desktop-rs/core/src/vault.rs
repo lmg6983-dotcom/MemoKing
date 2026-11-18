@@ -1482,6 +1482,18 @@ impl Vault {
         write_atomic(&self.root.join(ATTACH_DIR).join(&name), bytes)?;
         Ok(format!("{ATTACH_DIR}/{name}"))
     }
+
+    /// 다른 곳의 파일을 첨부로 복사 (매직 카피로 담은 파일 — 큰 영상도 메모리에 올리지 않게 파일째) → 첨부 경로
+    pub fn copy_attachment(&self, file: &Path) -> io::Result<String> {
+        let ext = file.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        let ext: String = ext.chars().filter(|c| c.is_ascii_alphanumeric()).take(8).collect();
+        let ext = if ext.is_empty() { "bin".into() } else { ext };
+        let name = format!("{}-{}.{ext}", file_stamp(chrono::Local::now()), &uuid::Uuid::new_v4().simple().to_string()[..4]);
+        let dir = self.root.join(ATTACH_DIR);
+        fs::create_dir_all(&dir)?;
+        fs::copy(file, dir.join(&name))?;
+        Ok(format!("{ATTACH_DIR}/{name}"))
+    }
 }
 
 /// 실행하면 프로그램이 도는 파일 (열기 전에 묻는다) — file-kinds.js isProgramFile

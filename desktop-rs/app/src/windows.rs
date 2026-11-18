@@ -411,6 +411,37 @@ pub fn show_note_win(w: &WebviewWindow) {
     let _ = w.show();
 }
 
+/// 이 메모 창이 보이면 포커스를 지금 앞의 앱에 돌려준다 (창은 그 위에 보인 채로) — 메모 단축키로 복사하고 창도 띄울 때.
+///   창은 여러 길(예비 창 · 재활용 · 그린 뒤 보이기)로 늦게 보여서 보일 때까지 잠깐 지켜본다
+#[cfg(windows)]
+pub fn keep_focus_after_show(app: &AppHandle, id: &str) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow, SetWindowPos, HWND_TOP, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+    // SAFETY: 인자 없는 조회
+    let prev = unsafe { GetForegroundWindow() } as isize;
+    let (app, id) = (app.clone(), id.to_string());
+    std::thread::spawn(move || {
+        for _ in 0..40 {
+            std::thread::sleep(Duration::from_millis(50));
+            let label = state(&app).note_labels.lock().unwrap().get(&id).cloned();
+            let Some(w) = label.and_then(|l| app.get_webview_window(&l)) else { continue };
+            if !w.is_visible().unwrap_or(false) {
+                continue;
+            }
+            std::thread::sleep(Duration::from_millis(50)); // 보인 뒤 set_focus 까지
+            let Ok(hwnd) = w.hwnd() else { return };
+            // SAFETY: prev 는 앞서 받은 창 핸들 (그새 닫혔으면 실패할 뿐), hwnd 는 살아 있는 이 창
+            unsafe {
+                SetForegroundWindow(prev as _);
+                SetWindowPos(hwnd.0 as _, HWND_TOP, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+            }
+            return;
+        }
+    });
+}
+
+#[cfg(not(windows))]
+pub fn keep_focus_after_show(_: &AppHandle, _: &str) {}
+
 /// 숨은 지 오래(60초)된 창은 웹뷰도 안 보임으로 — 바로 끄면 탭을 오갈 때 다시 그리느라 흰 화면이 비칠 수 있어 잠시 둔다
 const DEEP_HIDE_MS: u64 = 60_000;
 pub fn hide_deep_later(w: &WebviewWindow) {

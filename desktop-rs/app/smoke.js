@@ -81,6 +81,12 @@ window.addEventListener('load', () => setTimeout(async () => {
     };
     await check('동영상 첫 장면 (메인 ffmpeg)', () => poster('clip.mp4'));
     await check('HEVC 동영상 첫 장면 (메인 ffmpeg)', () => poster('clip-hevc.mp4'));
+    // 매직 카피: 상주 PowerShell 도우미가 클립보드를 풀어 온다 (점검은 Ctrl+C 를 보내지 않는다, capture.rs)
+    await check('매직 카피 도우미가 클립보드 읽기', async () => {
+      await mk.copyText('매직 카피 점검 글');
+      const d = await window.__TAURI_INTERNALS__.invoke('ipc', { channel: 'smoke:clipboard-dump', args: [] });
+      return d.info.text === true && d.text === '매직 카피 점검 글';
+    });
     await check('동영상이 아닌 파일의 첫 장면은 204', async () => (await fetch(`${mk.posterBase}attachments/dot.png`)).status === 204);
     await check('CSS app-region 읽힘 (창 끌기)', () => dragRegion('.titlebar'));
     await check('창 단추 셋 (CSP 아래에서도 모양)', () => {

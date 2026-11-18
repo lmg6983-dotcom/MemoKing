@@ -306,15 +306,10 @@ fn tray_chosen(app: &AppHandle, id: &str) {
         "capture" => {
             crate::services::start_area_capture(app);
         }
-        // shortcut: 클립보드의 글만 (Electron 매직 카피는 파일 · 그림도), 매직 카피를 옮길 때 그것으로
+        // 지금 클립보드의 글 · 파일 · 그림으로 (매직 카피에서 Ctrl+C 만 빼고, capture.rs)
         "clipboard" => {
-            use tauri_plugin_clipboard_manager::ClipboardExt;
-            let text = app.clipboard().read_text().unwrap_or_default();
-            if text.trim().is_empty() {
-                crate::windows::show_hud(app, "가져올 내용이 없어요", "글을 복사한 뒤 다시 눌러 주세요.", "warn");
-            } else {
-                let _ = memos::handle(app, "list", "memo:import", &[text.into(), json!({ "open": true })]);
-            }
+            let app = app.clone();
+            std::thread::spawn(move || crate::capture::magic_copy(&app, false));
         }
         "reminders" | "history" => show_list_tab(app, id),
         "show-all" => show_all_notes(app),
