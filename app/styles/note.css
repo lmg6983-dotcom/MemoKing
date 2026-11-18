@@ -538,6 +538,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 /* ---------- 이전 버전 (links-panel 모양을 같이 씀) ---------- */
 .versions-hint { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .versions-list:empty::after { content: "아직 남겨 둔 버전이 없어요. 고치기 시작하면 10분마다 남아요"; }
+.versions-list[aria-busy="true"]:empty::after { content: "버전을 불러오는 중이에요"; cursor: progress; }
 .version-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border); }
 .version-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .version-text b { font-size: 13px; color: var(--text-strong); }

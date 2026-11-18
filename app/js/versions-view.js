@@ -2,6 +2,7 @@
 // 버전마다 "언제" · 그때의 첫 줄들 · 되돌리기 단추. 되돌려도 지금 내용이 버전으로 남으니 묻지 않는다.
 import { koClock, koMonthDay } from './core/time.js';
 import { UI } from './core/ui-text.js';
+import { busyWhile } from './dom.js';
 
 // "3분 전 (오후 3:20)", "어제 오후 3:20", "10월 5일 오후 3:20" — 같은 시간대 버전도 구별되게 늘 시각을 붙인다
 //   newest: 맨 위(가장 새) 버전만 "방금" — 아래 것까지 "방금" 이면 어느 쪽이 새것인지 몰랐다. seconds: 같은 분의 버전끼리는 초까지
@@ -47,7 +48,7 @@ export function renderVersions(list, versions, onRestore) {
     restore.className = 'btn version-restore';
     restore.textContent = '되돌리기';
     restore.setAttribute('aria-label', `${when.textContent} 내용으로 되돌리기`);
-    restore.addEventListener('click', () => onRestore(v.name));
+    restore.addEventListener('click', () => busyWhile(restore, onRestore(v.name)));
     li.append(text, restore);
     return li;
   }));
