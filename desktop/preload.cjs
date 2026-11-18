@@ -201,6 +201,7 @@ contextBridge.exposeInMainWorld('memoking', {
   attachments: {
     save: invoke('attachment:save'),
     read: invoke('attachment:read'),
+    rotate: invoke('attachment:rotate'), // 그림을 오른쪽으로 90도 돌린 새 첨부 → 자리 (PC Rust 판 — 없거나 못 하면 화면이 돌린다)
     open: invoke('attachment:open'),
     fetch: invoke('attachment:fetch'),
     info: invoke('attachment:info'),

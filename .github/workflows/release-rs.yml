@@ -64,6 +64,12 @@ jobs:
 
       # 배포판에만 쓰는 설정: 이름(Electron 판과 바로가기, 설치 폴더가 겹치지 않게), 함께 넣을 파일, 업데이트 파일 만들기
       #   서명 공개 열쇠와 업데이트 주소는 tauri.conf.json 에 있다. 개인 열쇠(비밀값)가 없으면 업데이트 파일 없이 설치 파일만 만든다
+      # Rust 판이 쓰지 않는 화면 파일은 설치 파일에 넣지 않는다 (Tauri 는 app/ 를 통째로 싣는다)
+      #   tesseract 한글 OCR (약 9MB): Electron 판의 알림 캡처 읽기용 — Rust 판은 Windows OCR 로 읽는다 (history.rs)
+      - name: 쓰지 않는 화면 파일 빼기
+        shell: bash
+        run: rm -rf app/vendor/tesseract app/ocr.html app/js/ocr.js
+
       - name: 배포 설정 만들기
         run: |
           if [ "$HAS_SIGNING_KEY" != "true" ]; then

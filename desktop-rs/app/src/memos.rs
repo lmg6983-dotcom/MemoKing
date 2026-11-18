@@ -518,6 +518,37 @@ fn read_attachment(app: &AppHandle, rel: &str) -> Result<Value, String> {
     std::fs::read(&file).map(|b| bytes_value(&b)).map_err(|e| e.to_string())
 }
 
+/// 그림을 오른쪽으로 90도 돌린 새 첨부 → 그 자리 (원본은 그대로 — 메모의 되돌리기로 원래 장).
+///   예전에는 메모 창이 화면 스레드에서 캔버스로 풀고 돌려, 큰 사진이면 그동안 창이 멈췄다. 사진의 방향(EXIF)을 반영하고 긴 변 4096 까지.
+///   못 읽는 형식(HEIC 등)은 오류 — 화면이 예전처럼 돌린다
+fn rotate_attachment(app: &AppHandle, rel: &str) -> Result<Value, String> {
+    use image::ImageDecoder;
+    let fail = |e: &dyn std::fmt::Display| format!("사진을 돌리지 못했어요 ({e})");
+    let file = with_vault(app, |v| Ok(v.resolve(rel)))?.filter(|f| f.is_file()).ok_or("사진을 찾지 못했어요")?;
+    let ext = rel.rsplit('.').next().unwrap_or_default().to_ascii_lowercase();
+    if ext == "gif" {
+        return Err("움직이는 그림(GIF)은 돌리면 멈춘 그림이 돼서 돌리지 않았어요".into());
+    }
+    let mut dec = image::ImageReader::open(&file).map_err(|e| fail(&e))?.with_guessed_format().map_err(|e| fail(&e))?.into_decoder().map_err(|e| fail(&e))?;
+    let turn = dec.orientation().unwrap_or(image::metadata::Orientation::NoTransforms);
+    let mut img = image::DynamicImage::from_decoder(dec).map_err(|e| fail(&e))?;
+    img.apply_orientation(turn);
+    if img.width().max(img.height()) > 4096 {
+        img = img.resize(4096, 4096, image::imageops::FilterType::Lanczos3); // 메모리 · 시간 — 4096 이면 화면 · 인쇄에 충분
+    }
+    let img = img.rotate90();
+    let mut out = std::io::Cursor::new(Vec::new());
+    // 사진은 JPEG, 그 밖(투명한 곳이 있을 수 있는 그림)은 PNG
+    let ext = if matches!(ext.as_str(), "jpg" | "jpeg") {
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 92).encode_image(&img.to_rgb8()).map_err(|e| fail(&e))?;
+        "jpg"
+    } else {
+        img.write_to(&mut out, image::ImageFormat::Png).map_err(|e| fail(&e))?;
+        "png"
+    };
+    with_vault(app, |v| v.save_attachment(out.get_ref(), ext).map(Value::from).map_err(|e| e.to_string()))
+}
+
 /// 첨부를 그 파일의 프로그램으로 연다 → "" (열림) · "cancelled" · 까닭
 fn open_attachment(app: &AppHandle, rel: &str) -> Result<Value, String> {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
@@ -925,6 +956,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             with_vault(app, |v| v.save_attachment(&bytes, &arg_str(args, 1)).map(Value::from).map_err(|e| e.to_string()))
         }
         "attachment:read" => read_attachment(app, &arg_str(args, 0)),
+        "attachment:rotate" => rotate_attachment(app, &arg_str(args, 0)),
         "attachment:info" => {
             let rel = arg_str(args, 0);
             let rel = memoking_core::js::decode_uri(&rel).unwrap_or(rel);
