@@ -16,6 +16,7 @@ body {
   gap: 10px 16px;
   padding: 18px 20px 12px;
   border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag; /* 창 테두리가 없다 — 머리로 창을 옮긴다 (찾기 칸은 아래에서 no-drag) */
 }
 .head-text { flex: 1 1 260px; min-width: 0; }
 .head h1 { margin: 0 0 4px; font-size: 18px; line-height: 24px; font-weight: 800; letter-spacing: -0.015em; }
@@ -25,6 +26,7 @@ body {
   flex: 0 1 200px; height: 32px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: var(--radius-md);
   background: var(--surface-1);
+  -webkit-app-region: no-drag;
 }
 .find svg { width: 14px; height: 14px; flex: none; fill: none; stroke: var(--text-muted); stroke-width: 1.6; stroke-linecap: round; }
 .find input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: inherit; font: inherit; font-size: 13px; }

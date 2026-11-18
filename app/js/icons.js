@@ -56,6 +56,8 @@ const ICONS = {
   rows: `<rect x="3.5" y="4.5" width="17" height="6" rx="1.8" ${stroke}/><rect x="3.5" y="13.5" width="17" height="6" rx="1.8" ${stroke}/>`,
   grid: `<rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.8" ${stroke}/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.8" ${stroke}/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.8" ${stroke}/><rect x="13" y="13" width="7.5" height="7.5" rx="1.8" ${stroke}/>`,
   pen: `<path d="M4 20h4L19 9a2.83 2.83 0 00-4-4L4 16v4z" ${stroke}/><path d="M13.5 6.5l4 4" ${stroke}/>`,
+  // 고르기 (PDF 보기의 도구 줄: 글자 고르기 · 넘겨 보기)
+  cursor: `<path d="M6 3.5l12.5 7.2-5.6 1.4-2.4 5.4L6 3.5z" ${stroke}/>`,
   pause: '<rect x="7" y="5" width="3.6" height="14" rx="1.2" fill="currentColor"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.2" fill="currentColor"/>',
   play: '<path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z" fill="currentColor"/>',
   stop: '<rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/>',

@@ -16,6 +16,19 @@ window.addEventListener('load', () => setTimeout(async () => {
     const s = getComputedStyle(document.querySelector(sel));
     return (s.webkitAppRegion || s.appRegion) === 'drag';
   };
+  // 약속: 창 위쪽 띠(위에서 6px)의 어딘가는 창 끌기 영역 — shim.js 처럼 누른 곳부터 위로 올라가며 본다 (no-drag 가 먼저면 끌 수 없음)
+  //   덮는 화면(PDF 보기 · 사진 보기)이 떠 있어도 마찬가지 (tests/window-drag.test.js 는 CSS 만 본다)
+  const draggableAt = (x, y) => {
+    for (let el = document.elementFromPoint(x, y); el instanceof Element; el = el.parentElement) {
+      const s = getComputedStyle(el);
+      const r = s.webkitAppRegion || s.appRegion;
+      if (r === 'no-drag') return false;
+      if (r === 'drag') return true;
+    }
+    return false;
+  };
+  const topMovable = () => [0.2, 0.4, 0.6].some((f) => draggableAt(innerWidth * f, 6));
+  const pressEsc = () => (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
   const until = (fn, ms = 5000) => new Promise((resolve, reject) => {
     const t0 = Date.now();
     const tick = async () => {
@@ -89,6 +102,7 @@ window.addEventListener('load', () => setTimeout(async () => {
     });
     await check('동영상이 아닌 파일의 첫 장면은 204', async () => (await fetch(`${mk.posterBase}attachments/dot.png`)).status === 204);
     await check('CSS app-region 읽힘 (창 끌기)', () => dragRegion('.titlebar'));
+    await check('창 위쪽 띠로 창을 옮길 수 있음', () => topMovable());
     await check('창 단추 셋 (CSP 아래에서도 모양)', () => {
       const b = document.querySelectorAll('.mk-caption button');
       return b.length === 3 && getComputedStyle(b[0]).width === '46px';
@@ -222,6 +236,27 @@ window.addEventListener('load', () => setTimeout(async () => {
     doc.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true }));
     await stage('되돌리기가 안 됨', until(() => !chip()));
     return document.querySelector('.mk-file-drop').hidden;
+  });
+  await check('창 위쪽 띠로 창을 옮길 수 있음', () => topMovable());
+  // 덮는 화면: 떠 있는 동안에도 창을 옮길 수 있고, Esc 로 닫힌다 (빈 바이트 — 못 읽어도 보기와 위 막대는 뜬다)
+  await check('PDF 보기: 창 옮기기 · Esc 로 닫기', async () => {
+    const { openPdfViewer } = await import(new URL('js/pdf-viewer.js', location.href).href);
+    void openPdfViewer({ bytes: new Uint8Array([1, 2, 3]), name: '점검.pdf' });
+    await until(() => document.querySelector('.mk-pdf-view'));
+    if (!topMovable()) throw new Error('PDF 보기가 떠 있으면 창을 옮길 수 없음');
+    pressEsc();
+    await until(() => !document.querySelector('.mk-pdf-view')).catch(() => { throw new Error('Esc 로 닫히지 않음'); });
+    return true;
+  });
+  await check('사진 보기: 창 옮기기 · Esc 로 닫기', async () => {
+    const { openAlbumViewer } = await import(new URL('js/album-viewer.js', location.href).href);
+    openAlbumViewer({ images: [{ src: 'attachments/dot.png', alt: '점' }], url: (src) => `${mk.vaultBase}${src}` });
+    const view = await until(() => document.querySelector('.mk-album-view'));
+    view.classList.add('ui-active'); // 단추 줄이 보일 때 (마우스를 움직이면 보인다)
+    if (!topMovable()) throw new Error('사진 보기가 떠 있으면 창을 옮길 수 없음');
+    pressEsc();
+    await until(() => !document.querySelector('.mk-album-view')).catch(() => { throw new Error('Esc 로 닫히지 않음'); });
+    return true;
   });
   await check('닫을 때 화면 스냅샷이 남음', () => {
     window.mkFlushSync?.();
