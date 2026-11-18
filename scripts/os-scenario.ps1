@@ -21,22 +21,32 @@ function Step($name, [scriptblock]$body) {
   try { Save-Screen ($name -replace '[\\/:*?"<>|]', '') } catch {}
 }
 function Wait-Js($page, $expr, $sec = 6) { [bool](Wait-Until $sec { Test-Js $page $expr }) }
-function Esc { [W]::Keys(0x1B); Start-Sleep -Milliseconds 500 }
+function Esc { if ($script:Note) { Show-Page $script:Note }; [W]::Keys(0x1B); Start-Sleep -Milliseconds 500 }
 function Open-Menu($page) { Click-El $page '#menu-btn'; if (-not (Wait-Js $page "!document.getElementById('menu').hidden" 3)) { throw '메뉴가 열리지 않음' } }
 
 Initialize-TestRun $Exe
 $script:Note = $null
 try {
   Start-TestApp
-  $list = Wait-Until 30 { Find-Page 'index.html' }
+  $list = Wait-Until 30 { Find-Page $script:ListUrl }
   Step '시작: 목록 창이 뜨고 화면에 연결됨' { [bool]$list }
   if (-not $list) { throw '목록 창(원격 디버깅)에 연결하지 못했어요 — 최신 시험판인지 확인해 주세요' }
   Start-Sleep 2
+  # 새로 만든 설정이라 "vX 으로 업데이트했어요" 안내가 뜬다 — 사람처럼 확인을 눌러 닫고 시작
+  if (Wait-Js $list "Boolean(document.querySelector('dialog[open]'))" 3) {
+    Step '처음 안내 창 닫기 (확인)' {
+      Click-El $list 'dialog[open] button:last-of-type'
+      Wait-Js $list "!document.querySelector('dialog[open]')" 3
+    }
+  }
 
   # ---------- 아침: 새 메모에 장보기 목록 ----------
-  Step '목록 창 [+] 로 새 메모' {
-    Click-El $list '#fab'
-    $script:Note = Wait-Until 15 { Find-Page 'note.html' }
+  Step '목록 창 [+] › 글 메모 로 새 메모' {
+    Click-El $list '#fab' # + 는 위로 위성 단추(음성 · 손 · 글 메모)를 펼친다
+    if (-not (Wait-Js $list "Boolean(document.querySelector('[data-new=""text""]')?.offsetParent)" 3)) { throw '+ 메뉴가 펼쳐지지 않음' }
+    Start-Sleep -Milliseconds 300
+    Click-El $list '[data-new="text"]'
+    $script:Note = Wait-Until 15 { Find-Page 'note\.html' }
     [bool]$script:Note
   }
   $n = $script:Note
@@ -46,7 +56,7 @@ try {
   Step '제목과 체크리스트 쓰기 (한글 그대로)' {
     Click-El $n '.mk-doc'
     [W]::Type("장보기 목록`n")
-    Click-El $n '[data-cmd="task"]'
+    [W]::Keys(0x11, 0x10, 0x39) # 체크리스트 Ctrl+Shift+9 (좁은 창에서는 서식 막대 단추가 ≫ 안에 접힌다)
     [W]::Type("우유`n계란")
     Wait-Js $n "document.querySelectorAll('.mk-doc li').length >= 2 && document.querySelector('.mk-doc').textContent.includes('계란')"
   }
@@ -82,7 +92,7 @@ try {
     Click-El $n '.mk-doc img.mk-image:not(.mk-pdf-thumb)'
     Wait-Js $n "Boolean(document.querySelector('.mk-album-view'))"
   }
-  Step '사진 보기: 위 막대로 창 옮기기' { Test-WindowDrag $n '.mk-album-gap' -60 40 }
+  Step '사진 보기: 위 막대로 창 옮기기' { Test-WindowDrag $n '.mk-album-head' -60 40 0.02 0.5 } # 왼쪽 끝 빈 곳 (좁은 창은 단추가 막대를 채운다)
   Step '사진 보기: Esc 로 닫기' { Esc; Wait-Js $n "!document.querySelector('.mk-album-view')" 3 }
 
   Step 'PDF 를 끌어 넣기 → 첫 쪽 썸네일' {
@@ -111,7 +121,7 @@ try {
 
   # ---------- 오후: 그리기 · 표 · 찾기 ----------
   Step '손 메모: 그려서 넣기 (Ctrl+Shift+D)' {
-    Click-El $n '.mk-doc' 0.5 0.95
+    Click-El $n '#editor' 0.5 0.9 # 보이는 글 칸 아래쪽 (긴 메모는 .mk-doc 아래 끝이 창 밖)
     [W]::Keys(0x11, 0x10, 0x44)
     if (-not (Wait-Js $n "Boolean(document.querySelector('.ink-sheet'))" 4)) { throw '그리기 화면이 열리지 않음' }
     $s = Get-Spot $n '.ink-scroll' 0.4 0.4
@@ -151,31 +161,30 @@ try {
   Step 'PDF로 저장 창: 열고 옮기고 닫기' {
     Open-Menu $n
     Click-El $n '#pdf-btn'
-    $p = Wait-Until 10 { Find-Page 'pdf.html' }
+    $p = Wait-Until 10 { Find-Page 'pdf\.html' }
     if (-not $p) { throw 'PDF로 저장 창이 뜨지 않음' }
     Start-Sleep 1
     $m = Test-WindowDrag $p '.options h1' 60 40
     Click-El $p '#cancel'
-    $m
+    # 취소하면 창이 닫혀야 한다 (예전: window.close() 를 받는 곳이 없어 흰 창이 남았다 — shim.js)
+    $closed = [bool](Wait-Until 5 { -not (Get-Pages | Where-Object { $_.url -match 'pdf\.html' }) })
+    @(($m[0] -and $closed), "$($m[1]) · 취소로 닫힘=$closed")
   }
-  Step '단축키 창: 열고 옮기고 닫기' {
+  Step '단축키 목록: 메뉴에서 열고 닫기' {
     Open-Menu $n
     if (-not (Test-Js $n "Boolean(document.getElementById('shortcuts-btn')?.offsetParent)")) { Click-El $n '#menu-more-btn' }
     Click-El $n '#shortcuts-btn'
-    $p = Wait-Until 10 { Find-Page 'shortcuts.html' }
-    if (-not $p) { throw '단축키 창이 뜨지 않음' }
-    Start-Sleep 1
-    $m = Test-WindowDrag $p '.head-text' 60 40 0.5 0.2
-    Click-El $p '#done'
-    $m
+    if (-not (Wait-Js $n "Boolean(document.querySelector('.shortcut-sheet[open]'))" 4)) { throw '단축키 목록이 뜨지 않음' }
+    Click-El $n '.shortcut-sheet[open] .dialog-x'
+    Wait-Js $n "!document.querySelector('.shortcut-sheet[open]')" 3
   }
   Step '메모 닫고 목록에서 찾아 다시 열기' {
     Click-El $n '#close-btn'
-    if (-not (Wait-Until 5 { -not (Find-Page 'note.html') })) { throw '메모 창이 닫히지 않음' }
+    if (-not (Wait-Until 5 { -not (Find-Page 'note\.html') })) { throw '메모 창이 닫히지 않음' }
     Click-El $list '#search'
     [W]::Type('장보기'); Start-Sleep 1
     Click-El $list '.card'
-    $script:Note = Wait-Until 10 { Find-Page 'note.html' }
+    $script:Note = Wait-Until 10 { Find-Page 'note\.html' }
     [bool]$script:Note
   }
   $n = $script:Note
@@ -186,7 +195,7 @@ try {
     Open-Menu $n
     Click-El $n '#delete-btn'
     if (Test-Js $n "Boolean(document.getElementById('confirm-ok')?.offsetParent)") { Click-El $n '#confirm-ok' }
-    Wait-Until 6 { -not (Find-Page 'note.html') }
+    Wait-Until 6 { -not (Find-Page 'note\.html') }
   }
 }
 catch { Add-Result '시나리오 멈춤' $false $_.Exception.Message }

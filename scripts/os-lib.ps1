@@ -49,11 +49,14 @@ public static class W {
     var t = new Thread(() => { Thread.Sleep(delayMs); Drag(x0, y0, x1, y1); }); t.IsBackground = true; t.Start(); return t;
   }
   public static void Click(int x, int y) { SetCursorPos(x, y); Thread.Sleep(80); mouse_event(LDOWN, 0, 0, 0, UIntPtr.Zero); Thread.Sleep(50); mouse_event(LUP, 0, 0, 0, UIntPtr.Zero); }
-  /// 키 하나 또는 조합 (Ctrl+Shift+D 면 0x11, 0x10, 0x44) — 차례로 누르고 거꾸로 뗀다
+  [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint mapType);
+  /// 키 하나 또는 조합 (Ctrl+Shift+D 면 0x11, 0x10, 0x44) — 차례로 누르고 거꾸로 뗀다.
+  ///   실제 키보드처럼 스캔 코드를 함께 (없으면 웹 화면의 event.code 가 비어 Ctrl+B 같은 단축키가 먹지 않았다) · Home/End/화살표/Delete 는 확장 키
   public static void Keys(params byte[] vks) {
-    foreach (var k in vks) { keybd_event(k, 0, 0, UIntPtr.Zero); Thread.Sleep(25); }
-    for (int i = vks.Length - 1; i >= 0; i--) { keybd_event(vks[i], 0, 2, UIntPtr.Zero); Thread.Sleep(25); }
+    foreach (var k in vks) { keybd_event(k, (byte)MapVirtualKey(k, 0), Ext(k), UIntPtr.Zero); Thread.Sleep(25); }
+    for (int i = vks.Length - 1; i >= 0; i--) { keybd_event(vks[i], (byte)MapVirtualKey(vks[i], 0), Ext(vks[i]) | 2, UIntPtr.Zero); Thread.Sleep(25); }
   }
+  static uint Ext(byte vk) { return (vk >= 0x21 && vk <= 0x28) || vk == 0x2D || vk == 0x2E ? 1u : 0u; }
   /// 글자 그대로 치기 (한글도 — 입력기를 거치지 않는 유니코드 입력). \n 은 Enter
   public static void Type(string text) {
     foreach (char c in text) {
@@ -161,11 +164,24 @@ function Invoke-FileDrop($path, $x, $y) {
 }
 
 # ---------- 화면에 묻기 (원격 디버깅) ----------
-function Get-Pages { try { @(Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json/list" -TimeoutSec 3 | Where-Object { $_.type -eq 'page' }) } catch { @() } }
+# Windows PowerShell 5.1 의 Invoke-RestMethod 는 JSON 배열을 한 덩어리로 넘긴다 — 변수에 받아 하나씩 풀어야 화면마다 따로
+function Get-Pages {
+  try { $all = Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json/list" -TimeoutSec 3 } catch { return @() }
+  @($all | ForEach-Object { $_ } | Where-Object { $_.type -eq 'page' })
+}
 function Invoke-Js($page, [string]$expr) {
-  $ws = New-Object System.Net.WebSockets.ClientWebSocket
   $none = [Threading.CancellationToken]::None
-  if (-not $ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $none).Wait(5000)) { throw '화면에 연결하지 못함' }
+  # 연결이 가끔 실패한다 (켜지는 동안 화면이 다시 만들어지면 주소가 바뀜) — 같은 화면을 다시 찾아 몇 번 다시 붙는다
+  for ($try = 1; ; $try++) {
+    $ws = New-Object System.Net.WebSockets.ClientWebSocket
+    $ok = try { $ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $none).Wait(5000) } catch { $false }
+    if ($ok) { break }
+    $ws.Dispose()
+    if ($try -ge 4) { throw '화면에 연결하지 못함' }
+    Start-Sleep -Milliseconds 600
+    $fresh = Get-Pages | Where-Object { $_.id -eq $page.id -or $_.url -eq $page.url } | Select-Object -First 1
+    if ($fresh) { $page.webSocketDebuggerUrl = $fresh.webSocketDebuggerUrl; $page.id = $fresh.id }
+  }
   try {
     $msg = @{ id = 1; method = 'Runtime.evaluate'; params = @{ expression = $expr; returnByValue = $true; awaitPromise = $true } } | ConvertTo-Json -Compress -Depth 6
     $bytes = [Text.Encoding]::UTF8.GetBytes($msg)
@@ -186,20 +202,33 @@ function Invoke-Js($page, [string]$expr) {
     }
   } finally { $ws.Dispose() }
 }
-# 보이는 화면 하나 (url 에 그 이름) — 숨겨 둔 예비 창은 빼고
-function Find-Page($urlPart, $exclude = @()) {
+# 보이는 화면 하나 (url 이 그 정규식에 맞는 것) — 숨겨 둔 예비 창은 빼고. 목록 창은 index.html 이 아니라 http://tauri.localhost/ 라 $ListUrl
+$script:ListUrl = 'localhost/(index\.html)?([?#].*)?$'
+function Find-Page($urlPattern, $exclude = @()) {
   foreach ($p in Get-Pages) {
-    if ($p.url -notlike "*$urlPart*" -or $exclude -contains $p.id) { continue }
+    if ($p.url -notmatch $urlPattern -or $exclude -contains $p.id) { continue }
     try { if ((Invoke-Js $p 'document.visibilityState') -eq 'visible') { return $p } } catch {}
   }
   return $null
 }
+# 그 화면의 창을 맨 앞으로 — 사람처럼 창 위쪽의 빈 막대(창 끌기 영역)를 한 번 누른다. 이미 초점이 있으면 그대로
+#   (Alt 를 눌러 Windows 의 앞으로 가져오기 제한을 푸는 방법은 앞에 있던 창이 Alt 를 받아 메뉴 모드에 들어가 화면 연결까지 막혔다)
+function Show-Page($page) {
+  if (Test-Js $page 'document.hasFocus()') { return }
+  $js = "(() => { const at = (x, y) => { for (let e = document.elementFromPoint(x, y); e instanceof Element; e = e.parentElement) { const s = getComputedStyle(e); const r = s.webkitAppRegion || s.appRegion; if (r === 'no-drag') return false; if (r === 'drag') return true; } return false; }; for (let y = 4; y < Math.min(60, innerHeight); y += 8) for (const f of [0.5, 0.35, 0.65, 0.2, 0.8]) { const x = innerWidth * f; if (at(x, y)) { const d = devicePixelRatio; return { x: Math.round((screenX + x) * d), y: Math.round((screenY + y) * d) }; } } return null; })()"
+  $s = Invoke-Js $page $js
+  if (-not $s) { return }
+  [W]::Click($s.x, $s.y)
+  [void](Wait-Until 2 { Test-Js $page 'document.hasFocus()' })
+}
 # 요소의 화면 자리 (실제 픽셀) — 없거나 안 보이면 $null. part: 요소 안 어디 (0..1, 기본 가운데)
+#   창 밖으로 밀려 있으면 먼저 보이게 스크롤하고, 그래도 창 밖이면 $null (창 밖을 누르면 뒤의 다른 창이 눌린다)
 function Get-Spot($page, [string]$sel, $fx = 0.5, $fy = 0.5) {
-  $js = "(() => { const e = document.querySelector($(ConvertTo-Json $sel)); if (!e) return null; const r = e.getBoundingClientRect(); if (!r.width || !r.height) return null; const d = devicePixelRatio; return { x: Math.round((screenX + r.left + r.width * $fx) * d), y: Math.round((screenY + r.top + r.height * $fy) * d) }; })()"
+  $js = "(() => { const e = document.querySelector($(ConvertTo-Json $sel)); if (!e) return null; let r = e.getBoundingClientRect(); if (!r.width || !r.height) return null; const px = r.left + r.width * $fx, py = r.top + r.height * $fy; if (px < 0 || py < 0 || px > innerWidth || py > innerHeight) { e.scrollIntoView({ block: 'center', inline: 'center' }); r = e.getBoundingClientRect(); } const x = r.left + r.width * $fx, y = r.top + r.height * $fy; if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return null; const d = devicePixelRatio; return { x: Math.round((screenX + x) * d), y: Math.round((screenY + y) * d) }; })()"
   Invoke-Js $page $js
 }
 function Click-El($page, [string]$sel, $fx = 0.5, $fy = 0.5) {
+  Show-Page $page
   $s = Get-Spot $page $sel $fx $fy
   if (-not $s) { throw "찾지 못함: $sel" }
   [W]::Click($s.x, $s.y); Start-Sleep -Milliseconds 350
@@ -209,6 +238,7 @@ function Test-Js($page, [string]$expr) { [bool](Invoke-Js $page "Boolean($expr)"
 function Get-WinPos($page) { Invoke-Js $page '({ x: Math.round(screenX * devicePixelRatio), y: Math.round(screenY * devicePixelRatio) })' }
 # 그 요소를 잡고 끌어 창이 그만큼 옮겨지는가 → @(맞음, "옮긴 만큼")
 function Test-WindowDrag($page, [string]$sel, $dx = 60, $dy = 40, $fx = 0.5, $fy = 0.5) {
+  Show-Page $page
   $s = Get-Spot $page $sel $fx $fy
   if (-not $s) { return @($false, "잡을 곳 없음: $sel") }
   $a = Get-WinPos $page
