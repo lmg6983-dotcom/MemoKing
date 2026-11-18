@@ -96,9 +96,10 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("메모킹을 켜지 못했어요")
         .run(|_, e| {
-            // AI 엔진은 따로 도는 프로세스라 메모킹을 꺼도 남는다
+            // AI 엔진 · 팝업 알림 도우미는 따로 도는 프로세스라 메모킹을 꺼도 남는다
             if let tauri::RunEvent::Exit = e {
                 ai::stop();
+                history::stop_helpers();
                 windows::stop();
             }
         });
