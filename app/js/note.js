@@ -1820,8 +1820,13 @@ function showTasks(tasks, opts) {
 // 닫을 때: 태그 · 일정을 저절로 (설정 › 태그 자동 추가 · 일정 자동 등록)
 //   글 모델을 넣은 PC: AI가 고른 태그를 사용자 태그와 합쳐 3개까지 — 창을 닫은 뒤 메인이 단다(aiTagAfterClose, 메모마다 한 번).
 //   아니면 태그 없는 메모에 확실한 추천 태그 (휴대폰과 같음)
+// 이 창에서 글을 고쳤나 (열 때 모습과 다른가) — 보기만 하고 닫으면 닫을 때 할 일(태그 달기)을 건너뛴다
+let openedBody = null;
+const editedHere = () => Boolean(editor) && openedBody !== null && editor.getMarkdown() !== openedBody;
+
 async function autoTagOnClose() {
   if (!editor || tagDismissed || memo?.locked) return false; // 잠긴 메모의 태그는 목록에 보이지 않으므로 달지 않는다
+  if (!editedHere()) return false; // 보기만 한 메모: 설정 · AI 상태 · 태그 추천을 묻지 않는다 (닫을 때 수백 ms — 속도 기록), 열어 본 것만으로 태그가 붙어 저장되지도 않게
   try {
     const body = editor.getMarkdown();
     if (isBlankBody(body)) return false;
@@ -2185,7 +2190,7 @@ if (!memo) {
     api.perf?.log(`메모 열기 (${perf.how} · 스냅샷): 스냅샷 보임 ${perfMs(perf.snap)}ms · 편집기 완성 ${perfMs(perf.editor)}ms (글 ${memo.body.length}자)`)?.catch(() => {});
   }
   // 편집기가 불러온 뒤 정리한 마크다운을 기준으로 삼는다 (열기만 해도 저장되는 일 방지).
-  current = saved = editor.getMarkdown();
+  current = saved = openedBody = editor.getMarkdown();
   // 목록 안 그림을 열며 목록 뒤로 옮겼으면 고친 대로 저장
   if (editor.listsFixed()) {
     saved = '';
