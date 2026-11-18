@@ -1704,7 +1704,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       return { kind: 'image', src: thumbSrc, alt: baseName(name), title: pdfThumbTitle(pdfSrc) };
     } catch (err) {
       console.warn('문서를 PDF로 바꾸지 못했어요', name, err);
-      onNotice?.(`${name}은 PDF로 바꾸지 못해 파일로 넣었어요`, true);
+      // 여는 비밀번호가 걸린 PDF(건강보험 · 은행 서류 등)는 첫 쪽을 그릴 수 없다 — 그렇다고 알린다 (pdf-engine.js openPdf)
+      onNotice?.(/암호/.test(err?.message ?? '')
+        ? `${name}은 비밀번호가 걸린 PDF라 미리보기 없이 파일로 넣었어요`
+        : `${name}은 PDF로 바꾸지 못해 파일로 넣었어요`, true);
       return null;
     }
   }
@@ -3261,11 +3264,12 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     dropFiles: (files, x, y) => (readOnly ? Promise.resolve() : insertFilesAt(dropPos(x, y), files)),
     /**
      * 놓으면 들어갈 곳 { rect, replace, above } — insertBlocks 와 같게: 빈 줄이면 그 줄을 바꾸고(replace), 글 줄이면 그 줄 아래,
-     * 줄과 줄 사이면 앞 줄 아래 (맨 앞이면 첫 줄 위 — above). 놓을 수 없으면 null
+     * 줄과 줄 사이면 앞 줄 아래 (맨 앞이면 첫 줄 위 — above). doc: 글 칸 전체 (표시 폭은 이것에 맞춘다). 놓을 수 없으면 null
      */
     dropTarget: (x, y) => {
       if (readOnly) return null;
       const v = view();
+      const doc = v.dom.getBoundingClientRect();
       const $p = v.state.doc.resolve(dropPos(x, y));
       const rectOf = (pos) => {
         const dom = pos >= 0 ? v.nodeDOM(pos) : null;
@@ -3273,12 +3277,12 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       };
       if ($p.depth > 0) {
         const rect = rectOf($p.before());
-        if (rect) return { rect, replace: $p.parent.isTextblock && $p.parent.content.size === 0 };
+        if (rect) return { rect, doc, replace: $p.parent.isTextblock && $p.parent.content.size === 0 };
       }
       const before = $p.nodeBefore ? rectOf($p.pos - $p.nodeBefore.nodeSize) : null;
-      if (before) return { rect: before, replace: false };
+      if (before) return { rect: before, doc, replace: false };
       const after = $p.nodeAfter ? rectOf($p.pos) : null;
-      return { rect: after ?? v.dom.getBoundingClientRect(), replace: false, above: Boolean(after) };
+      return { rect: after ?? doc, doc, replace: false, above: Boolean(after) };
     },
     focus: () => view().focus(),
     /** 서식 없이 붙여넣기 (오른쪽 클릭 메뉴 › 서식 없이 붙여넣기 — 클립보드의 글자) → 편집기에 넣었는가 */

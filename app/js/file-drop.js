@@ -38,8 +38,9 @@ export function setupFileDrop(box, getEditor, onError) {
     zone.hidden = false;
     slot.hidden = false;
     const r = target.rect;
-    const left = Math.max(r.left, b.left + 8) - b.left - 4;
-    const width = Math.min(r.right, b.right - 8) - b.left + 4 - left;
+    // 폭은 줄마다 다르지 않게 글 칸 전체에 (사진 · 칩 · 목록 줄 폭을 따르면 들쭉날쭉해 창과 안 맞아 보였다) — 둘레 점선 틀 안쪽으로
+    const left = Math.max(target.doc.left - 6, b.left + 8) - b.left;
+    const width = Math.min(target.doc.right + 6, b.right - 8) - b.left - left;
     // 빈 줄은 그 줄 칸이 바뀌고, 그 밖은 줄 사이 얇은 막대 — 줄이 화면 밖이면 보이는 끝에 붙인다
     const top = target.replace ? r.top : (target.above ? r.top : r.bottom) - 3;
     const height = target.replace ? Math.max(r.height, 24) : 6;
