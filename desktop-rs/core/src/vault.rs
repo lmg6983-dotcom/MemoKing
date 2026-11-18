@@ -366,10 +366,15 @@ impl Vault {
 
     /// 목록: 고정한 메모 먼저, 그다음 최근 고친 순
     pub fn list(&self) -> Vec<Value> {
+        self.sorted().into_iter().map(|e| self.summary(e)).collect()
+    }
+
+    fn sorted(&self) -> Vec<&Entry> {
         let mut list: Vec<&Entry> = self.entries.values().filter(|e| e.file.is_some()).collect();
         let t = |e: &Entry| e.meta.updated.as_deref().and_then(time::parse_js_date).map_or(0, |d| d.timestamp_millis());
-        list.sort_by(|a, b| b.meta.pinned.cmp(&a.meta.pinned).then(t(b).cmp(&t(a))));
-        list.into_iter().map(|e| self.summary(e)).collect()
+        // 날짜 읽기는 메모마다 한 번 (비교마다 읽으면 2,000개에 4만 번)
+        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(t(e))));
+        list
     }
 
     pub fn entry(&self, id: &str) -> Option<&Entry> {
@@ -989,13 +994,14 @@ impl Vault {
     /// 찾기 — 제목 · 본문 글(서식 뺀 줄)에서
     pub fn search(&self, query: &str, exclude: Option<&str>) -> Vec<Value> {
         let matches = crate::search::matcher(query);
-        let texts: HashMap<&str, std::sync::Arc<Parts>> = self.entries.values().filter(|e| e.file.is_some()).map(|e| (e.id.as_str(), self.parts(e))).collect();
-        self.list()
+        // 맞는 메모만 카드로 만든다 (글자를 칠 때마다 2,000개 카드를 다 만들지 않게)
+        self.sorted()
             .into_iter()
-            .filter(|m| {
-                let id = m["id"].as_str().unwrap_or_default();
-                Some(id) != exclude && matches(&[m["title"].as_str().unwrap_or_default(), texts.get(id).map_or("", |p| p.text.as_str())])
+            .filter(|e| {
+                let p = self.parts(e);
+                Some(e.id.as_str()) != exclude && matches(&[p.title.as_str(), p.text.as_str()])
             })
+            .map(|e| self.summary(e))
             .collect()
     }
 
