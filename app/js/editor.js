@@ -48,7 +48,7 @@ import { createTidy } from './tidy.js';
 import { createDateRemind, refreshDateRemind } from './date-remind.js';
 import { transcriptLines, voiceCardMarkdown } from './core/voice-card.js';
 import { burstAt } from './confetti-burst.js';
-import { haptic } from './dom.js';
+import { haptic, reduceMotion } from './dom.js';
 import { createFindPlugin, findController } from './find-replace.js';
 import { mathPlugins, insertMathBlock } from './math.js';
 import { fileChipGuard } from './file-chip-guard.js';
@@ -1723,6 +1723,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const id = String(++pendingSeq);
     const send = (meta) => sendPending(id, meta);
     send({ set: { pos, name: it.name, pdf: extOf(it.name) === 'pdf', done: 0, total: 0 } });
+    // 칩을 넣으며 커서 줄로 스크롤한 뒤에 생긴 칸(종이 한 장 높이)이라, 작은 메모 창에서는 창 아래로 밀려 안 보였다 — 보이게
+    requestAnimationFrame(() => {
+      const box = [...view().dom.querySelectorAll('.mk-doc-pending')].pop();
+      box?.closest('p')?.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+    });
     const thumb = await documentPdfItem(it, (done, total) => send({ set: { done, total } }));
     const v = view();
     if (v.isDestroyed) return;
