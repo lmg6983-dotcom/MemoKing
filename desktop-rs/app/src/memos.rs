@@ -138,6 +138,19 @@ fn with_open_flag(app: &AppHandle, list: Vec<Value>) -> Value {
     )
 }
 
+/// 곧 push_list: 창을 열고 닫고 탭을 바꿀 때 몇 번씩 불러도 목록은 한 번만 새로, 부른 스레드(메인 스레드일 수 있다)를 붙잡지 않고 (Electron pushList 처럼 80ms 모아서)
+pub fn push_list_soon(app: &AppHandle) {
+    static GEN: AtomicU64 = AtomicU64::new(0);
+    let n = GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(80));
+        if GEN.load(Ordering::Relaxed) == n {
+            push_list(&app);
+        }
+    });
+}
+
 // 폴더가 바뀌었다 — 열린 메모 창의 폴더 표시도 새로
 fn refresh_note_files(app: &AppHandle) {
     let labels: Vec<(String, String)> = state(app).note_labels.lock().unwrap().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -345,7 +358,7 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
     if let Some((_, assign)) = spare {
         let _ = assign.send(json!({ "id": id }));
     }
-    push_list(app);
+    push_list_soon(app);
     schedule_spare(app, 3000);
     Ok(win)
 }
@@ -357,7 +370,7 @@ fn closed_note(app: &AppHandle, id: &str) {
         v.close_lock(id); // 닫은 잠긴 메모의 열쇠를 남기지 않는다
         v.finalize(id).map_err(|e| e.to_string())
     });
-    push_list(app);
+    push_list_soon(app);
 }
 
 fn create_memo(app: &AppHandle, opts: &Value) -> Result<Value, String> {
@@ -755,7 +768,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
                 }
                 Ok(())
             });
-            push_list(app);
+            push_list_soon(app);
             r.map(|()| true.into())
         }
         // 잠그기 · 열기: 열쇠 만들기(PBKDF2)는 일부러 느리다 — 메모 폴더를 붙잡지 않고 먼저 만든다

@@ -102,7 +102,8 @@ fn set_open(app: &AppHandle, id: &str, open: bool) {
     if open {
         list.push(id.into());
     }
-    st.set_setting("openNotes", list.into());
+    st.settings.lock().unwrap().insert("openNotes".into(), list.into());
+    save_soon(app); // 메모 창을 닫을 때(메인 스레드) 설정 파일 쓰기를 기다리지 않게
 }
 
 /// 메모 창이 열렸다 (memos::open_note): 열린 메모로 기억하고, 옮기면 자리를 기억한다

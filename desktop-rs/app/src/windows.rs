@@ -572,7 +572,7 @@ pub fn show_tab(app: &AppHandle, id: &str, at: Option<Rect>, focus: bool) -> boo
         create_hidden(app, id, b, move |app| reveal_tab(app, &id2, b, focus)).is_some()
     };
     push_stack_to(app, &s.memos);
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
     prewarm(app, id);
     ok
 }
@@ -683,7 +683,7 @@ fn stack_into(app: &AppHandle, target: &str, moving: &str) -> bool {
         }
     }
     push_stack_to(app, &s.memos);
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
     true
 }
 
@@ -750,7 +750,7 @@ pub fn remove_from_stack(app: &AppHandle, id: &str, mode: &str) -> bool {
         }
         _ => {}
     }
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
     true
 }
 
@@ -829,7 +829,7 @@ fn tear_end(app: &AppHandle, p: Option<(f64, f64)>) -> bool {
         remember_bounds(app, &[t.id], b);
     }
     let _ = w.set_focus();
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
     true
 }
 
@@ -998,7 +998,7 @@ fn set_note_layer(app: &AppHandle, id: &str, layer: Option<&str>, note: &str) ->
         }
         emit(app, w.label(), "memo:layer", state);
     }
-    crate::memos::push_list(app); // 목록 카드의 바탕화면 표시
+    crate::memos::push_list_soon(app); // 목록 카드의 바탕화면 표시
     layer_state(app, id)
 }
 
@@ -1172,7 +1172,7 @@ fn pin_failed(app: &AppHandle) {
         apply_layer(app, &id, &w, false);
         emit(app, &label, "memo:layer", layer_state(app, &id));
     }
-    crate::memos::push_list(app);
+    crate::memos::push_list_soon(app);
 }
 
 fn reassert_top(w: &WebviewWindow) {
