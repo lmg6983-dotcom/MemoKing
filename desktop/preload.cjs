@@ -118,6 +118,7 @@ contextBridge.exposeInMainWorld('memoking', {
     setAutoEvents: invoke('app:set-auto-events'),
     setAiPhone: invoke('app:set-ai-phone'),
     setLinkPreviews: invoke('app:set-link-previews'),
+    setPerf: invoke('app:set-perf'), // 빠르게 열기 기능 켜고 끄기 (이름, 켜짐) → 켜짐 — PC Rust 판
     setTrashDays: invoke('app:set-trash-days'),
     // 전역 단축키 바꾸기: set(이름, 단축키|null=기본값) · pause(true) 는 새 키를 누르는 동안 잠시 놓기
     setShortcut: invoke('shortcuts:set'),

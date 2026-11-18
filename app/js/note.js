@@ -283,6 +283,7 @@ const bodyHash = (text) => {
 };
 function saveSnapshot() {
   try {
+    if (memo?.snapshots === false) return void localStorage.removeItem(snapKey(id)); // 설정 › 빠르게 열기에서 껐다
     // 잠긴 메모: 남기지 않고, 잠그기 전에 남긴 것도 지운다 (잠근 글이 평문으로 남지 않게)
     if (memo?.locked) return void localStorage.removeItem(snapKey(id));
     const html = editor ? el.editorRoot.querySelector('.milkdown:not(.mk-snapshot)')?.outerHTML : null;
@@ -300,7 +301,7 @@ function saveSnapshot() {
 function showSnapshot(body) {
   try {
     // 잠긴 메모(다른 기기에서 잠갔을 수도): 보이지 않고 남은 것도 지운다
-    if (memo?.locked) {
+    if (memo?.locked || memo?.snapshots === false) {
       localStorage.removeItem(snapKey(id));
       return false;
     }

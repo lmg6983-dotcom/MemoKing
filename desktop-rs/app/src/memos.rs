@@ -175,6 +175,7 @@ fn app_settings(app: &AppHandle) -> Value {
         "shortcuts": { "quickMemo": quick, "magic": status("magic"), "list": status("list") },
         "fitTables": not_false("fitTables"),
         "linkPreviews": not_false("linkPreviews"),
+        "perf": PERF_FLAGS.iter().map(|&k| (k.to_string(), Value::from(not_false(k)))).collect::<serde_json::Map<_, _>>(),
         "magicPolish": not_false("magicPolish"),
         // 나눠 쓰지 않으면 늘 Life (Electron viewMode)
         "mode": if s("workLife") == true && s("mode") == "work" { "work" } else { "life" },
@@ -229,8 +230,16 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
 
 /// 메모 창은 투명 창으로 만든다 — WebView2 가 창 크기보다 한 프레임 늦게 그려 크기를 바꿀 때 끈적이고 가장자리에 검은 · 흰 띠가 비치던 것
 ///   (tauri-apps/tauri#13270: 투명 창이면 부드럽다). 화면(note.css)이 바탕을 칠하고, 창은 다 그린 뒤에 보인다 (예비 창 · 숨겨 만든 창)
-// shortcut: 그림자 · 테두리가 달라 보이면 false 로 되돌린다
-const NOTE_TRANSPARENT: bool = true;
+//   설정 › 빠르게 열기에서 끌 수 있다 (새로 만드는 창부터)
+fn note_transparent(app: &AppHandle) -> bool {
+    perf_on(app, "perfTransparent")
+}
+
+/// 새 성능 기능 스위치 (설정 › 빠르게 열기) — 어떤 PC 에서 문제가 생기면 새 버전 없이 끈다. 없으면 켜짐
+pub const PERF_FLAGS: [&str; 4] = ["perfPreload", "perfDiscard", "perfTransparent", "perfSnapshot"];
+pub fn perf_on(app: &AppHandle, name: &str) -> bool {
+    state(app).setting(name) != false
+}
 
 /// 미리 불러 둔 메모 창 (Electron makeSpare): 편집기를 다 읽어 두고 열 메모를 기다린다
 struct Spare {
@@ -276,7 +285,7 @@ fn make_spare(app: &AppHandle) {
     let forget = move |label: &str| {
         SPARE.lock().unwrap().retain(|s| s.label != label); // 기다리던 win:spare 는 null 을 받고 창을 닫는다
     };
-    match crate::window(app, &label, "note.html?spare=1").inner_size(340.0, 380.0).min_inner_size(240.0, 200.0).visible(false).transparent(NOTE_TRANSPARENT).build() {
+    match crate::window(app, &label, "note.html?spare=1").inner_size(340.0, 380.0).min_inner_size(240.0, 200.0).visible(false).transparent(note_transparent(app)).build() {
         Ok(w) => {
             crate::windows::memory_low(&w, true); // 기다리는 동안은 덜 (메모를 건네받아 포커스를 받으면 보통)
             let l = label.clone();
@@ -347,6 +356,7 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
         return Ok(w);
     }
     let started = std::time::Instant::now(); // 속도 기록: 창 만들기 (예비 창이면 거의 0)
+    let transparent = note_transparent(app);
     let title = with_vault(app, |v| Ok(v.get(id).and_then(|m| m["title"].as_str().map(str::to_string)).unwrap_or_default()))?;
     let on_top = st.setting("onTop")[id] == true;
     let spare = if show || ready.is_some() { take_spare(app) } else { None };
@@ -367,8 +377,8 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
                 .title(title)
                 .inner_size(340.0, 380.0)
                 .min_inner_size(240.0, 200.0)
-                .transparent(NOTE_TRANSPARENT)
-                .visible(show && !NOTE_TRANSPARENT) // 투명 창은 다 그린 뒤에 보인다 (아래 ready) — 그 전에는 뒤가 비친다
+                .transparent(transparent)
+                .visible(show && !transparent) // 투명 창은 다 그린 뒤에 보인다 (아래 ready) — 그 전에는 뒤가 비친다
                 .always_on_top(on_top);
             let b = match bounds {
                 Some([x, y, w, h]) => b.position(x, y).inner_size(w, h),
@@ -391,7 +401,7 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
     crate::os::track_note(app, id, &win);
     crate::windows::track(app, id, &win);
     // 예비 창은 이미 한 번 그린 창이라 숨겨 두었다가 메모를 다 그리면 보인다. 메모를 건네기 전에 걸어 둔다 (그리기가 먼저 끝나지 않게)
-    let ready = if show && (spare.is_some() || NOTE_TRANSPARENT) {
+    let ready = if show && (spare.is_some() || transparent) {
         let id = id.to_string();
         Some(Box::new(move |app: &AppHandle| {
             if let Some(w) = app.get_webview_window(&label) {
@@ -764,7 +774,7 @@ const PRELOAD_KEEP: Duration = Duration::from_secs(4);
 /// 미리 그려 두기만 한 창 — 열면(open_note) 빠진다. 남아 있으면 PRELOAD_KEEP 뒤에 거둔다
 static PRELOADED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 fn preload_note(app: &AppHandle, id: &str) {
-    if id.is_empty() || state(app).note_labels.lock().unwrap().contains_key(id) || crate::windows::in_stack(app, id) {
+    if !perf_on(app, "perfPreload") || id.is_empty() || state(app).note_labels.lock().unwrap().contains_key(id) || crate::windows::in_stack(app, id) {
         return;
     }
     let ok = state(app).vault.lock().unwrap().as_ref().and_then(|v| v.entry(id).map(|e| !e.body.trim().is_empty() && !memoking_core::body::is_locked_body(&e.body))).unwrap_or(false);
@@ -824,6 +834,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
                 o.insert("onTop".into(), layer["top"].clone());
                 o.insert("stack".into(), stack);
                 m["linkPreviews"] = (st.setting("linkPreviews") != false).into();
+                m["snapshots"] = perf_on(app, "perfSnapshot").into(); // 화면 스냅샷 (설정 › 빠르게 열기)
                 m["workLife"] = (st.setting("workLife") == true).into();
                 Ok(m)
             })

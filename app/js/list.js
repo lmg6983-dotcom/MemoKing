@@ -1140,6 +1140,8 @@ async function loadSettings() {
   $('fit-tables').checked = s.fitTables !== false;
   $('magic-polish').checked = s.magicPolish !== false;
   $('link-previews').checked = s.linkPreviews !== false;
+  $('perf-group').hidden = !s.perf; // PC Rust 판만 보낸다
+  for (const box of document.querySelectorAll('.perf-flag')) box.checked = s.perf?.[box.dataset.perf] !== false;
   showQuickMemo(s.quickMemo);
   showShortcuts(s.shortcuts);
   showMcp(s.mcp);
@@ -1398,6 +1400,11 @@ $('fit-tables').addEventListener('change', async (e) => {
 $('link-previews').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setLinkPreviews(e.target.checked);
 });
+for (const box of document.querySelectorAll('.perf-flag')) {
+  box.addEventListener('change', async (e) => {
+    e.target.checked = await api.settings.setPerf(e.target.dataset.perf, e.target.checked);
+  });
+}
 $('magic-polish').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setMagicPolish(e.target.checked);
 });

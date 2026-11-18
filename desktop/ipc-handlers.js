@@ -559,6 +559,7 @@ export function registerIpc(ctx) {
   ipcMain.handle('mode:hours', (_e, hours) => setWorkHours(hours));
   ipcMain.handle('mode:work-life', (_e, on) => setWorkLife(on)); // 설정 › Work / Life 나누기
   // 링크 미리보기 카드 켜고 끄기 — 열린 메모 · 위젯에도 바로
+  ipcMain.handle('app:set-perf', (_e, _name, on) => Boolean(on)); // PC Rust 판만 (화면에서 숨긴다)
   ipcMain.handle('app:set-link-previews', (_e, on) => {
     settings.linkPreviews = Boolean(on);
     saveSettings();

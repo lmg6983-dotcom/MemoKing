@@ -49,6 +49,14 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
     let on = truthy(args.first());
     Some(match channel {
         "app:set-fit-tables" => Ok(set_flag(&st, "fitTables", on)),
+        // 빠르게 열기 · 메모리 기능 끄기 (문제가 있는 PC 에서 새 버전 없이) — 이름은 정해 둔 것만
+        "app:set-perf" => {
+            let name = args.first().and_then(Value::as_str).unwrap_or_default();
+            if !crate::memos::PERF_FLAGS.contains(&name) {
+                return Some(Err("모르는 설정이에요".into()));
+            }
+            Ok(set_flag(&st, name, truthy(args.get(1))))
+        }
         "app:set-magic-polish" => Ok(set_flag(&st, "magicPolish", on)),
         "app:set-link-previews" => {
             // 열린 메모 · 위젯에도 바로

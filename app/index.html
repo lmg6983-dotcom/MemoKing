@@ -265,6 +265,14 @@
         <input type="checkbox" id="hold-tune" class="switch" role="switch" checked>
         <span>내 손에 맞추기 <small title="메모 안에서 글자를 고르려다 줄이 옮겨지면, 줄을 옮기려고 꾹 누르는 시간을 조금씩 늘려요. 이 PC에만 저장해요">꾹 눌러 줄 옮기기를 손에 맞춰요 <button type="button" class="link-btn inline-link" id="hold-reset" title="꾹 누르는 시간을 처음 값으로 되돌려요">처음 값으로</button></small></span>
       </label>
+      <!-- 빠르게 열기 · 메모리 기능 — 어떤 PC 에서 문제가 생기면 끈다 (PC Rust 판만, list.js) -->
+      <div id="perf-group" hidden>
+        <p class="label sub">빠르게 열기 <small>이상하면 하나씩 꺼 보세요</small></p>
+        <label class="setting-row"><input type="checkbox" class="switch perf-flag" data-perf="perfPreload" role="switch" checked><span>미리 열기 <small>목록 카드에 마우스를 올려 두면 미리 그려 둬요</small></span></label>
+        <label class="setting-row"><input type="checkbox" class="switch perf-flag" data-perf="perfSnapshot" role="switch" checked><span>지난 모습 먼저 보이기 <small>메모를 열 때 지난번 화면을 먼저 보여요</small></span></label>
+        <label class="setting-row"><input type="checkbox" class="switch perf-flag" data-perf="perfDiscard" role="switch" checked><span>오래 안 본 탭 쉬게 하기 <small>10분 넘게 안 본 탭의 메모리를 비워요</small></span></label>
+        <label class="setting-row"><input type="checkbox" class="switch perf-flag" data-perf="perfTransparent" role="switch" checked><span>부드러운 창 크기 조절 <small>끄면 다음에 여는 창부터 예전 방식 (창 모양이 이상할 때)</small></span></label>
+      </div>
       <div class="setting-row">
         <span>넣을 때 묻기 <small id="choices-note"></small></span>
         <button type="button" class="btn small" id="choices-reset" hidden>다시 묻기</button>
