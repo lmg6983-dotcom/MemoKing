@@ -224,27 +224,11 @@
       </div>
       <div id="ai-auto-group" hidden>
         <p class="label sub">AI가 자동으로 하는 일</p>
-        <label class="setting-row">
-          <input type="checkbox" id="auto-tags-ai" class="switch" role="switch" checked>
-          <span>AI 태그 <small id="ai-tags-note" role="status">메모마다 한 번, 태그를 합쳐 3개까지 달아요</small></span>
-        </label>
-        <div class="dialog-actions left sub-actions" id="ai-tags-actions">
-          <button type="button" class="link-btn" id="ai-tags-all">예전 메모에도 달기</button>
-          <button type="button" class="link-btn danger" id="ai-tags-clear">AI 태그 모두 지우기</button>
-        </div>
-        <label class="setting-row">
-          <input type="checkbox" id="auto-events" class="switch" role="switch" checked>
-          <span>일정 자동 등록 <small>새로 쓴 줄의 약속 · 마감을 일정 탭에 넣어요</small></span>
-        </label>
         <label class="setting-row" id="magic-polish-row">
           <input type="checkbox" id="magic-polish" class="switch" role="switch" checked>
           <span>MagicKey 메모 다듬기 <small>맞춤법을 고치고, 첫 줄이 길면 짧은 제목을 붙여요</small></span>
         </label>
-        <label class="setting-row">
-          <input type="checkbox" id="ai-phone" class="switch" role="switch">
-          <span>휴대폰 메모도 이 PC에서 <small title="휴대폰에서 쓴 메모가 들어오면 1분 뒤 달아요. PC가 여러 대면 한 대에서만 켜 주세요">휴대폰 메모에도 태그 · 일정을 달아요 (PC 한 대에서만)</small></span>
-        </label>
-        <p class="set-note">메모를 닫을 때 · MagicKey 로 저장할 때 뒤에서 해요. 알림을 누르면 메모가 열리고 거기서 되돌릴 수 있어요.</p>
+        <p class="set-note">MagicKey 로 저장할 때 뒤에서 해요.</p>
       </div>
       <p class="set-note">기본 모델: 카카오 카나나2 · Powered by Kanana · <a href="https://huggingface.co/kakaocorp/kanana-2-3b-instruct/blob/main/LICENSE" target="_blank" rel="noopener">라이선스 보기</a></p>
     </section>
@@ -276,10 +260,6 @@
       <label class="setting-row">
         <input type="checkbox" id="link-previews" class="switch" role="switch" checked>
         <span>링크 미리보기 <small title="끄면 링크 한 줄로만 보이고 사이트에 미리보기를 받으러 가지 않아요">링크를 제목 · 사진 카드로 보여요</small></span>
-      </label>
-      <label class="setting-row">
-        <input type="checkbox" id="auto-tags" class="switch" role="switch" checked>
-        <span>태그 자동 추가 <small title="합쳐 3개까지. 인사 · 짧은 대답처럼 주제가 없는 메모에는 달지 않아요">메모를 닫을 때 내용에 맞는 태그를 달아요</small></span>
       </label>
       <label class="setting-row">
         <input type="checkbox" id="hold-tune" class="switch" role="switch" checked>

@@ -49,9 +49,6 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
     let on = truthy(args.first());
     Some(match channel {
         "app:set-fit-tables" => Ok(set_flag(&st, "fitTables", on)),
-        "app:set-auto-tags" => Ok(set_flag(&st, "autoTags", on)),
-        "app:set-auto-events" => Ok(set_flag(&st, "autoEvents", on)),
-        "app:set-ai-phone" => Ok(set_flag(&st, "aiPhone", on)),
         "app:set-magic-polish" => Ok(set_flag(&st, "magicPolish", on)),
         "app:set-link-previews" => {
             // 열린 메모 · 위젯에도 바로

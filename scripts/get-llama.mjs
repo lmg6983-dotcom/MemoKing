@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const LLAMA_TAG = 'b11400'; // 2026-10-05
+export const LLAMA_TAG = 'b11400'; // 2026-10-05 — PC Rust 판이 받는 판(desktop-rs/app/src/ai.rs LLAMA_TAG)과 같게
 const ASSET = `llama-${LLAMA_TAG}-bin-win-vulkan-x64.zip`;
 const DEST = join(dirname(fileURLToPath(import.meta.url)), '..', 'desktop', 'vendor', 'llama');
 const MARK = join(DEST, 'VERSION');
