@@ -1,7 +1,7 @@
 # PC Rust 판 베타 배포 (desktop-rs/). Actions 탭 › Run workflow 로만 돈다.
 #   올라가는 곳: 이 저장소의 사전 배포 `desktop-rs` (안드로이드의 `android` 와 같은 방식, 정식 Release 와 따로)
 #   올라가는 것: MemoKing-Rust-Setup-<버전>.exe, MemoKing-Rust-Setup.exe (늘 같은 이름), latest-tauri.json (자동 업데이트)
-#   설치 파일에 함께 넣는 것: AI 엔진 llama-server (npm run llama)
+#   설치 파일에 함께 넣는 것: AI 엔진 llama-server (npm run llama) · HEVC 영상 변환기 ffmpeg (desktop-rs/scripts/build-ffmpeg-min.sh)
 #   버전은 desktop-rs/app/tauri.conf.json 의 version. 올려야 자동 업데이트가 새 버전으로 알아본다
 #   처음 한 번 준비: guides/RELEASE.md 의 "PC Rust 판 베타"
 name: Release (PC Rust 베타)
@@ -17,7 +17,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # HEVC 영상을 H.264 로 바꾸는 작은 ffmpeg.exe (LGPL, mingw 크로스 빌드). 스크립트가 바뀔 때만 다시 빌드
+  ffmpeg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: desktop/vendor/ffmpeg
+          key: ffmpeg-min-${{ hashFiles('desktop-rs/scripts/build-ffmpeg-min.sh') }}
+      - run: sudo apt-get update && sudo apt-get install -y mingw-w64 nasm
+      - run: bash desktop-rs/scripts/build-ffmpeg-min.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-min
+          path: desktop/vendor/ffmpeg/
+
   release:
+    needs: ffmpeg
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:
@@ -40,6 +58,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/get-llama.mjs
 
+      - name: HEVC 영상 변환기 받기 (desktop/vendor/ffmpeg)
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-min
+          path: desktop/vendor/ffmpeg
+
       # 배포판에만 쓰는 설정: 이름(Electron 판과 바로가기, 설치 폴더가 겹치지 않게), 함께 넣을 파일, 업데이트 파일 만들기
       #   서명 공개 열쇠와 업데이트 주소는 tauri.conf.json 에 있다. 개인 열쇠(비밀값)가 없으면 업데이트 파일 없이 설치 파일만 만든다
       - name: 배포 설정 만들기
@@ -52,7 +76,7 @@ jobs:
             const conf = {
               productName: "MemoKing Beta",
               bundle: {
-                resources: { "../../desktop/vendor/llama/": "llama/" },
+                resources: { "../../desktop/vendor/llama/": "llama/", "../../desktop/vendor/ffmpeg/": "ffmpeg/" },
                 createUpdaterArtifacts: signed,
               },
             };
