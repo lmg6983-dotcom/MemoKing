@@ -10,7 +10,8 @@
 
 [![최신 버전](https://img.shields.io/github/v/release/lmg6983-dotcom/MemoKing?label=%EC%B5%9C%EC%8B%A0&color=FFC83D&labelColor=1f2328)](https://github.com/lmg6983-dotcom/MemoKing/releases/latest)
 [![받은 횟수](https://img.shields.io/github/downloads/lmg6983-dotcom/MemoKing/total?label=%EB%B0%9B%EC%9D%80%20%ED%9A%9F%EC%88%98&color=FFC83D&labelColor=1f2328)](https://github.com/lmg6983-dotcom/MemoKing/releases)
-[![PC 점검](https://img.shields.io/github/actions/workflow/status/lmg6983-dotcom/MemoKing/pc.yml?branch=main&label=PC%20%EC%A0%90%EA%B2%80&labelColor=1f2328)](https://github.com/lmg6983-dotcom/MemoKing/actions/workflows/pc.yml)
+[![PC 점검](https://img.shields.io/github/actions/workflow/status/lmg6983-dotcom/MemoKing/desktop-rs.yml?branch=main&label=PC%20%EC%A0%90%EA%B2%80&labelColor=1f2328)](https://github.com/lmg6983-dotcom/MemoKing/actions/workflows/desktop-rs.yml)
+[![Rust + Tauri](https://img.shields.io/badge/Rust%20%2B%20Tauri-1.0-CE422B?logo=rust&logoColor=white&labelColor=1f2328)](#-10--rust로-다시-만들었어요)
 [![Android APK](https://img.shields.io/github/actions/workflow/status/lmg6983-dotcom/MemoKing/android.yml?branch=main&label=Android%20APK&labelColor=1f2328)](https://github.com/lmg6983-dotcom/MemoKing/actions/workflows/android.yml)
 [![MIT 라이선스](https://img.shields.io/badge/license-MIT-blue?labelColor=1f2328)](LICENSE)
 
@@ -20,7 +21,7 @@
 &nbsp;
 [![Android용 받기](https://img.shields.io/badge/Android-APK%20%EB%B0%9B%EA%B8%B0-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/lmg6983-dotcom/MemoKing/releases/download/android/MemoKing-android.apk)
 
-[기능](#-이런-걸-할-수-있어요) · [단축키](#-자주-쓰는-단축키) · [저장 위치](#-메모는-어디에-저장되나요) · [개발](#-개발) · [바뀐 점](#-바뀐-점-버전별)
+[1.0](#-10--rust로-다시-만들었어요) · [기능](#-이런-걸-할-수-있어요) · [단축키](#-자주-쓰는-단축키) · [저장 위치](#-메모는-어디에-저장되나요) · [개발](#-개발) · [바뀐 점](#-바뀐-점-버전별)
 
 <br>
 
@@ -34,6 +35,21 @@
 
 <br>
 
+## 🦀 1.0 — Rust로 다시 만들었어요
+
+PC 판을 Electron에서 **Rust + Tauri**로 처음부터 다시 만들었어요. 메모 폴더 · 설정 · 단축키는 그대로예요.
+
+| | Electron 판 (0.87) | **Rust 판 (1.0)** |
+|---|---|---|
+| 📦 설치 파일 | 140 MB | **약 33 MB** (베타 0.88.6 실측) |
+| 🧠 화면 엔진 | 앱마다 들어 있는 Chromium | Windows에 이미 있는 WebView2 (창들이 엔진 하나를 나눠 써요) |
+| ⚙️ 앱 본체 | Node.js | Rust — 저장 · 검색 · 썸네일 · 사진 돌리기 · 동영상 첫 장면을 화면 밖에서 |
+| 🤖 AI 엔진 | 설치 파일에 포함 | AI를 처음 쓸 때 받기 (안 쓰면 0 MB) |
+
+- **Electron 판을 쓰고 있었다면** 앱이 1.0 업데이트를 알려 줘요. 받으면 예전 판을 지우고 새 판으로 바꿔 켜요. 자동 시작 설정도 옮겨요.
+- 메모 창은 미리 만들어 두고, 닫은 창은 다시 쓰고, 지난 모습을 먼저 보여 줘서 **바로 열려요**. 오래 안 본 탭은 쉬게 해서 메모리를 아껴요 (설정 › 빠르게 열기에서 끌 수 있어요).
+- 바뀐 점: 자동 태그 · AI 일정 자동 등록은 정확도가 낮아 뺐어요. AI 비서 연결(MCP) 대신 AI가 Google Drive의 메모 폴더를 직접 읽어요.
+
 ## ✨ 이런 걸 할 수 있어요
 
 | | |
@@ -43,7 +59,7 @@
 | ⚡ **어디서든 빠르게** | `Ctrl+Alt+C` **매직 카피**는 어느 앱에서든 고른 글이나 그림을 새 메모로 (두 번 누르면 화면 영역 캡처). `Ctrl+Alt+1~9`로 정해 둔 메모를 바로 복사하거나 띄워요. |
 | 🗂️ **정리하고 찾기** | `#태그`로 나누고, 색 · 고정 · 사진 같은 조건으로 거르고, 검색해요. 메모 창 여러 개를 탭 하나로 묶거나(스택), 늘 위에 두거나(왕관), 바탕화면에 붙여요(테이프). |
 | 📅 **일정과 알림** | 글에 "내일 오후 3시"처럼 쓰면 일정으로 넣을 수 있고 미리 알림도 받아요. Windows 알림을 보관함에 모아 둘 수도 있어요 (처음에는 꺼져 있어요). |
-| 🤖 **AI — 인터넷 없이 이 PC 안에서** | 맞춤법 검사, 문체 다듬기, 초안 쓰기, 태그 붙이기. Claude 데스크톱 같은 AI 비서와 연결하면(MCP) 메모를 찾고 읽고 남기게 할 수 있어요. |
+| 🤖 **AI — 인터넷 없이 이 PC 안에서** | 맞춤법 검사, 문체 다듬기, 초안 쓰기. AI 엔진은 처음 쓸 때 한 번 받아요. Gemini 같은 AI는 Google Drive의 메모 폴더를 바로 읽어요 (`_memoking/index.json` 색인). |
 | 📱 **휴대폰도 같이** | 안드로이드 앱이 같은 메모 폴더 형식을 쓰고 Google Drive로 PC와 맞춰요. 홈 화면 위젯, 녹음과 받아쓰기, 다른 앱에서 공유해 메모 만들기도 돼요. → [android/README.md](android/README.md) |
 
 > [!TIP]
@@ -92,12 +108,18 @@
 
 ## 🔧 개발
 
-[Node.js](https://nodejs.org) 22 이상이 필요해요.
+PC 판은 [Rust](https://rustup.rs) + [Tauri 2](https://tauri.app) (`desktop-rs/`), 화면은 PC · 휴대폰이 함께 쓰는 HTML · JS (`app/`)예요. 화면 단위 테스트에는 [Node.js](https://nodejs.org) 22 이상이 필요해요.
 
 ```sh
-npm start        # 앱 실행
-npm test         # 단위 테스트
-npm run dist     # 설치 파일 만들기 → dist/MemoKing-Setup-<버전>.exe
+cd desktop-rs
+cargo run                    # 앱 실행 (Windows)
+cargo run -- --smoke         # 앱 안 자동 점검 (CI 와 같은 것)
+cargo test --workspace       # Rust 단위 테스트
+npx @tauri-apps/cli@2.12.5 build   # 설치 파일 → target/release/bundle/nsis/
+```
+
+```sh
+npm test                     # 화면 · 공용 JS 단위 테스트
 ```
 
 | 문서 | 내용 |
@@ -117,7 +139,7 @@ README의 화면 사진은 `npm run shots:sns`로 실제 앱을 띄워 찍은 �
 
 Windows 설치 파일은 [SignPath.io](https://about.signpath.io)가 무료로 제공하는 코드 서명을 받고, 인증서는 [SignPath Foundation](https://signpath.org)이 발급해요. (승인을 받은 뒤부터 적용돼요.)
 
-- 서명은 이 저장소의 GitHub Actions(`.github/workflows/release.yml`)에서 소스로 빌드한 설치 파일에만 해요.
+- 서명은 이 저장소의 GitHub Actions(`.github/workflows/release-rs.yml`)에서 소스로 빌드한 설치 파일에만 해요. (1.0 Rust 설치 파일은 아직 서명 전이에요.)
 - 만들고 검토하는 사람(Committer · Reviewer)과 서명을 승인하는 사람(Approver): [lmg6983-dotcom](https://github.com/lmg6983-dotcom)
 - 개인정보: 메모킹은 사용자가 쓰기로 한 기능(Google Drive 동기화, 업데이트 확인, 링크 미리보기 등)이 아니면 다른 시스템으로 어떤 정보도 보내지 않아요. 개발자에게 보내는 정보는 없어요. 자세한 내용은 [개인정보 처리방침](docs/privacy.html)에 있어요.
 
@@ -131,6 +153,7 @@ Windows 설치 파일은 [SignPath.io](https://about.signpath.io)가 무료로 �
 <!-- HISTORY:START -->
 | 태그 | 날짜 | 단계 | 내용 |
 |---|---|---|---|
+| `v1.0.0` | 2026-11-18 | 6. 배포 | **PC 판을 Rust로 다시 만든 1.0**: 설치 파일이 140MB에서 30MB대로 줄고, 창들이 Windows의 WebView2 엔진 하나를 나눠 써요. 메모 폴더 · 설정은 그대로이고, Electron 판에서 업데이트하면 예전 판을 지우고 새 판으로 바꿔요. **바로 열리는 메모 창**: 창을 미리 만들어 두고, 닫은 창을 다시 쓰고, 지난 모습을 먼저 보여 줘요. 목록 카드에 마우스를 올리면 미리 열고, 오래 안 본 탭은 쉬게 해요. 설정 › 빠르게 열기에서 끌 수 있어요. **매직 카피 · 두 번 눌러 캡처**: Ctrl+Alt+C로 어느 앱에서든 고른 글 · 파일 · 그림을 새 메모로, 두 번 누르면 화면 영역 캡처. **더 가볍게**: 사진 썸네일 · 사진 돌리기 · 동영상 첫 장면을 앱 본체가 만들어요. AI 엔진은 처음 쓸 때 받아요. **Google Drive 공유 링크**: 파일을 Drive에 올리고 링크를 복사해요. **뺀 것**: 자동 태그 · AI 일정 자동 등록 · AI 비서 연결(MCP) |
 | `v0.87.0` | 2026-11-16 | 3. 개선 | **기다리는 동안 그 자리에 진행 표시, 꾹 눌러 옮기기 (휴대폰 0.63.0)**: 문서를 넣으면 파일 칩이 바로 들어가고, 첫 쪽 썸네일이 들어갈 자리에 종이 모양 임시 칸이 진행 막대와 함께 보여요. 다 되면 그 자리가 썸네일로 바뀌어요. AI 글쓰기도 답이 나올 자리에 임시 칸이 먼저 보이고, 맞춤법은 몇 번째 문단을 보는지 막대로 알려 줘요. 휴대폰에서 콘텐츠를 꾹 누르면 옮기기가 되고 놓으면 글 고치기로 돌아온다고 안내하고, 가로줄도 꾹 눌러 옮겨요. 옮길 곳이 없을 때 옮기기 모드에 남던 것을 고쳤어요 |
 | `v0.86.3` | 2026-11-16 | 3. 개선 | **메모 목록에 놓은 PDF 도 첫 쪽 썸네일**: PC 메모 목록에 PDF · 한글 · Word 같은 문서를 끌어다 놓으면 메모 창이 열리고, 메모 안에 넣을 때처럼 파일 칩과 첫 쪽 썸네일이 한 덩어리로 들어가요. 썸네일을 누르면 펜 · 형광펜 · 글자 칠하기로 주석을 달 수 있어요. 문서를 여러 개 놓으면 메모 창이 문서마다 열려요 |
 | `v0.86.2` | 2026-11-16 | 3. 개선 | **문서 칩과 첫 쪽 썸네일을 한 덩어리로 (휴대폰 0.62.2)**: PDF · 한글 · Word 같은 문서를 넣으면 파일 칩 바로 아래에 첫 쪽 썸네일이 붙어 한 덩어리가 돼요. 옮기기 · 복사 · 지우기를 함께 하고, 메뉴에는 "문서" 로 보여요. 빨간 PDF 표시는 썸네일 안 오른쪽 아래에 있어요. 예전에 넣은 문서는 그대로 두 줄로 남아요 |
