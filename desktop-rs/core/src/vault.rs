@@ -170,6 +170,15 @@ impl Vault {
         for id in locked {
             self.drop_unsafe_versions(&id);
         }
+        // 목록 카드에 쓸 본문 분석을 코어마다 나눠 미리 (메모 2,000개면 첫 목록이 메모 폴더를 0.2초 넘게 붙잡았다)
+        let all: Vec<&Entry> = self.entries.values().collect();
+        let lanes = std::thread::available_parallelism().map_or(1, |n| n.get());
+        let me = &*self;
+        std::thread::scope(|s| {
+            for chunk in all.chunks(all.len().div_ceil(lanes).max(1)) {
+                s.spawn(move || chunk.iter().for_each(|e| drop(me.parts(e))));
+            }
+        });
         Ok(())
     }
 
@@ -304,8 +313,7 @@ impl Vault {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         e.body.hash(&mut h);
         let key = h.finish();
-        let mut cache = self.parts.lock().unwrap();
-        if let Some((k, p)) = cache.get(&e.id) {
+        if let Some((k, p)) = self.parts.lock().unwrap().get(&e.id) {
             if *k == key {
                 return p.clone();
             }
@@ -321,7 +329,7 @@ impl Vault {
             web_link: has_web_link(&e.body),
             text: lines.join("\n"),
         });
-        cache.insert(e.id.clone(), (key, p.clone()));
+        self.parts.lock().unwrap().insert(e.id.clone(), (key, p.clone()));
         p
     }
 
