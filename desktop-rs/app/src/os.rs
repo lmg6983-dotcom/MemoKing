@@ -379,6 +379,19 @@ fn magickey_name(arg: &str) -> bool {
     (1..=64).contains(&mid.len()) && mid.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
+/// 글 첫 줄의 날짜 → { at, hasTime, repeat, end, title } (date-detect.js remindFromText) · 없으면 None
+fn remind_from_text(text: &str, now: chrono::DateTime<chrono::Local>) -> Option<Value> {
+    use memoking_core::date_detect::{find_dates, guess_title};
+    let line = text.split('\n').next().unwrap_or_default();
+    let w = find_dates(line, now).into_iter().next()?;
+    let iso = |t: chrono::DateTime<chrono::Local>| t.with_timezone(&chrono::Utc).to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let mut d = json!({ "at": iso(w.at), "hasTime": w.has_time, "repeat": w.repeat, "title": guess_title(line, w.from, w.to) });
+    if let Some(end) = w.end {
+        d["end"] = iso(end).into();
+    }
+    Some(d)
+}
+
 /// 실행 인자대로 (jump-list.js launchAction · main.js handleLaunch) — 메모 창을 열었으면 true (아니면 부르는 쪽이 목록을 띄운다)
 fn launch(app: &AppHandle, args: &[String]) -> bool {
     let val = |p: &str| args.iter().find_map(|a| a.strip_prefix(p).map(str::to_string));
@@ -387,12 +400,21 @@ fn launch(app: &AppHandle, args: &[String]) -> bool {
     }
     if let Some(file) = val("--new-memo-file=").filter(|f| magickey_name(f)) {
         let Some((real, text)) = magickey_file(&file, &std::env::temp_dir()) else { return false };
-        // shortcut: 알림(토스트) · --remind(글 속 날짜로 알림)는 아직 — --open-new 가 없어도 연다 (Electron 의 토스트를 못 띄울 때처럼). 알림을 옮길 때 고치기
-        let saved = matches!(memos::handle(app, "list", "memo:import", &[text.into(), json!({ "open": true })]), Some(Ok(_)));
-        if saved {
-            let _ = std::fs::remove_file(real); // 저장한 뒤에야 지운다 (실패하면 글이 남게)
+        let open = args.iter().any(|a| a == "--open-new");
+        let Some(Ok(id)) = memos::handle(app, "list", "memo:import", &[text.clone().into(), json!({ "open": open })]) else { return false };
+        let _ = std::fs::remove_file(real); // 저장한 뒤에야 지운다 (실패하면 글이 남게)
+        let id = id.as_str().unwrap_or_default().to_string();
+        // "알림 맞춰 저장"(--remind): 첫 줄의 날짜로 일정 하나 (날짜를 못 찾으면 알림 없이 저장)
+        let now = chrono::Local::now();
+        let event = args.iter().any(|a| a == "--remind").then(|| remind_from_text(&text, now)).flatten().and_then(|d| memoking_core::reminders::event_from_date(&d, now));
+        let saved = event.and_then(|r| crate::reminders::handle(app, "list", "reminders:set", &[id.clone().into(), json!([r])])).and_then(Result::ok).and_then(|v| v.get(0).cloned());
+        // 열지 않으면 Windows 알림 (누르면 열기)
+        if !open {
+            let first: String = text.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or_default().trim_start_matches('#').trim().chars().take(40).collect();
+            let when = saved.map(|r| format!("알림: {}", memoking_core::reminders::describe_reminder(&r, now))).unwrap_or_default();
+            crate::reminders::toast(app, &id, "메모를 만들었어요", &first, &if when.is_empty() { "눌러서 열기".to_string() } else { format!("{when} · 눌러서 열기") }, None);
         }
-        return saved;
+        return true;
     }
     args.iter().any(|a| a == "--new-memo") && new_memo(app)
 }

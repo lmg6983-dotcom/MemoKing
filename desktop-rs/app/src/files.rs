@@ -489,8 +489,15 @@ fn share_once(app: &AppHandle, f: &Value) -> Value {
     };
     let title = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     match via {
-        // shortcut: Google Drive 연결은 아직 — Drive 를 옮길 때 올리고 링크 복사 (share-drive.js)
-        "drive" => json!({ "error": "설정에서 Google Drive를 먼저 연결해 주세요" }),
+        "drive" if crate::ipc::smoke() => json!({ "ok": true, "link": "https://drive.google.com/smoke" }),
+        "drive" => match crate::drive::share_link(app, &file, &title) {
+            Ok(link) => {
+                use tauri_plugin_clipboard_manager::ClipboardExt;
+                let _ = app.clipboard().write_text(link.clone());
+                json!({ "ok": true, "link": link })
+            }
+            Err(error) => json!({ "error": error }),
+        },
         "localsend" => {
             let Some(exe) = find_local_send() else {
                 let _ = app.opener().open_url(LOCALSEND_DOWNLOAD, None::<&str>);
@@ -666,8 +673,9 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "attachment:fetch" => fetch_remote_image(app, &memoking_core::js::string(&arg(0))),
         "share:targets" => {
             let local_send = find_local_send().is_some();
+            let drive = crate::drive::connected();
             Ok(json!([
-                { "id": "drive", "label": "Google Drive 링크", "sub": "아직 연결 전이에요. 눌러서 설정에서 연결하기", "ready": false, "connect": true },
+                { "id": "drive", "label": "Google Drive 링크", "sub": if drive { "올리고 링크를 복사해요 (링크가 있는 사람은 보기)" } else { "아직 연결 전이에요. 눌러서 설정에서 연결하기" }, "ready": drive, "connect": !drive },
                 { "id": "localsend", "label": "LocalSend", "sub": if local_send { "같은 와이파이의 휴대폰, PC로 바로 (오픈소스)" } else { "무료 오픈소스 앱, 누르면 내려받기 페이지를 열어요" }, "ready": true },
                 { "id": "mail", "label": "메일에 첨부", "sub": "기본 메일 앱(Outlook 등)의 새 메일에", "ready": cfg!(windows) || crate::ipc::smoke() },
             ]))
