@@ -51,6 +51,27 @@ export function setModeSwitch(sw, mode) {
   if (first) requestAnimationFrame(() => requestAnimationFrame(() => sw.classList.remove('ms-still')));
 }
 
+/** 오래 걸릴 수 있는 일 동안 누른 것(단추 · 카드 · 탭)에 aria-busy (base.css: 흐리게 · 기다리는 커서).
+ *  금방 끝나는 일에는 깜빡이지 않게 잠시 뒤에 붙이고, 끝나거나 실패하면 걷는다 → work 의 결과 */
+export async function busyWhile(el, work, after = 250) {
+  const t = setTimeout(() => el?.setAttribute('aria-busy', 'true'), after);
+  try {
+    return await work;
+  } finally {
+    clearTimeout(t);
+    el?.removeAttribute('aria-busy');
+  }
+}
+
+/** 다른 창을 띄우는 일(처음 여는 창은 화면을 새로 읽어 늦다): 그 창이 앞으로 와 이 창이 포커스를 잃을 때까지(늦어도 3초) busyWhile */
+export function busyUntilBlur(el, work) {
+  const covered = new Promise((res) => {
+    window.addEventListener('blur', res, { once: true });
+    setTimeout(res, 3000);
+  });
+  return busyWhile(el, Promise.all([work, covered]));
+}
+
 // 같은 애니메이션 클래스를 다시 붙여 처음부터 다시 돌린다
 export function replayClass(el, cls) {
   el.classList.remove(cls);

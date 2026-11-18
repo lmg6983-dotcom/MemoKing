@@ -86,20 +86,25 @@ pub fn decode_entities(s: &str, html: bool) -> String {
         .into_owned()
 }
 
+// 식에 꼭 있어야 하는 글자가 줄에 없으면 돌리지 않는다 (줄마다 열 번 넘는 정규식: 메모 2,000개 목록 · 색인이 각각 1초 걸렸다)
+fn replace_if(r: &Regex, s: String, need: &[char], rep: &str) -> String {
+    if s.contains(need) { replace_all(r, &s, rep) } else { s }
+}
+
 // 한 줄의 마크다운 기호를 걷어내 사람이 읽는 글자만 남긴다
 fn strip_inline(line: &str) -> String {
-    let s = LINE_BREAK.replace(line, "${1}${2}").into_owned();
-    let s = replace_all(&IMAGE, &s, " ");
-    let s = replace_all(&LINK, &s, "${1}");
-    let s = replace_all(&BR, &s, " ");
-    let s = replace_all(&AUTOLINK, &s, "${1}");
-    let s = replace_all(&HTML_TAG, &s, "");
-    let s = replace_all(&BOLD_STRIKE, &s, "${2}");
-    let s = replace_all(&ITALIC_STAR, &s, "${1}${2}");
-    let s = replace_all(&UNDERSCORE, &s, "${1}${3}");
-    let s = replace_all(&CODE, &s, "${1}");
-    let s = replace_all(&ESCAPED, &s, "${1}");
-    let s = decode_entities(&s, true);
+    let s = if line.contains('\\') { LINE_BREAK.replace(line, "${1}${2}").into_owned() } else { line.to_string() };
+    let s = replace_if(&IMAGE, s, &['['], " ");
+    let s = replace_if(&LINK, s, &['['], "${1}");
+    let s = replace_if(&BR, s, &['<'], " ");
+    let s = replace_if(&AUTOLINK, s, &['<'], "${1}");
+    let s = replace_if(&HTML_TAG, s, &['<'], "");
+    let s = replace_if(&BOLD_STRIKE, s, &['*', '~'], "${2}");
+    let s = replace_if(&ITALIC_STAR, s, &['*'], "${1}${2}");
+    let s = replace_if(&UNDERSCORE, s, &['_'], "${1}${3}");
+    let s = replace_if(&CODE, s, &['`'], "${1}");
+    let s = replace_if(&ESCAPED, s, &['\\'], "${1}");
+    let s = if s.contains('&') { decode_entities(&s, true) } else { s };
     js::trim(&replace_all(&SPACES, &s, " ")).to_string()
 }
 
@@ -111,7 +116,7 @@ fn strip_block(line: &str) -> String {
 
 /// 표 한 줄 → "품목, 가격" (표 줄이 아니면 None, 구분선이면 "") — tables.js tableLineText
 fn table_line_text(line: &str) -> Option<String> {
-    if !TABLE_LINE.is_match(line).unwrap_or(false) {
+    if !line.contains('|') || !TABLE_LINE.is_match(line).unwrap_or(false) {
         return None;
     }
     if TABLE_RULE.is_match(line).unwrap_or(false) {
@@ -134,11 +139,11 @@ pub fn plain_lines(body: &str, max: usize) -> Vec<String> {
     let mut out = vec![];
     let mut fence = false;
     for raw in lines(body) {
-        if FENCE_LINE.is_match(raw).unwrap_or(false) {
+        if raw.contains(['`', '~']) && FENCE_LINE.is_match(raw).unwrap_or(false) {
             fence = !fence;
             continue;
         }
-        if !fence && (RULE_LINE.is_match(raw).unwrap_or(false) || COMMENT_LINE.is_match(raw).unwrap_or(false)) {
+        if !fence && raw.contains(['-', '*', '_']) && (RULE_LINE.is_match(raw).unwrap_or(false) || COMMENT_LINE.is_match(raw).unwrap_or(false)) {
             continue;
         }
         let text = if fence {
@@ -176,8 +181,23 @@ pub fn extract_title(body: &str) -> String {
 
 /// 제목(첫 줄)을 뺀 나머지 — "출처: …" 줄은 빼고, 수식 표시($)는 걷어낸다
 pub fn extract_preview(body: &str, max: usize) -> String {
-    let rest: Vec<String> = plain_lines(without_broken_header(body), usize::MAX).into_iter().skip(1).filter(|l| !SOURCE_LINE.is_match(l).unwrap_or(false)).collect();
+    preview_of(&plain_lines(without_broken_header(body), usize::MAX), max)
+}
+
+fn preview_of(lines: &[String], max: usize) -> String {
+    let rest: Vec<&str> = lines.iter().skip(1).map(String::as_str).filter(|l| !SOURCE_LINE.is_match(l).unwrap_or(false)).collect();
     js::slice16(&replace_all(&MATH, &rest.join(" "), "${1}"), max)
+}
+
+/// 제목 · 미리 보기 · 읽는 줄을 한 번에 (목록 카드는 셋 다 쓴다, 줄 읽기가 가장 무겁다)
+pub fn title_preview_lines(body: &str, max: usize) -> (String, String, Vec<String>) {
+    let lines = plain_lines(body, usize::MAX);
+    if without_broken_header(body).len() != body.len() {
+        return (extract_title(body), extract_preview(body, max), lines);
+    }
+    let title = lines.first().map_or_else(|| UNTITLED.to_string(), |t| js::slice16(t, 80));
+    let preview = preview_of(&lines, max);
+    (title, preview, lines)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

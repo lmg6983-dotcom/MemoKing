@@ -281,7 +281,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .mk-audio {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) auto auto;
-  grid-template-areas: "play name name name" "play bar cur dur";
+  grid-template-areas: "play name name loop" "play bar cur dur";
   align-items: center;
   gap: 0 10px;
   padding: 10px 12px 8px 10px;
@@ -298,6 +298,10 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .mk-audio :is(.plyr, .plyr__controls) { display: contents; }
 .mk-audio audio { display: none; }
 .mk-audio .mk-media-label { grid-area: name; }
+.mk-audio .mk-loop { grid-area: loop; justify-self: end; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border-radius: 50%; }
+/* 반복 재생이 켜지면 강조색 (동영상은 흰 단추들 사이에서 노랑) */
+.mk-media .mk-loop[aria-pressed="true"] { color: var(--note-accent); }
+.mk-video .mk-loop[aria-pressed="true"] { color: var(--brand-yellow, #ffcc00); }
 .mk-audio .plyr__control[data-plyr="play"] { grid-area: play; width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 50%; }
 .mk-audio .plyr__control[data-plyr="play"] svg { width: 22px; height: 22px; }
 .mk-audio .plyr__progress__container { grid-area: bar; margin: 0; padding: 0; }
@@ -534,6 +538,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 /* ---------- 이전 버전 (links-panel 모양을 같이 씀) ---------- */
 .versions-hint { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .versions-list:empty::after { content: "아직 남겨 둔 버전이 없어요. 고치기 시작하면 10분마다 남아요"; }
+.versions-list[aria-busy="true"]:empty::after { content: "버전을 불러오는 중이에요"; cursor: progress; }
 .version-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border); }
 .version-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .version-text b { font-size: 13px; color: var(--text-strong); }

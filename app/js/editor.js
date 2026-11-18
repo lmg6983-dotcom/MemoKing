@@ -95,6 +95,29 @@ function playerOptions(kind) {
   };
 }
 
+// 반복 재생 단추 (Plyr 에는 없다): 동영상은 음소거 옆, 소리는 이름 줄 오른쪽 끝. 누를 때마다 켜고 끈다
+const LOOP_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
+function addLoopButton(player, el, kind) {
+  const controls = player.elements?.controls;
+  if (!controls) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'plyr__control mk-loop';
+  btn.innerHTML = LOOP_ICON;
+  const show = () => {
+    btn.setAttribute('aria-pressed', String(el.loop));
+    btn.setAttribute('aria-label', el.loop ? '반복 재생 끄기' : '반복 재생');
+    btn.title = el.loop ? '반복 재생 끄기' : '반복 재생';
+  };
+  show();
+  btn.addEventListener('click', () => {
+    el.loop = !el.loop;
+    show();
+  });
+  const before = kind === 'video' ? controls.querySelector('[data-plyr="settings"], .plyr__menu, [data-plyr="fullscreen"]') : null;
+  controls.insertBefore(btn, before);
+}
+
 // 플레이어에서 누르면 그 기능이 되는 곳 (재생 막대·단추). 그중 MEDIA_SCRUB(설정 메뉴)은 꾹 눌러도 옮기지 않음
 const MEDIA_CONTROL = `${MEDIA_SCRUB}, .plyr__progress, input, [role="slider"], .plyr__control, button`;
 
@@ -193,6 +216,7 @@ function mediaView(node, view, getPos) {
     if (kind === 'video') el.setAttribute('playsinline', '');
     dom.append(el);
     const player = new Plyr(el, playerOptions(kind));
+    addLoopButton(player, el, kind);
     // 재생 전 그림: 1초쯤의 장면 (휴대폰 WebView 는 그대로 두면 회색 기본 그림만 보인다)
     let gone = false;
     const poster = () => videoPoster(src).then((url) => { if (url && !gone) player.poster = url; });
@@ -619,6 +643,12 @@ const tagHighlight = $prose(() => new Plugin({
 //   상태: id → { pos(칩 문단 끝), name, pdf, done, total } — 글이 바뀌면 자리도 따라간다. meta: { id, set } · { id, remove }
 const pendingDocKey = new PluginKey('memoking-doc-pending');
 function pendingDocDom(p) {
+  if (p.uploading) { // 붙여 넣은 · 고른 파일을 저장하는 동안: 끌어다 놓을 때(Milkdown 업로드)와 같은 "넣는 중"
+    const el = document.createElement('span');
+    el.className = 'mk-uploading';
+    el.textContent = '넣는 중';
+    return el;
+  }
   const box = document.createElement('span');
   box.className = 'mk-doc-pending';
   box.contentEditable = 'false';
@@ -655,7 +685,7 @@ const pendingDocs = $prose(() => new Plugin({
     decorations(state) {
       const map = pendingDocKey.getState(state);
       if (!map?.size) return null;
-      return DecorationSet.create(state.doc, [...map].map(([id, p]) => Decoration.widget(p.pos, () => pendingDocDom(p), { key: `doc-pending-${id}-${p.done}-${p.total}`, side: 1, ignoreSelection: true })));
+      return DecorationSet.create(state.doc, [...map].filter(([, p]) => !p.uploading || p.shown).map(([id, p]) => Decoration.widget(p.pos, () => pendingDocDom(p), { key: `doc-pending-${id}-${p.done}-${p.total}-${p.shown}`, side: 1, ignoreSelection: true })));
     },
   },
 }));
@@ -1588,6 +1618,22 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return arrangeItems(items);
   }
 
+  // 파일들을 저장해 pos 에 넣는다. 저장이 길어지면(큰 사진 · 여러 장) 그 자리에 "넣는 중" — 그사이 친 글만큼 자리를 따라간다
+  async function insertFilesAt(pos, files) {
+    const id = String(++pendingSeq);
+    sendPending(id, { set: { pos, uploading: true } });
+    const later = setTimeout(() => sendPending(id, { set: { shown: true } }), 250);
+    try {
+      const items = await filesToItems(files);
+      const v = view();
+      const at = pendingDocKey.getState(v.state)?.get(id)?.pos ?? pos;
+      if (items.length && !v.isDestroyed) insertBlocks(at, items);
+    } finally {
+      clearTimeout(later);
+      sendPending(id, { remove: true });
+    }
+  }
+
   /**
    * 넣을 것 다듬기 (PC·휴대폰 같은 질문 — 휴대폰은 앱이 저장한 뒤 이것만 부른다):
    *   문서(PDF · Word · 한글)는 파일로 둘지 장마다 그림(묶음 사진)으로 바꿀지 — 원노트처럼
@@ -1658,12 +1704,13 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   // 넣은 문서 칩의 문단(끝 자리 pos)에 PDF 첫 쪽 썸네일을 붙인다 — 바꾸는 동안은 그 자리에 임시 칸 (진행 정도)
   //   그사이 칩을 지웠거나 옮겨 문단이 달라졌으면 붙이지 않는다
   let pendingSeq = 0;
+  const sendPending = (id, meta) => {
+    const v = view();
+    if (!v.isDestroyed) v.dispatch(v.state.tr.setMeta(pendingDocKey, { id, ...meta }).setMeta('addToHistory', false));
+  };
   async function pairDocument(it, pos) {
     const id = String(++pendingSeq);
-    const send = (meta) => {
-      const v = view();
-      if (!v.isDestroyed) v.dispatch(v.state.tr.setMeta(pendingDocKey, { id, ...meta }).setMeta('addToHistory', false));
-    };
+    const send = (meta) => sendPending(id, meta);
     send({ set: { pos, name: it.name, pdf: extOf(it.name) === 'pdf', done: 0, total: 0 } });
     const thumb = await documentPdfItem(it, (done, total) => send({ set: { done, total } }));
     const v = view();
@@ -2123,10 +2170,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         const htmlHasText = Boolean(html) && Boolean(new window.DOMParser().parseFromString(html, 'text/html').body.textContent.trim());
         if (!files.length || htmlHasText) return false;
         event.preventDefault();
-        const pos = v.state.selection.from;
-        filesToItems(files)
-          .then((items) => items.length && insertBlocks(pos, items))
-          .catch((err) => console.error('붙여 넣은 파일을 넣지 못했어요', err));
+        insertFilesAt(v.state.selection.from, files).catch((err) => console.error('붙여 넣은 파일을 넣지 못했어요', err));
         return true;
       },
       // 메모에서 끌어낸 파일이 도로 이 메모에 떨어지면 무시 (같은 파일이 한 번 더 들어가지 않게 — block-move.js 끌어내기)
@@ -3204,11 +3248,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     insertInk: () => insertInk(),
     editInk: (pos) => editInk(view(), pos),
     // 커서 자리에 파일들을 넣는다.
-    async insertFiles(files) {
-      const pos = view().state.selection.from;
-      const items = await filesToItems(files);
-      if (items.length) insertBlocks(pos, items);
-    },
+    insertFiles: (files) => insertFilesAt(view().state.selection.from, files),
     focus: () => view().focus(),
     /** 서식 없이 붙여넣기 (오른쪽 클릭 메뉴 › 서식 없이 붙여넣기 — 클립보드의 글자) → 편집기에 넣었는가 */
     pastePlain: (text) => {

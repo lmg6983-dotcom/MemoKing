@@ -22,7 +22,7 @@ import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSliders } from './seg-slider.js';
 import { setupVoiceRecorder } from './voice-recorder.js';
 import { setupAnnotation } from './ink-annotate.js';
-import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups, swipeDismiss, EASE_OUT } from './dom.js';
+import { reduceMotion, replayClass, menuKeys, focusFirstIfKeyboard, radioGroups, swipeDismiss, EASE_OUT, busyWhile, busyUntilBlur } from './dom.js';
 import { createClearStamp } from './clear-stamp.js';
 import { fillSuggestChips, trackPlaceholder } from './suggest-chips.js';
 import { renderVersions } from './versions-view.js';
@@ -701,7 +701,7 @@ $('image-save-btn').addEventListener('click', () => memoImage('save'));
 $('pdf-btn').addEventListener('click', async () => {
   closeMenu();
   await flush(); // 지금 적은 내용까지 PDF 에
-  api.pdf.open(id);
+  busyUntilBlur(el.menuBtn, api.pdf.open(id)); // PDF 창이 뜰 때까지
 });
 // 첨부 경로 (attachments/%EC… → 풀린 이름)
 function decodePath(src) {
@@ -832,8 +832,13 @@ el.linksBtn.addEventListener('click', () => {
 
 const versionsPanel = $('versions-panel');
 async function refreshVersions() {
-  const versions = await api.memo.versions(id);
-  renderVersions($('versions-list'), versions, restoreVersion);
+  const list = $('versions-list');
+  list.setAttribute('aria-busy', 'true'); // 처음 열 때 빈 목록이 "버전이 없어요" 로 보이지 않게 (note.css)
+  try {
+    renderVersions(list, await api.memo.versions(id), restoreVersion);
+  } finally {
+    list.removeAttribute('aria-busy');
+  }
 }
 async function restoreVersion(name) {
   await flush(); // 지금 내용이 버전으로 남도록 먼저 저장
@@ -1798,7 +1803,7 @@ async function newTab() {
   addingTab = true;
   try {
     await flush();
-    await api.stack.newTab(id);
+    await busyUntilBlur($('new-btn'), api.stack.newTab(id));
   } finally {
     setTimeout(() => (addingTab = false), 400);
   }
@@ -1880,7 +1885,7 @@ tabsEl.addEventListener('click', async (e) => {
   if (tab && tab.dataset.tabId !== id) {
     // 저장을 기다리지 않고 바로 바꾼다 (저장은 함께 진행 — 다른 탭은 이 메모의 글이 필요 없다)
     flush();
-    api.stack.activate(tab.dataset.tabId);
+    busyUntilBlur(tab, api.stack.activate(tab.dataset.tabId)); // 그 탭의 창을 아직 만들지 않았으면 뜨기까지 걸린다
   }
 });
 // 탭 끌기: 왼쪽 탭 줄 안에서는 탭이 들려 위아래로 따라오고, 탭 줄 밖(오른쪽으로 20px 넘게·창 밖)으로 끌어내면

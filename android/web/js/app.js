@@ -1097,15 +1097,16 @@ $('print-go').addEventListener('click', async () => {
   const id = printJob.id;
   if (!id) return;
   const title = printTitle(id);
-  const html = await fittedDoc(id);
-  if (printJob.mode === 'print') {
-    closeSheet(printSheet);
-    call('print', { title, html, ...printSize() }).catch((err) => toast(err.message, true));
-    return;
-  }
+  // 쪽에 맞추기(fittedDoc)는 그림이 많으면 한참 걸린다 — 누르자마자 단추를 잠그고, PDF 면 "만드는 중" 부터
   $('print-go').disabled = true;
-  $('print-busy').hidden = false;
+  $('print-busy').hidden = printJob.mode === 'print';
   try {
+    const html = await fittedDoc(id);
+    if (printJob.mode === 'print') {
+      closeSheet(printSheet);
+      call('print', { title, html, ...printSize() }).catch((err) => toast(err.message, true));
+      return;
+    }
     // 앱이 PDF 를 바로 만들지 못하면 스스로 인쇄 화면("PDF로 저장")을 연다. 그래도 답이 없으면 계속 기다리지 않는다
     await withTimeout(call('sharePdf', { title, name: fileName(title, 'pdf'), html, ...printSize() }), PDF_WAIT_MS, 'PDF를 만들지 못했어요. 잠시 뒤 다시 해 주세요');
     closeSheet(printSheet);

@@ -84,9 +84,11 @@ pub fn tokenize(text: &str) -> Vec<String> {
         .flatten()
         .filter_map(|m| {
             let mut word = m.as_str();
-            if HANGUL_END.is_match(word).unwrap_or(false) {
+            // 끝 글자가 ASCII 면 한글일 수 없다 (낱말마다 정규식을 돌리면 색인이 느렸다)
+            if !word.ends_with(|c: char| c.is_ascii()) && HANGUL_END.is_match(word).unwrap_or(false) {
                 // 뗀 뒤 두 글자 이상 남을 때만 뗀다 ("사과" 의 "과" 는 조사가 아님)
-                let josa = JOSA.iter().find(|j| len16(word) >= len16(j) + 2 && word.ends_with(**j) && josa_fits(word, j));
+                let n = len16(word);
+                let josa = JOSA.iter().find(|j| word.ends_with(**j) && n >= len16(j) + 2 && josa_fits(word, j));
                 if let Some(j) = josa.filter(|j| !ends_in_noun(word, j)) {
                     word = &word[..word.len() - j.len()];
                 }

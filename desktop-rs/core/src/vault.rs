@@ -170,6 +170,15 @@ impl Vault {
         for id in locked {
             self.drop_unsafe_versions(&id);
         }
+        // 목록 카드에 쓸 본문 분석을 코어마다 나눠 미리 (메모 2,000개면 첫 목록이 메모 폴더를 0.2초 넘게 붙잡았다)
+        let all: Vec<&Entry> = self.entries.values().collect();
+        let lanes = std::thread::available_parallelism().map_or(1, |n| n.get());
+        let me = &*self;
+        std::thread::scope(|s| {
+            for chunk in all.chunks(all.len().div_ceil(lanes).max(1)) {
+                s.spawn(move || chunk.iter().for_each(|e| drop(me.parts(e))));
+            }
+        });
         Ok(())
     }
 
@@ -304,16 +313,15 @@ impl Vault {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         e.body.hash(&mut h);
         let key = h.finish();
-        let mut cache = self.parts.lock().unwrap();
-        if let Some((k, p)) = cache.get(&e.id) {
+        if let Some((k, p)) = self.parts.lock().unwrap().get(&e.id) {
             if *k == key {
                 return p.clone();
             }
         }
-        let lines = body::plain_lines(&e.body, usize::MAX);
+        let (title, preview, lines) = body::title_preview_lines(&e.body, 1200);
         let p = std::sync::Arc::new(Parts {
-            title: body::extract_title(&e.body),
-            preview: body::extract_preview(&e.body, 1200),
+            title,
+            preview,
             media: body::extract_media(&e.body),
             tags: body::extract_tags(&e.body),
             tasks: body::task_progress(&e.body),
@@ -321,7 +329,7 @@ impl Vault {
             web_link: has_web_link(&e.body),
             text: lines.join("\n"),
         });
-        cache.insert(e.id.clone(), (key, p.clone()));
+        self.parts.lock().unwrap().insert(e.id.clone(), (key, p.clone()));
         p
     }
 
@@ -366,10 +374,15 @@ impl Vault {
 
     /// 목록: 고정한 메모 먼저, 그다음 최근 고친 순
     pub fn list(&self) -> Vec<Value> {
+        self.sorted().into_iter().map(|e| self.summary(e)).collect()
+    }
+
+    fn sorted(&self) -> Vec<&Entry> {
         let mut list: Vec<&Entry> = self.entries.values().filter(|e| e.file.is_some()).collect();
         let t = |e: &Entry| e.meta.updated.as_deref().and_then(time::parse_js_date).map_or(0, |d| d.timestamp_millis());
-        list.sort_by(|a, b| b.meta.pinned.cmp(&a.meta.pinned).then(t(b).cmp(&t(a))));
-        list.into_iter().map(|e| self.summary(e)).collect()
+        // 날짜 읽기는 메모마다 한 번 (비교마다 읽으면 2,000개에 4만 번)
+        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(t(e))));
+        list
     }
 
     pub fn entry(&self, id: &str) -> Option<&Entry> {
@@ -989,13 +1002,14 @@ impl Vault {
     /// 찾기 — 제목 · 본문 글(서식 뺀 줄)에서
     pub fn search(&self, query: &str, exclude: Option<&str>) -> Vec<Value> {
         let matches = crate::search::matcher(query);
-        let texts: HashMap<&str, std::sync::Arc<Parts>> = self.entries.values().filter(|e| e.file.is_some()).map(|e| (e.id.as_str(), self.parts(e))).collect();
-        self.list()
+        // 맞는 메모만 카드로 만든다 (글자를 칠 때마다 2,000개 카드를 다 만들지 않게)
+        self.sorted()
             .into_iter()
-            .filter(|m| {
-                let id = m["id"].as_str().unwrap_or_default();
-                Some(id) != exclude && matches(&[m["title"].as_str().unwrap_or_default(), texts.get(id).map_or("", |p| p.text.as_str())])
+            .filter(|e| {
+                let p = self.parts(e);
+                Some(e.id.as_str()) != exclude && matches(&[p.title.as_str(), p.text.as_str()])
             })
+            .map(|e| self.summary(e))
             .collect()
     }
 
