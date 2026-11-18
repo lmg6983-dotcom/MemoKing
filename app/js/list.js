@@ -35,7 +35,7 @@ import { setupDrivePanel } from './drive-panel.js';
 import { isAllClear } from './core/tasks.js';
 import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
-import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT, slideSide } from './dom.js';
+import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT, slideSide, busyWhile, busyUntilBlur } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
 import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet } from './folder-ui.js';
@@ -833,7 +833,7 @@ async function runSearch() {
   const { text, tags } = parseQuery(state.query);
   state.queryTags = tags;
   const seq = ++searchSeq;
-  const results = text ? await api.memos.search(text) : null;
+  const results = text ? await busyWhile(el.cards, api.memos.search(text)) : null;
   if (seq !== searchSeq) return;
   state.results = results;
   render();
@@ -1115,7 +1115,7 @@ el.fabMenu.addEventListener('click', (e) => {
   newMemo(b.dataset.new === 'voice' ? { record: true } : b.dataset.new === 'ink' ? { ink: true } : {});
 });
 el.settingsBtn.addEventListener('click', async () => {
-  await loadSettings();
+  await busyWhile(el.settingsBtn, loadSettings());
   drivePanel?.refresh();
   paintPhoneQr().catch((err) => console.warn('[휴대폰 앱 QR]', err));
   openPanelDialog(el.settings);
@@ -1576,7 +1576,7 @@ async function showBlockedCount() {
   $('blocked-count').textContent = n ? `${n}개 꺼짐` : '';
 }
 $('history-apps-btn').addEventListener('click', async () => {
-  await renderApps();
+  await busyWhile($('history-apps-btn'), renderApps());
   openPanelDialog($('apps-dialog'));
 });
 
@@ -1672,7 +1672,7 @@ el.cards.addEventListener('contextmenu', (e) => {
   openCardMenu({
     memo, at, api, workLife: state.workLife,
     run: {
-      open: (id) => api.memo.open(id),
+      open: (id) => busyUntilBlur(card, api.memo.open(id)),
       pin: togglePin,
       color: (m, color) => api.memo.set(m.id, { color }),
       day: async (m) => {
@@ -1712,7 +1712,7 @@ el.cards.addEventListener('click', async (e) => {
   const del = e.target.closest('[data-delete]');
   if (del) return deleteMemo(del.dataset.delete);
   const pdfBtn = e.target.closest('[data-pdf]');
-  if (pdfBtn) return api.pdf.open(pdfBtn.dataset.pdf);
+  if (pdfBtn) return busyUntilBlur(pdfBtn, api.pdf.open(pdfBtn.dataset.pdf));
   const pinBtn = e.target.closest('[data-pin]');
   if (pinBtn) {
     const m = state.memos.find((x) => x.id === pinBtn.dataset.pin);
@@ -1739,7 +1739,7 @@ el.cards.addEventListener('click', async (e) => {
   }
   // 찾는 중이면 그 말을 넘겨, 메모가 열리면 찾은 자리로 가고 칠한다
   const findText = state.query ? parseQuery(state.query).text : '';
-  api.memo.open(card.dataset.id, findText ? { find: findText } : undefined);
+  busyUntilBlur(card, api.memo.open(card.dataset.id, findText ? { find: findText } : undefined)); // 창이 뜨기까지 누른 카드가 기다리는 모양
 });
 
 /** 충돌 사본 ↔ 원본 나란히: 사본 내용으로 바꾸기 · 사본 지우기 · 둘 다 두기 · 따로 열어 보기 */
@@ -2407,8 +2407,8 @@ async function refreshTrashCount() {
   $('trash-count').textContent = items.length ? String(items.length) : '';
 }
 $('trash-btn').addEventListener('click', async () => {
+  await busyWhile($('trash-btn'), renderTrash());
   el.settings.close();
-  await renderTrash();
   openPanelDialog(trashEl.dialog);
   // 설정에서 왔으면 휴지통을 닫을 때 설정으로 돌아간다 (막다른 길이 되지 않게)
   trashEl.dialog.addEventListener('close', () => openPanelDialog(el.settings), { once: true });

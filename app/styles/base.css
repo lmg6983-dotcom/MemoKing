@@ -199,6 +199,8 @@ svg { width: 20px; height: 20px; flex: none; }
 @media (hover: hover) and (pointer: fine) { .btn.primary:hover { background: var(--brand-yellow-hover); } }
 .btn.danger { background: var(--danger); color: var(--on-danger); box-shadow: none; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* 누른 일을 하는 중 (dom.js busyWhile) — 추억 공유 단추와 같은 모양 */
+:is(.btn, .icon-btn, .link-btn, .card, .cards, .stack-tab)[aria-busy="true"] { opacity: 0.6; cursor: progress; }
 
 .dialog {
   width: min(380px, calc(100vw - 32px));
