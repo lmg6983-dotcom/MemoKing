@@ -1525,7 +1525,7 @@ fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) 
     if !from_sticker.and_then(|l| app.get_webview_window(&l)).is_some_and(|w| is_shown(&w)) {
         return false;
     }
-    let moved = {
+    let (moved, kind) = {
         let mut g = wm();
         let kind = g.stickers.get(a).filter(|s| s.win.is_some()).map(|s| s.kind);
         if kind.is_none() || g.stickers.get(b).is_none_or(|s| s.win.is_some() || Some(s.kind) != kind) {
@@ -1533,7 +1533,7 @@ fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) 
         }
         let l = g.stickers.get_mut(a).and_then(|s| s.win.take());
         g.stickers.get_mut(b).unwrap().win = l.clone();
-        l
+        (l, kind)
     };
     let Some(sw) = moved.and_then(|l| app.get_webview_window(&l)) else { return false };
     // 주인 창(owner)을 바꾼다: 새 탭 위에 있고, 옛 탭과 함께 숨거나 닫히지 않게
@@ -1542,7 +1542,7 @@ fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) 
         windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(hwnd(&sw) as _, windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT, hwnd(to) as _);
     }
     if let Some(o) = bounds(to) {
-        set_bounds(&sw, sticker_bounds(o, wm().stickers.get(b).map_or("crown", |s| s.kind), false));
+        set_bounds(&sw, sticker_bounds(o, kind.unwrap_or("crown"), false));
     }
     sync_tape_pair(app, a);
     sync_tape_pair(app, b);
