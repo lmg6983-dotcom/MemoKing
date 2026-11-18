@@ -68,9 +68,12 @@ try {
     [W]::Keys(0x23); [W]::Type("`n`n#장보기 ")
     Wait-Js $n "Boolean(document.querySelector('.mk-doc .mk-tag'))"
   }
-  Step '체크 표시 (첫 항목 누르기)' {
-    Click-El $n '.mk-doc li' 0.02 0.5
-    Wait-Js $n "document.querySelector('.mk-doc li')?.getAttribute('data-checked') === 'true'" 3
+  Step '체크 표시 (첫 항목의 네모 누르기)' {
+    # 네모는 항목 왼쪽 바깥에 그려진다 — 앱이 재는 자리 그대로 (editor.js checkboxPoint)
+    $s = Invoke-Js $n "(() => { const li = document.querySelector('.mk-doc li[data-item-type=""task""]'); if (!li) return null; li.scrollIntoView({ block: 'center' }); const r = li.getBoundingClientRect(); const fs = parseFloat(getComputedStyle(li).fontSize) || 14; const d = devicePixelRatio; return { x: Math.round((screenX + r.left - fs * 0.9) * d), y: Math.round((screenY + r.top + fs * 0.8) * d) }; })()"
+    if (-not $s) { throw '체크리스트 항목이 없음' }
+    [W]::Click($s.x, $s.y)
+    Wait-Js $n "document.querySelector('.mk-doc li[data-item-type=""task""]')?.getAttribute('data-checked') === 'true'" 3
   }
   Step '메모 색 바꾸기 (메뉴 › 색)' {
     $before = Invoke-Js $n 'document.body.dataset.color'
@@ -121,7 +124,7 @@ try {
 
   # ---------- 오후: 그리기 · 표 · 찾기 ----------
   Step '손 메모: 그려서 넣기 (Ctrl+Shift+D)' {
-    Click-El $n '#editor' 0.5 0.9 # 보이는 글 칸 아래쪽 (긴 메모는 .mk-doc 아래 끝이 창 밖)
+    Click-El $n '.mk-doc > :first-child' 0.1 0.5; [W]::Keys(0x11, 0x23) # 제목 줄을 누르고 Ctrl+End 로 메모 끝 (빈 곳을 누르려다 사진을 눌러 사진 보기가 열렸다)
     [W]::Keys(0x11, 0x10, 0x44)
     if (-not (Wait-Js $n "Boolean(document.querySelector('.ink-sheet'))" 4)) { throw '그리기 화면이 열리지 않음' }
     $s = Get-Spot $n '.ink-scroll' 0.4 0.4
@@ -130,6 +133,7 @@ try {
     Wait-Js $n "Boolean(document.querySelector('.mk-doc .mk-ink'))" 6
   }
   Step '표 넣기 (+ › 표)' {
+    Click-El $n '.mk-doc > :first-child' 0.1 0.5; [W]::Keys(0x11, 0x23)
     Click-El $n '#add-btn'
     Click-El $n '[data-add="table"]'
     Wait-Js $n "Boolean(document.querySelector('.mk-doc table'))" 4
@@ -150,10 +154,12 @@ try {
   }
   Step '늘 위에 두기 (왕관) 켜고 끄기' {
     $a = Invoke-Js $n "document.getElementById('top-btn').outerHTML"
-    Click-El $n '#top-btn'; Start-Sleep -Milliseconds 400
-    $b = Invoke-Js $n "document.getElementById('top-btn').outerHTML"
-    Click-El $n '#top-btn'
-    @(($a -ne $b), $(if ($a -ne $b) { '단추 상태가 바뀜' } else { '눌러도 그대로' }))
+    Click-El $n '#top-btn'; Start-Sleep -Milliseconds 600
+    $on = (Invoke-Js $n "document.getElementById('top-btn').outerHTML") -ne $a
+    # 켜면 왕관이 창 위 가장자리 스티커가 되어 그 단추 자리를 덮는다 — 끄기는 단축키로 (Ctrl+Shift+T)
+    Show-Page $n; [W]::Keys(0x11, 0x10, 0x54); Start-Sleep -Milliseconds 600
+    $off = (Invoke-Js $n "document.getElementById('top-btn').outerHTML") -eq $a
+    @(($on -and $off), "켜짐=$on · 꺼짐(처음대로)=$off")
   }
   Step '메모 창: 위 막대로 옮기기' { Test-WindowDrag $n '.bar' 70 50 }
 
@@ -180,12 +186,17 @@ try {
     Wait-Js $n "!document.querySelector('.shortcut-sheet[open]')" 3
   }
   Step '메모 닫고 목록에서 찾아 다시 열기' {
+    # 닫은 메모 창은 숨겨 두었다가 다시 쓴다 — 숨은 창의 화면이 "보임" 으로 남아 있어, 닫힘은 Windows 창 수로 본다
+    $notes = { @([W]::Windows((Get-TestPids)) | Where-Object { $t = [W]::Title($_); $t -ne '메모킹' -and $t -notlike '*memoking.exe' }).Count }
+    $before = & $notes
     Click-El $n '#close-btn'
-    if (-not (Wait-Until 5 { -not (Find-Page 'note\.html') })) { throw '메모 창이 닫히지 않음' }
+    if (-not (Wait-Until 5 { (& $notes) -lt $before })) { throw "메모 창이 닫히지 않음 (창 $before 개 그대로)" }
     Click-El $list '#search'
     [W]::Type('장보기'); Start-Sleep 1
     Click-El $list '.card'
-    $script:Note = Wait-Until 10 { Find-Page 'note\.html' }
+    if (-not (Wait-Until 10 { (& $notes) -ge $before })) { throw '목록 카드를 눌러도 메모 창이 열리지 않음' }
+    # 다시 연 창: 글에 '계란' 이 있는 보이는 메모 화면 (초점은 목록의 찾기 칸에 남을 수 있다)
+    $script:Note = Wait-Until 10 { foreach ($p in Get-Pages | Where-Object { $_.url -match 'note\.html' }) { try { if (Test-Js $p "document.visibilityState === 'visible' && (document.querySelector('.mk-doc')?.textContent ?? '').includes('계란')") { $p; break } } catch {} } }
     [bool]$script:Note
   }
   $n = $script:Note
@@ -193,10 +204,14 @@ try {
     $n -and (Wait-Js $n "(() => { const d = document.querySelector('.mk-doc'); return d && d.textContent.includes('계란') && d.querySelector('img.mk-image:not(.mk-pdf-thumb)') && d.querySelector('img.mk-pdf-thumb') && d.querySelector('.mk-ink'); })()" 8)
   }
   Step '휴지통으로 (메뉴 › 삭제)' {
+    $notes = { @([W]::Windows((Get-TestPids)) | Where-Object { $t = [W]::Title($_); $t -ne '메모킹' -and $t -notlike '*memoking.exe' }).Count }
+    $before = & $notes
     Open-Menu $n
     Click-El $n '#delete-btn'
     if (Test-Js $n "Boolean(document.getElementById('confirm-ok')?.offsetParent)") { Click-El $n '#confirm-ok' }
-    Wait-Until 6 { -not (Find-Page 'note\.html') }
+    $closed = [bool](Wait-Until 6 { (& $notes) -lt $before })
+    $gone = [bool](Wait-Until 6 { -not (Test-Js $list "[...document.querySelectorAll('.card')].some((c) => c.textContent.includes('장보기'))") })
+    @(($closed -and $gone), "창 닫힘=$closed · 목록에서 빠짐=$gone")
   }
 }
 catch { Add-Result '시나리오 멈춤' $false $_.Exception.Message }

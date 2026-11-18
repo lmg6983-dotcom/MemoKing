@@ -40,7 +40,9 @@ public static class W {
   }
   /// 사람처럼: 누르고 → 조금 움직여 끌기 시작 → 목표로 미끄러지듯 → 잠깐 머물고(놓을 자리 표시) → 놓기
   public static void Drag(int x0, int y0, int x1, int y1) {
-    SetCursorPos(x0, y0); Thread.Sleep(120); mouse_event(LDOWN, 0, 0, 0, UIntPtr.Zero); Thread.Sleep(120);
+    // 누르고 잠깐 머문 뒤 움직인다 — 창 끌기는 화면 → 앱(IPC) → 창 옮기기 시작 순이라, 누르자마자 움직이면 시작이 늦어
+    //   손을 뗀 뒤에도 창이 마우스를 따라다니다 Windows 창 맞추기(Snap)에 걸렸다
+    SetCursorPos(x0, y0); Thread.Sleep(120); mouse_event(LDOWN, 0, 0, 0, UIntPtr.Zero); Thread.Sleep(350);
     Glide(x0, y0, x0 + 10, y0 + 10, 5, 20); Glide(x0 + 10, y0 + 10, x1, y1, 30, 15);
     Thread.Sleep(400); Glide(x1, y1, x1 + 2, y1 + 1, 2, 40); Thread.Sleep(250);
     mouse_event(LUP, 0, 0, 0, UIntPtr.Zero);
@@ -239,7 +241,10 @@ function Test-Js($page, [string]$expr) { [bool](Invoke-Js $page "Boolean($expr)"
 function Get-WinPos($page) { Invoke-Js $page '({ x: Math.round(screenX * devicePixelRatio), y: Math.round(screenY * devicePixelRatio) })' }
 # 그 요소를 잡고 끌어 창이 그만큼 옮겨지는가 → @(맞음, "옮긴 만큼")
 function Test-WindowDrag($page, [string]$sel, $dx = 60, $dy = 40, $fx = 0.5, $fy = 0.5) {
-  $s = Get-Spot $page $sel $fx $fy # 앞으로 가져오지 않는다 — 사람도 뒤에 있는 창의 막대를 바로 잡아 끈다
+  # 앞으로 가져오지 않는다 — 사람도 뒤에 있는 창의 막대를 바로 잡아 끈다.
+  #   그 막대 안에서 실제로 끌리는 곳을 찾는다 (가운데가 "미분류" 같은 단추일 수 있다 — shim.js 처럼 눌린 곳부터 위로 올라가며)
+  $js = "(() => { const box = document.querySelector($(ConvertTo-Json $sel)); if (!box) return null; const r = box.getBoundingClientRect(); const at = (x, y) => { for (let e = document.elementFromPoint(x, y); e instanceof Element; e = e.parentElement) { const s = getComputedStyle(e); const g = s.webkitAppRegion || s.appRegion; if (g === 'no-drag') return false; if (g === 'drag') return true; } return false; }; const y = r.top + r.height * $fy; for (const f of [$fx, 0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9, 0.03]) { const x = r.left + r.width * f; if (x > 0 && x < innerWidth && y > 0 && y < innerHeight && at(x, y)) { const d = devicePixelRatio; return { x: Math.round((screenX + x) * d), y: Math.round((screenY + y) * d) }; } } return null; })()"
+  $s = Invoke-Js $page $js
   if (-not $s) { return @($false, "잡을 곳 없음: $sel") }
   $a = Get-WinPos $page
   [W]::Drag($s.x, $s.y, $s.x + $dx, $s.y + $dy); Start-Sleep -Milliseconds 500
