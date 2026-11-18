@@ -2962,7 +2962,7 @@ dependencies = [
 
 [[package]]
 name = "memoking"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "aes-gcm",
  "arboard",
@@ -2999,7 +2999,7 @@ dependencies = [
 
 [[package]]
 name = "memoking-core"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "aes-gcm",
  "base64 0.23.1",
