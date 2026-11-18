@@ -334,6 +334,8 @@ pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
 
 /// 메모 창이 보이게 됐다: 그 메모의 층(왕관 · 테이프)과 스티커
 pub fn shown(app: &AppHandle, id: &str, win: &WebviewWindow) {
+    // 미리 만든 숨은 탭이 아니라 보인 메모를 열린 메모로 (맨 뒤가 다음에 켤 때 보일 탭, Electron 처럼 show 때)
+    crate::os::set_open(app, id, true);
     apply_layer(app, id, win, false);
 }
 

@@ -95,7 +95,7 @@ fn remember(app: &AppHandle, label: &str, id: Option<&str>) {
     save_soon(app);
 }
 
-fn set_open(app: &AppHandle, id: &str, open: bool) {
+pub fn set_open(app: &AppHandle, id: &str, open: bool) {
     let st = state(app);
     let mut list = st.setting("openNotes").as_array().cloned().unwrap_or_default();
     list.retain(|x| x != id);
@@ -106,9 +106,8 @@ fn set_open(app: &AppHandle, id: &str, open: bool) {
     save_soon(app); // 메모 창을 닫을 때(메인 스레드) 설정 파일 쓰기를 기다리지 않게
 }
 
-/// 메모 창이 열렸다 (memos::open_note): 열린 메모로 기억하고, 옮기면 자리를 기억한다
+/// 메모 창을 만들었다 (memos::create_note_window): 옮기면 자리를 기억한다. 열린 메모로는 보일 때 기억한다 (windows::shown)
 pub fn track_note(app: &AppHandle, id: &str, win: &WebviewWindow) {
-    set_open(app, id, true);
     let (app, id, label) = (app.clone(), id.to_string(), win.label().to_string());
     win.on_window_event(move |e| match e {
         WindowEvent::Moved(_) | WindowEvent::Resized(_) => remember(&app, &label, Some(&id)),
