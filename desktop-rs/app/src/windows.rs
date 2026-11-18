@@ -303,7 +303,30 @@ pub fn track(app: &AppHandle, id: &str, win: &WebviewWindow) {
             }
         }
         // 스택의 탭 창 하나를 닫으면 스택 모두 (Electron 'close')
-        WindowEvent::CloseRequested { .. } => close_stack(&app, &id),
+        //   창은 바로 숨기고, 남은 글을 동기 저장(mkFlushSync)한 뒤에 없앤다. 웹뷰를 닫는 동안의 beforeunload 저장을 기다리며 멈추지 않게
+        WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            close_stack(&app, &id);
+            let Some(w) = app.get_webview_window(&label) else { return };
+            hide_note(&app, &w);
+            let destroy = {
+                let (app, label) = (app.clone(), label.clone());
+                // 이벤트 처리 · 스크립트 답 안에서 웹뷰를 없애지 않는다
+                move || {
+                    let (app, label) = (app.clone(), label.clone());
+                    std::thread::spawn(move || {
+                        if let Some(w) = app.get_webview_window(&label) {
+                            let _ = w.destroy();
+                        }
+                    });
+                }
+            };
+            // 화면이 멈춰 답이 없어도 3초 뒤에는 닫는다
+            later(3000, destroy.clone());
+            if w.eval_with_callback("window.mkFlushSync?.()", move |_| destroy()).is_err() {
+                let _ = w.destroy();
+            }
+        }
         WindowEvent::Destroyed => destroyed(&app, &id, &label),
         _ => {}
     });
