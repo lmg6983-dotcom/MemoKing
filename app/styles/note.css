@@ -2413,8 +2413,18 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 
 /* 묶음 사진 크게 보기 (album-viewer.js) — 테두리 없이 전체 화면, 헤더·테일은 이미지 위에 활성 상태에서만 표시(2초 뒤 숨김) */
 .mk-album-view { position: fixed; inset: 0; z-index: 100000; background: #000; color: #fff; animation: mk-fade-in 0.15s ease-out; -webkit-app-region: no-drag; } /* PC: 메모 창 위 막대의 창 끌기 영역이 덮은 사진 보기 위에서도 살아 있어 위 단추가 눌리지 않았다 */
-.mk-album-head { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 10px 12px; padding-top: calc(10px + env(safe-area-inset-top)); background: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), transparent); transition: opacity 0.2s ease-out; -webkit-app-region: drag; }
-.mk-album-head button { -webkit-app-region: no-drag; } /* PC: 머리줄의 빈 곳으로 창을 옮긴다 (보기가 메모 창 위 막대를 덮는다) — 단추는 그대로 */
+/* 머리줄: PDF 보기와 같은 유리 막대 [장 수 · 그린 장] …… [돌리기 · 풀기 · 저장 · 공유 · 삭제 · 그리기] | [닫기]
+   PC 는 늘 보인다 — 창을 옮길 곳이자 (보기가 메모 창 위 막대를 덮는다) 상용 사진 보기처럼 도구가 제자리에. 휴대폰은 누를 때만 (몰입) */
+.mk-album-head {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 2px;
+  min-height: calc(52px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 6px 0 14px; box-sizing: border-box;
+  background: rgba(28, 28, 30, 0.82); backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06); transition: opacity 0.2s ease-out;
+  -webkit-app-region: drag;
+}
+.mk-album-head button { -webkit-app-region: no-drag; } /* 머리줄의 빈 곳으로 창을 옮기고, 단추는 그대로 */
+.mk-album-sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: rgba(255, 255, 255, 0.14); }
+.mk-album-view.inking .mk-album-sep { display: none; }
 .mk-album-count { font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.9; white-space: nowrap; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
 .mk-album-gap { flex: 1; }
 .mk-album-inked { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(255, 204, 0, 0.22); color: #ffd84d; font-size: 12px; }
@@ -2426,7 +2436,10 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 /* 아래 장 목록 (이미지 위 오버레이) */
 .mk-album-strip { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3; display: flex; gap: 6px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent); overflow-x: auto; scrollbar-width: thin; justify-content: safe center; transition: opacity 0.2s ease-out; }
 .mk-album-strip[hidden] { display: none; }
-.mk-album-view:not(.ui-active):not(.inking) :is(.mk-album-head, .mk-album-strip, .mk-album-nav) { opacity: 0; pointer-events: none; }
+.mk-album-view:not(.ui-active):not(.inking) :is(.mk-album-strip, .mk-album-nav) { opacity: 0; pointer-events: none; }
+@media (pointer: coarse) { .mk-album-view:not(.ui-active):not(.inking) .mk-album-head { opacity: 0; pointer-events: none; } }
+/* PC: 머리줄이 늘 있으니 사진은 그 아래부터 (머리줄에 가리지 않게) */
+@media (hover: hover) and (pointer: fine) { .mk-album-stage { top: 44px; } }
 .mk-album-thumb { position: relative; flex: none; width: 46px; height: 46px; padding: 0; border: 2px solid transparent; border-radius: 7px; background: #222; opacity: 0.6; cursor: pointer; overflow: hidden; }
 .mk-album-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
 .mk-album-thumb:hover { opacity: 0.85; }
@@ -2436,9 +2449,17 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-note { position: absolute; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.95); color: #1f1f1c; font-size: 13px; line-height: 1.45; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 .mk-album-note[hidden] { display: none; }
 .mk-album-note-btn { flex: none; border: 0; background: none; color: #8a6a00; font: inherit; font-weight: 700; cursor: pointer; padding: 2px 0; }
-.mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(6px); color: #fff; font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.mk-album-btn:hover { background: rgba(0, 0, 0, 0.65); }
+/* 단추: 막대 안에서 하나의 도구 줄로 (단추마다 따로 뜬 검은 동그라미 대신) — 올리면 옅게 */
+.mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 38px; padding: 0 12px; border: 0; border-radius: 11px; background: transparent; color: #f5f5f7; font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: background 0.12s, color 0.12s, transform 0.12s ease-out; }
+.mk-album-btn:active { transform: scale(0.94); }
+@media (hover: hover) { .mk-album-btn:hover { background: rgba(255, 255, 255, 0.14); } }
+.mk-album-btn:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 2px; }
 .mk-album-btn svg { width: 18px; height: 18px; }
+/* 그리기: 메모킹 노랑 (보기에서 할 수 있는 주된 일) */
+.mk-album-draw { margin-left: 4px; background: rgba(255, 204, 0, 0.16); color: #ffd84d; font-weight: 650; }
+@media (hover: hover) { .mk-album-draw:hover { background: rgba(255, 204, 0, 0.26); } }
+/* 닫기: 올리면 Windows 창 닫기처럼 빨강 (목록 창 창 단추 · PDF 보기와 같은 색) */
+@media (hover: hover) { .mk-album-close:hover { background: #c42b1c; color: #fff; } }
 .mk-album-stage { position: absolute; inset: 0; margin: 0; overflow: hidden; touch-action: none; } /* 테두리 여백 없이 화면 전체 */
 /* 장 전체가 화면 안에 (세로로 긴 장도) — 그림 상자 = 보이는 그림이어야 그리기판이 그 위에 꼭 맞는다 */
 .mk-album-big { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; background: transparent; user-select: none; -webkit-user-drag: none; transform-origin: 0 0; }
@@ -2454,8 +2475,14 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
   .mk-album-btn-text { display: none; }
 }
 .mk-album-count { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.mk-album-nav { position: absolute; top: 50%; z-index: 3; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.45); color: #fff; cursor: pointer; display: grid; place-items: center; transition: opacity 0.2s ease-out; }
-.mk-album-nav:hover { background: rgba(0, 0, 0, 0.65); }
+.mk-album-nav {
+  position: absolute; top: 50%; z-index: 3; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%;
+  background: rgba(28, 28, 30, 0.72); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: #fff; cursor: pointer; display: grid; place-items: center; transition: opacity 0.2s ease-out, background 0.12s;
+}
+.mk-album-nav:hover { background: rgba(58, 58, 60, 0.9); }
+.mk-album-nav:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 2px; }
 .mk-album-nav svg { width: 20px; height: 20px; }
 .mk-album-nav.prev { left: 8px; }
 .mk-album-nav.prev svg { transform: rotate(180deg); }
@@ -2524,33 +2551,56 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-pdf-view.closing { animation: mk-pdf-out 0.14s ease-in forwards; }
 @keyframes mk-pdf-in { from { opacity: 0; transform: scale(0.985); } }
 @keyframes mk-pdf-out { to { opacity: 0; transform: scale(0.985); } }
-/* 위 막대: 쪽 위에 반투명으로 떠 있다 (쪽이 막대 아래로 지나간다) */
+/* 위 막대: 쪽 위에 반투명으로 떠 있다 (쪽이 막대 아래로 지나간다). [PDF 표 · 제목 / 쪽] …… [다른 앱으로] | [닫기] */
 .mk-pdf-bar {
-  position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 4px;
-  padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top)); background: var(--pdf-bar);
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 2px;
+  height: calc(52px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 6px 0 14px; box-sizing: border-box; background: var(--pdf-bar);
   backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px); border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   -webkit-app-region: drag; /* PC: 보기가 메모 창 위 막대(창 끌기)를 덮으므로 이 막대로 창을 옮긴다 — 단추는 아래에서 no-drag */
 }
 .mk-pdf-bar button { -webkit-app-region: no-drag; }
-.mk-pdf-heading { flex: 1; min-width: 0; padding: 0 6px; line-height: 1.25; }
-.mk-pdf-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 650; font-size: 15px; letter-spacing: -0.01em; }
-.mk-pdf-sub { font-size: 12px; color: var(--pdf-muted); font-variant-numeric: tabular-nums; }
+/* 메모 속 PDF 썸네일의 "PDF" 표와 같은 빨강 — 어떤 파일을 보는지 한눈에 */
+.mk-pdf-badge { flex: none; padding: 2px 6px; border-radius: 5px; background: #c4282e; color: #fff; font-size: 10.5px; font-weight: 800; line-height: 1.5; letter-spacing: 0.02em; }
+.mk-pdf-heading { flex: 1; min-width: 0; padding: 0 10px; line-height: 1.25; }
+.mk-pdf-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 650; font-size: 14.5px; letter-spacing: -0.01em; }
+.mk-pdf-sub { margin-top: 1px; font-size: 11.5px; color: var(--pdf-muted); font-variant-numeric: tabular-nums; }
+.mk-pdf-sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: rgba(255, 255, 255, 0.14); }
 .mk-pdf-ibtn {
-  flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px;
-  background: transparent; color: var(--pdf-fg); cursor: pointer; transition: background 0.12s, transform 0.12s ease-out;
+  flex: none; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 11px;
+  background: transparent; color: var(--pdf-fg); cursor: pointer; transition: background 0.12s, color 0.12s, transform 0.12s ease-out;
 }
-.mk-pdf-ibtn svg { width: 21px; height: 21px; }
+.mk-pdf-ibtn svg { width: 20px; height: 20px; }
 .mk-pdf-ibtn:active { transform: scale(0.92); }
 @media (hover: hover) { .mk-pdf-ibtn:hover { background: var(--pdf-btn-hover); } }
-.mk-pdf-ibtn:focus-visible, .mk-pdf-pill:focus-visible, .mk-pdf-done:focus-visible, .mk-pdf-zoomval:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 2px; }
-.mk-pdf-annot { background: var(--pdf-btn); }
-.mk-pdf-done { display: none; flex: none; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--brand-yellow, #ffcc00); color: #1a1a1a; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
-.mk-pdf-view[data-mode="ink"] .mk-pdf-done { display: block; }
-.mk-pdf-view[data-mode="ink"] .mk-pdf-annot, .mk-pdf-view[data-mode="ink"] .mk-pdf-zoombar, .mk-pdf-view[data-mode="ink"] .mk-pdf-pill { display: none; }
-/* 쪽들 */
+/* 닫기: 오른쪽 끝, 올리면 Windows 창 닫기처럼 빨강 (목록 창 창 단추와 같은 색) */
+@media (hover: hover) { .mk-pdf-close:hover { background: #c42b1c; color: #fff; } }
+.mk-pdf-ibtn:focus-visible, .mk-pdf-pill:focus-visible, .mk-pdf-zoomval:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 2px; }
+/* 왼쪽 도구 줄: 고르기 · 펜 · 형광펜 · 지우개 — 늘 같은 자리, 고른 도구는 메모킹 노랑 */
+.mk-pdf-rail {
+  position: absolute; left: 10px; top: 50%; z-index: 3; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 2px; padding: 5px; border-radius: 16px;
+  background: var(--pdf-bar); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: mk-pdf-rail-in 0.22s ease-out;
+}
+@keyframes mk-pdf-rail-in { from { opacity: 0; transform: translate(-6px, -50%); } }
+.mk-pdf-rail .mk-pdf-tool { width: 38px; height: 38px; }
+.mk-pdf-rail .mk-pdf-tool:first-child { margin-bottom: 7px; position: relative; } /* 고르기 | 그리기 도구 사이 가는 줄 */
+.mk-pdf-rail .mk-pdf-tool:first-child::after { content: ""; position: absolute; left: 9px; right: 9px; bottom: -5px; height: 1px; background: rgba(255, 255, 255, 0.14); }
+.mk-pdf-tool[aria-pressed="true"] { background: var(--brand-yellow, #ffcc00); color: #1a1a1a; }
+@media (hover: hover) { .mk-pdf-tool[aria-pressed="true"]:hover { background: var(--brand-yellow, #ffcc00); } }
+/* 그리는 동안 색 · 굵기 · 되돌리기 · 완료는 아래 공용 막대 — 도구 고르기는 왼쪽 줄이 맡는다 */
+.mk-pdf-view .ink-dock .ink-tools { display: none; }
+.mk-pdf-view[data-mode="ink"] .mk-pdf-zoombar, .mk-pdf-view[data-mode="ink"] .mk-pdf-pill { display: none; }
+/* 쪽들 — 양옆 여백은 쪽 폭 계산(pdf-viewer.js sidePad)이 그대로 읽는다. 도구 줄이 있으면 그 자리만큼 */
 .mk-pdf-scroll { flex: 1; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
 .mk-pdf-pages { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: calc(68px + env(safe-area-inset-top)) 8px calc(96px + env(safe-area-inset-bottom)); min-width: min-content; }
-@media (min-width: 600px) { .mk-pdf-pages { padding-left: 24px; padding-right: 24px; gap: 20px; } }
+.mk-pdf-view.has-rail .mk-pdf-pages { padding-left: 60px; }
+@media (min-width: 600px) {
+  .mk-pdf-pages { padding-left: 24px; padding-right: 24px; gap: 20px; }
+  .mk-pdf-view.has-rail .mk-pdf-pages { padding-left: 72px; padding-right: 72px; }
+}
+@media (prefers-reduced-motion: reduce) { .mk-pdf-rail { animation: none; } }
 .mk-pdf-page {
   position: relative; flex: none; border-radius: 3px; overflow: hidden; background: #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 28px rgba(0, 0, 0, 0.35);
@@ -2618,7 +2668,6 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-pdf-seldot { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
 .mk-pdf-seldot::before { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
 .mk-pdf-selbtn:focus-visible, .mk-pdf-seldot:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 1px; }
-@media (max-width: 480px) { .mk-pdf-bar { padding-left: 6px; padding-right: 8px; } .mk-pdf-title { font-size: 14.5px; } }
 @media print { .mk-pdf-view { display: none !important; } }
 /* 메모 속 PDF 썸네일: 누르면 미리보기 — 오른쪽 아래 "PDF" 표시 */
 .mk-doc img.mk-pdf-thumb { box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12); background: #fff; cursor: zoom-in; }
@@ -2657,20 +2706,29 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-doc p:has(> .mk-doc-pending) .mk-doc-pending-label { margin-bottom: 8px; }
 /* PC(마우스): 위 막대 · 확대 막대를 메모 창 단추(.icon-btn 32px · 아이콘 18px) 크기에 맞춘다 — 휴대폰 손가락 크기 그대로라 PC 에서는 혼자 컸다 */
 @media (hover: hover) and (pointer: fine) {
-  .mk-pdf-bar { gap: 2px; padding: 4px 6px; }
+  .mk-pdf-bar { height: 42px; padding: 0 5px 0 10px; }
   .mk-pdf-ibtn { width: 32px; height: 32px; border-radius: var(--radius-sm, 8px); }
   .mk-pdf-ibtn svg { width: 18px; height: 18px; }
-  .mk-pdf-heading { padding: 0 4px; }
+  .mk-pdf-heading { padding: 0 8px; }
   .mk-pdf-title { font-size: 13px; }
   .mk-pdf-sub { font-size: 11px; }
-  .mk-pdf-done { height: 28px; padding: 0 12px; font-size: 12.5px; }
-  .mk-pdf-pages { padding-top: 52px; }
+  .mk-pdf-pages { padding-top: 54px; }
+  .mk-pdf-rail { left: 8px; padding: 4px; border-radius: 12px; }
+  .mk-pdf-rail .mk-pdf-tool { width: 32px; height: 32px; }
+  .mk-pdf-rail .mk-pdf-tool:first-child::after { left: 7px; right: 7px; }
+  .mk-pdf-view.has-rail .mk-pdf-pages { padding-left: 52px; }
+  /* 사진 보기 머리줄도 같은 크기 (사진은 그 아래 44px 부터 — .mk-album-stage) */
+  .mk-album-head { min-height: 44px; height: 44px; padding: 0 5px 0 12px; }
+  .mk-album-btn { height: 32px; padding: 0 10px; border-radius: var(--radius-sm, 8px); font-size: 13px; }
+  .mk-album-head .mk-album-icon { width: 32px; padding: 0; }
+  .mk-album-count { font-size: 13px; }
   .mk-pdf-zoombar { right: 12px; bottom: 12px; padding: 3px; border-radius: 10px; }
   .mk-pdf-zoombar .mk-pdf-ibtn { width: 28px; height: 28px; border-radius: 7px; }
   .mk-pdf-zsym { font-size: 15px; }
   .mk-pdf-zoomval { min-width: 44px; height: 28px; border-radius: 7px; font-size: 12px; }
   .mk-pdf-pill { bottom: 12px; padding: 5px 12px; font-size: 12px; }
 }
+@media (hover: hover) and (pointer: fine) and (min-width: 600px) { .mk-pdf-view.has-rail .mk-pdf-pages { padding-left: 64px; padding-right: 64px; } }
 /* 화면 스냅샷 (note.js showSnapshot): 편집기를 만드는 동안 지난번 모습을 먼저 — 만드는 중인 편집기는 그 뒤에 감춰 둔다 */
 .editor > .mk-snapshot { pointer-events: none; }
 .editor > .mk-snapshot ~ .milkdown { position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; }

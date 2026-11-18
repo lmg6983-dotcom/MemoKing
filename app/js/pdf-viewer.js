@@ -46,18 +46,26 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
     b.addEventListener('click', run);
     return b;
   };
-  // 위 막대
+  // 위 막대: [PDF 표 · 제목 / 쪽] …… [다른 앱으로 열기] | [닫기] — 닫기는 늘 오른쪽 끝 (Windows 창 · 상용 PDF 보기처럼)
   const bar = el('div', 'mk-pdf-bar');
-  const close = iconBtn('닫기 (Esc)', 'close', () => shut());
+  const close = iconBtn('닫기 (Esc)', 'close', () => shut(), 'mk-pdf-close');
+  const badge = el('span', 'mk-pdf-badge', { textContent: 'PDF', ariaHidden: 'true' }); // 메모 속 썸네일의 PDF 표와 같은 빨강
   const heading = el('div', 'mk-pdf-heading');
-  const title = el('div', 'mk-pdf-title', { textContent: name });
+  const title = el('div', 'mk-pdf-title', { textContent: name, title: name });
   const sub = el('div', 'mk-pdf-sub', { textContent: '여는 중' });
   heading.append(title, sub);
-  const annotBtn = onSave ? iconBtn('주석 달기 (펜 · 형광펜)', 'pen', () => setInk(true), 'mk-pdf-annot') : null;
   const ext = onExternal ? iconBtn('다른 앱으로 열기', 'share', () => onExternal()) : null;
-  const doneBtn = el('button', 'mk-pdf-done', { type: 'button', textContent: '완료', title: '주석 저장하고 끝내기 (Esc)' });
-  doneBtn.addEventListener('click', () => setInk(false));
-  bar.append(close, heading, ...(annotBtn ? [annotBtn] : []), ...(ext ? [ext] : []), doneBtn);
+  bar.append(badge, heading, ...(ext ? [ext, el('span', 'mk-pdf-sep', { ariaHidden: 'true' })] : []), close);
+  // 왼쪽 도구 줄 (주석을 넣을 수 있을 때 늘 같은 자리): 고르기 · 펜 · 형광펜 · 지우개 — 펜을 고르면 바로 그리고, 고르기로 돌아오면 저장
+  //   색 · 굵기 · 되돌리기 · 완료는 그리는 동안 아래 막대 (ink-editor.js 공용 — 도구 단추는 이 줄이 맡아 거기서는 숨긴다)
+  const rail = onSave ? el('div', 'mk-pdf-rail', { role: 'toolbar', ariaLabel: '주석 도구', ariaOrientation: 'vertical' }) : null;
+  const railBtns = {};
+  for (const [t, label, ic] of rail ? [['select', '고르기 · 넘겨 보기 (Esc)', 'cursor'], ['pen', '펜 (P)', 'pen'], ['highlighter', '형광펜 (H)', 'highlighter'], ['eraser', '지우개 (E)', 'eraser']] : []) {
+    const b = iconBtn(label, ic, () => pickTool(t), 'mk-pdf-tool');
+    b.setAttribute('aria-pressed', String(t === 'select'));
+    railBtns[t] = b;
+    rail.append(b);
+  }
   // 쪽들
   const scroller = el('div', 'mk-pdf-scroll');
   const list = el('div', 'mk-pdf-pages');
@@ -76,7 +84,8 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   };
   zoomBar.append(zoomBtn('작게 (Ctrl+−)', '−', () => setZoom(zoom / 1.25)), zoomLabel, zoomBtn('크게 (Ctrl++)', '+', () => setZoom(zoom * 1.25)));
   const toast = el('div', 'mk-pdf-toast', { role: 'status' });
-  view.append(bar, scroller, pill, zoomBar, toast);
+  view.append(bar, ...(rail ? [rail] : []), scroller, pill, zoomBar, toast);
+  view.classList.toggle('has-rail', Boolean(rail));
   document.body.append(view);
   const restore = document.activeElement;
   close.focus();
@@ -137,16 +146,30 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   }
   const repaintAll = () => pages.forEach((p, i) => (p.svg || inkOf(i).length) && paintInk(i));
 
+  function syncRail() {
+    for (const [t, b] of Object.entries(railBtns)) b.setAttribute('aria-pressed', String(inking ? tools.tool === t : t === 'select'));
+  }
+  async function pickTool(t) {
+    if (t === 'select') return setInk(false);
+    tools.tool = t;
+    tools.save();
+    if (!inking) return setInk(true);
+    toolbar?.update();
+    syncRail();
+  }
+
   async function setInk(on) {
     if (on === inking || !pdf) return;
     if (on) {
       clearSel();
       inking = true;
       view.dataset.mode = 'ink';
+      syncRail();
       hist = inkHistory(hist.get());
       pages.forEach((_, i) => surfaceFor(i));
       toolbar = createInkToolbar({
         tools,
+        onChange: syncRail,
         onUndo: () => hist.undo() && afterUndo(),
         onRedo: () => hist.redo() && afterUndo(),
         canUndo: hist.canUndo,
@@ -167,6 +190,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
     // 끝내기: 바뀐 것이 있으면 PDF 에 넣어 저장
     inking = false;
     view.dataset.mode = 'view';
+    syncRail();
     for (const s of surfaces.values()) s.destroy();
     surfaces = new Map();
     toolbar?.el.remove();
@@ -253,7 +277,12 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   const want = (p) => Math.min(4096, Math.round(p.box.clientWidth * Math.min(2.5, window.devicePixelRatio || 1))); // 크게 확대해도 캔버스는 4096px 까지 (메모리)
   const stale = (p) => !p.failed && !(p.drawnAt && Math.abs(p.drawnAt - want(p)) < 8);
   const PT = 96 / 72; // PDF 1pt → 화면 px (100% = 종이 실제 크기)
-  const baseWidth = () => Math.min(scroller.clientWidth - (scroller.clientWidth < 600 ? 16 : 48), Math.round((pages[0]?.w ?? 690) * PT)); // 쪽 폭 (확대 1) — 실제 크기, 화면이 좁으면 폭에 맞춘다
+  // 쪽 폭 (확대 1) — 실제 크기, 화면이 좁으면 폭에 맞춘다. 양옆 여백은 CSS 가 정한 대로 (도구 줄 자리 포함 — note.css .mk-pdf-pages)
+  const sidePad = () => {
+    const s = getComputedStyle(list);
+    return parseFloat(s.paddingLeft) + parseFloat(s.paddingRight);
+  };
+  const baseWidth = () => Math.min(scroller.clientWidth - sidePad(), Math.round((pages[0]?.w ?? 690) * PT));
   const layout = () => {
     const w = Math.round(baseWidth() * zoom);
     for (const p of pages) {
@@ -677,7 +706,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
       else shut();
       return;
     }
-    if (inking && inkKeys(e, { undo: () => hist.undo() && afterUndo(), redo: () => hist.redo() && afterUndo(), setTool: (t) => { tools.tool = t; tools.save(); toolbar?.update(); } })) {
+    if (inking && inkKeys(e, { undo: () => hist.undo() && afterUndo(), redo: () => hist.redo() && afterUndo(), setTool: (t) => { tools.tool = t; tools.save(); toolbar?.update(); syncRail(); } })) {
       e.preventDefault();
       return;
     }
