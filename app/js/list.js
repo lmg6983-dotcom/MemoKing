@@ -2063,8 +2063,26 @@ api.on('memos:changed', (memos) => {
     memosStale = true; // 메모 탭으로 돌아오면 다시 그린다
     return remindersTab.refresh({ quiet: activeTab !== 'reminders' }); // 메모 제목이 바뀌면 알림 탭에도
   }
-  if (state.query) runSearch();
-  else render();
+  // 목록이 숨어 있으면 다시 보일 때 그린다. 보일 때도 잇따른 변경(글을 치는 동안 0.6초마다 저장)은 1초에 한 번만:
+  //   메모 2,000장을 다시 그리는 데 0.15초쯤 걸려, 같은 렌더러를 쓰는 메모 창(PC Rust 판)의 입력이 그때마다 끊겼다
+  if (document.hidden) {
+    memosStale = true;
+    return;
+  }
+  clearTimeout(changedTimer);
+  changedTimer = setTimeout(() => {
+    lastChangedRender = performance.now();
+    if (state.query) runSearch();
+    else render();
+  }, Math.max(0, lastChangedRender + 1000 - performance.now()));
+});
+let changedTimer = 0;
+let lastChangedRender = -Infinity;
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && memosStale && activeTab === 'memos') {
+    if (state.query) runSearch();
+    else render();
+  }
 });
 api.on('vault:opened', (info) => {
   applyInfo(info);
