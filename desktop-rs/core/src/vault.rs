@@ -310,10 +310,10 @@ impl Vault {
                 return p.clone();
             }
         }
-        let lines = body::plain_lines(&e.body, usize::MAX);
+        let (title, preview, lines) = body::title_preview_lines(&e.body, 1200);
         let p = std::sync::Arc::new(Parts {
-            title: body::extract_title(&e.body),
-            preview: body::extract_preview(&e.body, 1200),
+            title,
+            preview,
             media: body::extract_media(&e.body),
             tags: body::extract_tags(&e.body),
             tasks: body::task_progress(&e.body),
