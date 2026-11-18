@@ -121,6 +121,39 @@ window.addEventListener('load', () => setTimeout(async () => {
     await check('목록 카드 메뉴 → 메모 창에서 하기', async () => (await mk.memo.cardCommand(seed.id, 'versions')) === true && (await mk.memo.cardCommand(seed.id, 'nope')) === false);
     await check('따로 남긴 글 수', async () => (await mk.recovered.count()) === 0);
     await check('이어 쓰기 안내 없음 (모두 이 PC 에서 고침)', async () => (await mk.memo.handoff()) === null);
+    // ---------- 빠르게 열기 · 메모리 (0.88.x) ----------
+    await check('켤 때 로딩 화면이 걷힘', () => until(() => !document.getElementById('boot') || document.getElementById('boot').classList.contains('done'), 8000));
+    await check('켤 때 복원 끝남 (app:restoring)', async () => (await mk.app.restoring()) === false);
+    const pic = (src) => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error(`못 읽음 ${src}`));
+      img.src = src;
+    });
+    await check('줄인 그림 주소 (작은 그림은 원본 그대로)', async () => (await pic(`${mk.vaultBase}attachments/dot.png?thumb=480`)).naturalWidth === 1);
+    await check('줄인 그림 (큰 그림은 긴 변 256)', async () => {
+      // 무늬를 채운 600x400 PNG (150KB 를 넘어야 줄인다)
+      const c = document.createElement('canvas');
+      c.width = 600;
+      c.height = 400;
+      const g = c.getContext('2d');
+      const px = g.createImageData(600, 400);
+      for (let i = 0; i < px.data.length; i++) px.data[i] = (i * 2654435761) >>> 24;
+      g.putImageData(px, 0, 0);
+      const bytes = new Uint8Array(await (await new Promise((r) => c.toBlob(r, 'image/png'))).arrayBuffer());
+      const big = await mk.attachments.save(bytes, 'png');
+      const img = await pic(`${mk.vaultBase}${big}?thumb=256`);
+      return bytes.length > 150 * 1024 && img.naturalWidth === 256 && Math.abs(img.naturalHeight - 171) <= 1; // 400 × 256 / 600 = 170.7
+    });
+    await check('빠르게 열기 스위치 (끄고 켜기)', async () => {
+      const off = await mk.settings.setPerf('perfPreload', false);
+      const read = (await mk.settings.get()).perf;
+      const on = await mk.settings.setPerf('perfPreload', true);
+      return off === false && read.perfPreload === false && read.perfSnapshot === true && on === true;
+    });
+    await check('모르는 설정 이름은 거절', () => mk.settings.setPerf('vaultPath', false).then(() => false, () => true));
+    await check('AI 엔진: 받을 수 있음 (설치 파일에 없어도)', async () => (await mk.ai.status()).engine === true);
+    await check('속도 기록', async () => (await mk.perf.log('점검')) === null);
     // 앱 화면 밖으로 넘어가지 않는다 (넘어가면 이 점검이 끝나지 않아 실패로 보인다)
     await check('다른 주소로 넘어가지 않음', async () => {
       const here = location.href;
@@ -156,5 +189,9 @@ window.addEventListener('load', () => setTimeout(async () => {
   await check('첨부 정보', async () => (await mk.attachments.info(rel)).size === 256);
   await check('다른 이름으로 저장', async () => (await mk.attachments.saveAs({ name: '내/보내기:파일.bin', rel })).name === '보내기 파일.bin'); // Electron safeName 처럼 경로 앞은 뗀다
   await check('CSS app-region 읽힘 (창 끌기)', () => dragRegion('.bar'));
+  await check('닫을 때 화면 스냅샷이 남음', () => {
+    window.mkFlushSync?.();
+    return JSON.parse(localStorage.getItem(`memoking.snap.${id}`) ?? 'null')?.html?.includes('milkdown');
+  });
   done();
 }, 1500));
