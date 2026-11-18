@@ -269,7 +269,7 @@ fn schedule_spare(app: &AppHandle, ms: u64) {
 
 fn make_spare(app: &AppHandle) {
     // 점검(smoke)은 창마다 점검을 돌려 알려 온 창 수를 센다. 예비 창을 섞지 않는다
-    if crate::ipc::smoke() || state(app).vault.lock().unwrap().is_none() {
+    if crate::ipc::counting_smoke() || state(app).vault.lock().unwrap().is_none() {
         return;
     }
     let label = format!("note-{}", NEXT_NOTE.fetch_add(1, Ordering::Relaxed));

@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/droptest-rs.yml
       - desktop-rs/scripts/drop-driver.ps1
+      - desktop-rs/app/smoke.js
       - app/js/file-drop.js
 
 permissions:
@@ -32,30 +33,34 @@ jobs:
         with:
           workspaces: desktop-rs
       - run: cargo build
-      - name: 새 메모 창에 두 번 끌어 놓기
+      # ① nofix: 배포된 1.0 처럼 (창 전체에서 받기 끔) ② fix: 지금 코드 — 둘 다 예비 창으로 열린 새 메모 창, 글자 줄 위에 놓는다
+      - name: 새 메모 창에 두 번 끌어 놓기 (① 배포판처럼 · ② 고친 뒤)
         run: |
-          $ready = Join-Path $env:TEMP 'memoking-droptest-ready.txt'
-          Remove-Item $ready -ErrorAction SilentlyContinue
           $sample = Join-Path $env:TEMP 'drop-sample.txt'
           Set-Content $sample '끌어 놓기 시험 파일' -Encoding utf8
-          $env:MEMOKING_DROPTEST = '1'
-          $p = Start-Process target/debug/memoking.exe -ArgumentList '--smoke' -RedirectStandardOutput smoke.txt -PassThru
-          $t = 0
-          while (-not (Test-Path $ready) -and $t -lt 120) { Start-Sleep -Milliseconds 500; $t++ }
-          if (-not (Test-Path $ready)) { Get-Content smoke.txt -Encoding utf8; throw '메모 창이 준비되지 않았어요' }
-          $xy = (Get-Content $ready).Split(' ')
-          "놓을 곳: $($xy -join ', ')"
-          $log = & powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File scripts/drop-driver.ps1 -File $sample -X $xy[0] -Y $xy[1] -Times 2
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          $img = New-Object System.Drawing.Bitmap $b.Width, $b.Height
-          [System.Drawing.Graphics]::FromImage($img).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
-          $img.Save("$PWD/drop-screen.png")
-          "--- 도우미 (OLE 결과) ---"; $log
-          if (-not $p.WaitForExit(90000)) { Stop-Process $p; '앱이 끝나지 않았어요' }
-          "--- 앱 ---"; Get-Content smoke.txt -Encoding utf8
+          foreach ($mode in 'nofix', 'fix') {
+            "===== $mode ====="
+            $ready = Join-Path $env:TEMP 'memoking-droptest-ready.txt'
+            Remove-Item $ready -ErrorAction SilentlyContinue
+            $env:MEMOKING_DROPTEST = $mode
+            $p = Start-Process target/debug/memoking.exe -ArgumentList '--smoke' -RedirectStandardOutput "smoke-$mode.txt" -PassThru
+            $t = 0
+            while (-not (Test-Path $ready) -and $t -lt 160) { Start-Sleep -Milliseconds 500; $t++ }
+            if (-not (Test-Path $ready)) { Stop-Process $p -ErrorAction SilentlyContinue; Get-Content "smoke-$mode.txt" -Encoding utf8; '메모 창이 준비되지 않았어요'; continue }
+            $xy = (Get-Content $ready).Split(' ')
+            "놓을 곳: $($xy -join ', ')"
+            $log = & powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File scripts/drop-driver.ps1 -File $sample -X $xy[0] -Y $xy[1] -Times 2
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $img = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($img).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $img.Save("$PWD/drop-$mode.png")
+            "--- 도우미 (OLE 결과) ---"; $log
+            if (-not $p.WaitForExit(90000)) { Stop-Process $p; '앱이 끝나지 않았어요' }
+            "--- 앱 ---"; Get-Content "smoke-$mode.txt" -Encoding utf8 | Where-Object { $_ -notmatch '^\[memoking\] GET' }
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: drop-screen
-          path: desktop-rs/drop-screen.png
+          path: desktop-rs/drop-*.png

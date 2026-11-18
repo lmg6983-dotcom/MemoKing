@@ -30,14 +30,25 @@ window.addEventListener('load', () => setTimeout(async () => {
   // 끌어 놓기 재현 (MEMOKING_DROPTEST=1 · .github/workflows/droptest-rs.yml): 새 메모 창 하나를 정해진 자리에 두고,
   //   바깥 도우미가 탐색기처럼 OLE 로 파일을 두 번 끌어다 놓는다 → 창이 받은 이벤트와 들어간 파일 수를 시간과 함께 남긴다
   const invoke = (channel, args = []) => window.__TAURI_INTERNALS__.invoke('ipc', { channel, args });
-  if (await invoke('smoke:droptest')) {
+  const dropMode = await invoke('smoke:droptest');
+  if (dropMode) {
     if (label === 'list') {
       let noteDone = false;
       window.__TAURI__.event.listen('smoke:note-done', () => (noteDone = true));
-      await check('끌어 놓기 시험 창 열기', async () => typeof (await mk.memo.create({})) === 'string');
+      // nofix: 창 전체에서 받기(file-drop.js)를 끈 채 — 배포된 1.0 과 같게 (note.js 가 읽는다)
+      try {
+        if (dropMode === 'nofix') localStorage.setItem('memoking.noFileDrop', '1');
+        else localStorage.removeItem('memoking.noFileDrop');
+      } catch {}
+      await new Promise((r) => setTimeout(r, 4000)); // 예비 창이 다 만들어지게 (실제처럼 예비 창으로 열린다)
+      const lines = Array.from({ length: 24 }, (_, i) => `${i + 1}번째 줄 — 끌어 놓을 자리`).join('\n\n');
+      await check(`끌어 놓기 시험 창 열기 (${dropMode})`, async () => typeof (await mk.memo.import(`# 끌어 놓기 시험\n\n${lines}`, { open: true })) === 'string');
       await until(() => noteDone, 90000).catch(() => {});
       return done();
     }
+    // 기다리는 예비 창은 건너뛴다 (메모를 건네받은 창만 — 주소에 id 가 생긴다)
+    await until(() => new URLSearchParams(location.search).get('id'), 60000).catch(() => null);
+    if (!new URLSearchParams(location.search).get('id')) return;
     const t0 = performance.now();
     const log = [];
     const at = () => Math.round((performance.now() - t0) / 100) / 10;
@@ -46,7 +57,7 @@ window.addEventListener('load', () => setTimeout(async () => {
     window.addEventListener('dragover', () => overs++, true);
     const chips = () => document.querySelectorAll('.mk-doc a[href^="attachments/"]').length;
     await until(() => document.querySelector('.mk-doc .ProseMirror, .mk-doc[contenteditable]'), 15000).catch(() => {});
-    log.push(`${at()}s 편집기 준비 · 준비 알림`);
+    log.push(`${at()}s 편집기 준비 (${new URLSearchParams(location.search).get('id') ? '' : 'id 없음 '}${performance.getEntriesByType('navigation')[0]?.name.includes('spare') ? '예비 창' : '새 창'}) · 준비 알림`);
     await invoke('smoke:droptest-ready');
     let last = 0;
     const tEnd = Date.now() + 45000;

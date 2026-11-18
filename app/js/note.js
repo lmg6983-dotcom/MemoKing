@@ -1065,8 +1065,16 @@ async function insertFiles(files) {
   }
 }
 
+// (점검: localStorage memoking.noFileDrop = 1 이면 끈다 — droptest-rs.yml 이 배포된 1.0 과 견준다)
+const noFileDrop = (() => {
+  try {
+    return localStorage.getItem('memoking.noFileDrop') === '1';
+  } catch {
+    return false;
+  }
+})();
 // 파일 끌어 놓기: 창 어디에 놓아도 (글 아래 빈 곳 · 여백 · 머리줄) 놓은 높이의 줄 아래에 — 끄는 동안 놓을 자리를 보인다 (file-drop.js)
-setupFileDrop({
+if (!noFileDrop) setupFileDrop({
   dropAt: (x, y) => (editor && !memo?.needsPassword ? editor.dropAt(x, y) : null),
   isOwn: isOwnDragOut,
   onDrop: (pos, files) => {

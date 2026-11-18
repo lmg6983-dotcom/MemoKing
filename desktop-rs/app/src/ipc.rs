@@ -20,6 +20,11 @@ pub fn smoke() -> bool {
     *ON.get_or_init(|| std::env::args().any(|a| a == "--smoke"))
 }
 
+/// 창 수를 세는 점검인가 — 끌어 놓기 재현(MEMOKING_DROPTEST)은 실제처럼 예비 창 · 창 재활용을 쓴다
+pub fn counting_smoke() -> bool {
+    smoke() && std::env::var_os("MEMOKING_DROPTEST").is_none()
+}
+
 pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -> Result<Value, String> {
     if let Some(r) = crate::memos::handle(app, label, channel, &args) {
         return r;
@@ -61,7 +66,7 @@ pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -
         // 매직 카피 도우미가 지금 클립보드를 읽어 오는지 (Ctrl+C 는 보내지 않는다 — 점검 PC 의 다른 앱에 키가 가지 않게)
         "smoke:clipboard-dump" if smoke() => crate::capture::smoke_dump(app),
         // 끌어 놓기 재현 (droptest-rs.yml): 켜졌나 · 창을 정해진 자리에 두고 바깥 도우미에게 놓을 곳(화면 좌표)을 알린다
-        "smoke:droptest" if smoke() => Ok(std::env::var_os("MEMOKING_DROPTEST").is_some().into()),
+        "smoke:droptest" if smoke() => Ok(std::env::var("MEMOKING_DROPTEST").ok().map_or(Value::Bool(false), Value::from)),
         "smoke:droptest-ready" if smoke() => {
             use tauri::Manager;
             let w = app.get_webview_window(label).ok_or("창 없음")?;

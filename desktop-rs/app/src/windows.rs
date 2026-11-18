@@ -592,7 +592,7 @@ pub fn retire_note(app: &AppHandle, label: &str) {
         *n += 1;
         *n <= RECYCLE_MAX
     };
-    match note_id(app, label).filter(|_| reuse && !crate::os::quitting() && !crate::ipc::smoke() && crate::memos::spare_room(app)) {
+    match note_id(app, label).filter(|_| reuse && !crate::os::quitting() && !crate::ipc::counting_smoke() && crate::memos::spare_room(app)) {
         Some(id) => {
             crate::memos::closed_note(app, &id, label);
             crate::os::note_closed(app, &id);
