@@ -37,7 +37,25 @@ jobs:
       - run: cargo test -p memoking-core
         working-directory: desktop-rs
 
+  # HEVC 영상을 H.264 로 바꾸는 작은 ffmpeg.exe (LGPL, mingw 크로스 빌드). 스크립트가 바뀔 때만 다시 빌드
+  ffmpeg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: desktop/vendor/ffmpeg
+          key: ffmpeg-min-${{ hashFiles('desktop-rs/scripts/build-ffmpeg-min.sh') }}
+      - run: sudo apt-get update && sudo apt-get install -y mingw-w64 nasm
+      - run: bash desktop-rs/scripts/build-ffmpeg-min.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-min
+          path: desktop/vendor/ffmpeg/
+
   windows:
+    needs: ffmpeg
     runs-on: windows-latest
     timeout-minutes: 40
     defaults:
@@ -45,6 +63,11 @@ jobs:
         working-directory: desktop-rs
     steps:
       - uses: actions/checkout@v4
+      # 점검(--smoke)의 HEVC 영상을 H.264 로 바꿀 때 쓴다 (개발 자리 desktop/vendor/ffmpeg, video.rs)
+      - uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-min
+          path: desktop/vendor/ffmpeg
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
