@@ -155,9 +155,10 @@ fn new_memo(app: &AppHandle) -> bool {
 fn quit(app: &AppHandle) {
     QUITTING.store(true, Ordering::SeqCst);
     let labels: Vec<String> = state(app).note_labels.lock().unwrap().values().cloned().collect();
+    // 닫기 길로 (windows::track: 숨기고 남은 글을 저장한 뒤 없앤다, 늦어도 3초). 자동 저장 전의 마지막 글을 잃지 않게
     for l in labels {
         if let Some(w) = app.get_webview_window(&l) {
-            let _ = w.destroy();
+            let _ = w.close();
         }
     }
     let app = app.clone();
