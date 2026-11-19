@@ -2102,7 +2102,7 @@ fn hide_bubble(app: &AppHandle, owner: &str) {
     if let Some(w) = app.get_webview_window(&label) {
         emit(app, &label, "bubble:hide", Value::Null); // 먼저 비우고 숨긴다 (다음에 보일 때 지난 글이 비치지 않게)
         if is_shown(&w) {
-            let _ = w.hide();
+            hide_quiet(&w);
             // 숨은 채 30초면 없앤다 — 메모 창마다 말풍선 웹뷰가 하나씩 숨어 남았다 (다음에 뜰 때 다시 만든다)
             let app = app.clone();
             later(30_000, move || {
@@ -2154,9 +2154,29 @@ fn status_bubble(app: &AppHandle, owner: &str, b: &Value) -> Value {
     if !is_shown(&w) {
         // 숨겨 둔 창은 지난 글이 남은 그림으로 먼저 보일 수 있어 새 글을 그릴 틈을 준다
         std::thread::sleep(Duration::from_millis(40));
-        let _ = w.show();
+        show_quiet(&w);
     }
     true.into()
+}
+
+/// 포커스를 뺏지 않고 보이기 · 숨기기 — Tauri show() 는 SW_SHOW 라 말풍선이 뜰 때마다 쓰던 메모 창의 글자 입력을 가로챘다
+///   (포커스 받지 않는 창이라도 SW_SHOW 는 앞으로 끌어온다). 보이기를 Tauri 밖에서 했으니 숨기기도 밖에서 (Tauri 는 보인 줄 모른다)
+fn show_quiet(w: &WebviewWindow) {
+    #[cfg(windows)]
+    unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd(w) as _, windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNOACTIVATE);
+    }
+    #[cfg(not(windows))]
+    let _ = w.show();
+}
+
+fn hide_quiet(w: &WebviewWindow) {
+    #[cfg(windows)]
+    unsafe {
+        windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd(w) as _, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
+    }
+    #[cfg(not(windows))]
+    let _ = w.hide();
 }
 
 // ---------- 그 밖의 창 일 ----------
