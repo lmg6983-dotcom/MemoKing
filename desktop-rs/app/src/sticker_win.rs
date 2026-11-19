@@ -275,27 +275,51 @@ pub use win::{close, create, hwnd, place, rect, set_owner, shown};
 
 #[cfg(windows)]
 mod win {
+    //! 스티커 창은 따로 된 UI 스레드에서 산다: 앱의 메인 스레드는 웹뷰 일로 바빠, 거기서 돌던 타이머(WM_TIMER — 가장 늦게 처리되고
+    //! 16ms 를 청하면 Windows 시계 단위로 31ms)로는 움직임이 초당 30장쯤에 끊겼다. 여기서는 화면이 새로 그려질 때마다(DwmFlush,
+    //! 모니터 주사율 그대로 60 · 120 · 144Hz) 한 장씩 그린다. 바깥에서 부르는 함수는 이 스레드에 일을 넘기고 바로 돌아온다
     use super::{art, hover_progress, lift, padded, physical, pose, render, resize, Image, Leave, HOVER_MS};
     use memoking_core::placement::Rect;
     use std::collections::HashMap;
+    use std::sync::mpsc::{channel, Sender};
     use std::sync::{LazyLock, Mutex, MutexGuard, OnceLock};
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
     use tauri::AppHandle;
     use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
+    use windows_sys::Win32::Graphics::Dwm::DwmFlush;
     use windows_sys::Win32::Graphics::Gdi::{
-        CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, ReleaseDC, SelectObject, AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS,
+        CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, SelectObject, AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLENDFUNCTION, DIB_RGB_COLORS, HBITMAP, HDC,
     };
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+    use windows_sys::Win32::System::Threading::GetCurrentThreadId;
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowLongPtrW, KillTimer, LoadCursorW, RegisterClassExW, SetCursor, SetTimer, SetWindowLongPtrW, ShowWindow, SystemParametersInfoW,
-        UpdateLayeredWindow, GWLP_HWNDPARENT, GWLP_USERDATA, IDC_HAND, MA_NOACTIVATE, SPI_GETCLIENTAREAANIMATION, SW_SHOWNOACTIVATE, ULW_ALPHA, WM_DESTROY, WM_LBUTTONUP, WM_MOUSEACTIVATE,
-        WM_MOUSEMOVE, WM_SETCURSOR, WM_TIMER, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
+        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, GetWindowLongPtrW, LoadCursorW, PeekMessageW, PostThreadMessageW, RegisterClassExW, SetCursor, SetWindowLongPtrW,
+        ShowWindow, SystemParametersInfoW, TranslateMessage, UpdateLayeredWindow, GWLP_HWNDPARENT, GWLP_USERDATA, IDC_HAND, MA_NOACTIVATE, MSG, PM_NOREMOVE, PM_REMOVE, SPI_GETCLIENTAREAANIMATION,
+        SW_SHOWNOACTIVATE, ULW_ALPHA, WM_APP, WM_DESTROY, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_SETCURSOR, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
     };
 
     const WM_MOUSELEAVE: u32 = 0x02A3; // UI_Controls 기능을 켜지 않으려고
-    const TIMER: usize = 1;
-    const FRAME_MS: u32 = 16;
+
+    /// 그릴 판 (창 크기의 DIB) — 장면마다 새로 만들지 않고 크기가 바뀔 때만
+    struct Surface {
+        w: i32,
+        h: i32,
+        dc: isize,
+        bmp: isize,
+        old: isize,
+        bits: usize,
+    }
+
+    impl Drop for Surface {
+        fn drop(&mut self) {
+            unsafe {
+                SelectObject(self.dc as HDC, self.old as _);
+                DeleteObject(self.bmp as HBITMAP);
+                DeleteDC(self.dc as HDC);
+            }
+        }
+    }
 
     struct St {
         hwnd: isize,
@@ -311,8 +335,11 @@ mod win {
         /// 움직임: (사라지는 모습 — None 은 붙는 중, 시작)
         anim: Option<(Option<Leave>, Instant)>,
         leaving: bool,
+        /// 아직 움직이는 중 (붙기 · 떼기 · 들림) — 장면마다 다시 그린다
+        busy: bool,
         /// 화면 배율로 줄여 둔 쉬는 그림 · 들린 그림 (크기가 같으면 다시 쓰지 않는다)
         cache: Option<((usize, usize), Image, Image)>,
+        surface: Option<Surface>,
     }
 
     static STICKERS: LazyLock<Mutex<HashMap<u64, St>>> = LazyLock::new(Mutex::default);
@@ -320,6 +347,80 @@ mod win {
 
     fn all() -> MutexGuard<'static, HashMap<u64, St>> {
         STICKERS.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    // ---------- 스티커 UI 스레드 ----------
+
+    type Job = Box<dyn FnOnce() + Send>;
+    static UI: OnceLock<(Mutex<Sender<Job>>, u32)> = OnceLock::new();
+
+    /// 스티커 스레드에서 f (만들기 · 옮기기 · 거두기는 창을 만든 스레드에서 해야 한다)
+    fn run(f: impl FnOnce() + Send + 'static) {
+        let (tx, tid) = UI.get_or_init(start);
+        let _ = tx.lock().unwrap_or_else(std::sync::PoisonError::into_inner).send(Box::new(f));
+        unsafe { PostThreadMessageW(*tid, WM_APP, 0, 0) }; // 메시지를 기다리던 스레드를 깨운다
+    }
+
+    fn start() -> (Mutex<Sender<Job>>, u32) {
+        let (tx, rx) = channel::<Job>();
+        let (tid_tx, tid_rx) = channel();
+        let spawned = std::thread::Builder::new().name("sticker-ui".into()).spawn(move || unsafe {
+            let mut msg: MSG = std::mem::zeroed();
+            PeekMessageW(&mut msg, std::ptr::null_mut(), WM_APP, WM_APP, PM_NOREMOVE); // 이 스레드의 메시지 줄을 만든다
+            let _ = tid_tx.send(GetCurrentThreadId());
+            let mut last = Instant::now();
+            loop {
+                while let Ok(job) = rx.try_recv() {
+                    job();
+                }
+                if all().values().any(|s| s.busy) {
+                    while PeekMessageW(&mut msg, std::ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
+                        TranslateMessage(&msg);
+                        DispatchMessageW(&msg);
+                    }
+                    while let Ok(job) = rx.try_recv() {
+                        job();
+                    }
+                    frame();
+                    // 다음 화면 새로 그리기까지 기다린다 (주사율에 맞춰). 화면 합성이 꺼져 바로 돌아오면 쉬어서 돌기만 하지 않게
+                    if DwmFlush() < 0 || last.elapsed() < Duration::from_millis(4) {
+                        std::thread::sleep(Duration::from_millis(8));
+                    }
+                    last = Instant::now();
+                } else if GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+                    TranslateMessage(&msg);
+                    DispatchMessageW(&msg); // 스레드로 온 깨우기(WM_APP)는 창이 없어 그냥 지나간다
+                } else {
+                    return;
+                }
+            }
+        });
+        let tid = spawned.ok().and_then(|_| tid_rx.recv().ok()).unwrap_or(0);
+        (Mutex::new(tx), tid)
+    }
+
+    /// 움직이는 스티커를 한 장씩 그리고, 다 사라진 것은 거둔다
+    fn frame() {
+        let ids: Vec<u64> = all().iter().filter(|(_, s)| s.busy).map(|(id, _)| *id).collect();
+        for id in ids {
+            if present(id) {
+                let gone = {
+                    let mut g = all();
+                    let leaving = g.get(&id).is_some_and(|s| s.leaving);
+                    if let Some(s) = g.get_mut(&id) {
+                        s.busy = false;
+                    }
+                    if leaving {
+                        g.remove(&id).map(|s| s.hwnd)
+                    } else {
+                        None
+                    }
+                };
+                if let Some(h) = gone {
+                    unsafe { DestroyWindow(h as HWND) };
+                }
+            }
+        }
     }
 
     fn wide(s: &str) -> Vec<u16> {
@@ -348,59 +449,71 @@ mod win {
         NAME.as_ptr()
     }
 
-    /// 스티커 창을 만들어 띄운다 — owner: 주인 창(그 위에 머물고 함께 숨는다), rect: 논리 자리
+    // ---------- 바깥에서 부르는 것 (어느 스레드에서든) ----------
+
+    /// 스티커 창을 만들어 띄운다 — owner: 주인 창(그 위에 머물고 함께 숨는다), rect: 논리 자리. 다 띄우면 windows::sticker_ready
     #[allow(clippy::too_many_arguments)]
     pub fn create(app: &AppHandle, id: u64, owner: i64, kind: &'static str, dark: bool, rect: Rect, scale: f64, animate: bool) {
         let _ = APP.set(app.clone());
-        let [x, y, w, h] = physical(padded(rect), scale);
-        let h_ = unsafe {
-            CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, class(), std::ptr::null(), WS_POPUP, x, y, w, h, owner as HWND, std::ptr::null_mut(), GetModuleHandleW(std::ptr::null()), std::ptr::null())
-        };
-        if h_.is_null() {
-            return;
-        }
-        unsafe { SetWindowLongPtrW(h_, GWLP_USERDATA, id as isize) };
-        let anim = (animate && !reduce_motion()).then(|| (None, Instant::now()));
-        all().insert(id, St { hwnd: h_ as isize, kind, dark, hover: false, hover_at: Instant::now(), hover_from: 0.0, rect, scale, anim, leaving: false, cache: None });
-        present(id);
-        unsafe {
-            ShowWindow(h_, SW_SHOWNOACTIVATE);
-            if anim.is_some() {
-                SetTimer(h_, TIMER, FRAME_MS, None);
+        run(move || {
+            let [x, y, w, h] = physical(padded(rect), scale);
+            let h_ = unsafe {
+                CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, class(), std::ptr::null(), WS_POPUP, x, y, w, h, owner as HWND, std::ptr::null_mut(), GetModuleHandleW(std::ptr::null()), std::ptr::null())
+            };
+            if h_.is_null() {
+                return;
             }
-        }
+            unsafe { SetWindowLongPtrW(h_, GWLP_USERDATA, id as isize) };
+            let anim = (animate && !reduce_motion()).then(|| (None, Instant::now()));
+            let st = St { hwnd: h_ as isize, kind, dark, hover: false, hover_at: Instant::now(), hover_from: 0.0, rect, scale, anim, leaving: false, busy: anim.is_some(), cache: None, surface: None };
+            all().insert(id, st);
+            present(id);
+            unsafe { ShowWindow(h_, SW_SHOWNOACTIVATE) };
+            notify(id, crate::windows::sticker_ready);
+        });
     }
 
-    /// 주인 창을 따라 옮긴다
+    /// 주인 창을 따라 옮긴다 (메인 스레드를 거치지 않아 끌 때 늦게 따라오지 않는다)
     pub fn place(id: u64, rect: Rect, scale: f64) {
-        if let Some(s) = all().get_mut(&id) {
-            s.rect = rect;
-            s.scale = scale;
-        }
-        present(id);
+        run(move || {
+            let busy = all().get_mut(&id).map(|s| {
+                s.rect = rect;
+                s.scale = scale;
+                s.busy
+            });
+            if busy == Some(false) {
+                present(id); // 움직이는 중이면 다음 장면이 새 자리에 그린다
+            }
+        });
     }
 
     /// 주인 창 바꾸기 (탭을 바꿀 때 스티커 창을 새 탭으로 넘긴다)
     pub fn set_owner(id: u64, owner: i64) {
-        if let Some(h) = all().get(&id).map(|s| s.hwnd) {
-            unsafe { SetWindowLongPtrW(h as HWND, GWLP_HWNDPARENT, owner as isize) };
-        }
+        run(move || {
+            if let Some(h) = all().get(&id).map(|s| s.hwnd) {
+                unsafe { SetWindowLongPtrW(h as HWND, GWLP_HWNDPARENT, owner as isize) };
+            }
+        });
     }
 
     /// 거두기 — how 가 있으면 그 모습 뒤에
     pub fn close(id: u64, how: Option<Leave>) {
-        if how.is_none() {
-            let h = all().remove(&id).map(|s| s.hwnd);
-            if let Some(h) = h {
-                unsafe { DestroyWindow(h as HWND) };
-            }
-            return;
-        }
+        // 바로 사라진 것으로 친다 (말풍선이 피해 가지 않게 · 다시 붙일 때 겹쳐 세지 않게)
         if let Some(s) = all().get_mut(&id) {
             s.leaving = true;
-            s.anim = Some((how, Instant::now()));
-            unsafe { SetTimer(s.hwnd as HWND, TIMER, FRAME_MS, None) };
         }
+        run(move || {
+            if how.is_none() {
+                let h = all().remove(&id).map(|s| s.hwnd);
+                if let Some(h) = h {
+                    unsafe { DestroyWindow(h as HWND) };
+                }
+            } else if let Some(s) = all().get_mut(&id) {
+                s.leaving = true; // 아직 만드는 중이던 창이면 여기서 처음 표시된다 (일은 차례대로)
+                s.anim = Some((how, Instant::now()));
+                s.busy = true;
+            }
+        });
     }
 
     /// 창 번호 (바탕화면 층 도우미에 테이프를 짝지어 알린다) — 아직 없으면 0
@@ -417,6 +530,8 @@ mod win {
     pub fn rect(id: u64) -> Option<Rect> {
         all().get(&id).filter(|s| !s.leaving).map(|s| s.rect)
     }
+
+    // ---------- 그리기 (스티커 스레드) ----------
 
     fn lifted(s: &St, reduce: bool) -> (f64, bool) {
         let ms = s.hover_at.elapsed().as_secs_f64() * 1000.0;
@@ -440,26 +555,30 @@ mod win {
         // CSS 처럼 움직임(animation)이 도는 동안은 그 변환이 들림(transition)을 덮는다
         let transform = if s.anim.is_some() { p.transform } else { lift(s.kind, hover, size) };
         let img = render(rest, up, lift(s.kind, 1.0, size), hover, transform, size, s.scale, (w as usize, h as usize));
-        let hwnd = s.hwnd as HWND;
-        let alpha = p.opacity;
-        unsafe {
-            let screen = GetDC(std::ptr::null_mut());
-            let dc = CreateCompatibleDC(screen);
-            let mut info: BITMAPINFO = std::mem::zeroed();
-            info.bmiHeader = BITMAPINFOHEADER { biSize: size_of::<BITMAPINFOHEADER>() as u32, biWidth: w, biHeight: -h, biPlanes: 1, biBitCount: 32, biCompression: BI_RGB, ..std::mem::zeroed() };
-            let mut bits = std::ptr::null_mut();
-            let bmp = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &mut bits, std::ptr::null_mut(), 0);
-            if !bmp.is_null() && !bits.is_null() {
-                std::ptr::copy_nonoverlapping(img.px.as_ptr(), bits.cast::<u8>(), img.px.len());
-                let old = SelectObject(dc, bmp);
-                let blend = BLENDFUNCTION { BlendOp: AC_SRC_OVER as u8, BlendFlags: 0, SourceConstantAlpha: (alpha * 255.0).round().clamp(0.0, 255.0) as u8, AlphaFormat: AC_SRC_ALPHA as u8 };
-                let (pt, size, zero) = (POINT { x, y }, SIZE { cx: w, cy: h }, POINT { x: 0, y: 0 });
-                UpdateLayeredWindow(hwnd, screen, &pt, &size, dc, &zero, 0, &blend, ULW_ALPHA);
-                SelectObject(dc, old);
-                DeleteObject(bmp);
+        if s.surface.as_ref().is_none_or(|f| (f.w, f.h) != (w, h)) {
+            s.surface = None;
+            s.surface = unsafe {
+                let dc = CreateCompatibleDC(std::ptr::null_mut());
+                let mut info: BITMAPINFO = std::mem::zeroed();
+                info.bmiHeader = BITMAPINFOHEADER { biSize: size_of::<BITMAPINFOHEADER>() as u32, biWidth: w, biHeight: -h, biPlanes: 1, biBitCount: 32, biCompression: BI_RGB, ..std::mem::zeroed() };
+                let mut bits = std::ptr::null_mut();
+                let bmp = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &mut bits, std::ptr::null_mut(), 0);
+                if bmp.is_null() || bits.is_null() {
+                    DeleteDC(dc);
+                    None
+                } else {
+                    let old = SelectObject(dc, bmp);
+                    Some(Surface { w, h, dc: dc as isize, bmp: bmp as isize, old: old as isize, bits: bits as usize })
+                }
+            };
+        }
+        if let Some(f) = &s.surface {
+            unsafe {
+                std::ptr::copy_nonoverlapping(img.px.as_ptr(), f.bits as *mut u8, img.px.len());
+                let blend = BLENDFUNCTION { BlendOp: AC_SRC_OVER as u8, BlendFlags: 0, SourceConstantAlpha: (p.opacity * 255.0).round().clamp(0.0, 255.0) as u8, AlphaFormat: AC_SRC_ALPHA as u8 };
+                let (pt, sz, zero) = (POINT { x, y }, SIZE { cx: w, cy: h }, POINT { x: 0, y: 0 });
+                UpdateLayeredWindow(s.hwnd as HWND, std::ptr::null_mut(), &pt, &sz, f.dc as HDC, &zero, 0, &blend, ULW_ALPHA);
             }
-            DeleteDC(dc);
-            ReleaseDC(std::ptr::null_mut(), screen);
         }
         if p.done {
             s.anim = None;
@@ -491,6 +610,7 @@ mod win {
                         s.hover_from = lifted(s, reduce_motion()).0;
                         s.hover_at = Instant::now();
                         s.hover = over;
+                        s.busy = true; // 들림 · 내려앉음은 장면마다 (스티커 스레드의 고리가 그린다)
                     })
                     .is_some();
                 if changed {
@@ -498,8 +618,6 @@ mod win {
                         let mut t = TRACKMOUSEEVENT { cbSize: size_of::<TRACKMOUSEEVENT>() as u32, dwFlags: TME_LEAVE, hwndTrack: h, dwHoverTime: 0 };
                         unsafe { TrackMouseEvent(&mut t) };
                     }
-                    present(id);
-                    unsafe { SetTimer(h, TIMER, FRAME_MS, None) };
                     notify(id, move |app, id| crate::windows::sticker_hover(app, id, over));
                 }
                 return 0;
@@ -510,19 +628,7 @@ mod win {
                 }
                 return 0;
             }
-            WM_TIMER if wp == TIMER => {
-                if present(id) {
-                    unsafe { KillTimer(h, TIMER) };
-                    let gone = all().get(&id).is_some_and(|s| s.leaving);
-                    if gone {
-                        all().remove(&id);
-                        unsafe { DestroyWindow(h) };
-                    }
-                }
-                return 0;
-            }
             WM_DESTROY => {
-                unsafe { KillTimer(h, TIMER) };
                 // 주인 창과 함께 운영체제가 거둔 때도 잊는다 (다른 창이 같은 번호를 받으면 그 창을 건드리지 않게)
                 let mine = all().get(&id).is_some_and(|s| s.hwnd == h as isize);
                 if mine {

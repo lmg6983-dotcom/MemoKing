@@ -581,7 +581,7 @@ fn destroyed(app: &AppHandle, id: &str, label: &str) {
         (g.stickers.remove(label).and_then(|s| s.win), g.pinned.remove(label))
     };
     if let Some(id) = sticker {
-        ui(app, move || sticker_win::close(id, None));
+        sticker_win::close(id, None);
     }
     if let Some(w) = app.get_webview_window(&format!("bubble-{label}")) {
         let _ = w.destroy();
@@ -1787,8 +1787,7 @@ fn sync_sticker(app: &AppHandle, owner: &str) {
     if on_screen(&o) {
         match (win, bounds(&o)) {
             (Some(id), Some(b)) => {
-                let (r, scale) = (sticker_bounds(b, kind, owner == "list"), o.scale_factor().unwrap_or(1.0));
-                ui(app, move || sticker_win::place(id, r, scale));
+                sticker_win::place(id, sticker_bounds(b, kind, owner == "list"), o.scale_factor().unwrap_or(1.0));
             }
             (None, _) => open_sticker_win(app, owner, false),
             _ => {}
@@ -1830,7 +1829,6 @@ fn open_sticker_win(app: &AppHandle, owner: &str, animate: bool) {
         let Some(b) = bounds(&o) else { return };
         let dark = o.theme().is_ok_and(|t| t == tauri::Theme::Dark);
         sticker_win::create(&app2, id, hwnd(&o), kind, dark, sticker_bounds(b, kind, owner == "list"), o.scale_factor().unwrap_or(1.0), animate);
-        std::thread::spawn(move || sync_tape_pair(&app2, &owner));
     });
 }
 
@@ -1856,14 +1854,10 @@ fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) 
     };
     let Some(id) = moved else { return false };
     // 주인 창(owner)을 바꾼다: 새 탭 위에 있고, 옛 탭과 함께 숨거나 닫히지 않게
-    let (owner, scale) = (hwnd(to), to.scale_factor().unwrap_or(1.0));
-    let r = bounds(to).map(|o| sticker_bounds(o, kind.unwrap_or("crown"), false));
-    ui(app, move || {
-        sticker_win::set_owner(id, owner);
-        if let Some(r) = r {
-            sticker_win::place(id, r, scale);
-        }
-    });
+    sticker_win::set_owner(id, hwnd(to));
+    if let Some(r) = bounds(to).map(|o| sticker_bounds(o, kind.unwrap_or("crown"), false)) {
+        sticker_win::place(id, r, to.scale_factor().unwrap_or(1.0));
+    }
     sync_tape_pair(app, a);
     sync_tape_pair(app, b);
     true
@@ -1871,7 +1865,7 @@ fn hand_over_sticker(app: &AppHandle, from: &WebviewWindow, to: &WebviewWindow) 
 
 /// 스티커 창 거두기 — how: 떼어지는 · 작은 왕관으로 들어가는 모습 뒤에
 fn close_sticker_win(app: &AppHandle, owner: &str, id: u64, how: Option<Leave>) {
-    ui(app, move || sticker_win::close(id, how));
+    sticker_win::close(id, how);
     let (app2, owner) = (app.clone(), owner.to_string());
     let after = move || {
         sync_tape_pair(&app2, &owner);
@@ -1900,6 +1894,14 @@ fn sticker_owner(id: u64) -> Option<(String, &'static str)> {
 pub fn sticker_hover(app: &AppHandle, id: u64, over: bool) {
     if let Some((owner, kind)) = sticker_owner(id) {
         emit(app, &owner, "sticker:hover", json!({ "kind": kind, "over": over }));
+    }
+}
+
+/// 스티커 창이 떴다 (sticker_win.rs 가 부른다): 바탕화면 층 메모면 테이프를 짝지어 알린다
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn sticker_ready(app: &AppHandle, id: u64) {
+    if let Some((owner, _)) = sticker_owner(id) {
+        sync_tape_pair(app, &owner);
     }
 }
 
