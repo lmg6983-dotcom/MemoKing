@@ -12769,6 +12769,16 @@
      "end": null,
      "repeat": null,
      "title": "기준 시각이 달라도 ( · 월말 · 연말)"
+    },
+    {
+     "from": 20,
+     "to": 22,
+     "text": "월말",
+     "at": 1798675200000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "기준 시각이 달라도 (일요일 밤 · · 연말)"
     }
    ],
    [
@@ -12781,6 +12791,16 @@
      "end": null,
      "repeat": null,
      "title": "기준 시각이 달라도 ( · 월말 · 연말)"
+    },
+    {
+     "from": 20,
+     "to": 22,
+     "text": "월말",
+     "at": 1801353600000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "기준 시각이 달라도 (일요일 밤 · · 연말)"
     }
    ]
   ]
@@ -16239,6 +16259,16 @@
    ],
    [
     {
+     "from": 15,
+     "to": 17,
+     "text": "월말",
+     "at": 1798675200000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "그 달의 몇째 주 요일 · · 보름 뒤 · 음력 명절"
+    },
+    {
      "from": 20,
      "to": 24,
      "text": "보름 뒤",
@@ -16250,6 +16280,16 @@
     }
    ],
    [
+    {
+     "from": 15,
+     "to": 17,
+     "text": "월말",
+     "at": 1801353600000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "그 달의 몇째 주 요일 · · 보름 뒤 · 음력 명절"
+    },
     {
      "from": 20,
      "to": 24,
@@ -16970,8 +17010,30 @@
      "title": "마감"
     }
    ],
-   [],
-   []
+   [
+    {
+     "from": 0,
+     "to": 2,
+     "text": "월말",
+     "at": 1798675200000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "마감"
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 2,
+     "text": "월말",
+     "at": 1801353600000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "마감"
+    }
+   ]
   ]
  },
  {
@@ -17013,8 +17075,30 @@
      "title": ""
     }
    ],
-   [],
-   []
+   [
+    {
+     "from": 0,
+     "to": 2,
+     "text": "월말",
+     "at": 1798675200000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 2,
+     "text": "월말",
+     "at": 1801353600000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ]
   ]
  },
  {
@@ -17077,8 +17161,30 @@
      "title": "정산"
     }
    ],
-   [],
-   []
+   [
+    {
+     "from": 0,
+     "to": 5,
+     "text": "이번달 말",
+     "at": 1798675200000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "정산"
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 5,
+     "text": "이번달 말",
+     "at": 1801353600000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "정산"
+    }
+   ]
   ]
  },
  {
@@ -17120,8 +17226,30 @@
      "title": ""
     }
    ],
-   [],
-   []
+   [
+    {
+     "from": 0,
+     "to": 5,
+     "text": "이번달 말",
+     "at": 1798675200000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 5,
+     "text": "이번달 말",
+     "at": 1801353600000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ]
   ]
  },
  {
@@ -17955,6 +18083,261 @@
      "title": ""
     }
    ]
+  ]
+ },
+ {
+  "text": "오늘 날짜만 적은 말은 기본 9시가 지나도 그날 종일로 찾는다",
+  "out": [
+   [],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "text": "2026.11.19",
+  "out": [
+   [
+    {
+     "from": 0,
+     "to": 10,
+     "text": "2026.11.19",
+     "at": 1795046400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 10,
+     "text": "2026.11.19",
+     "at": 1795046400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "text": "2026-11-19",
+  "out": [
+   [
+    {
+     "from": 0,
+     "to": 10,
+     "text": "2026-11-19",
+     "at": 1795046400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 10,
+     "text": "2026-11-19",
+     "at": 1795046400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "text": "11월 19일",
+  "out": [
+   [
+    {
+     "from": 0,
+     "to": 7,
+     "text": "11월 19일",
+     "at": 1795046400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 7,
+     "text": "11월 19일",
+     "at": 1795046400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 7,
+     "text": "11월 19일",
+     "at": 1826582400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 7,
+     "text": "11월 19일",
+     "at": 1826582400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 7,
+     "text": "11월 19일",
+     "at": 1826582400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ]
+  ]
+ },
+ {
+  "text": "2026년 11월 19일",
+  "out": [
+   [
+    {
+     "from": 0,
+     "to": 13,
+     "text": "2026년 11월 19일",
+     "at": 1795046400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 13,
+     "text": "2026년 11월 19일",
+     "at": 1795046400000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "text": "2026-11-19 9:00",
+  "out": [
+   [
+    {
+     "from": 0,
+     "to": 15,
+     "text": "2026-11-19 9:00",
+     "at": 1795046400000,
+     "hasTime": true,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 15,
+     "text": "2026-11-19 9:00",
+     "at": 1795046400000,
+     "hasTime": true,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "text": "2026.11.18",
+  "out": [
+   [
+    {
+     "from": 0,
+     "to": 10,
+     "text": "2026.11.18",
+     "at": 1794960000000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 10,
+     "text": "2026.11.18",
+     "at": 1794960000000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "text": "어제 날짜는 지난 날",
+  "out": [
+   [],
+   [],
+   [],
+   [],
+   []
+  ]
+ },
+ {
+  "text": "\"오늘\" 만은 그대로 날짜가 아님",
+  "out": [
+   [],
+   [],
+   [],
+   [],
+   []
   ]
  },
  {
@@ -21418,8 +21801,30 @@
      "title": "정산"
     }
    ],
-   [],
-   []
+   [
+    {
+     "from": 0,
+     "to": 2,
+     "text": "월말",
+     "at": 1798675200000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "정산"
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 2,
+     "text": "월말",
+     "at": 1801353600000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": "정산"
+    }
+   ]
   ]
  },
  {
@@ -21461,8 +21866,30 @@
      "title": ""
     }
    ],
-   [],
-   []
+   [
+    {
+     "from": 0,
+     "to": 7,
+     "text": "이번 달 말일",
+     "at": 1798675200000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 7,
+     "text": "이번 달 말일",
+     "at": 1801353600000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ]
   ]
  },
  {
@@ -24570,8 +24997,30 @@
      "title": ""
     }
    ],
-   [],
-   []
+   [
+    {
+     "from": 0,
+     "to": 3,
+     "text": "31일",
+     "at": 1798675200000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ],
+   [
+    {
+     "from": 0,
+     "to": 3,
+     "text": "31일",
+     "at": 1801353600000,
+     "hasTime": false,
+     "end": null,
+     "repeat": null,
+     "title": ""
+    }
+   ]
   ]
  },
  {

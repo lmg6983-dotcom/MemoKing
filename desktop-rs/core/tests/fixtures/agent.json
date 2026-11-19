@@ -17776,6 +17776,396 @@
  },
  {
   "kind": "text",
+  "text": "오늘 날짜만 적은 말은 기본 9시가 지나도 그날 종일로 찾는다",
+  "now": "2026-10-25T10:00:00+09:00",
+  "intent": {
+   "action": "answer",
+   "unsure": false
+  },
+  "split": [
+   "오늘 날짜만 적은 말은 기본 9시가 지나도 그날 종일로 찾는다"
+  ],
+  "appendText": "오늘 날짜만 적은 말은 기본 9시가 지나도 그날 종일로 찾는다",
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "오늘 날짜만 적은 말은 기본 9시가 지나도 그날 종일로 찾는다",
+  "now": "2026-11-17T08:30:00+09:00",
+  "intent": {
+   "action": "answer",
+   "unsure": false
+  },
+  "split": null,
+  "appendText": null,
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026.11.19",
+  "now": "2026-10-25T10:00:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "2026.11.19"
+   },
+   "unsure": true
+  },
+  "split": [
+   "2026.11.19"
+  ],
+  "appendText": "2026.11.19",
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026.11.19",
+  "now": "2026-11-17T08:30:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "2026.11.19"
+   },
+   "unsure": true
+  },
+  "split": null,
+  "appendText": null,
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026-11-19",
+  "now": "2026-10-25T10:00:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "2026-11-19"
+   },
+   "unsure": true
+  },
+  "split": [
+   "2026-11-19"
+  ],
+  "appendText": "2026-11-19",
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026-11-19",
+  "now": "2026-11-17T08:30:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "2026-11-19"
+   },
+   "unsure": true
+  },
+  "split": null,
+  "appendText": null,
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "11월 19일",
+  "now": "2026-10-25T10:00:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "11월 19일"
+   },
+   "unsure": true
+  },
+  "split": [
+   "11월 19일"
+  ],
+  "appendText": "11월 19일",
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "11월 19일",
+  "now": "2026-11-17T08:30:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "11월 19일"
+   },
+   "unsure": true
+  },
+  "split": null,
+  "appendText": null,
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026년 11월 19일",
+  "now": "2026-10-25T10:00:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "2026년 11월 19일"
+   },
+   "unsure": true
+  },
+  "split": [
+   "2026년 11월 19일"
+  ],
+  "appendText": "2026년 11월 19일",
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026년 11월 19일",
+  "now": "2026-11-17T08:30:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "2026년 11월 19일"
+   },
+   "unsure": true
+  },
+  "split": null,
+  "appendText": null,
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026-11-19 9:00",
+  "now": "2026-10-25T10:00:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": true,
+    "repeat": null,
+    "text": "2026-11-19 9:00"
+   },
+   "unsure": true
+  },
+  "split": [
+   "2026-11-19 9:00"
+  ],
+  "appendText": "2026-11-19 9:00",
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026-11-19 9:00",
+  "now": "2026-11-17T08:30:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-19T00:00:00.000Z",
+    "hasTime": true,
+    "repeat": null,
+    "text": "2026-11-19 9:00"
+   },
+   "unsure": true
+  },
+  "split": null,
+  "appendText": null,
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026.11.18",
+  "now": "2026-10-25T10:00:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-18T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "2026.11.18"
+   },
+   "unsure": true
+  },
+  "split": [
+   "2026.11.18"
+  ],
+  "appendText": "2026.11.18",
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "2026.11.18",
+  "now": "2026-11-17T08:30:00+09:00",
+  "intent": {
+   "action": "event",
+   "title": "일정",
+   "when": {
+    "at": "2026-11-18T00:00:00.000Z",
+    "hasTime": false,
+    "repeat": null,
+    "text": "2026.11.18"
+   },
+   "unsure": true
+  },
+  "split": null,
+  "appendText": null,
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "어제 날짜는 지난 날",
+  "now": "2026-10-25T10:00:00+09:00",
+  "intent": {
+   "action": "answer",
+   "unsure": false
+  },
+  "split": [
+   "어제 날짜는 지난 날"
+  ],
+  "appendText": "어제 날짜는 지난 날",
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "어제 날짜는 지난 날",
+  "now": "2026-11-17T08:30:00+09:00",
+  "intent": {
+   "action": "answer",
+   "unsure": false
+  },
+  "split": null,
+  "appendText": null,
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "\"오늘\" 만은 그대로 날짜가 아님",
+  "now": "2026-10-25T10:00:00+09:00",
+  "intent": {
+   "action": "answer",
+   "unsure": false
+  },
+  "split": [
+   "\"오늘\" 만은 그대로 날짜가 아님"
+  ],
+  "appendText": "\"오늘\" 만은 그대로 날짜가 아님",
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
+  "text": "\"오늘\" 만은 그대로 날짜가 아님",
+  "now": "2026-11-17T08:30:00+09:00",
+  "intent": {
+   "action": "answer",
+   "unsure": false
+  },
+  "split": null,
+  "appendText": null,
+  "memoBody": null,
+  "query": null,
+  "events": [],
+  "scheduleText": null,
+  "plans": null
+ },
+ {
+  "kind": "text",
   "text": "매직 에이전트: 말 모양으로 가르기 — 일정 · 새 메모 · 덧붙이기 · 요약 · 질문",
   "now": "2026-10-25T10:00:00+09:00",
   "intent": {

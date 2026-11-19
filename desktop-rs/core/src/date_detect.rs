@@ -598,7 +598,8 @@ pub fn find_dates(s: &str, now: T) -> Vec<Found> {
         }
         // 되풀이는 이미 지났으면 다음 차례로
         let at = repeat.map_or(at, |r| next_repeat(at, r, now));
-        if at <= now + Duration::seconds(30) {
+        // 날짜만 적은 말(종일)은 그날이 다 가기 전까지는 앞으로의 날 (date-detect.js dayLeft)
+        if if has_time { at <= now + Duration::seconds(30) } else { add_days(at, 1) <= now } {
             return;
         }
         found.push(Found { from, to, text: crate::js::trim(&s[from..to]).to_string(), at, has_time, end, repeat: repeat.map(|r| repeat_at(r, at)) });
