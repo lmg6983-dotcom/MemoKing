@@ -472,6 +472,12 @@ pub fn keep_focus_after_show(_: &AppHandle, _: &str) {}
 
 /// 숨은 지 오래(60초)된 창은 웹뷰도 안 보임으로 — 바로 끄면 탭을 오갈 때 다시 그리느라 흰 화면이 비칠 수 있어 잠시 둔다
 const DEEP_HIDE_MS: u64 = 60_000;
+/// 숨기는 창(알림 영역으로 간 목록 창)의 메모리를 낮추고, 한동안 숨어 있으면 그리기도 멈춘다 — 보일 때는 show_note_win
+pub fn rest_hidden(w: &WebviewWindow) {
+    memory_low(w, true);
+    hide_deep_later(w);
+}
+
 pub fn hide_deep_later(w: &WebviewWindow) {
     let w = w.clone();
     later(DEEP_HIDE_MS, move || {

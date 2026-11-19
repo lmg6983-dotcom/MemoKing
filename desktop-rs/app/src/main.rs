@@ -104,7 +104,10 @@ mod webview_env {
 }
 /// wry 의 기본 인자(미니 메뉴 · 스마트스크린 끄기)에 렌더러 프로세스 수 묶기를 더한다 — 인자를 주면 기본 인자를 대신하므로 그대로 옮겨 적는다
 #[cfg(windows)]
-const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --renderer-process-limit=4";
+// 메모킹이 쓰지 않는 크롬 기능을 끈다 (다른 Tauri 앱들이 WebView2 메모리를 줄인 방법): 미리 띄워 두는 빈 렌더러(SpareRenderer…) ·
+//   번역 · 최적화 힌트 · 미디어 라우터(Cast) · 백그라운드 네트워크 · 구성 요소 업데이트. msWebOOUI · msPdfOOUI · msSmartScreenProtection 은
+//   wry 의 기본값 — 인자를 주면 기본값을 대신하므로 함께 적는다. --disable-features 는 하나로 (두 번 쓰면 뒤의 것만 먹는다)
+const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,SpareRendererForSitePerProcess,Translate,OptimizationHints,MediaRouter --disable-background-networking --disable-component-update --renderer-process-limit=4";
 #[cfg(windows)]
 fn shared_env<'a>(app: &AppHandle, b: Builder<'a>) -> Builder<'a> {
     match webview_env::get() {

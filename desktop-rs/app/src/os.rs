@@ -163,7 +163,7 @@ pub fn forget_bounds_if_gone(app: &AppHandle, id: &str) {
 pub fn show_list(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("list") {
         let _ = w.unminimize();
-        let _ = w.show();
+        crate::windows::show_note_win(&w); // 숨는 동안 낮춘 메모리 · 멈춘 그리기를 되돌리고 보인다 (메모 창과 같게)
         let _ = w.set_focus();
     }
     crate::windows::sync_list_crown(app);
@@ -172,6 +172,7 @@ pub fn show_list(app: &AppHandle) {
 pub fn toggle_list(app: &AppHandle) {
     let Some(w) = app.get_webview_window("list") else { return };
     if w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false) && w.is_focused().unwrap_or(false) {
+        crate::windows::rest_hidden(&w);
         let _ = w.hide();
         crate::windows::sync_list_crown(app);
     } else {
@@ -445,6 +446,7 @@ pub fn start(app: &AppHandle, list: &WebviewWindow) {
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
             if let Some(w) = app2.get_webview_window("list") {
+                crate::windows::rest_hidden(&w);
                 let _ = w.hide();
             }
             crate::windows::sync_list_crown(&app2);
