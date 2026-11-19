@@ -352,6 +352,7 @@ impl Vault {
             "preview": p.preview,
             "color": e.meta.color,
             "pinned": e.meta.pinned,
+            "pinnedAt": e.meta.extra.get("pinnedAt").and_then(Value::as_str),
             "created": e.meta.created,
             "updated": e.meta.updated,
             "thumb": media.iter().find(|m| m.kind == "image").map(|m| &m.src),
@@ -382,7 +383,9 @@ impl Vault {
         let mut list: Vec<&Entry> = self.entries.values().filter(|e| e.file.is_some()).collect();
         let t = |e: &Entry| e.meta.updated.as_deref().and_then(time::parse_js_date).map_or(0, |d| d.timestamp_millis());
         // 날짜 읽기는 메모마다 한 번 (비교마다 읽으면 2,000개에 4만 번)
-        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(t(e))));
+        // 상단 고정은 나중에 고정한 것이 위 (memo-sort.js 와 같음)
+        let pinned_at = |e: &Entry| e.meta.extra.get("pinnedAt").and_then(Value::as_str).and_then(time::parse_js_date).map_or(0, |d| d.timestamp_millis());
+        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(if e.meta.pinned { pinned_at(e) } else { 0 }), std::cmp::Reverse(t(e))));
         list
     }
 
@@ -418,6 +421,7 @@ impl Vault {
             "title": body::extract_title(&e.body),
             "color": e.meta.color,
             "pinned": e.meta.pinned,
+            "pinnedAt": e.meta.extra.get("pinnedAt").and_then(Value::as_str),
             "links": e.meta.links,
             "reminders": e.meta.reminders,
             "tables": e.meta.tables,
@@ -1021,8 +1025,13 @@ impl Vault {
         if let Some(c) = patch["color"].as_str().filter(|c| memo_file::COLORS.contains(c)) {
             e.meta.color = c.into();
         }
-        if let Some(p) = patch["pinned"].as_bool() {
+        if let Some(p) = patch["pinned"].as_bool().filter(|p| *p != e.meta.pinned) {
+            // 상단 고정한 때 — 목록의 상단 고정 묶음은 나중에 고정한 것이 위 (vault-locks.js setMeta 와 같음)
             e.meta.pinned = p;
+            e.meta.extra.remove("pinnedAt");
+            if p {
+                e.meta.extra.insert("pinnedAt".into(), time::now_iso().into());
+            }
         }
         if patch["tables"].is_array() {
             e.meta.tables = crate::tables::normalize_tables(&patch["tables"]);
@@ -1748,6 +1757,9 @@ mod tests {
         // 머리말: 색 · 고정
         let m = v.set_meta(&a, &json!({ "color": "blue", "pinned": true })).unwrap().unwrap();
         assert!(m["color"] == "blue" && m["pinned"] == true);
+        assert!(m["pinnedAt"].is_string(), "상단 고정한 때");
+        assert!(v.set_meta(&a, &json!({ "pinned": false })).unwrap().unwrap()["pinnedAt"].is_null(), "풀면 지운다");
+        v.set_meta(&a, &json!({ "pinned": true })).unwrap();
         assert_eq!(v.list()[0]["id"], json!(a), "고정한 메모가 먼저");
         // 연결 · 나를 연결한 메모
         v.link(&a, &b, true).unwrap().unwrap();

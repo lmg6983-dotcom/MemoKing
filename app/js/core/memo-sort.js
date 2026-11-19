@@ -1,5 +1,6 @@
 // 메모 목록 정렬 (PC 목록 창 · 휴대폰 목록이 같이 쓴다, 순수 함수 — tests/memo-sort.test.js)
-//   고정한 메모는 어떤 정렬이든 늘 맨 앞. 같으면 최신순으로 (순서가 흔들리지 않게)
+//   상단 고정한 메모는 어떤 정렬이든 늘 맨 앞, 그 안에서는 나중에 고정한 것이 위 (고정한 때를 모르는 예전 고정은 그 아래, 고른 정렬로).
+//   같으면 최신순으로 (순서가 흔들리지 않게)
 
 export const SORTS = [
   { id: 'updated', label: '최신순' }, // 최근에 고친 메모가 앞
@@ -21,8 +22,9 @@ const BY = {
   title: (a, b) => collator.compare(a.title ?? '', b.title ?? ''),
 };
 
-/** @param {{ pinned?: boolean, updated?: string, created?: string, views?: number, title?: string }[]} memos */
+/** @param {{ pinned?: boolean, pinnedAt?: string|null, updated?: string, created?: string, views?: number, title?: string }[]} memos */
 export function sortMemos(memos, sort = DEFAULT_SORT) {
   const by = BY[sort] ?? BY.updated;
-  return [...memos].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || by(a, b) || BY.updated(a, b));
+  const pinned = (a, b) => (a.pinned && b.pinned ? time(b.pinnedAt) - time(a.pinnedAt) : 0);
+  return [...memos].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || pinned(a, b) || by(a, b) || BY.updated(a, b));
 }

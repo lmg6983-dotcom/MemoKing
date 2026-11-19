@@ -110,6 +110,7 @@ body {
 }
 .cards .col { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
 .cards[data-layout="rows"] .col { gap: 8px; max-width: 760px; margin: 0 auto; }
+.cards[data-layout="rows"] .card-sep { max-width: 760px; margin: 0 auto; } /* 한 줄씩 보기: 가운데 카드 줄과 같은 폭 */
 .cards .item { position: relative; min-width: 0; }
 
 .card {
@@ -590,10 +591,6 @@ body:not([data-tab="memos"]) .folder-btn { display: none; }
   scrollbar-gutter: stable;
 }
 
-/* ---------- v0.15.0: 카드 압정 · 휴지통 ---------- */
-/* 목록 맨 위에 고정 (압정) — 버튼 자리·크기는 아래 .card-actions */
-.card-pin.on { color: var(--text-strong); }
-.card-pin:hover { color: var(--text-strong); }
 
 /* 설정: 고르기 한 줄 */
 .setting-row.select-row { justify-content: space-between; cursor: default; }
@@ -655,7 +652,7 @@ body:not([data-tab="memos"]) .folder-btn { display: none; }
 }
 .cards .item:hover .card-actions, .card-actions:focus-within, .cards .item:has(.card:focus-visible) .card-actions { opacity: 1; }
 body.is-dragging .card-actions { visibility: hidden; }
-.card-actions .card-delete, .card-actions .card-pin, .card-actions .card-pdf {
+.card-actions .card-delete, .card-actions .card-pdf {
   position: static;
   width: 28px; /* 마우스로 맞히기 쉽게 (24px 은 작았다) */
   height: 28px;

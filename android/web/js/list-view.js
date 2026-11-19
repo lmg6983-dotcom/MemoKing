@@ -237,12 +237,6 @@ function renderCard(memo) {
   title.className = 'card-title';
   title.textContent = memo.title;
   head.append(title);
-  if (memo.pinned) {
-    const pin = badge('pin-fill', '', 'pin');
-    pin.setAttribute('role', 'img');
-    pin.setAttribute('aria-label', '고정됨');
-    head.append(pin);
-  }
   card.append(head);
 
   if (memo.preview) {
@@ -330,13 +324,15 @@ function columnsFor(width) {
 
 // 지금 목록에 쌓인 메모 (빠진 것만 있으면 그 카드만 들어낸다 — 아래 layoutCards)
 let shownIds = [];
+let shownPinned = 0;
 function layoutCards(memos) {
   const cols = columnsFor(el.cards.clientWidth || window.innerWidth);
   // 메모 몇 개만 빠졌고(지우기 · 다른 폴더로 옮기기) 나머지 카드가 그대로면 그 카드만 들어낸다 —
   //   모든 카드를 다시 쌓으면 메모가 많을 때 화면 모양을 통째로 다시 계산해, 밀어 지운 뒤 화면이 잠깐 멈췄다.
   //   남은 카드는 제 줄에서 위로 미끄러진다 (glideCards). 줄 길이가 조금 어긋나는 것은 다음에 다시 쌓을 때 맞춘다
   const ids = memos.map((m) => m.id);
-  if (cols === lastCols && shownIds.length > ids.length && el.cards.querySelector('.item')) {
+  const pinnedCount = memos.filter((m) => m.pinned).length;
+  if (cols === lastCols && pinnedCount === shownPinned && shownIds.length > ids.length && el.cards.querySelector('.item')) {
     const keep = new Set(ids);
     const gone = shownIds.filter((id) => !keep.has(id));
     const same = gone.length === shownIds.length - ids.length && shownIds.filter((id) => keep.has(id)).every((id, i) => id === ids[i])
@@ -349,6 +345,7 @@ function layoutCards(memos) {
     }
   }
   shownIds = ids;
+  shownPinned = pinnedCount;
   lastCols = cols;
   const columns = Array.from({ length: cols }, () => {
     const c = document.createElement('div');
@@ -361,8 +358,15 @@ function layoutCards(memos) {
   const top = scroller?.scrollTop ?? 0;
   const had = Boolean(el.cards.querySelector('.item'));
   if (had) el.cards.style.minHeight = `${el.cards.offsetHeight}px`;
-  el.cards.replaceChildren(...columns);
-  stackCards(columns, memos.map(cardFor), { chunk: !had, late: (items) => items.forEach((li) => (li.style.animation = 'none')) }); // 나눠 쌓이는 뒤쪽 카드는 튀어나오지 않게
+  // 상단 고정한 메모가 있으면 "상단 고정" 묶음 · 선 · "메모" 묶음으로 (PC list.js 와 같음)
+  const pinned = memos.filter((m) => m.pinned);
+  const rest = pinned.length ? memos.filter((m) => !m.pinned) : memos;
+  const pinCols = pinned.length ? columns.map(() => Object.assign(document.createElement('div'), { className: 'col' })) : [];
+  const sep = (text) => Object.assign(document.createElement('div'), { className: 'card-sep', role: 'separator', textContent: text });
+  el.cards.classList.toggle('sectioned', pinned.length > 0);
+  el.cards.replaceChildren(...(pinned.length ? [sep('상단 고정'), ...pinCols, ...(rest.length ? [sep('메모')] : [])] : []), ...(rest.length || !pinned.length ? columns : []));
+  if (pinned.length) stackCards(pinCols, pinned.map(cardFor), { chunk: false });
+  stackCards(columns, rest.map(cardFor), { chunk: !had, late: (items) => items.forEach((li) => (li.style.animation = 'none')) }); // 나눠 쌓이는 뒤쪽 카드는 튀어나오지 않게
   el.cards.style.minHeight = '';
   if (scroller && top && scroller.scrollTop !== top) scroller.scrollTop = top;
   if (cardCache.size > memos.length + 200) for (const id of cardCache.keys()) if (!memos.some((m) => m.id === id)) cardCache.delete(id);

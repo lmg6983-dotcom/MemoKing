@@ -143,7 +143,12 @@ class LockMethods {
     if (!entry) return null;
     const prev = metaSnapshot(entry.meta);
     if (patch.color && COLORS.includes(patch.color)) entry.meta.color = patch.color;
-    if (typeof patch.pinned === 'boolean') entry.meta.pinned = patch.pinned;
+    if (typeof patch.pinned === 'boolean' && patch.pinned !== entry.meta.pinned) {
+      // 상단 고정한 때 — 목록의 상단 고정 묶음은 나중에 고정한 것이 위 (머리말 pinnedAt, 모르는 판은 그대로 둔다)
+      entry.meta.pinned = patch.pinned;
+      const { pinnedAt: _, ...extra } = entry.meta.extra ?? {};
+      entry.meta.extra = patch.pinned ? { ...extra, pinnedAt: toLocalIso() } : extra;
+    }
     if (Array.isArray(patch.tables)) entry.meta.tables = normalizeTables(patch.tables);
     if (typeof patch.ink === 'string') entry.meta.ink = normalizeInkPath(patch.ink);
     if (patch.day !== undefined) entry.meta.day = normalizeDay(patch.day ?? ''); // 회상 달력의 날 ("" · null 이면 만든 날로)

@@ -290,6 +290,7 @@ export class Vault extends EventTarget {
       tags: [...parts.tags],
       color: entry.meta.color,
       pinned: entry.meta.pinned,
+      pinnedAt: entry.meta.extra?.pinnedAt ?? null, // 상단 고정한 때 (core/vault-locks.js)
       created: entry.meta.created,
       updated: entry.meta.updated,
       day: entry.meta.day || '', // 회상 달력: "이 날의 기록으로" 정한 날
@@ -347,6 +348,7 @@ export class Vault extends EventTarget {
       title: extractTitle(entry.body),
       color: entry.meta.color,
       pinned: entry.meta.pinned,
+      pinnedAt: entry.meta.extra?.pinnedAt ?? null,
       links: entry.meta.links,
       reminders: entry.meta.reminders,
       tables: entry.meta.tables ?? [],
