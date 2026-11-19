@@ -1866,8 +1866,8 @@ fn close_sticker_win(app: &AppHandle, owner: &str, id: u64, how: Option<Leave>) 
         }
     };
     match how {
-        Some(Leave::Dock) => later(160, after),
-        Some(Leave::Peel) => later(220, after),
+        Some(Leave::Dock) => later(sticker_win::DOCK_MS as u64 + 10, after),
+        Some(Leave::Peel) => later(sticker_win::PEEL_MS as u64 + 20, after),
         None => after(),
     }
 }

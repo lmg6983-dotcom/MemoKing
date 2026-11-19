@@ -91,25 +91,178 @@ pub enum Leave {
     Dock,
 }
 
-/// 움직임: (지난 시간 ms) → (불투명도 0~1, 위아래 어긋남 논리 px, 끝났나). stick=None 은 붙을 때
-pub fn motion(leave: Option<Leave>, ms: f64, reduce: bool) -> (f64, f64, bool) {
-    let ease = |t: f64| 1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(4); // art.css 의 cubic-bezier(0.23, 1, 0.32, 1) 에 가깝게
-    match (leave, reduce) {
-        (None, true) => (1.0, 0.0, true), // 움직임을 줄이면 붙을 때는 그냥 나타난다
-        (None, false) => {
-            let t = ms / 320.0;
-            ((t / 0.55).min(1.0), -12.0 * (1.0 - ease(t)), t >= 1.0)
-        }
-        (Some(_), true) => {
-            let t = ms / 160.0;
-            (1.0 - t.min(1.0), 0.0, t >= 1.0) // 흐려지기만 (떼어졌다는 것은 보이게)
-        }
-        (Some(l), false) => {
-            let (dur, dy) = if l == Leave::Peel { (200.0, -10.0) } else { (150.0, 8.0) };
-            let t = ms / dur;
-            (1.0 - ease(t), dy * ease(t), t >= 1.0)
+/// CSS cubic-bezier(x1, y1, x2, y2) — t(0~1) → 진행
+pub fn bezier((x1, y1, x2, y2): (f64, f64, f64, f64), t: f64) -> f64 {
+    let t = t.clamp(0.0, 1.0);
+    let at = |a: f64, b: f64, u: f64| 3.0 * a * u * (1.0 - u).powi(2) + 3.0 * b * u * u * (1.0 - u) + u.powi(3);
+    // x(u) = t 인 u 를 반으로 나눠 찾는다 (x 는 늘 커진다)
+    let (mut lo, mut hi) = (0.0, 1.0);
+    for _ in 0..30 {
+        let mid = (lo + hi) / 2.0;
+        if at(x1, x2, mid) < t {
+            lo = mid;
+        } else {
+            hi = mid;
         }
     }
+    at(y1, y2, (lo + hi) / 2.0)
+}
+/// art.css 의 움직임 곡선 (부드럽게 멈춤) · 마우스 올림 transition: ease-out
+const SNAP: (f64, f64, f64, f64) = (0.23, 1.0, 0.32, 1.0);
+const EASE_OUT: (f64, f64, f64, f64) = (0.0, 0.0, 0.58, 1.0);
+/// 떼어질 때 · 들어갈 때의 움직임 (easeOutCubic) — SNAP 은 0.2초 중 첫 0.04초에 70% 를 가 사라짐이 툭 끊겨 보였다
+const GLIDE: (f64, f64, f64, f64) = (0.33, 1.0, 0.68, 1.0);
+pub const HOVER_MS: f64 = 150.0;
+pub const PEEL_MS: f64 = 320.0;
+pub const DOCK_MS: f64 = 240.0;
+
+/// 투명도는 처음과 끝을 부드럽게 (smoothstep) — 한 장면 사이에 크게 바뀌지 않게
+fn fade(t: f64) -> f64 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// 2D 변환 (x, y) → (a x + c y + e, b x + d y + f)
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Affine([f64; 6]);
+
+impl Affine {
+    const ID: Self = Self([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
+    fn then(self, o: Self) -> Self {
+        // self 를 먼저, 그다음 o
+        let [a, b, c, d, e, f] = self.0;
+        let [p, q, r, s, t, u] = o.0;
+        Self([p * a + r * b, q * a + s * b, p * c + r * d, q * c + s * d, p * e + r * f + t, q * e + s * f + u])
+    }
+    fn inverse(self) -> Self {
+        let [a, b, c, d, e, f] = self.0;
+        let det = a * d - b * c;
+        let (ia, ib, ic, id) = (d / det, -b / det, -c / det, a / det);
+        Self([ia, ib, ic, id, -(ia * e + ic * f), -(ib * e + id * f)])
+    }
+    pub fn apply(self, (x, y): (f64, f64)) -> (f64, f64) {
+        let [a, b, c, d, e, f] = self.0;
+        (a * x + c * y + e, b * x + d * y + f)
+    }
+}
+
+/// CSS transform: translateY(ty) rotate(deg) scale(k), transform-origin (ox, oy) — 논리 px, 그림 상자 기준
+pub fn css((ox, oy): (f64, f64), ty: f64, deg: f64, k: f64) -> Affine {
+    let (sin, cos) = deg.to_radians().sin_cos();
+    let mv = |x: f64, y: f64| Affine([1.0, 0.0, 0.0, 1.0, x, y]);
+    mv(-ox, -oy).then(Affine([k, 0.0, 0.0, k, 0.0, 0.0])).then(Affine([cos, sin, -sin, cos, 0.0, 0.0])).then(mv(ox, oy + ty))
+}
+
+/// 한 순간의 모습: 불투명도 · 변환 (그림 상자 기준) · 끝났나
+#[derive(Debug)]
+pub struct Pose {
+    pub opacity: f64,
+    pub transform: Affine,
+    pub done: bool,
+}
+
+/// 붙고(leave=None) 떼어지고 들어가는 모습 — art.css 의 @keyframes 그대로. w·h: 그림 상자 (논리 px)
+pub fn pose(kind: &str, leave: Option<Leave>, ms: f64, reduce: bool, (w, h): (f64, f64)) -> Pose {
+    let at = |fx: f64, fy: f64| (w * fx, h * fy);
+    let crown = kind != "tape";
+    match (leave, reduce) {
+        (None, true) => Pose { opacity: 1.0, transform: Affine::ID, done: true }, // 움직임을 줄이면 붙을 때는 그냥 나타난다
+        (Some(_), true) => {
+            let t = (ms / 160.0).min(1.0);
+            Pose { opacity: 1.0 - t, transform: Affine::ID, done: t >= 1.0 } // 흐려지기만 (떼어졌다는 것은 보이게)
+        }
+        // sticker-stick 0.32s: 0% { opacity 0; translateY(-12px) rotate(-12deg) scale(1.16) } 100% { none } — 투명도는 80% 까지 부드럽게 (art.css 는 55% 라 툭 나타났다)
+        (None, false) => {
+            let t = (ms / 320.0).min(1.0);
+            let p = bezier(SNAP, t);
+            let origin = if crown { at(0.5, 0.7) } else { at(0.5, 0.6) };
+            Pose { opacity: fade(t / 0.8), transform: css(origin, -12.0 * (1.0 - p), -12.0 * (1.0 - p), 1.16 - 0.16 * p), done: t >= 1.0 }
+        }
+        // sticker-peel: to { opacity 0; translateY(-10px) rotate(10deg) scale(1.08) } — 길이 · 곡선은 GLIDE 참고
+        (Some(Leave::Peel), false) => {
+            let t = (ms / PEEL_MS).min(1.0);
+            let p = bezier(GLIDE, t);
+            let origin = if crown { at(0.3, 0.8) } else { at(0.5, 0.6) };
+            Pose { opacity: 1.0 - fade(t), transform: css(origin, -10.0 * p, 10.0 * p, 1.0 + 0.08 * p), done: t >= 1.0 }
+        }
+        // sticker-dock: to { opacity 0; translateY(8px) scale(0.4) } (제목 줄 작은 왕관 쪽으로)
+        (Some(Leave::Dock), false) => {
+            let t = (ms / DOCK_MS).min(1.0);
+            let p = bezier(GLIDE, t);
+            Pose { opacity: 1.0 - fade(t), transform: css(at(0.5, 0.8), 8.0 * p, 0.0, 1.0 - 0.6 * p), done: t >= 1.0 }
+        }
+    }
+}
+
+/// 마우스를 올렸을 때 들린 모습 (.crown.hover · .tape.hover) — hover 그림(render.mjs)이 이 변환으로 구워져 있다
+pub fn lift(kind: &str, t: f64, (w, h): (f64, f64)) -> Affine {
+    if kind == "tape" {
+        css((w * 0.5, h * 0.6), -t, -2.0 * t, 1.0)
+    } else {
+        css((w * 0.3, h * 0.8), -2.0 * t, -4.0 * t, 1.0)
+    }
+}
+
+/// 마우스 올림 진행 (0 쉼 ~ 1 들림): from 에서 시작해 target 으로 HOVER_MS 동안
+pub fn hover_progress(from: f64, target: bool, ms: f64, reduce: bool) -> f64 {
+    let to = if target { 1.0 } else { 0.0 };
+    if reduce {
+        return to;
+    }
+    from + (to - from) * bezier(EASE_OUT, ms / HOVER_MS)
+}
+
+/// 움직이는 스티커가 잘리지 않게 창을 그림 상자보다 이만큼(논리 px) 넓게
+pub const PAD: f64 = 18.0;
+
+/// 그림 상자 [x, y, w, h] → 둘레를 넓힌 창 자리 (논리)
+pub fn padded([x, y, w, h]: Rect) -> Rect {
+    [x - PAD, y - PAD, w + 2.0 * PAD, h + 2.0 * PAD]
+}
+
+fn sample(img: &Image, x: f64, y: f64) -> [f32; 4] {
+    // 겹선형 (미리 곱한 값) — 그림 밖은 투명
+    let (x0, y0) = (x.floor(), y.floor());
+    let (fx, fy) = ((x - x0) as f32, (y - y0) as f32);
+    let px = |xi: f64, yi: f64| -> [f32; 4] {
+        if xi < 0.0 || yi < 0.0 || xi >= img.w as f64 || yi >= img.h as f64 {
+            return [0.0; 4];
+        }
+        let o = (yi as usize * img.w + xi as usize) * 4;
+        [f32::from(img.px[o]), f32::from(img.px[o + 1]), f32::from(img.px[o + 2]), f32::from(img.px[o + 3])]
+    };
+    let (a, b, c, d) = (px(x0, y0), px(x0 + 1.0, y0), px(x0, y0 + 1.0), px(x0 + 1.0, y0 + 1.0));
+    std::array::from_fn(|i| (a[i] * (1.0 - fx) + b[i] * fx) * (1.0 - fy) + (c[i] * (1.0 - fx) + d[i] * fx) * fy)
+}
+
+/// 한 장 그리기: 쉬는 그림 · 들린 그림(hover, 0~1 만큼 섞음)을 변환해 둘레 넓힌 판에 — 판 크기 (cw, ch) 화면 px
+///   rest · lifted 는 그림 상자를 화면 배율로 줄여 둔 것, baked: lifted 가 구워진 들림 변환. transform 은 그림 상자 논리 px 기준
+#[allow(clippy::too_many_arguments)]
+pub fn render(rest: &Image, lifted: &Image, baked: Affine, hover: f64, transform: Affine, (w, h): (f64, f64), scale: f64, (cw, ch): (usize, usize)) -> Image {
+    let (kx, ky) = (rest.w as f64 / w, rest.h as f64 / h); // 논리 px → 그림 px
+    let back = transform.inverse();
+    let mut px = vec![0u8; cw * ch * 4];
+    for y in 0..ch {
+        for x in 0..cw {
+            // 판의 화소 가운데 → 그림 상자 논리 좌표 → 변환 전 자리
+            let p = ((x as f64 + 0.5) / scale - PAD, (y as f64 + 0.5) / scale - PAD);
+            let (ex, ey) = back.apply(p);
+            let mut v = if hover < 1.0 { sample(rest, ex * kx - 0.5, ey * ky - 0.5) } else { [0.0; 4] };
+            if hover > 0.0 {
+                // 들린 그림은 이미 들린 자리에 그려져 있다 — 같은 내용이 같은 곳에 오게 들림 변환을 한 번 더 거쳐 읽는다
+                let (lx, ly) = baked.apply((ex, ey));
+                let l = sample(lifted, lx * kx - 0.5, ly * ky - 0.5);
+                for i in 0..4 {
+                    v[i] = v[i] * (1.0 - hover as f32) + l[i] * hover as f32;
+                }
+            }
+            let o = (y * cw + x) * 4;
+            for i in 0..4 {
+                px[o + i] = v[i].round().clamp(0.0, 255.0) as u8;
+            }
+        }
+    }
+    Image { w: cw, h: ch, px }
 }
 
 /// 논리 자리 → 화면 픽셀 자리
@@ -122,7 +275,7 @@ pub use win::{close, create, hwnd, place, rect, set_owner, shown};
 
 #[cfg(windows)]
 mod win {
-    use super::{art, motion, physical, resize, Image, Leave};
+    use super::{art, hover_progress, lift, padded, physical, pose, render, resize, Image, Leave, HOVER_MS};
     use memoking_core::placement::Rect;
     use std::collections::HashMap;
     use std::sync::{LazyLock, Mutex, MutexGuard, OnceLock};
@@ -149,14 +302,17 @@ mod win {
         kind: &'static str,
         dark: bool,
         hover: bool,
-        /// 쉬는 자리 (논리) · 화면 배율
+        /// 마우스 올림이 바뀐 때 · 그때의 들림 정도 (0~1, 그사이는 HOVER_MS 동안 부드럽게)
+        hover_at: Instant,
+        hover_from: f64,
+        /// 그림 상자 자리 (논리) · 화면 배율
         rect: Rect,
         scale: f64,
         /// 움직임: (사라지는 모습 — None 은 붙는 중, 시작)
         anim: Option<(Option<Leave>, Instant)>,
         leaving: bool,
-        /// 줄여 둔 그림 (원본 종류 · 크기가 같으면 다시 쓰지 않는다)
-        cache: Option<((usize, usize, usize), Image)>,
+        /// 화면 배율로 줄여 둔 쉬는 그림 · 들린 그림 (크기가 같으면 다시 쓰지 않는다)
+        cache: Option<((usize, usize), Image, Image)>,
     }
 
     static STICKERS: LazyLock<Mutex<HashMap<u64, St>>> = LazyLock::new(Mutex::default);
@@ -196,7 +352,7 @@ mod win {
     #[allow(clippy::too_many_arguments)]
     pub fn create(app: &AppHandle, id: u64, owner: i64, kind: &'static str, dark: bool, rect: Rect, scale: f64, animate: bool) {
         let _ = APP.set(app.clone());
-        let [x, y, w, h] = physical(rect, scale);
+        let [x, y, w, h] = physical(padded(rect), scale);
         let h_ = unsafe {
             CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, class(), std::ptr::null(), WS_POPUP, x, y, w, h, owner as HWND, std::ptr::null_mut(), GetModuleHandleW(std::ptr::null()), std::ptr::null())
         };
@@ -205,7 +361,7 @@ mod win {
         }
         unsafe { SetWindowLongPtrW(h_, GWLP_USERDATA, id as isize) };
         let anim = (animate && !reduce_motion()).then(|| (None, Instant::now()));
-        all().insert(id, St { hwnd: h_ as isize, kind, dark, hover: false, rect, scale, anim, leaving: false, cache: None });
+        all().insert(id, St { hwnd: h_ as isize, kind, dark, hover: false, hover_at: Instant::now(), hover_from: 0.0, rect, scale, anim, leaving: false, cache: None });
         present(id);
         unsafe {
             ShowWindow(h_, SW_SHOWNOACTIVATE);
@@ -242,7 +398,6 @@ mod win {
         }
         if let Some(s) = all().get_mut(&id) {
             s.leaving = true;
-            s.hover = false;
             s.anim = Some((how, Instant::now()));
             unsafe { SetTimer(s.hwnd as HWND, TIMER, FRAME_MS, None) };
         }
@@ -263,19 +418,30 @@ mod win {
         all().get(&id).filter(|s| !s.leaving).map(|s| s.rect)
     }
 
-    /// 지금 모습으로 다시 그린다 → 움직임이 끝났나
+    fn lifted(s: &St, reduce: bool) -> (f64, bool) {
+        let ms = s.hover_at.elapsed().as_secs_f64() * 1000.0;
+        (hover_progress(s.hover_from, s.hover, ms, reduce), reduce || ms >= HOVER_MS)
+    }
+
+    /// 지금 모습으로 다시 그린다 → 움직임(붙고 떼어짐 · 들림)이 다 끝났나
     fn present(id: u64) -> bool {
         let mut g = all();
         let Some(s) = g.get_mut(&id) else { return true };
-        let (alpha, dy, done) = s.anim.map_or((1.0, 0.0, true), |(how, t0)| motion(how, t0.elapsed().as_secs_f64() * 1000.0, reduce_motion()));
-        let [x, y, w, h] = physical([s.rect[0], s.rect[1] + dy, s.rect[2], s.rect[3]], s.scale);
-        let src = art(s.kind, s.dark, s.hover);
-        let key = (src as *const Image as usize, w as usize, h as usize);
-        if s.cache.as_ref().is_none_or(|(k, _)| *k != key) {
-            s.cache = Some((key, resize(src, w as usize, h as usize)));
+        let reduce = reduce_motion();
+        let size = (s.rect[2], s.rect[3]);
+        let p = s.anim.map_or_else(|| pose(s.kind, None, f64::MAX, true, size), |(how, t0)| pose(s.kind, how, t0.elapsed().as_secs_f64() * 1000.0, reduce, size));
+        let (hover, settled) = lifted(s, reduce);
+        let [x, y, w, h] = physical(padded(s.rect), s.scale);
+        let art_size = ((s.rect[2] * s.scale).round().max(1.0) as usize, (s.rect[3] * s.scale).round().max(1.0) as usize);
+        if s.cache.as_ref().is_none_or(|(k, ..)| *k != art_size) {
+            s.cache = Some((art_size, resize(art(s.kind, s.dark, false), art_size.0, art_size.1), resize(art(s.kind, s.dark, true), art_size.0, art_size.1)));
         }
-        let img = &s.cache.as_ref().unwrap().1;
+        let (_, rest, up) = s.cache.as_ref().unwrap();
+        // CSS 처럼 움직임(animation)이 도는 동안은 그 변환이 들림(transition)을 덮는다
+        let transform = if s.anim.is_some() { p.transform } else { lift(s.kind, hover, size) };
+        let img = render(rest, up, lift(s.kind, 1.0, size), hover, transform, size, s.scale, (w as usize, h as usize));
         let hwnd = s.hwnd as HWND;
+        let alpha = p.opacity;
         unsafe {
             let screen = GetDC(std::ptr::null_mut());
             let dc = CreateCompatibleDC(screen);
@@ -295,10 +461,10 @@ mod win {
             DeleteDC(dc);
             ReleaseDC(std::ptr::null_mut(), screen);
         }
-        if done {
+        if p.done {
             s.anim = None;
         }
-        done
+        p.done && (settled || s.leaving) // 사라지는 중이면 들림이 덜 내려앉아도 끝
     }
 
     fn notify(id: u64, f: impl FnOnce(&AppHandle, u64) + Send + 'static) {
@@ -317,13 +483,23 @@ mod win {
             }
             WM_MOUSEMOVE | WM_MOUSELEAVE => {
                 let over = msg == WM_MOUSEMOVE;
-                let changed = all().get_mut(&id).filter(|s| !s.leaving && s.hover != over).map(|s| s.hover = over).is_some();
+                let changed = all()
+                    .get_mut(&id)
+                    .filter(|s| !s.leaving && s.hover != over)
+                    .map(|s| {
+                        // 들리는 도중에 마우스가 나가도 그 자리에서 이어서 내려앉는다
+                        s.hover_from = lifted(s, reduce_motion()).0;
+                        s.hover_at = Instant::now();
+                        s.hover = over;
+                    })
+                    .is_some();
                 if changed {
                     if over {
                         let mut t = TRACKMOUSEEVENT { cbSize: size_of::<TRACKMOUSEEVENT>() as u32, dwFlags: TME_LEAVE, hwndTrack: h, dwHoverTime: 0 };
                         unsafe { TrackMouseEvent(&mut t) };
                     }
                     present(id);
+                    unsafe { SetTimer(h, TIMER, FRAME_MS, None) };
                     notify(id, move |app, id| crate::windows::sticker_hover(app, id, over));
                 }
                 return 0;
@@ -404,14 +580,78 @@ mod tests {
     }
 
     #[test]
-    fn stick_and_peel_motion() {
-        assert_eq!(motion(None, 0.0, false), (0.0, -12.0, false));
-        let (a, dy, done) = motion(None, 320.0, false);
-        assert!((a - 1.0).abs() < 1e-9 && dy.abs() < 1e-9 && done);
-        assert_eq!(motion(None, 0.0, true), (1.0, 0.0, true));
-        let (a, dy, done) = motion(Some(Leave::Peel), 200.0, false);
-        assert!(a.abs() < 1e-9 && (dy + 10.0).abs() < 1e-9 && done);
-        assert_eq!(motion(Some(Leave::Dock), 80.0, true), (0.5, 0.0, false));
+    fn css_curves_and_transforms() {
+        // cubic-bezier: 끝점 · 대칭 곡선의 가운데
+        assert!(bezier(SNAP, 0.0).abs() < 1e-6 && (bezier(SNAP, 1.0) - 1.0).abs() < 1e-6);
+        assert!((bezier((0.25, 0.1, 0.75, 0.9), 0.5) - 0.5).abs() < 1e-4);
+        assert!(bezier(SNAP, 0.3) > 0.8, "빨리 가다 부드럽게 멈춤");
+        // rotate(90deg) 는 시계 방향 (화면 y 는 아래로): 원점 오른쪽 점이 아래로
+        let r = css((0.0, 0.0), 0.0, 90.0, 1.0).apply((1.0, 0.0));
+        assert!(r.0.abs() < 1e-9 && (r.1 - 1.0).abs() < 1e-9);
+        // transform-origin 은 움직이지 않는다 · 되돌리면 제자리
+        let m = css((10.0, 20.0), -12.0, -12.0, 1.16);
+        let o = m.apply((10.0, 20.0));
+        assert!((o.0 - 10.0).abs() < 1e-9 && (o.1 - 8.0).abs() < 1e-9);
+        let back = m.inverse().apply(m.apply((3.0, 4.0)));
+        assert!((back.0 - 3.0).abs() < 1e-9 && (back.1 - 4.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn stick_peel_dock_poses() {
+        let size = (64.0, 52.0);
+        let start = pose("crown", None, 0.0, false, size);
+        assert!(start.opacity.abs() < 1e-6 && !start.done);
+        assert_ne!(start.transform, Affine::ID, "위에서 기울고 크게 시작");
+        let end = pose("crown", None, 320.0, false, size);
+        assert!((end.opacity - 1.0).abs() < 1e-6 && end.done);
+        let c = end.transform.apply((5.0, 7.0));
+        assert!((c.0 - 5.0).abs() < 1e-6 && (c.1 - 7.0).abs() < 1e-6, "끝나면 제자리");
+        assert!(pose("tape", None, 0.0, true, size).done, "움직임을 줄이면 바로");
+        let peel = pose("crown", Some(Leave::Peel), PEEL_MS, false, size);
+        assert!(peel.opacity.abs() < 1e-6 && peel.done);
+        assert!(peel.transform.apply((19.2, 41.6)).1 < 41.6 - 9.0, "위로 들리며");
+        // 한 장면(16ms)마다 투명도가 10% 넘게 바뀌지 않는다 (붙기 · 떼기 · 들어가기)
+        for leave in [None, Some(Leave::Peel), Some(Leave::Dock)] {
+            let mut last = pose("crown", leave, 0.0, false, size).opacity;
+            for f in 1..=40 {
+                let now = pose("crown", leave, f as f64 * 16.0, false, size).opacity;
+                assert!((now - last).abs() <= 0.1, "{leave:?} {f}: {last} → {now}");
+                last = now;
+            }
+        }
+        let dock = pose("crown", Some(Leave::Dock), 75.0, true, size);
+        assert!((dock.opacity - 0.53).abs() < 0.01 && !dock.done && dock.transform == Affine::ID);
+        // 들림: 반쯤에서 마우스가 나가면 그 자리에서 내려앉는다
+        assert!((hover_progress(0.0, true, HOVER_MS, false) - 1.0).abs() < 1e-6);
+        let mid = hover_progress(0.0, true, 50.0, false);
+        assert!(mid > 0.0 && mid < 1.0);
+        assert!((hover_progress(mid, false, 0.0, false) - mid).abs() < 1e-9);
         assert_eq!(physical([10.2, 20.0, 64.0, 52.0], 1.5), [15, 30, 96, 78]);
+        assert_eq!(padded([100.0, 50.0, 64.0, 52.0]), [100.0 - PAD, 50.0 - PAD, 64.0 + 2.0 * PAD, 52.0 + 2.0 * PAD]);
+    }
+
+    #[test]
+    fn render_places_art_inside_padding() {
+        let size = (64.0, 52.0);
+        let rest = resize(art("crown", false, false), 64, 52);
+        let up = resize(art("crown", false, true), 64, 52);
+        let (cw, ch) = ((64.0 + 2.0 * PAD) as usize, (52.0 + 2.0 * PAD) as usize);
+        // 변환 없음 · 들림 없음: 둘레(PAD) 안쪽에 그림 그대로
+        let still = render(&rest, &up, lift("crown", 1.0, size), 0.0, Affine::ID, size, 1.0, (cw, ch));
+        let at = |img: &Image, x: usize, y: usize| img.px[(y * img.w + x) * 4 + 3];
+        for (x, y) in [(32, 30), (10, 40), (50, 15)] {
+            assert_eq!(at(&still, x + PAD as usize, y + PAD as usize), at(&rest, x, y));
+        }
+        assert_eq!(at(&still, 2, 2), 0, "둘레는 투명 (마우스가 통과)");
+        // 다 들리면 들린 그림 그대로
+        let lifted_full = render(&rest, &up, lift("crown", 1.0, size), 1.0, lift("crown", 1.0, size), size, 1.0, (cw, ch));
+        for (x, y) in [(32, 30), (10, 40)] {
+            assert!(at(&lifted_full, x + PAD as usize, y + PAD as usize).abs_diff(at(&up, x, y)) <= 2);
+        }
+        // 붙기 시작: 크고 기울어 둘레 밖으로도 번진다 (창을 넓힌 까닭)
+        let big = render(&rest, &up, lift("crown", 1.0, size), 0.0, pose("crown", None, 0.0, false, size).transform, size, 1.0, (cw, ch));
+        let rows_used = (0..ch).filter(|&y| (0..cw).any(|x| at(&big, x, y) > 0)).count();
+        let rows_rest = (0..ch).filter(|&y| (0..cw).any(|x| at(&still, x, y) > 0)).count();
+        assert!(rows_used > rows_rest);
     }
 }
