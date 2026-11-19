@@ -173,9 +173,9 @@ export function contentKindName(node, dom) {
   if (dom.querySelector('.mk-ink')) return '손 메모';
   if (dom.querySelector('.mk-video')) return '동영상';
   if (dom.querySelector('.mk-media')) return '소리';
-  if (dom.querySelector('img.mk-album-img')) return '묶음 사진';
+  if (dom.querySelector('img.mk-album-img')) return '묶음 이미지';
   if (dom.querySelector('img.mk-pdf-thumb')) return '문서'; // 문서 칩 + PDF 첫 쪽 썸네일 한 덩어리
-  if (dom.querySelector('img.mk-image')) return '그림';
+  if (dom.querySelector('img.mk-image')) return '이미지';
   if (dom.querySelector('a[data-file]')) return '파일';
   if (dom.querySelector('.mk-link-card, [data-link-card]')) return '링크';
   return '내용';
@@ -1057,7 +1057,7 @@ class Mover {
             });
           }
           if (ext !== 'pdf' && !hasPair) extraItems.push({ id: 'expand-pdf', label: 'PDF 짝 만들기' });
-          extraItems.push({ id: 'expand-images', label: '그림으로 펼치기' });
+          extraItems.push({ id: 'expand-images', label: '이미지로 펼치기' });
         }
         if (['txt', 'md', 'csv', 'json', 'xml', 'log'].includes(ext)) {
           extraItems.push({ id: 'expand-text', label: '텍스트로 본문에 풀기' });

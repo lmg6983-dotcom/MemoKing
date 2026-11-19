@@ -1,13 +1,13 @@
 [
  {
   "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
-  "share": "왕 테스트\n\n일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n\n• 점 하나\n  • 하위 점\n    • 하위의 하위\n• 점 둘\n\n☐ 할 일\n☑ 끝낸 일\n• [ ]\n\n1. 첫째\n2. 둘째\n  1. 둘째의 하위\n\n│ 인용 문장\n│ 두 번째 줄\n\n품목 | 가격\n사과 | 1,000원\n배 | 2,000원\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n\\int_0^1 x\\,dx\n\nconst a = 1; // 코드 # 태그 아님\n\n링크 글자 (https://example.com) 그리고 https://naver.com 맨주소\n\n[사진 그림]\n\n줄바꿈\n다음 줄\n\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n———\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..",
-  "copy": "일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n\n• 점 하나\n  • 하위 점\n    • 하위의 하위\n• 점 둘\n\n☐ 할 일\n☑ 끝낸 일\n• [ ]\n\n1. 첫째\n2. 둘째\n  1. 둘째의 하위\n\n│ 인용 문장\n│ 두 번째 줄\n\n품목 | 가격\n사과 | 1,000원\n배 | 2,000원\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n\\int_0^1 x\\,dx\n\nconst a = 1; // 코드 # 태그 아님\n\n링크 글자 (https://example.com) 그리고 https://naver.com 맨주소\n\n[사진 그림]\n\n줄바꿈\n다음 줄\n\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n———\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 .."
+  "share": "왕 테스트\n\n일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n\n• 점 하나\n  • 하위 점\n    • 하위의 하위\n• 점 둘\n\n☐ 할 일\n☑ 끝낸 일\n• [ ]\n\n1. 첫째\n2. 둘째\n  1. 둘째의 하위\n\n│ 인용 문장\n│ 두 번째 줄\n\n품목 | 가격\n사과 | 1,000원\n배 | 2,000원\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n\\int_0^1 x\\,dx\n\nconst a = 1; // 코드 # 태그 아님\n\n링크 글자 (https://example.com) 그리고 https://naver.com 맨주소\n\n[이미지 그림]\n\n줄바꿈\n다음 줄\n\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n———\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..",
+  "copy": "일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n\n• 점 하나\n  • 하위 점\n    • 하위의 하위\n• 점 둘\n\n☐ 할 일\n☑ 끝낸 일\n• [ ]\n\n1. 첫째\n2. 둘째\n  1. 둘째의 하위\n\n│ 인용 문장\n│ 두 번째 줄\n\n품목 | 가격\n사과 | 1,000원\n배 | 2,000원\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n\\int_0^1 x\\,dx\n\nconst a = 1; // 코드 # 태그 아님\n\n링크 글자 (https://example.com) 그리고 https://naver.com 맨주소\n\n[이미지 그림]\n\n줄바꿈\n다음 줄\n\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n———\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 .."
  },
  {
   "body": "# 왕 테스트\n\n일반 문단 *기울임* **굵게** ~~취소~~ `코드` <u>밑줄</u> <mark>형광</mark> <span style=\"color: #e5484d\">빨강</span>\n\n- 점 하나\n  - 하위 점\n    - 하위의 하위\n- 점 둘\n\n- [ ] 할 일\n- [x] 끝낸 일\n- [ ]\n\n1. 첫째\n2. 둘째\n   1. 둘째의 하위\n\n> 인용 문장\n> 두 번째 줄\n\n| 품목 | 가격 |\n| --- | ---: |\n| 사과 | 1,000원 |\n| 배 | 2,000원 |\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```js\nconst a = 1; // 코드 # 태그 아님\n```\n\n[링크 글자](https://example.com) 그리고 https://naver.com 맨주소\n\n![그림](attachments/a.png)\n\n줄바꿈\\\n다음 줄\n\n이스케이프: \\* 별표 \\_ 밑줄 1\\. 숫자점 \\[괄호\\]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n---\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..\n",
-  "share": "왕 테스트\n\n일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n\n• 점 하나\n  • 하위 점\n    • 하위의 하위\n• 점 둘\n\n☐ 할 일\n☑ 끝낸 일\n• [ ]\n\n1. 첫째\n2. 둘째\n  1. 둘째의 하위\n\n│ 인용 문장\n│ 두 번째 줄\n\n품목 | 가격\n사과 | 1,000원\n배 | 2,000원\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n\\int_0^1 x\\,dx\n\nconst a = 1; // 코드 # 태그 아님\n\n링크 글자 (https://example.com) 그리고 https://naver.com 맨주소\n\n[사진 그림]\n\n줄바꿈\n다음 줄\n\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n———\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..",
-  "copy": "일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n\n• 점 하나\n  • 하위 점\n    • 하위의 하위\n• 점 둘\n\n☐ 할 일\n☑ 끝낸 일\n• [ ]\n\n1. 첫째\n2. 둘째\n  1. 둘째의 하위\n\n│ 인용 문장\n│ 두 번째 줄\n\n품목 | 가격\n사과 | 1,000원\n배 | 2,000원\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n\\int_0^1 x\\,dx\n\nconst a = 1; // 코드 # 태그 아님\n\n링크 글자 (https://example.com) 그리고 https://naver.com 맨주소\n\n[사진 그림]\n\n줄바꿈\n다음 줄\n\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n———\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 .."
+  "share": "왕 테스트\n\n일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n\n• 점 하나\n  • 하위 점\n    • 하위의 하위\n• 점 둘\n\n☐ 할 일\n☑ 끝낸 일\n• [ ]\n\n1. 첫째\n2. 둘째\n  1. 둘째의 하위\n\n│ 인용 문장\n│ 두 번째 줄\n\n품목 | 가격\n사과 | 1,000원\n배 | 2,000원\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n\\int_0^1 x\\,dx\n\nconst a = 1; // 코드 # 태그 아님\n\n링크 글자 (https://example.com) 그리고 https://naver.com 맨주소\n\n[이미지 그림]\n\n줄바꿈\n다음 줄\n\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n———\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 ..",
+  "copy": "일반 문단 기울임 굵게 취소 코드 밑줄 형광 빨강\n\n• 점 하나\n  • 하위 점\n    • 하위의 하위\n• 점 둘\n\n☐ 할 일\n☑ 끝낸 일\n• [ ]\n\n1. 첫째\n2. 둘째\n  1. 둘째의 하위\n\n│ 인용 문장\n│ 두 번째 줄\n\n품목 | 가격\n사과 | 1,000원\n배 | 2,000원\n\n수식 $x^2 + y^2$ 그리고 블록:\n\n\\int_0^1 x\\,dx\n\nconst a = 1; // 코드 # 태그 아님\n\n링크 글자 (https://example.com) 그리고 https://naver.com 맨주소\n\n[이미지 그림]\n\n줄바꿈\n다음 줄\n\n이스케이프: * 별표 _ 밑줄 1. 숫자점 [괄호]\n\n#태그 #업무 문장 속 #해시 그리고 C# 언어\n\n———\n\n이메일 a@b.com 과 100% 그리고 3 < 5 > 2 & 기호\n\n끝 문단 ,,, 말줄임 .."
  },
  {
   "body": "본문",
@@ -161,8 +161,8 @@
  },
  {
   "body": "![](attachments/x.mp4)\n![소리](attachments/y.m4a)\n[문서](attachments/z.pdf)\n![사진](attachments/p.PNG \"album page\")\n![](https://e.com/a.png)\n[웹](https://e.com)",
-  "share": "[동영상 x.mp4]\n[녹음 소리]\n[파일 문서]\n[사진 사진]\n[사진]\n웹 (https://e.com)",
-  "copy": "[동영상 x.mp4]\n[녹음 소리]\n[파일 문서]\n[사진 사진]\n[사진]\n웹 (https://e.com)"
+  "share": "[동영상 x.mp4]\n[녹음 소리]\n[파일 문서]\n[이미지 사진]\n[이미지]\n웹 (https://e.com)",
+  "copy": "[동영상 x.mp4]\n[녹음 소리]\n[파일 문서]\n[이미지 사진]\n[이미지]\n웹 (https://e.com)"
  },
  {
   "body": "github_pat_ABC_def snake_case _강조_ __굵게__ *별* **굵은별** ~~취소~~",
@@ -231,8 +231,8 @@
  },
  {
   "body": "![a](attachments/%ED%95%9C.png) ![b](attachments/%E0%A4%A.png) ![c]( <attachments/sp ace.jpg> ) ![d](attachments/q.webm \"x\") ![동영상](attachments/v.webm) ![t](attachments/t.png \"pdf attachments/doc.pdf\") [x](memo.md) [y](attachments/f.zip)",
-  "share": "[사진 a] [사진 b] ![c]( <attachments/sp ace.jpg> ) [동영상 d] [동영상 동영상] [사진 t] x (memo.md) [파일 y]",
-  "copy": "[사진 a] [사진 b] ![c]( <attachments/sp ace.jpg> ) [동영상 d] [동영상 동영상] [사진 t] x (memo.md) [파일 y]"
+  "share": "[이미지 a] [이미지 b] ![c]( <attachments/sp ace.jpg> ) [동영상 d] [동영상 동영상] [이미지 t] x (memo.md) [파일 y]",
+  "copy": "[이미지 a] [이미지 b] ![c]( <attachments/sp ace.jpg> ) [동영상 d] [동영상 동영상] [이미지 t] x (memo.md) [파일 y]"
  },
  {
   "body": "# 왕 테스트",
@@ -366,8 +366,8 @@
  },
  {
   "body": "![그림](attachments/a.png)",
-  "share": "[사진 그림]",
-  "copy": "[사진 그림]"
+  "share": "[이미지 그림]",
+  "copy": "[이미지 그림]"
  },
  {
   "body": "줄바꿈\\",
@@ -416,8 +416,8 @@
  },
  {
   "body": "![](attachments/rec%20one.m4a) ![녹음](attachments/r.m4a) ![](attachments/v.mp4) ![설명](attachments/p.png) ![](attachments/noext) ![](attachments/doc.zip)",
-  "share": "[녹음 rec one.m4a] [녹음 녹음] [동영상 v.mp4] [사진 설명] [사진] [파일 doc.zip]",
-  "copy": "[녹음 rec one.m4a] [녹음 녹음] [동영상 v.mp4] [사진 설명] [사진] [파일 doc.zip]"
+  "share": "[녹음 rec one.m4a] [녹음 녹음] [동영상 v.mp4] [이미지 설명] [이미지] [파일 doc.zip]",
+  "copy": "[녹음 rec one.m4a] [녹음 녹음] [동영상 v.mp4] [이미지 설명] [이미지] [파일 doc.zip]"
  },
  {
   "body": "| a | b\\|c |\n|---|:---:|\n| **굵게** | `코드` |",

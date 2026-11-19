@@ -141,7 +141,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'quick', chapter: '메모킹만의 기능', win: 'list', target: [], needs: 'quickMemo', advance: 'quick-memo', emoji: '⚡',
     title: '매직 카피 (Ctrl+Alt+C)',
-    text: '웹 페이지나 문서에서 글을 고르고 Ctrl+Alt+C, 곧바로 메모가 돼요. 파일이나 그림을 고르고 눌러도 돼요.',
+    text: '웹 페이지나 문서에서 글을 고르고 Ctrl+Alt+C, 곧바로 메모가 돼요. 파일이나 이미지를 고르고 눌러도 돼요.',
     try: '웹 브라우저나 메모장에서 글을 조금 끌어 고르고 Ctrl+Alt+C를 눌러 보세요',
     offText: '설정에서 매직 카피 키를 켜면, 다른 앱에서 글이나 파일을 고르고 Ctrl+Alt+C를 눌러 바로 메모로 담아요.',
     next: LATER,
@@ -149,7 +149,7 @@ export const TUTORIAL_STEPS = [
   {
     id: 'capture', chapter: '메모킹만의 기능', win: 'list', target: [], needs: 'quickMemo', advance: 'capture-done', emoji: '✂️',
     title: '매직 카피 두 번: 화면 잘라 메모',
-    text: 'Ctrl+Alt+C를 빠르게 두 번! 화면이 멈추면 담고 싶은 곳을 끌어서 잘라요. 자른 그림이 바로 메모가 돼요.',
+    text: 'Ctrl+Alt+C를 빠르게 두 번! 화면이 멈추면 담고 싶은 곳을 끌어서 잘라요. 자른 이미지가 바로 메모가 돼요.',
     try: 'Ctrl+Alt+C를 빠르게 두 번 누르고, 아무 곳이나 네모로 끌어 보세요',
     offText: '설정에서 매직 카피 키를 켜면 Ctrl+Alt+C를 빠르게 두 번 눌러 화면의 원하는 곳을 잘라 메모로 담아요.',
     next: LATER,
@@ -203,7 +203,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'move', chapter: '메모킹만의 메모', win: 'note', target: ['.mode-knob .mk-dial', '.mode-knob'], keep: ['.ProseMirror > *', '.mode-knob'], sample: true, advance: 'mode-moved', emoji: '↕️', image: 'm-move.jpg',
     title: '다이얼로 옮기기',
-    text: '오른쪽 아래 다이얼로 글 고치기, 옮기기, 글 위에 그리기를 골라요. 옮기기에서는 줄, 사진, 표를 짧게 눌러 끌면 돼요 (연습용 장보기 목록을 넣어 뒀어요). 글을 복사하거나 고칠 땐 글 고치기로.',
+    text: '오른쪽 아래 다이얼로 글 고치기, 옮기기, 글 위에 그리기를 골라요. 옮기기에서는 줄, 이미지, 표를 짧게 눌러 끌면 돼요 (연습용 장보기 목록을 넣어 뒀어요). 글을 복사하거나 고칠 땐 글 고치기로.',
     try: '오른쪽 아래 다이얼을 한 번 눌러 옮기기로 돌려 보세요',
     next: LATER,
   },
@@ -238,7 +238,7 @@ export const MOBILE_TUTORIAL_STEPS = [
   {
     id: 'tabs', chapter: '목록', win: 'list', target: ['.tabs'], emoji: '🔔',
     title: '아래 탭으로 오가기',
-    text: '메모, 일정, 알림 보관함 탭이 아래에 있어요. 일정에서는 캘린더와 회상(그날의 사진과 메모)을, 알림 보관함에서는 지나간 알림을 봐요.',
+    text: '메모, 일정, 알림 보관함 탭이 아래에 있어요. 일정에서는 캘린더와 회상(그날의 이미지와 메모)을, 알림 보관함에서는 지나간 알림을 봐요.',
     next: '다음',
   },
   {

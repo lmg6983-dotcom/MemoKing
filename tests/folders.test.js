@@ -49,9 +49,11 @@ test('미분류: 폴더에 넣지 않은 메모만 — 목록에는 폴더가 �
   assert.equal(isFolderName(UNFILED), false); // 사용자가 같은 이름의 폴더를 만들 수 없다
 });
 
-test('맨 위에 고정한 폴더: 먼저, 그 안에서 이름순 · 파일 읽기 · 이름 바꾸기', () => {
+test('상단 고정한 폴더: 먼저, 나중에 고정한 것이 위 · 파일 읽기 · 이름 바꾸기', () => {
   const list = folderList(['집', '업무', '공부', '취미'], [], ['취미', '공부', '없는폴더']);
   assert.deepEqual(list.map((f) => [f.name, Boolean(f.pinned)]), [['공부', true], ['취미', true], ['업무', false], ['집', false]]);
+  // 고정한 차례: 뒤가 나중 — 나중에 고정한 '취미' 가 위
+  assert.deepEqual(folderList(['집', '공부', '취미'], [], ['공부', '취미']).map((f) => f.name), ['취미', '공부', '집']);
   assert.deepEqual(parsePinned('["업무","업무","_memoking",3,"a:b"]'), ['업무']);
   assert.deepEqual(parsePinned('{망가짐'), []);
   assert.deepEqual(parsePinned(null), []);

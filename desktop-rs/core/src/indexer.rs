@@ -333,7 +333,7 @@ pub const AGENT_GUIDE: &str = r##"# 메모킹 폴더 안내 (LLM 에이전트용
 | id | 메모 고유 id (파일명이 바뀌어도 유지) |
 | created / updated | 만든 시각 / 고친 시각 (ISO 8601) |
 | color | 스티커 색 |
-| pinned | 목록 맨 위 고정 여부 |
+| pinned | 상단 고정 여부 (pinnedAt: 상단 고정한 때) |
 | links | 사용자가 직접 연결한 메모들의 id |
 
 ## index.json의 memos[] 항목

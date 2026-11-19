@@ -132,7 +132,7 @@ export function tableReviewReasons(table) {
   const cells = [...table.querySelectorAll('td, th')];
   if (cells.some((c) => c.colSpan > 1 || c.rowSpan > 1)) reasons.push('병합된 칸');
   if (table.querySelector('table')) reasons.push('표 안의 표');
-  if (table.querySelector('img, picture, svg, canvas, object')) reasons.push('그림');
+  if (table.querySelector('img, picture, svg, canvas, object')) reasons.push('이미지');
   if (table.querySelector('math, .MathJax, .katex, [data-formula]') || cells.some((c) => /^\s*=[A-Z가-힣_(]/i.test(c.textContent) || /\$[^$]+\$/.test(c.textContent))) reasons.push('수식');
   return reasons;
 }

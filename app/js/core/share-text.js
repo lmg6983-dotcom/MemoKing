@@ -14,7 +14,7 @@ function mediaLabel(alt, src) {
   const name = alt || decodeURIComponent(String(src).split('/').pop() ?? '');
   if (AUDIO_EXT.test(src)) return `[녹음 ${name}]`.replace(/\s+\]$/, ']');
   if (VIDEO_EXT.test(src)) return `[동영상 ${name}]`.replace(/\s+\]$/, ']');
-  if (IMAGE_EXT.test(src) || !/\.[a-z0-9]{1,5}$/i.test(src)) return `[사진${alt ? ` ${alt}` : ''}]`;
+  if (IMAGE_EXT.test(src) || !/\.[a-z0-9]{1,5}$/i.test(src)) return `[이미지${alt ? ` ${alt}` : ''}]`;
   return `[파일 ${name}]`;
 }
 

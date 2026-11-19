@@ -33,7 +33,7 @@ const SPLIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShare, onDelete, onUndo, onRotate, onSplit, onMove }) {
   let i = Math.max(0, Math.min(images.length - 1, start));
-  const view = el('div', 'mk-album-view', { role: 'dialog', ariaModal: 'true', ariaLabel: images.length > 1 ? '묶음 사진' : '사진 크게 보기' });
+  const view = el('div', 'mk-album-view', { role: 'dialog', ariaModal: 'true', ariaLabel: images.length > 1 ? '묶음 이미지' : '이미지 크게 보기' });
   const head = el('div', 'mk-album-head');
   const count = el('span', 'mk-album-count');
   const inkedMark = el('span', 'mk-album-inked');
@@ -593,7 +593,7 @@ export function openAlbumViewer({ images, start = 0, url, onDraw, onSave, onShar
     layer.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
     await layer.decode();
     ctx.drawImage(layer, 0, 0, W, H);
-    return new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('그림을 만들지 못했어요'))), photo ? 'image/jpeg' : 'image/webp', 0.92));
+    return new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('이미지를 만들지 못했어요'))), photo ? 'image/jpeg' : 'image/webp', 0.92));
   }
 
   // ---------- 닫기 · 키 ----------

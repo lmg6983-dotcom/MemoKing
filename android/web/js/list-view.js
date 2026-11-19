@@ -80,7 +80,7 @@ const state = {
   workLife: null, // 설정 › Work / Life 나누기 (null: 정한 적 없음 — 처음 목록을 읽을 때 Work 메모가 있으면 켬)
   folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 휴대폰에 기억
   folderDirs: null, // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도) — 앱에 묻는 일이라 기억해 두고 필요할 때만 다시 (loadFolderDirs)
-  pinnedFolders: [], // 맨 위에 고정한 폴더 (_memoking/pinned-folders.json, loadFolderDirs)
+  pinnedFolders: [], // 상단 고정한 폴더 (_memoking/pinned-folders.json, loadFolderDirs)
   picking: false, // 여러 장 고르기 (메모 메뉴 › 여러 개 고르기) — 카드를 누르면 열지 않고 고른다
   picked: new Set(),
 };
@@ -237,12 +237,6 @@ function renderCard(memo) {
   title.className = 'card-title';
   title.textContent = memo.title;
   head.append(title);
-  if (memo.pinned) {
-    const pin = badge('pin-fill', '', 'pin');
-    pin.setAttribute('role', 'img');
-    pin.setAttribute('aria-label', '고정됨');
-    head.append(pin);
-  }
   card.append(head);
 
   if (memo.preview) {
@@ -330,13 +324,16 @@ function columnsFor(width) {
 
 // 지금 목록에 쌓인 메모 (빠진 것만 있으면 그 카드만 들어낸다 — 아래 layoutCards)
 let shownIds = [];
+let shownPinned = 0;
 function layoutCards(memos) {
   const cols = columnsFor(el.cards.clientWidth || window.innerWidth);
   // 메모 몇 개만 빠졌고(지우기 · 다른 폴더로 옮기기) 나머지 카드가 그대로면 그 카드만 들어낸다 —
   //   모든 카드를 다시 쌓으면 메모가 많을 때 화면 모양을 통째로 다시 계산해, 밀어 지운 뒤 화면이 잠깐 멈췄다.
   //   남은 카드는 제 줄에서 위로 미끄러진다 (glideCards). 줄 길이가 조금 어긋나는 것은 다음에 다시 쌓을 때 맞춘다
   const ids = memos.map((m) => m.id);
-  if (cols === lastCols && shownIds.length > ids.length && el.cards.querySelector('.item')) {
+  const pinnedCount = memos.filter((m) => m.pinned).length;
+  // 상단 고정 수가 그대로고 일반 메모가 남을 때만 (일반 메모가 다 빠지면 "메모" 이름 줄도 없애야 해서 다시 쌓는다)
+  if (cols === lastCols && pinnedCount === shownPinned && (pinnedCount === 0 || ids.length > pinnedCount) && shownIds.length > ids.length && el.cards.querySelector('.item')) {
     const keep = new Set(ids);
     const gone = shownIds.filter((id) => !keep.has(id));
     const same = gone.length === shownIds.length - ids.length && shownIds.filter((id) => keep.has(id)).every((id, i) => id === ids[i])
@@ -349,6 +346,7 @@ function layoutCards(memos) {
     }
   }
   shownIds = ids;
+  shownPinned = pinnedCount;
   lastCols = cols;
   const columns = Array.from({ length: cols }, () => {
     const c = document.createElement('div');
@@ -361,8 +359,15 @@ function layoutCards(memos) {
   const top = scroller?.scrollTop ?? 0;
   const had = Boolean(el.cards.querySelector('.item'));
   if (had) el.cards.style.minHeight = `${el.cards.offsetHeight}px`;
-  el.cards.replaceChildren(...columns);
-  stackCards(columns, memos.map(cardFor), { chunk: !had, late: (items) => items.forEach((li) => (li.style.animation = 'none')) }); // 나눠 쌓이는 뒤쪽 카드는 튀어나오지 않게
+  // 상단 고정한 메모가 있으면 "상단 고정" 묶음 · 선 · "메모" 묶음으로 (PC list.js 와 같음)
+  const pinned = memos.filter((m) => m.pinned);
+  const rest = pinned.length ? memos.filter((m) => !m.pinned) : memos;
+  const pinCols = pinned.length ? columns.map(() => Object.assign(document.createElement('div'), { className: 'col' })) : [];
+  const sep = (text) => Object.assign(document.createElement('div'), { className: 'card-sep', role: 'separator', textContent: text });
+  el.cards.classList.toggle('sectioned', pinned.length > 0);
+  el.cards.replaceChildren(...(pinned.length ? [sep('상단 고정'), ...pinCols, ...(rest.length ? [sep('메모')] : [])] : []), ...(rest.length || !pinned.length ? columns : []));
+  if (pinned.length) stackCards(pinCols, pinned.map(cardFor), { chunk: false });
+  stackCards(columns, rest.map(cardFor), { chunk: !had, late: (items) => items.forEach((li) => (li.style.animation = 'none')) }); // 나눠 쌓이는 뒤쪽 카드는 튀어나오지 않게
   el.cards.style.minHeight = '';
   if (scroller && top && scroller.scrollTop !== top) scroller.scrollTop = top;
   if (cardCache.size > memos.length + 200) for (const id of cardCache.keys()) if (!memos.some((m) => m.id === id)) cardCache.delete(id);
@@ -551,7 +556,7 @@ function renderFolderSide() {
   // 폴더가 생기면 한 번: 메모를 꾹 눌러 끌면 폴더로 (눈에 안 보이는 동작)
   if (list.length && !el.folderSide.hidden) setTimeout(() => {
     const first = el.folderSide.querySelector(`[data-folder]:not([data-folder=""]):not([data-folder="${UNFILED}"])`);
-    if (first?.getClientRects().length && state.tab === 'memos') hintOnce('folder-drag', '메모를 꾹 누른 채 끌어 폴더에 놓으면 옮겨져요. 폴더를 꾹 누르면 이름을 바꾸거나 지울 수 있어요', { anchor: first });
+    if (first?.getClientRects().length && state.tab === 'memos') hintOnce('folder-drag', '메모를 꾹 누른 채 끌어 폴더에 놓으면 옮겨져요. 폴더를 꾹 누르면 이름을 바꾸거나 삭제할 수 있어요', { anchor: first });
   }, 900);
 }
 
@@ -601,13 +606,13 @@ el.folderBtn.addEventListener('click', async () => {
   applyFolderSide();
 });
 
-// 폴더 메뉴 (폴더 목록에서 꾹 누르기): 맨 위에 고정 · 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
+// 폴더 메뉴 (폴더 목록에서 꾹 누르기): 상단 고정 · 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
 async function folderMenu(name, anchor) {
   haptic(12);
   const r = anchor.getBoundingClientRect();
   const pick = await openContextMenu({
     x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
-    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
+    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 삭제', danger: true }],
   });
   try {
     if (pick === 'pin') {
@@ -628,7 +633,7 @@ async function folderMenu(name, anchor) {
       else render();
       // 메모는 지우지 않고 폴더 밖으로 — 되돌리기: 폴더를 다시 만들고 꺼낸 메모를 그 폴더로
       toast(!removed ? `메모 ${moved}개를 폴더 밖으로 옮겼어요. 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
-        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 지웠어요`, false, {
+        : moved ? `${name} 폴더를 삭제했어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 삭제했어요`, false, {
         label: '되돌리기',
         run: () => {
           app.vault.createFolder(name);
@@ -649,7 +654,7 @@ async function folderMenu(name, anchor) {
 export async function moveToFolder(ids, current) {
   if (!ids.length || !app.vault) return;
   loadFolderDirs();
-  const to = await pickFolder({ folders: state.folderDirs, current: ids.length === 1 ? current ?? '' : null, count: ids.length });
+  const to = await pickFolder({ folders: folderList(state.folderDirs ?? [], [], state.pinnedFolders).map((f) => f.name), current: ids.length === 1 ? current ?? '' : null, count: ids.length });
   if (to === null) return;
   let moved = 0;
   try {

@@ -265,8 +265,6 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 }
 .card-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; }
 .card-badge svg { width: 13px; height: 13px; }
-.card-badge.pin { margin-top: 3px; }
-.card-badge.pin svg { width: 15px; height: 15px; }
 .card-preview {
   display: -webkit-box;
   overflow: hidden;
@@ -429,6 +427,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   scroll-snap-type: x proximity;
 }
 .note-screen .format-items::-webkit-scrollbar { display: none; }
+.note-screen .format-items:has(:focus-visible) { scroll-snap-type: none; } /* Tab 으로 옮길 때는 걸쇠가 단추를 반쯤 밖으로 되돌리지 않게 */
 .note-screen .format-bar button { min-width: var(--tap); height: var(--tap); border-radius: 10px; font-size: 15px; }
 .note-screen .format-bar button svg { width: 21px; height: 21px; }
 .note-screen .format-bar button :is(b, i, u, s) { font-size: 17px; }

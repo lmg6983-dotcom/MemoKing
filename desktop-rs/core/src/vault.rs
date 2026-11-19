@@ -352,6 +352,7 @@ impl Vault {
             "preview": p.preview,
             "color": e.meta.color,
             "pinned": e.meta.pinned,
+            "pinnedAt": e.meta.extra.get("pinnedAt").and_then(Value::as_str),
             "created": e.meta.created,
             "updated": e.meta.updated,
             "thumb": media.iter().find(|m| m.kind == "image").map(|m| &m.src),
@@ -382,7 +383,9 @@ impl Vault {
         let mut list: Vec<&Entry> = self.entries.values().filter(|e| e.file.is_some()).collect();
         let t = |e: &Entry| e.meta.updated.as_deref().and_then(time::parse_js_date).map_or(0, |d| d.timestamp_millis());
         // 날짜 읽기는 메모마다 한 번 (비교마다 읽으면 2,000개에 4만 번)
-        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(t(e))));
+        // 상단 고정은 나중에 고정한 것이 위 (memo-sort.js 와 같음)
+        let pinned_at = |e: &Entry| e.meta.extra.get("pinnedAt").and_then(Value::as_str).and_then(time::parse_js_date).map_or(0, |d| d.timestamp_millis());
+        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(if e.meta.pinned { pinned_at(e) } else { 0 }), std::cmp::Reverse(t(e))));
         list
     }
 
@@ -418,6 +421,7 @@ impl Vault {
             "title": body::extract_title(&e.body),
             "color": e.meta.color,
             "pinned": e.meta.pinned,
+            "pinnedAt": e.meta.extra.get("pinnedAt").and_then(Value::as_str),
             "links": e.meta.links,
             "reminders": e.meta.reminders,
             "tables": e.meta.tables,
@@ -1021,8 +1025,13 @@ impl Vault {
         if let Some(c) = patch["color"].as_str().filter(|c| memo_file::COLORS.contains(c)) {
             e.meta.color = c.into();
         }
-        if let Some(p) = patch["pinned"].as_bool() {
+        if let Some(p) = patch["pinned"].as_bool().filter(|p| *p != e.meta.pinned) {
+            // 상단 고정한 때 — 목록의 상단 고정 묶음은 나중에 고정한 것이 위 (vault-locks.js setMeta 와 같음)
             e.meta.pinned = p;
+            e.meta.extra.remove("pinnedAt");
+            if p {
+                e.meta.extra.insert("pinnedAt".into(), time::now_iso().into());
+            }
         }
         if patch["tables"].is_array() {
             e.meta.tables = crate::tables::normalize_tables(&patch["tables"]);
@@ -1290,7 +1299,7 @@ impl Vault {
         }
         let a = self.root.join(from);
         if !a.is_dir() {
-            return Err("폴더를 찾지 못했어요. 다른 곳에서 지웠을 수 있어요".into());
+            return Err("폴더를 찾지 못했어요. 다른 곳에서 삭제했을 수 있어요".into());
         }
         let case_only = dst.to_lowercase() == from.to_lowercase(); // Windows 는 대소문자만 다른 이름을 같은 폴더로 본다
         if !case_only && self.root.join(&dst).exists() {
@@ -1315,7 +1324,7 @@ impl Vault {
         Ok(dst)
     }
 
-    /// 맨 위에 고정한 폴더 (_memoking/pinned-folders.json — 기기끼리 함께. app/js/core/folders.js parsePinned 와 같음)
+    /// 상단 고정한 폴더 (_memoking/pinned-folders.json — 기기끼리 함께. app/js/core/folders.js parsePinned 와 같음)
     pub fn pinned_folders(&self) -> Vec<String> {
         let text = fs::read_to_string(self.app_dir().join(PINNED_FOLDERS)).unwrap_or_default();
         let list: Vec<Value> = serde_json::from_str(&text).unwrap_or_default();
@@ -1328,7 +1337,7 @@ impl Vault {
         out
     }
 
-    /// 폴더 고정 · 풀기 → 새 목록 (지운 폴더 이름은 남긴다: 지우기를 되돌리면 그대로 고정)
+    /// 폴더 상단 고정 · 풀기 → 새 목록 (지운 폴더 이름은 남긴다: 지우기를 되돌리면 그대로 고정)
     pub fn set_folder_pinned(&self, name: &str, on: bool) -> Result<Vec<String>, String> {
         if memo_file::clean_folder_name(name) != name || name.is_empty() {
             return Err("폴더 이름으로 쓸 수 없어요".into());
@@ -1748,7 +1757,10 @@ mod tests {
         // 머리말: 색 · 고정
         let m = v.set_meta(&a, &json!({ "color": "blue", "pinned": true })).unwrap().unwrap();
         assert!(m["color"] == "blue" && m["pinned"] == true);
-        assert_eq!(v.list()[0]["id"], json!(a), "고정한 메모가 먼저");
+        assert!(m["pinnedAt"].is_string(), "상단 고정한 때");
+        assert!(v.set_meta(&a, &json!({ "pinned": false })).unwrap().unwrap()["pinnedAt"].is_null(), "풀면 삭제한다");
+        v.set_meta(&a, &json!({ "pinned": true })).unwrap();
+        assert_eq!(v.list()[0]["id"], json!(a), "상단 고정한 메모가 먼저");
         // 연결 · 나를 연결한 메모
         v.link(&a, &b, true).unwrap().unwrap();
         assert_eq!(v.links(&b)["backlinks"][0]["id"], json!(a));
@@ -1768,7 +1780,7 @@ mod tests {
         assert_eq!(v.trash_preview(&name).as_deref(), Some("장보기 목록"));
         let back = v.restore_trash(&name).unwrap().unwrap();
         assert_eq!(back, b);
-        assert_eq!(v.entry(&b).unwrap().file.as_deref(), Some("보관/나.md"), "지운 폴더로 되살린다");
+        assert_eq!(v.entry(&b).unwrap().file.as_deref(), Some("보관/나.md"), "삭제한 폴더로 되살린다");
         assert!(!fs::read_to_string(root.join("보관/나.md")).unwrap().contains("trashedFrom"));
         // 영구 삭제 · 비우기
         let n = v.trash(&b).unwrap().unwrap();
@@ -1798,7 +1810,7 @@ mod tests {
         let s = lock::new_session("비밀번호", 1000).unwrap();
         let m = v.lock(&id, s.clone(), true, false).unwrap().unwrap();
         assert!(m["locked"] == true && m["needsPassword"] == false && m["body"].as_str().unwrap().contains("둘째 글"));
-        assert!(v.versions(&id).is_empty(), "잠그기 전 풀린 버전은 지운다");
+        assert!(v.versions(&id).is_empty(), "잠그기 전 풀린 버전은 삭제한다");
         let file = root.join("비밀.md");
         let text = fs::read_to_string(&file).unwrap();
         assert!(!text.contains("둘째 글") && text.contains("lockRefs") && text.contains("memoking-lock v1"));

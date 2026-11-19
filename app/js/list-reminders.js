@@ -1156,7 +1156,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
         imageRel = (await api.attachments.save(png, 'png')) || '';
       }
     } catch (err) {
-      console.warn('[calendar] 달력 그림', err);
+      console.warn('[calendar] 달력 이미지', err);
     }
     const alt = `${e.start.getFullYear()}년 ${e.start.getMonth() + 1}월 달력, ${when}`;
     return importedEventBody({ title: e.title, imageRel, imageAlt: alt, location: e.location, description: e.description, url: e.url });

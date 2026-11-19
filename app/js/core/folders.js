@@ -41,22 +41,23 @@ export const withUnfiled = (list, memos) => (list.length ? [{ name: UNFILED, lab
 export const isFolderName = (name) => Boolean(name) && cleanFolderName(name) === name;
 
 /**
- * 폴더 목록 [{ name, count, pinned? }] (고정한 폴더가 먼저, 그 안에서 이름순) — 디스크의 폴더 + 메모가 든 폴더, count 는 넘긴 메모(지금 모드) 중 그 폴더의 수
+ * 폴더 목록 [{ name, count, pinned? }] (상단 고정한 폴더가 먼저 — 나중에 고정한 것이 위, 나머지는 이름순) — 디스크의 폴더 + 메모가 든 폴더, count 는 넘긴 메모(지금 모드) 중 그 폴더의 수
  * @param {string[]} dirs 디스크의 맨 위 하위 폴더 이름
  * @param {{ folder?: string }[]} memos
- * @param {string[]} [pinned] 맨 위에 고정한 폴더
+ * @param {string[]} [pinned] 상단 고정한 폴더 (고정한 차례대로)
  */
 export function folderList(dirs, memos, pinned = []) {
   const counts = new Map();
   for (const d of dirs ?? []) if (isFolderName(d)) counts.set(d, 0);
   for (const m of memos ?? []) if (m.folder) counts.set(m.folder, (counts.get(m.folder) ?? 0) + 1);
-  const pins = new Set(pinned);
+  const order = new Map((pinned ?? []).map((n, i) => [n, i])); // 파일에는 고정한 차례대로 (뒤가 나중)
+  const rank = (f) => order.get(f.name) ?? -1;
   return [...counts]
-    .map(([name, count]) => (pins.has(name) ? { name, count, pinned: true } : { name, count }))
-    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || a.name.localeCompare(b.name, 'ko'));
+    .map(([name, count]) => (order.has(name) ? { name, count, pinned: true } : { name, count }))
+    .sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'ko'));
 }
 
-// 맨 위에 고정한 폴더 (_memoking/pinned-folders.json — 기기끼리 함께. desktop-rs/core/src/vault.rs 와 같음)
+// 상단 고정한 폴더 (_memoking/pinned-folders.json — 기기끼리 함께. desktop-rs/core/src/vault.rs 와 같음)
 //   지운 폴더의 이름은 남겨 둔다: 지우기를 되돌려 다시 만들면 그대로 고정 (목록에는 있는 폴더만 나온다)
 export const PINNED_FOLDERS_FILE = '_memoking/pinned-folders.json';
 

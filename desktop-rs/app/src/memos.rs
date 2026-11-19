@@ -455,8 +455,10 @@ pub fn closed_note(app: &AppHandle, id: &str, label: &str) {
     });
 }
 
-fn create_memo(app: &AppHandle, opts: &Value) -> Result<Value, String> {
+/// from: 새 메모를 만든 창 — 새 창은 그 창 옆에 겹치지 않게 (windows::new_memo_spot)
+fn create_memo(app: &AppHandle, from: &str, opts: &Value) -> Result<Value, String> {
     let id = with_vault(app, |v| Ok(v.create(opts["color"].as_str(), opts["mode"].as_str(), opts["folder"].as_str().unwrap_or(""))))?;
+    crate::windows::place_new_memo(app, &id, from);
     open_note(app, &id)?;
     Ok(id.into())
 }
@@ -523,11 +525,11 @@ fn read_attachment(app: &AppHandle, rel: &str) -> Result<Value, String> {
 ///   못 읽는 형식(HEIC 등)은 오류 — 화면이 예전처럼 돌린다
 fn rotate_attachment(app: &AppHandle, rel: &str) -> Result<Value, String> {
     use image::ImageDecoder;
-    let fail = |e: &dyn std::fmt::Display| format!("사진을 돌리지 못했어요 ({e})");
-    let file = with_vault(app, |v| Ok(v.resolve(rel)))?.filter(|f| f.is_file()).ok_or("사진을 찾지 못했어요")?;
+    let fail = |e: &dyn std::fmt::Display| format!("이미지를 돌리지 못했어요 ({e})");
+    let file = with_vault(app, |v| Ok(v.resolve(rel)))?.filter(|f| f.is_file()).ok_or("이미지를 찾지 못했어요")?;
     let ext = rel.rsplit('.').next().unwrap_or_default().to_ascii_lowercase();
     if ext == "gif" {
-        return Err("움직이는 그림(GIF)은 돌리면 멈춘 그림이 돼서 돌리지 않았어요".into());
+        return Err("움직이는 이미지(GIF)는 돌리면 멈춘 이미지가 돼서 돌리지 않았어요".into());
     }
     let mut dec = image::ImageReader::open(&file).map_err(|e| fail(&e))?.with_guessed_format().map_err(|e| fail(&e))?.into_decoder().map_err(|e| fail(&e))?;
     let turn = dec.orientation().unwrap_or(image::metadata::Orientation::NoTransforms);
@@ -751,7 +753,7 @@ fn resolve_conflict(app: &AppHandle, copy_id: &str, keep: &str) -> Result<Value,
         let _ = w.eval("window.mkFlushSync?.()");
         std::thread::sleep(Duration::from_millis(500));
     }
-    let Some((copy, original)) = with_vault(app, |v| Ok(conflict_pair(v, copy_id)))? else { return fail("사본을 찾지 못했어요. 이미 지웠을 수 있어요") };
+    let Some((copy, original)) = with_vault(app, |v| Ok(conflict_pair(v, copy_id)))? else { return fail("사본을 찾지 못했어요. 이미 삭제했을 수 있어요") };
     if copy["locked"] == true || original.as_ref().is_some_and(|o| o["locked"] == true) {
         return fail("잠긴 메모는 직접 열어 고쳐 주세요");
     }
@@ -888,7 +890,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             c @ ("lock" | "unlock" | "versions") => note_command(app, &arg_str(args, 0), c.into()),
             _ => Ok(false.into()),
         },
-        "memo:create" => create_memo(app, args.first().unwrap_or(&Value::Null)),
+        "memo:create" => create_memo(app, label, args.first().unwrap_or(&Value::Null)),
         "memo:save" => {
             let id = arg_str(args, 0);
             let Some(body) = args.get(1).and_then(Value::as_str) else { return Some(Err("본문이 문자열이 아닙니다.".into())) };

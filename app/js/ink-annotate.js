@@ -319,7 +319,7 @@ export function setupAnnotation(o) {
     if (!changed) return;
     try {
       await o.save(anchored.length ? { v: 1, strokes: anchored } : null);
-      o.notice?.(anchored.length ? '글 위에 그린 것을 저장했어요' : '글 위에 그린 것을 모두 지웠어요');
+      o.notice?.(anchored.length ? '글 위에 그린 것을 저장했어요' : '글 위에 그린 것을 모두 삭제했어요');
     } catch (err) {
       console.error(err);
       o.notice?.('글 위에 그린 것을 저장하지 못했어요', true);

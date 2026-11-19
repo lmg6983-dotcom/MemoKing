@@ -92,8 +92,8 @@ fn fetch_remote_image(app: &AppHandle, url: &str) -> Result<Value, String> {
     let ty = content_type(&res);
     let ext = image_ext_from_type(&ty)
         .or_else(|| (ty.starts_with("image/") || ty.is_empty()).then(|| image_ext_from_url(target.as_str())).flatten())
-        .ok_or_else(|| format!("그림이 아니에요 ({}). 그림 주소(PNG, JPG, GIF, WebP)를 넣어 주세요", if ty.is_empty() { "형식 모름" } else { &ty }))?;
-    let bytes = read(&mut res, MAX_REMOTE_IMAGE, false, "50MB보다 커서 넣을 수 없어요. 더 작은 그림으로 해 주세요")?;
+        .ok_or_else(|| format!("이미지가 아니에요 ({}). 이미지 주소(PNG, JPG, GIF, WebP)를 넣어 주세요", if ty.is_empty() { "형식 모름" } else { &ty }))?;
+    let bytes = read(&mut res, MAX_REMOTE_IMAGE, false, "50MB보다 커서 넣을 수 없어요. 더 작은 이미지로 해 주세요")?;
     // 받는 동안은 메모 폴더를 잠그지 않는다 (다른 창이 멈추지 않게)
     let st = state(app);
     let guard = st.vault.lock().unwrap();
@@ -148,7 +148,7 @@ fn save_image(dir: &Path, url: &str, limit: u64) -> Result<String, String> {
     }
     let lower = url.to_lowercase();
     let ico = ty.contains("icon") || lower.ends_with(".ico") || lower.contains(".ico?");
-    let ext = image_ext_from_type(&ty).or(ico.then_some("ico")).or_else(|| image_ext_from_url(url)).ok_or("그림이 아니에요")?;
+    let ext = image_ext_from_type(&ty).or(ico.then_some("ico")).or_else(|| image_ext_from_url(url)).ok_or("이미지가 아니에요")?;
     let hash: String = sha1::Sha1::digest(url.as_bytes())[..8].iter().map(|b| format!("{b:02x}")).collect();
     let name = format!("{hash}.{ext}");
     let folder = dir.join("link-previews");
@@ -330,12 +330,12 @@ fn save_png(app: &AppHandle, id: &Value, base64: &str, file_name: Option<&str>) 
         Some(std::env::temp_dir().join(format!("memoking-smoke-{}.png", chrono::Utc::now().timestamp_millis())))
     } else {
         let dir = app.path().picture_dir().unwrap_or_else(|_| std::env::temp_dir());
-        let picked = app.dialog().file().set_title("그림으로 저장").set_directory(dir).set_file_name(&name).add_filter("PNG 그림", &["png"]).blocking_save_file();
+        let picked = app.dialog().file().set_title("이미지로 저장").set_directory(dir).set_file_name(&name).add_filter("PNG 이미지", &["png"]).blocking_save_file();
         picked.and_then(|p| p.into_path().ok())
     };
     let Some(file) = file else { return Ok(json!({ "cancelled": true })) };
     if let Err(err) = std::fs::write(&file, bytes) {
-        crate::windows::show_hud(app, "그림을 저장하지 못했어요", "다른 위치에 저장해 보세요", "warn");
+        crate::windows::show_hud(app, "이미지를 저장하지 못했어요", "다른 위치에 저장해 보세요", "warn");
         return Err(err.to_string());
     }
     let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -661,7 +661,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             use base64::Engine;
             use tauri_plugin_clipboard_manager::ClipboardExt;
             let png = base64::engine::general_purpose::STANDARD.decode(memoking_core::js::string(&arg(0))).ok();
-            let image = png.and_then(|b| tauri::image::Image::from_bytes(&b).ok()).ok_or_else(|| "그림을 읽지 못했어요. 다른 그림으로 다시 해 주세요".to_string());
+            let image = png.and_then(|b| tauri::image::Image::from_bytes(&b).ok()).ok_or_else(|| "이미지를 읽지 못했어요. 다른 이미지로 다시 해 주세요".to_string());
             image.and_then(|img| app.clipboard().write_image(&img).map_err(|e| e.to_string())).map(|()| json!({ "ok": true }))
         }
         "image:save" => save_png(app, &arg(0), &memoking_core::js::string(&arg(1)), args.get(2).and_then(Value::as_str)),

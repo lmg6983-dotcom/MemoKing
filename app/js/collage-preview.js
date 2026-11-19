@@ -42,7 +42,7 @@ export function openCollagePreview({ title, base64, actions, notify = () => {}, 
   const frame = el('div', 'mem-preview-frame');
   const img = el('img', 'mem-preview-img');
   img.src = `data:image/png;base64,${base64}`;
-  img.alt = `${title} 한 장 그림`;
+  img.alt = `${title} 한 장 이미지`;
   img.draggable = false;
   frame.append(img);
   const row = el('div', 'mem-preview-actions');

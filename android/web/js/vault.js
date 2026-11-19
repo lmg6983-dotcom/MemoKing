@@ -290,6 +290,7 @@ export class Vault extends EventTarget {
       tags: [...parts.tags],
       color: entry.meta.color,
       pinned: entry.meta.pinned,
+      pinnedAt: entry.meta.extra?.pinnedAt ?? null, // 상단 고정한 때 (core/vault-locks.js)
       created: entry.meta.created,
       updated: entry.meta.updated,
       day: entry.meta.day || '', // 회상 달력: "이 날의 기록으로" 정한 날
@@ -347,6 +348,7 @@ export class Vault extends EventTarget {
       title: extractTitle(entry.body),
       color: entry.meta.color,
       pinned: entry.meta.pinned,
+      pinnedAt: entry.meta.extra?.pinnedAt ?? null,
       links: entry.meta.links,
       reminders: entry.meta.reminders,
       tables: entry.meta.tables ?? [],
@@ -661,7 +663,7 @@ export class Vault extends EventTarget {
     const dst = cleanFolderName(to);
     if (!isFolderName(from) || !dst) throw new Error('폴더 이름으로 쓸 수 없어요');
     if (dst === from) return dst;
-    if (!fs.stat(from)?.dir) throw new Error('폴더를 찾지 못했어요. 다른 곳에서 지웠을 수 있어요');
+    if (!fs.stat(from)?.dir) throw new Error('폴더를 찾지 못했어요. 다른 곳에서 삭제했을 수 있어요');
     const caseOnly = dst.toLowerCase() === from.toLowerCase(); // 대소문자만 다른 이름을 같은 폴더로 보는 저장소가 있다
     if (!caseOnly && fs.stat(dst)) throw new Error(`"${dst}" 폴더가 이미 있어요. 다른 이름을 써 주세요`);
     const ok = caseOnly
@@ -683,7 +685,7 @@ export class Vault extends EventTarget {
     return dst;
   }
 
-  /** 맨 위에 고정한 폴더 이름들 (core/folders.js — 기기끼리 함께) */
+  /** 상단 고정한 폴더 이름들 (core/folders.js — 기기끼리 함께) */
   pinnedFolders() {
     try {
       return parsePinned(fs.readText(PINNED_FOLDERS_FILE));
@@ -692,7 +694,7 @@ export class Vault extends EventTarget {
     }
   }
 
-  /** 폴더 고정 · 풀기 → 새 목록 */
+  /** 폴더 상단 고정 · 풀기 → 새 목록 */
   pinFolder(name, on) {
     if (!isFolderName(name)) throw new Error('폴더 이름으로 쓸 수 없어요');
     const list = pinFolder(this.pinnedFolders(), name, on);

@@ -127,7 +127,11 @@ try {
   await page.waitForTimeout(500);
   await shot('01-list');
   check('목록: 메모 4개 카드', (await page.locator('.card').count()) === 4);
-  check('목록: 고정한 메모가 맨 앞', (await page.locator('.col').first().locator('.card').first().getAttribute('data-id')) === '00000000-0000-4000-8000-000000000001');
+  check('목록: 상단 고정한 메모가 맨 앞', (await page.locator('.col').first().locator('.card').first().getAttribute('data-id')) === '00000000-0000-4000-8000-000000000001');
+  check('목록: 상단 고정 묶음 · 선 · 메모 묶음 (카드에 핀 없음)', await page.evaluate(() => {
+    const seps = [...document.querySelectorAll('.cards > .card-sep')].map((e) => e.textContent);
+    return seps.join('|') === '상단 고정|메모' && !document.querySelector('.card .pin');
+  }));
   check('목록: 첨부 사진 썸네일', await page.locator('.card-thumb').first().evaluate((img) => img.complete && img.naturalWidth > 0));
 
   check('알림: 지난 알림이 울림 (알림 막대)', (await devLog()).log.some((l) => l.notify?.title === '약 먹기'));
@@ -176,10 +180,13 @@ try {
     await page.evaluate(([px, py]) => document.elementFromPoint(px, py).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: px, clientY: py })), [x, y]);
     await page.mouse.up();
     await page.waitForTimeout(250);
-    check('폴더 꾹 누르기: 뜬 메뉴가 손을 뗀 뒤에도 그대로 (맨 위에 고정 · 이름 바꾸기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 3);
+    check('폴더 꾹 누르기: 뜬 메뉴가 손을 뗀 뒤에도 그대로 (상단 고정 · 이름 바꾸기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 3);
     await page.locator('.mk-ctx-item[data-id="pin"]').click();
     await page.waitForTimeout(300);
-    check('맨 위에 고정: 폴더에 핀 · 기기끼리 함께 쓰는 파일에', await page.isVisible('#folder-side [data-folder="점검폴더"] .mf-pin')
+    check('상단 고정: 폴더가 "상단 고정" 묶음으로 (핀 없이 선으로 나눔) · 기기끼리 함께 쓰는 파일에', await page.evaluate(() => {
+      const sep = [...document.querySelectorAll('#folder-side .mf-sep')].find((e) => e.textContent === '상단 고정');
+      return Boolean(sep?.nextElementSibling?.querySelector('[data-folder="점검폴더"]')) && !document.querySelector('#folder-side .mf-pin');
+    })
       && JSON.parse(read('_memoking/pinned-folders.json')).includes('점검폴더'));
     await page.evaluate(() => document.querySelector('#folder-side [data-folder-menu="점검폴더"]')?.click());
     await page.waitForTimeout(300);
@@ -904,8 +911,12 @@ try {
     await touch('touchEnd', 0, 0);
     await page.waitForTimeout(300);
     const scrolledBy = await page.evaluate(() => document.getElementById('view-memos').scrollTop);
-    await page.evaluate(() => (document.getElementById('view-memos').scrollTop = 0)); // 훑어서 내려간 목록을 처음으로 (아래 점검이 같은 자리를 누르게)
-    await page.waitForTimeout(400);
+    // 훑어서 내려간 목록을 처음으로 (아래 점검이 같은 자리를 누르게) — 관성으로 더 미끄러지는 동안은 밀기를 받지 않으니 멈출 때까지
+    for (let k = 0; k < 10; k++) {
+      await page.evaluate(() => (document.getElementById('view-memos').scrollTop = 0));
+      await page.waitForTimeout(300);
+      if (await page.evaluate(() => document.getElementById('view-memos').scrollTop === 0)) break;
+    }
     await touch('touchStart', cx, cy);
     for (const mx of [-15, -60, -120, -200]) await touch('touchMove', cx + mx, cy);
     await touch('touchEnd', 0, 0);
@@ -951,7 +962,8 @@ try {
       const midFlight = await page.evaluate((sel) => ({ inDom: Boolean(document.querySelector(sel)), flying: document.querySelector(sel)?.classList.contains('flying') }), cardSel);
       await page.waitForTimeout(800);
       const rebuilt = await page.evaluate(() => window.__colsBuilt);
-      check('밀어 삭제: 날아가는 동안은 그대로 · 다 날아간 뒤 삭제하고 목록은 다시 쌓지 않고 그 카드만 들어냄', midFlight.inDom && midFlight.flying && rebuilt === 0
+      // 하나뿐인 상단 고정 메모를 지우면 "상단 고정" 묶음이 없어지니 목록을 한 번 다시 쌓는다 (그 밖에는 그 카드만 들어낸다)
+      check('밀어 삭제: 날아가는 동안은 그대로 · 다 날아간 뒤 삭제하고 목록은 한 번만 다시 쌓음', midFlight.inDom && midFlight.flying && rebuilt <= 1
         && !fs.existsSync(path.join(vault, fileName)) && await page.isHidden(cardSel), JSON.stringify({ midFlight, rebuilt }));
       await page.tap('.toast-action');
       await page.waitForTimeout(500);

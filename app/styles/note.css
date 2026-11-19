@@ -547,7 +547,8 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .version-restore { flex: none; height: 28px; padding: 0 10px; font-size: 12px; }
 
 /* ---------- AI 글쓰기 (서식 막대 끝 ✦ 위로 뜨는 작은 창) ---------- */
-.format-bar .ai-btn { font-size: 15px; }
+.format-bar .ai-btn { display: inline-grid; place-items: center; }
+.format-bar .ai-btn svg { width: 16px; height: 16px; }
 .format-bar .ai-btn[aria-expanded="true"] { background: var(--note-hover); color: var(--note-text); }
 .ai-pop { width: min(400px, calc(100vw - 12px)); max-height: min(70vh, 520px); padding: 8px; overflow-y: auto; }
 .ai-request { width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; font-size: 13px; outline: none; }

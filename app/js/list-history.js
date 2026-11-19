@@ -108,7 +108,7 @@ export function setupHistoryTab({ api, els, confirm, notify = null, menu = null 
       const tag = document.createElement('span');
       tag.className = 'noti-via';
       tag.textContent = '글자 인식';
-      tag.title = '알림 창에서 글자를 그대로 읽을 수 없어 그림에서 글자를 인식했어요. 틀린 글자가 있을 수 있어요';
+      tag.title = '알림 창에서 글자를 그대로 읽을 수 없어 이미지에서 글자를 인식했어요. 틀린 글자가 있을 수 있어요';
       meta.append('  ', tag);
     }
     if (e.body) text.append(body);

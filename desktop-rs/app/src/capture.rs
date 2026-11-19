@@ -172,7 +172,7 @@ pub fn magic_copy(app: &AppHandle, copy: bool) -> Option<String> {
     match res {
         Ok(Some(id)) => Some(id),
         Ok(None) => {
-            crate::windows::show_hud(app, "가져올 내용이 없어요", &format!("글, 파일, 그림을 고른 뒤 {key}를 눌러 주세요."), "warn");
+            crate::windows::show_hud(app, "가져올 내용이 없어요", &format!("글, 파일, 이미지를 고른 뒤 {key}를 눌러 주세요."), "warn");
             None
         }
         Err(e) => {
@@ -235,8 +235,8 @@ fn build_capture(app: &AppHandle, dir: &Path, info: &Value) -> Option<Value> {
     } else if html.is_none() && image.is_file() {
         // 그림 (화면 캡처, 그림 편집기, 브라우저 "이미지 복사")
         let src = vault.save_attachment(&std::fs::read(&image).ok()?, "png").ok()?;
-        items.push(json!({ "kind": "image", "src": src, "alt": "캡처한 그림" }));
-        heading = "캡처한 그림".into();
+        items.push(json!({ "kind": "image", "src": src, "alt": "캡처한 이미지" }));
+        heading = "캡처한 이미지".into();
     } else if let Some(h) = html {
         html_out = h.into(); // 웹 · 워드: 메모 창의 붙여넣기(서식 · 사진 저장)로
         text_out = text.into();

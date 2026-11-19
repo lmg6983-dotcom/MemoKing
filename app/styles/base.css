@@ -149,6 +149,10 @@ svg { width: 20px; height: 20px; flex: none; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* 잘리지 않게 안쪽에 그리는 테두리: 옆으로 밀리는 막대 · 스크롤 목록 · 창 가장자리에 붙은 단추는 바깥 테두리가 잘렸다 (Tab 으로 옮겨 다닐 때) */
+:is(.format-items, .tsb-chips, .mode-switch, header.bar, .folder-side, .cards) :focus-visible,
+.card:focus-visible, .mf-item:focus-visible { outline-offset: -2px; }
+.format-items, .tsb-chips { scroll-padding-inline: 6px; } /* Tab 으로 옮기면 단추가 통째로 보이게 */
 ::placeholder { color: var(--muted); } /* 흐린 색(--text-faint)은 대비 3:1 정도라 글자에는 쓰지 않는다 — 4.5:1 이상 */
 
 .icon-btn {
@@ -1670,11 +1674,14 @@ dialog.quick-event[open] {
 }
 @keyframes mf-run { 0%, 12% { transform: none; } 88%, 100% { transform: translateX(calc(var(--mf-w, 0px) - 100%)); } }
 /* 메모 수: 이름과 떨어진 작은 알약 (Apple 메일처럼) */
-.mf-pin { flex: none; width: 13px; height: 13px; color: var(--muted); } /* 맨 위에 고정한 폴더 */
 .mf-count { flex: none; min-width: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--muted); font-size: 11.5px; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
 .mf-item[aria-current="true"] .mf-count { background: color-mix(in srgb, var(--brand-yellow) 40%, transparent); }
 /* 두 묶음 사이: 가는 선과 "폴더" 머리글 */
 .mf-sep { margin: 6px 4px 0; padding: 9px 6px 3px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; list-style: none; user-select: none; }
+/* 메모 목록의 상단 고정 묶음 (PC · 휴대폰): 묶음마다 제 열 줄 — 이름 줄은 한 줄을 다 차지 (폴더 목록 .mf-sep 과 같은 모양) */
+.cards.sectioned { flex-wrap: wrap; align-content: flex-start; }
+.card-sep { flex: 0 0 100%; padding: 9px 2px 1px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; user-select: none; }
+.card-sep:first-child { border-top: 0; padding-top: 2px; }
 .mf-new { margin: 6px 0 0 4px; }
 .folder-dialog { width: min(360px, calc(100vw - 24px)); }
 .folder-dialog-body { max-height: min(60vh, 480px); padding: 3px; overflow-y: auto; } /* 3px: 칸의 노란 테두리가 잘리지 않게 */

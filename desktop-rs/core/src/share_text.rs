@@ -44,7 +44,7 @@ fn media_label(alt: &str, src: &str) -> String {
         return tidy(format!("[동영상 {name}]"));
     }
     if is(&IMAGE_EXT) || !is(&HAS_EXT) {
-        return if alt.is_empty() { "[사진]".into() } else { format!("[사진 {alt}]") };
+        return if alt.is_empty() { "[이미지]".into() } else { format!("[이미지 {alt}]") };
     }
     format!("[파일 {name}]")
 }

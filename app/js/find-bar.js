@@ -168,7 +168,7 @@ export function createFindBar({ host, after = null, find, notify = () => {}, onT
     rowsByKey[k.key] = { row, none, any };
     return row;
   });
-  const clearOpt = toggle('원래 서식 지우고 붙이기', '바꾼 글의 원래 서식(굵게 · 색 등)을 모두 지우고 고른 서식만 남기기');
+  const clearOpt = toggle('원래 서식 삭제하고 붙이기', '바꾼 글의 원래 서식(굵게 · 색 등)을 모두 삭제하고 고른 서식만 남기기');
   clearOpt.classList.add('mk-find-clear');
   const popFoot = el('div', 'mk-find-pop-foot');
   const popReset = btn('btn mk-find-act', '서식 없음', '고른 서식을 모두 풀기');

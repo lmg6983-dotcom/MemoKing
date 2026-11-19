@@ -64,7 +64,7 @@ test('서식 찾기: 찾은 자리의 글자가 모두 그 서식 · 찾을 말 
 
 test('서식 글 · 모두 찾기 목록 줄', () => {
   assert.equal(formatSummary({ bold: true, color: '#e03131', highlight: 'any' }), '굵게, 빨강 글자 색, 형광펜');
-  assert.equal(formatSummary({ clear: true, highlight: '#ffec99' }), '서식 지우기, 노랑 형광펜');
+  assert.equal(formatSummary({ clear: true, highlight: '#ffec99' }), '서식 삭제, 노랑 형광펜');
   assert.equal(formatSummary({}), '');
   const s = snippet('가나다라마바사아자차카타파하 메모 끝', 15, 17, 4);
   assert.deepEqual([s.before, s.hit, s.after, s.cutStart], ['타파하 ', '메모', ' 끝', true]);

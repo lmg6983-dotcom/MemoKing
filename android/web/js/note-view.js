@@ -515,7 +515,7 @@ async function pasteClipboardFiles(text) {
     }
     return;
   }
-  if (!text) return setStatus('클립보드에 붙여 넣을 그림이나 글이 없어요', true);
+  if (!text) return setStatus('클립보드에 붙여 넣을 이미지나 글이 없어요', true);
   // 다른 앱의 파일 주소(content://)를 읽지 못했으면 주소 글을 메모에 넣지 않고 알린다
   if (/^content:\/\//.test(text.trim())) return setStatus('복사한 파일을 읽지 못했어요. 그 앱에서 다시 복사하거나 + 로 넣어 주세요', true);
   // 그림을 읽지 못한 주소 글은 그대로 (평소 붙여넣기)
@@ -1168,7 +1168,7 @@ function setupKnob() {
     });
     // 사진을 처음 한 번 누르면: 크게 보려면 두 번 (파일 칩과 같게)
     window.addEventListener('mk:media-tapped', () => {
-      if (!el.screen.hidden) showGuideOnce('double-tap-media', '사진은 두 번 누르면 크게 봐요. 한 번 누르면 복사 · 저장 단추가 떠요', '사진 크게 보기');
+      if (!el.screen.hidden) showGuideOnce('double-tap-media', '이미지는 두 번 누르면 크게 봐요. 한 번 누르면 복사 · 저장 단추가 떠요', '이미지 크게 보기');
     });
   }
   // 다이얼은 아래쪽 막대들(도구막대 · 추천 태그 줄) 바로 위 — 키보드가 올라와 막대가 움직여도 따라간다

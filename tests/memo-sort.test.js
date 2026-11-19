@@ -30,3 +30,15 @@ test('정렬: 모르는 값은 최신순 · 원래 배열은 그대로', () => {
   assert.equal(sortLabel('title'), '이름순 (가나다)');
   assert.equal(memos[0].id, 'a');
 });
+
+test('상단 고정 묶음: 나중에 고정한 것이 위, 고정한 때를 모르는 예전 고정은 그 아래 고른 정렬로', () => {
+  const list = [
+    { id: 'old1', title: '나', updated: '2026-10-05T00:00:00Z', pinned: true },
+    { id: 'p1', title: '다', updated: '2026-10-01T00:00:00Z', pinned: true, pinnedAt: '2026-11-01T09:00:00' },
+    { id: 'n', title: '가', updated: '2026-10-09T00:00:00Z' },
+    { id: 'p2', title: '라', updated: '2026-09-01T00:00:00Z', pinned: true, pinnedAt: '2026-11-10T09:00:00' },
+    { id: 'old2', title: '가', updated: '2026-10-04T00:00:00Z', pinned: true },
+  ];
+  assert.deepEqual(sortMemos(list, 'updated').map((m) => m.id), ['p2', 'p1', 'old1', 'old2', 'n']);
+  assert.deepEqual(sortMemos(list, 'title').map((m) => m.id), ['p2', 'p1', 'old2', 'old1', 'n'], '고정 묶음 순서는 정렬과 상관없이 고정한 때');
+});

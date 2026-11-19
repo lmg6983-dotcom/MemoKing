@@ -90,7 +90,7 @@ const state = {
   filter: { tags: [], colors: [], kinds: [] },
   folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 PC 에 기억
   folderDirs: null, // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도) — 받기 전에는 null
-  pinnedFolders: [], // 맨 위에 고정한 폴더 (_memoking/pinned-folders.json)
+  pinnedFolders: [], // 상단 고정한 폴더 (_memoking/pinned-folders.json)
   picking: false, // 여러 장 고르기 중 (카드를 누르면 열지 않고 고른다)
   picked: new Set(), // 고른 카드 (폴더로 옮기기)
 };
@@ -251,14 +251,14 @@ async function folderMenu(name, anchor) {
   const r = anchor.getBoundingClientRect();
   const pick = await openContextMenu({
     x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
-    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
+    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 삭제', danger: true }],
   });
   if (pick === 'pin') {
     try {
       state.pinnedFolders = await api.memos.pinFolder(name, !state.pinnedFolders.includes(name));
       render();
     } catch (err) {
-      flashStatus(err.message || '폴더를 고정하지 못했어요');
+      flashStatus(err.message || '폴더를 상단 고정하지 못했어요');
     }
   } else if (pick === 'rename') {
     const to = await askFolderName({ existing: (state.folderDirs ?? []).filter((f) => f !== name), title: '폴더 이름 바꾸기', value: name, okLabel: '바꾸기' });
@@ -278,14 +278,14 @@ async function folderMenu(name, anchor) {
       await loadFolders();
       // 메모는 지우지 않고 폴더 밖으로 — 되돌리기: 폴더를 다시 만들고 꺼낸 메모를 그 폴더로
       showUndoBar(!removed ? `메모 ${moved}개를 폴더 밖으로 옮겼어요. 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
-        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 지웠어요`, async () => {
+        : moved ? `${name} 폴더를 삭제했어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 삭제했어요`, async () => {
         await api.memos.createFolder(name);
         if (ids.length) await api.memos.moveToFolder(ids, name);
         await loadFolders();
         setFolder(name);
       });
     } catch (err) {
-      flashStatus(err.message || '폴더를 지우지 못했어요');
+      flashStatus(err.message || '폴더를 삭제하지 못했어요');
     }
   }
 }
@@ -376,12 +376,19 @@ function layoutCards(memos) {
     return c;
   });
   const had = Boolean(el.cards.querySelector('.item'));
-  el.cards.replaceChildren(...columns);
+  // 상단 고정한 메모가 있으면 "상단 고정" 묶음 · 선 · "메모" 묶음으로 (묶음마다 제 열로 엇갈려 쌓는다)
+  const pinned = memos.filter((m) => m.pinned);
+  const rest = pinned.length ? memos.filter((m) => !m.pinned) : memos;
+  const pinCols = pinned.length ? columns.map(() => Object.assign(document.createElement('div'), { className: 'col' })) : [];
+  el.cards.classList.toggle('sectioned', pinned.length > 0);
+  el.cards.replaceChildren(...(pinned.length ? [cardSep('상단 고정'), ...pinCols, ...(rest.length ? [cardSep('메모')] : [])] : []), ...(rest.length || !pinned.length ? columns : []));
   // 미리 보기는 보일 만큼만 그린다: 줄 수 x 카드 폭 / 3px (글자가 3px 보다 좁지 않다), 200자 단위로 (폭이 조금 바뀔 때마다 카드를 새로 만들지 않게).
   //   1,200자를 다 그리면 메모 2,000개를 처음 쌓는 데 1초 더 걸렸다. 줄 수가 그대로인 채 폭만 1.5배 넘게 늘면 relayoutIfNeeded 가 다시 쌓는다
-  previewCap = Math.ceil(((layout === 'rows' ? 2 : 6) * (columns[0].clientWidth || 4000)) / 600) * 200;
+  // 화면에 붙은 열로 잰다 (상단 고정만 보일 때는 "메모" 묶음 열이 붙지 않아 폭이 0)
+  previewCap = Math.ceil(((layout === 'rows' ? 2 : 6) * ((rest.length ? columns : pinCols)[0].clientWidth || 4000)) / 600) * 200;
   previewCapFor = el.cards.clientWidth;
-  stackCards(columns, memos.map(cardFor), { chunk: !had }); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다). 나눠 쌓기는 처음에만 (보던 자리가 튀지 않게)
+  if (pinned.length) stackCards(pinCols, pinned.map(cardFor), { chunk: false }); // 고정 묶음은 한 번에 (뒤 묶음 쌓기가 이어 쌓기를 끊지 않게)
+  stackCards(columns, rest.map(cardFor), { chunk: !had }); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다). 나눠 쌓기는 처음에만 (보던 자리가 튀지 않게)
   if (cardCache.size > memos.length + 200) {
     const shown = new Set(memos.map((m) => m.id));
     for (const id of cardCache.keys()) if (!shown.has(id)) cardCache.delete(id);
@@ -390,6 +397,15 @@ function layoutCards(memos) {
 }
 
 const cardItems = () => el.cards.querySelectorAll('.item');
+
+/** 카드 목록의 묶음 이름 줄 (폴더 목록의 "상단 고정 · 폴더" 줄과 같은 모양) */
+function cardSep(text) {
+  const sep = document.createElement('div');
+  sep.className = 'card-sep';
+  sep.setAttribute('role', 'separator');
+  sep.textContent = text;
+  return sep;
+}
 
 function renderNow() {
   glide = true;
@@ -687,14 +703,13 @@ function renderCard(memo) {
   card.dataset.color = memo.color; // 카드 바탕·글씨 = 실제 메모 창의 색
   if (memo.open) card.title = '메모 창이 열려 있어요';
 
-  // 제목 줄: 제목(두 줄까지) (고정 압정) — 휴대폰과 같은 모양
+  // 제목 줄: 제목(두 줄까지) — 휴대폰과 같은 모양 (상단 고정은 압정 대신 목록의 묶음 · 선으로)
   const head = document.createElement('div');
   head.className = 'card-head';
   const title = document.createElement('div');
   title.className = 'card-title';
   title.textContent = memo.title;
   head.append(title);
-  if (memo.pinned) head.append(badge('pin-fill', '', 'pin'));
   card.append(head);
 
   if (memo.preview) {
@@ -793,15 +808,6 @@ function renderCard(memo) {
   del.dataset.delete = memo.id;
   del.append(icon('trash'));
 
-  // 목록 맨 위에 고정 (압정)
-  const pin = document.createElement('button');
-  pin.className = `icon-btn card-pin${memo.pinned ? ' on' : ''}`;
-  pin.title = memo.pinned ? UI.unpin : UI.pin;
-  pin.setAttribute('aria-label', `${memo.title} ${pin.title}`);
-  pin.setAttribute('aria-pressed', String(Boolean(memo.pinned)));
-  pin.dataset.pin = memo.id;
-  pin.append(icon(memo.pinned ? 'pin-fill' : 'pin'));
-
   // 마우스를 올리면(카드에 키보드 포커스가 있어도) 카드 오른쪽 아래에 뜨는 버튼 묶음 (데스크탑만 — 휴대폰은 길게 눌러 메뉴)
   const actions = document.createElement('div');
   actions.className = 'card-actions';
@@ -812,8 +818,8 @@ function renderCard(memo) {
   pdf.setAttribute('aria-label', `${memo.title} PDF로 저장`);
   pdf.dataset.pdf = memo.id;
   pdf.append(icon('pdf'));
-  actions.append(pdf, pin, del);
-  // 키보드는 카드 하나에 Tab 한 번 — 단추 셋은 Delete 키 · 메뉴 키(오른쪽 클릭 메뉴)로 (카드마다 Tab 4번이던 것)
+  actions.append(pdf, del);
+  // 키보드는 카드 하나에 Tab 한 번 — 단추 둘은 Delete 키 · 메뉴 키(오른쪽 클릭 메뉴)로 (카드마다 Tab 4번이던 것)
   for (const b of actions.children) b.tabIndex = -1;
 
   li.append(card, actions);
@@ -901,7 +907,7 @@ const MAX_TEXT_BYTES = 5 * 1024 * 1024;
 const dropShade = document.createElement('div');
 dropShade.className = 'file-drop';
 dropShade.hidden = true;
-dropShade.innerHTML = '<div class="file-drop-box"><b>놓으면 메모로 만들어요</b><span>.md, .txt는 글 그대로, 그림과 파일은 메모 안에</span></div>';
+dropShade.innerHTML = '<div class="file-drop-box"><b>놓으면 메모로 만들어요</b><span>.md, .txt는 글 그대로, 이미지와 파일은 메모 안에</span></div>';
 document.body.append(dropShade);
 const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
 let dragDepth = 0;
@@ -1160,7 +1166,7 @@ async function loadSettings() {
     hours: s.workHours,
     save: (h) => api.mode?.setHours(h),
     openHelper: () => openHelper(),
-    quietNote: '업무 시간 밖에는 Work 메모의 알림을 띄우지 않고 알림 보관함에 모아요. 고정한 메모의 알림은 늘 울려요',
+    quietNote: '업무 시간 밖에는 Work 메모의 알림을 띄우지 않고 알림 보관함에 모아요. 상단 고정한 메모의 알림은 늘 울려요',
   });
   if (api.stt) renderStt(await api.stt.status());
   if (api.ai) renderAi(await api.ai.status());
@@ -1393,8 +1399,8 @@ const paintChoices = () => {
   const kept = hasRememberedChoices();
   choicesBtn.hidden = !kept; // 지울 것이 없으면 꺼진 단추 대신 지금 상태만 글로
   $('choices-note').textContent = kept
-    ? '사진 여러 장 · 문서를 넣을 때 "앞으로 이렇게" 로 정해 둔 것이 있어요. 지우면 다시 물어요'
-    : '사진 여러 장 · 문서를 넣을 때마다 어떻게 넣을지 물어요';
+    ? '이미지 여러 장 · 문서를 넣을 때 "앞으로 이렇게" 로 정해 둔 것이 있어요. 삭제하면 다시 물어요'
+    : '이미지 여러 장 · 문서를 넣을 때마다 어떻게 넣을지 물어요';
 };
 choicesBtn.addEventListener('click', () => {
   forgetChoices();
@@ -1609,7 +1615,7 @@ async function togglePin(m) {
     clearTimeout(hoverTimer);
     const card = e.target.closest?.('.card');
     if (!card || !api.memo.cardCommand) return;
-    hoverTimer = setTimeout(() => card.isConnected && card.matches(':hover') && hintOnce('card-menu', '카드를 오른쪽 클릭하면 복사, 공유, 색, 고정, 폴더로 옮기기 같은 메뉴가 떠요', { anchor: card }), 1500);
+    hoverTimer = setTimeout(() => card.isConnected && card.matches(':hover') && hintOnce('card-menu', '카드를 오른쪽 클릭하면 복사, 공유, 색, 상단 고정, 폴더로 옮기기 같은 메뉴가 떠요', { anchor: card }), 1500);
   });
   el.cards.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
 }
@@ -1679,11 +1685,6 @@ el.cards.addEventListener('click', async (e) => {
   if (del) return deleteMemo(del.dataset.delete);
   const pdfBtn = e.target.closest('[data-pdf]');
   if (pdfBtn) return busyUntilBlur(pdfBtn, api.pdf.open(pdfBtn.dataset.pdf));
-  const pinBtn = e.target.closest('[data-pin]');
-  if (pinBtn) {
-    const m = state.memos.find((x) => x.id === pinBtn.dataset.pin);
-    return m ? togglePin(m) : undefined;
-  }
   const cardFolder = e.target.closest('[data-card-folder]');
   if (cardFolder) {
     el.search.value = '';
@@ -1724,7 +1725,7 @@ function compareConflict({ copy, original }) {
     t.textContent = label;
     const sub = document.createElement('div');
     sub.className = 'compare-sub';
-    sub.textContent = m ? `${m.file}${m.updated ? `, ${new Date(m.updated).toLocaleString('ko-KR')}` : ''}` : '원본을 찾지 못했어요 (이름을 바꿨거나 지웠어요)';
+    sub.textContent = m ? `${m.file}${m.updated ? `, ${new Date(m.updated).toLocaleString('ko-KR')}` : ''}` : '원본을 찾지 못했어요 (이름을 바꿨거나 삭제했어요)';
     const pre = document.createElement('pre');
     pre.className = 'compare-body';
     pre.textContent = !m ? '' : m.locked ? '(잠긴 메모라 내용을 볼 수 없어요)' : m.body;
@@ -1760,7 +1761,7 @@ function compareConflict({ copy, original }) {
   const locked = copy.locked || original?.locked;
   actions.append(
     btn('둘 다 두기', '', () => dialog.close()),
-    btn('사본 지우기', '', resolve('original')),
+    btn('사본 삭제', '', resolve('original')),
     btn('사본 내용으로 바꾸기', 'primary', resolve('copy')),
   );
   if (locked || !original) actions.lastChild.disabled = true;
@@ -1836,7 +1837,7 @@ async function finishDrag(p, point) {
 }
 
 el.cards.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 || e.target.closest('[data-delete], [data-pin], [data-pdf]')) return;
+  if (e.button !== 0 || e.target.closest('[data-delete], [data-pdf]')) return;
   const card = e.target.closest('.card');
   if (!card || press) return;
   press = { id: card.dataset.id, card, x: e.clientX, y: e.clientY, pointerId: e.pointerId, dragging: false, clone: null };
@@ -1940,7 +1941,7 @@ async function moveToFolder(ids, current, to = undefined) {
   if (!ids.length) return;
   let target = to;
   if (target === undefined) {
-    target = await pickFolder({ folders: state.folderDirs ?? [], current: ids.length === 1 ? current : null, count: ids.length });
+    target = await pickFolder({ folders: folderList(state.folderDirs ?? [], [], state.pinnedFolders).map((f) => f.name), current: ids.length === 1 ? current : null, count: ids.length });
     if (target === null) return;
   }
   const before = new Map(ids.map((id) => [id, state.memos.find((m) => m.id === id)?.folder ?? ''])); // 되돌리기용
