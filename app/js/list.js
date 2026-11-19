@@ -2315,6 +2315,18 @@ api.on('list:on-top', (on) => {
   if (on) tutEvent('list-crown-on'); // 튜토리얼: 목록도 늘 위에
 });
 api.on('list:crown-docked', ({ docked, animate } = {}) => setCrownDocked(Boolean(docked), animate !== false));
+// 창 위 왕관에 마우스를 올리면 무엇을 누르는지 (메모 창과 같게 — 처음 한 번만. 스티커 창은 글을 띄우지 못한다)
+api.on('sticker:hover', ({ over } = {}) => {
+  if (!over) return;
+  try {
+    const seen = JSON.parse(localStorage.getItem('memoking.stickerHintSeen') ?? '[]');
+    if (seen.includes('list-crown')) return;
+    localStorage.setItem('memoking.stickerHintSeen', JSON.stringify([...seen, 'list-crown']));
+  } catch {
+    // 기억 못 하면 다음에 한 번 더 볼 뿐
+  }
+  flashStatus('왕관을 누르면 떼어져요. 목록이 다시 다른 창 아래로 갈 수 있어요');
+});
 Promise.all([api.win.listOnTop(), api.win.listCrownDocked?.() ?? false]).then(([on, docked]) => {
   crownDocked = Boolean(docked);
   showListTop(on, false);
