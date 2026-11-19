@@ -90,9 +90,12 @@ body {
   border-radius: 50%; /* 알약 검색창 안의 동그라미 */
   background: none;
   color: var(--brand-yellow);
-  font-size: 15px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   cursor: pointer;
 }
+.search-ai svg { width: 16px; height: 16px; }
 .search-ai[hidden] { display: none; }
 .search-ai[aria-expanded="true"] { background: var(--hover); }
 @media (hover: hover) and (pointer: fine) { .search-ai:hover { background: var(--hover); } }

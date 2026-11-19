@@ -149,6 +149,10 @@ svg { width: 20px; height: 20px; flex: none; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* 잘리지 않게 안쪽에 그리는 테두리: 옆으로 밀리는 막대 · 스크롤 목록 · 창 가장자리에 붙은 단추는 바깥 테두리가 잘렸다 (Tab 으로 옮겨 다닐 때) */
+:is(.format-items, .tsb-chips, .mode-switch, header.bar, .folder-side, .cards) :focus-visible,
+.card:focus-visible, .mf-item:focus-visible { outline-offset: -2px; }
+.format-items, .tsb-chips { scroll-padding-inline: 6px; } /* Tab 으로 옮기면 단추가 통째로 보이게 */
 ::placeholder { color: var(--muted); } /* 흐린 색(--text-faint)은 대비 3:1 정도라 글자에는 쓰지 않는다 — 4.5:1 이상 */
 
 .icon-btn {
