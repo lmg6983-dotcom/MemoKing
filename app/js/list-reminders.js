@@ -4,7 +4,6 @@
 // 이미 고른 날을 한 번 더 눌러도 같다. 한 번짜리 일정은 달력에서 끌어 다른 날·시각으로 옮긴다.
 // 다른 캘린더: Google 캘린더 등 .ics 구독 · 휴대폰 캘린더(삼성 캘린더) 일정도 함께 보인다 — 읽기만 ("메모로 가져오기"는 메모킹 안에서)
 //   (calendar-links.js · core/calendar-feeds.js)
-import { Calendar, dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin, koLocale } from '../vendor/fullcalendar.js';
 import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
 import { describeReminder, describeTask, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
@@ -232,7 +231,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     items = visible ? allItems.filter(visible) : allItems;
     if (quiet) return updateCount(new Date());
     const key = `${JSON.stringify(items)}|${query}|${today().getTime()}`;
-    if (!(ifChanged && key === drawnKey)) {
+    if (!(ifChanged && key === drawnKey) || (!calendar && shown())) {
       drawnKey = key;
       render();
     }
@@ -297,7 +296,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   todayBtn.type = 'button';
   todayBtn.addEventListener('click', () => {
     selected = today();
-    calendar.today();
+    calendar?.today();
     render();
   });
   head.append(prev, title, next, todayBtn);
@@ -586,10 +585,10 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       if (schedules.length > 0) {
         const targetDay = dayStart(schedules[0].start);
         selected = targetDay;
-        if (isMonth() && (targetDay < calendar.view.currentStart || targetDay >= calendar.view.currentEnd)) {
-          calendar.gotoDate(targetDay);
+        if (isMonth() && (targetDay < calendar?.view.currentStart || targetDay >= calendar?.view.currentEnd)) {
+          calendar?.gotoDate(targetDay);
         } else if (!isMonth()) {
-          calendar.gotoDate(targetDay);
+          calendar?.gotoDate(targetDay);
         }
       }
 
@@ -743,77 +742,90 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       }
     }, true);
   }
-  const calendar = new Calendar(calEl, {
-    plugins: [dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin],
-    locale: koLocale,
-    initialView: fcView(viewId),
-    headerToolbar: false,
-    height: 'auto',
-    fixedWeekCount: true,
-    dayMaxEvents: maxEvents, // 칸 높이에 들어가는 만큼(fitSize 가 다시 정함), 나머지는 +n (낮은 창은 막대 대신 색 점)
-    moreLinkClass: 'mk-more',
-    moreLinkText: (n) => `+${n}`,
-    nowIndicator: true,
-    scrollTime: '08:00:00',
-    eventTimeFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
-    longPressDelay: LONG_PRESS,
-    eventLongPressDelay: LONG_PRESS,
-    editable: true,
-    eventDurationEditable: false,
-    defaultTimedEventDuration: '01:00',
-    noEventsContent: () => (query.trim() ? '찾는 일정이 없어요' : '이 달에는 일정이 없어요'),
-    dayCellTopContent: (arg) => (isMonth() ? dayTop(arg.date) : undefined),
-    dayCellClass: dayClass,
-    dayHeaderClass: (arg) => (arg.dow === 0 ? 'mk-sun' : arg.dow === 6 ? 'mk-sat' : ''),
-    events: (info, ok) => ok(calendarEvents(info.start, info.end)),
-    eventDidMount: (arg) => {
-      const { item, ext } = arg.event.extendedProps;
-      if (item) arg.el.dataset.color = item.color;
-      if (ext) arg.el.style.setProperty('--ext-color', ext.color || '#4285f4');
-      arg.el.title = ext ? `${arg.event.title}\n${ext.source}${ext.location ? `, ${ext.location}` : ''}` : arg.event.title;
-    },
-    datesSet: (arg) => {
-      title.textContent = arg.view.title;
-      dayIndexCache = null; // 보이는 날이 바뀜 — 낮은 창의 색 점도 새로
-      let again = compact;
-      // 달이 바뀌면 고른 날도 그 달로 (월 보기에서 옆 달로 넘겼을 때 아래 목록이 엉뚱한 달을 보이지 않게)
-      const start = arg.view.currentStart;
-      const end = arg.view.currentEnd;
-      if (selected < start || selected >= end) {
-        const t = today();
-        selected = t >= start && t < end ? t : dayStart(start);
-        again = true;
-      }
-      if (again) queueMicrotask(() => render()); // 한 번만 · 그리는 중에 옵션을 바꾸지 않게
-      if (viewId === MEMORIES) showMemories();
-    },
-    dateClick: (arg) => pickDay(arg.date),
-    // 일정을 누르면 다른 앱으로 나가지 않고 자세히 보기 (월 보기는 그날도 골라 아래 목록을 맞춘다)
-    eventClick: (arg) => {
-      arg.jsEvent.preventDefault();
-      const { item, ext } = arg.event.extendedProps;
-      if (isMonth() && !sameDay(arg.event.start, selected)) pickDay(arg.event.start, { add: false });
-      if (item?.reminder.task) api.memo.open(item.memoId);
-      else if (item) showMemoEvent(item, arg.event.start);
-      else if (ext) showExternal(ext);
-    },
-    eventDrop: (arg) => moveEvent(arg),
-    views: {
-      // 달 · 주 보기의 일정 막대는 이름만 — 칸이 좁아 "오전 9:3…" 처럼 시각부터 잘렸다 (주 보기는 자리가 곧 시각, 시각은 누르면 · 아래 목록에)
-      // 달 보기 칩: 제목만 (글자 크기 · 잘림 표시는 base.css .mk-mt)
-      dayGridMonth: {
-        dayHeaderFormat: { weekday: 'short' }, // 넓은 창에서도 "일" (일요일 X)
-        displayEventTime: false,
-        eventContent: (arg) => {
-          const t = document.createElement('span');
-          t.className = 'mk-mt';
-          t.textContent = arg.event.title;
-          return { domNodes: [t] };
+  // 달력(FullCalendar · 300KB)은 일정 탭을 처음 볼 때 읽고 그린다 — 메모 탭만 쓰는 동안 목록 창 메모리를 아낀다.
+  //   그 전에는 calendar 가 null 이라 아래의 달력 일은 모두 건너뛰고(?.), 탭 숫자 · 아래 목록은 그대로 맞춘다
+  let calendar = null;
+  let calendarLoading = null;
+  const shown = () => container.getClientRects().length > 0;
+  function ensureCalendar() {
+    calendarLoading ??= import('../vendor/fullcalendar.js').then(({ Calendar, dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin, koLocale }) => {
+    calendar = new Calendar(calEl, {
+        initialDate: selected, // 처음 그릴 때 고른 날의 달로 (그 전에 고른 날이 바뀌었을 수 있다)
+      plugins: [dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, themePlugin],
+      locale: koLocale,
+      initialView: fcView(viewId),
+      headerToolbar: false,
+      height: 'auto',
+      fixedWeekCount: true,
+      dayMaxEvents: maxEvents, // 칸 높이에 들어가는 만큼(fitSize 가 다시 정함), 나머지는 +n (낮은 창은 막대 대신 색 점)
+      moreLinkClass: 'mk-more',
+      moreLinkText: (n) => `+${n}`,
+      nowIndicator: true,
+      scrollTime: '08:00:00',
+      eventTimeFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
+      longPressDelay: LONG_PRESS,
+      eventLongPressDelay: LONG_PRESS,
+      editable: true,
+      eventDurationEditable: false,
+      defaultTimedEventDuration: '01:00',
+      noEventsContent: () => (query.trim() ? '찾는 일정이 없어요' : '이 달에는 일정이 없어요'),
+      dayCellTopContent: (arg) => (isMonth() ? dayTop(arg.date) : undefined),
+      dayCellClass: dayClass,
+      dayHeaderClass: (arg) => (arg.dow === 0 ? 'mk-sun' : arg.dow === 6 ? 'mk-sat' : ''),
+      events: (info, ok) => ok(calendarEvents(info.start, info.end)),
+      eventDidMount: (arg) => {
+        const { item, ext } = arg.event.extendedProps;
+        if (item) arg.el.dataset.color = item.color;
+        if (ext) arg.el.style.setProperty('--ext-color', ext.color || '#4285f4');
+        arg.el.title = ext ? `${arg.event.title}\n${ext.source}${ext.location ? `, ${ext.location}` : ''}` : arg.event.title;
+      },
+      datesSet: (arg) => {
+        title.textContent = arg.view.title;
+        dayIndexCache = null; // 보이는 날이 바뀜 — 낮은 창의 색 점도 새로
+        let again = compact;
+        // 달이 바뀌면 고른 날도 그 달로 (월 보기에서 옆 달로 넘겼을 때 아래 목록이 엉뚱한 달을 보이지 않게)
+        const start = arg.view.currentStart;
+        const end = arg.view.currentEnd;
+        if (selected < start || selected >= end) {
+          const t = today();
+          selected = t >= start && t < end ? t : dayStart(start);
+          again = true;
+        }
+        if (again) queueMicrotask(() => render()); // 한 번만 · 그리는 중에 옵션을 바꾸지 않게
+        if (viewId === MEMORIES) showMemories();
+      },
+      dateClick: (arg) => pickDay(arg.date),
+      // 일정을 누르면 다른 앱으로 나가지 않고 자세히 보기 (월 보기는 그날도 골라 아래 목록을 맞춘다)
+      eventClick: (arg) => {
+        arg.jsEvent.preventDefault();
+        const { item, ext } = arg.event.extendedProps;
+        if (isMonth() && !sameDay(arg.event.start, selected)) pickDay(arg.event.start, { add: false });
+        if (item?.reminder.task) api.memo.open(item.memoId);
+        else if (item) showMemoEvent(item, arg.event.start);
+        else if (ext) showExternal(ext);
+      },
+      eventDrop: (arg) => moveEvent(arg),
+      views: {
+        // 달 · 주 보기의 일정 막대는 이름만 — 칸이 좁아 "오전 9:3…" 처럼 시각부터 잘렸다 (주 보기는 자리가 곧 시각, 시각은 누르면 · 아래 목록에)
+        // 달 보기 칩: 제목만 (글자 크기 · 잘림 표시는 base.css .mk-mt)
+        dayGridMonth: {
+          dayHeaderFormat: { weekday: 'short' }, // 넓은 창에서도 "일" (일요일 X)
+          displayEventTime: false,
+          eventContent: (arg) => {
+            const t = document.createElement('span');
+            t.className = 'mk-mt';
+            t.textContent = arg.event.title;
+            return { domNodes: [t] };
+          },
         },
       },
-    },
-  });
-  calendar.render();
+    });
+      calendar.render();
+      fitSize();
+      render();
+    });
+    return calendarLoading;
+  }
   markView();
 
   // 좌우 스와이프 · 앞뒤 단추로 달 넘기기: 손가락을 따라 달력이 밀리다 스르르 다음/이전 달로 넘어간다
@@ -826,8 +838,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     stage.classList.remove('cal-sliding');
     void stage.offsetWidth;
     stage.classList.add('cal-sliding');
-    if (dir > 0) calendar.next();
-    else calendar.prev();
+    if (dir > 0) calendar?.next();
+    else calendar?.prev();
   }
   let swipe = null;
   // 움직임 · 끝은 손가락을 댄 요소에 단다 — 일정 칩은 누르는 순간 다시 그려져 문서에서 빠지면 그 뒤 터치가 카드까지 올라오지 않는다
@@ -898,13 +910,13 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     if (key === lastFit) return;
     lastFit = key;
     {
-      calendar.setOption('height', 'auto');
+      calendar?.setOption('height', 'auto');
       // 6주 + 요일 줄. 칸이 일정 한 줄도 못 담을 만큼 낮으면 예전처럼 날짜 + 색 점만 (compact)
       const nextCompact = viewId === 'dayGridMonth' && room / 7 < 40;
       if (nextCompact !== compact) {
         compact = nextCompact;
         card.classList.toggle('compact', compact);
-        calendar.setOption('eventDisplay', compact ? 'none' : 'auto');
+        calendar?.setOption('eventDisplay', compact ? 'none' : 'auto');
       }
       // 비율은 요일 줄을 뺀 날 칸들의 것
       const weekdays = calEl.querySelector('[role="columnheader"]')?.getBoundingClientRect().height || 26;
@@ -916,11 +928,11 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
         const topH = calEl.querySelector('[role="gridcell"] > :first-child')?.offsetHeight || 24;
         const moreH = calEl.querySelector('.mk-more')?.offsetHeight || 13;
         const rowH = compact ? (room - weekdays) / 6 : Math.max((room - weekdays) / 6, topH + 4 * chipH + moreH + 2); // 낮은 창(색 점)은 한 달이 다 보이게
-        calendar.setOption('aspectRatio', Math.min(8, Math.max(0.5, w / Math.max(100, rowH * 6))));
+        calendar?.setOption('aspectRatio', Math.min(8, Math.max(0.5, w / Math.max(100, rowH * 6))));
         const fit = Math.max(1, Math.floor((rowH - topH - moreH - 1) / chipH));
         if (fit !== maxEvents) {
           maxEvents = fit;
-          calendar.setOption('dayMaxEvents', fit);
+          calendar?.setOption('dayMaxEvents', fit);
         }
       }
     }
@@ -944,7 +956,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   }
 
   function showMemories() {
-    memView.show(calendar.view.currentStart);
+    memView.show(calendar?.view.currentStart ?? selected);
   }
 
   function setView(id, { remember = true } = {}) {
@@ -958,12 +970,12 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     }
     markView();
     if (id === MEMORIES) {
-      if (was !== 'dayGridMonth') calendar.changeView('dayGridMonth', selected);
+      if (was !== 'dayGridMonth') calendar?.changeView('dayGridMonth', selected);
       memView.closeDay();
       showMemories();
       return;
     }
-    if (fcView(was) !== id) calendar.changeView(id, selected); // 회상 → 월 은 같은 보기를 다시 보이기만 (크기는 달력이 스스로 다시 잰다)
+    if (fcView(was) !== id) calendar?.changeView(id, selected); // 회상 → 월 은 같은 보기를 다시 보이기만 (크기는 달력이 스스로 다시 잰다)
     fitSize();
     render();
   }
@@ -979,7 +991,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     const d = dayStart(date);
     const again = sameDay(d, selected);
     selected = d;
-    if (isMonth() && (d < calendar.view.currentStart || d >= calendar.view.currentEnd)) calendar.gotoDate(d);
+    if (isMonth() && (d < calendar?.view.currentStart || d >= calendar?.view.currentEnd)) calendar?.gotoDate(d);
     if (!again && isExpanded) {
       const raw = qInput.value.trim();
       const parsed = parseScheduleText(raw, d);
@@ -1314,13 +1326,14 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   }
 
   function render() {
+    if (!calendar && shown()) ensureCalendar(); // 다 읽으면 다시 render — 그동안 아래 목록 · 숫자는 먼저
     const now = new Date();
     const t = today();
     // 창을 켜 둔 채 자정이 지나면: "오늘" 을 보고 있었다면 새 오늘로 (다가오는 일정이 사라지지 않게)
     if (!sameDay(t, shownToday)) {
       if (sameDay(selected, shownToday)) {
         selected = t;
-        calendar.gotoDate(t);
+        calendar?.gotoDate(t);
       }
       shownToday = t;
     }
@@ -1330,9 +1343,9 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     // 고른 날이 바뀌었거나 낮은 창(날 칸에 색 점)일 때만 날 칸을 다시 그린다 — 새 함수를 주면 다시 그린다
     if (compact || selected.getTime() !== lastCellKey) {
       lastCellKey = selected.getTime();
-      calendar.setOption('dayCellClass', (arg) => dayClass(arg));
+      calendar?.setOption('dayCellClass', (arg) => dayClass(arg));
     }
-    calendar.refetchEvents();
+    calendar?.refetchEvents();
     renderRows();
     updateCount(now);
   }
@@ -1346,7 +1359,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       if (!out) return;
       await api.reminders.add(out.memoId, out.reminder, out.newTitle, out.memoBody);
       selected = dayStart(new Date(out.reminder.at)); // 일정 창에서 날짜를 바꿨으면 그날로
-      if (isMonth() && (selected < calendar.view.currentStart || selected >= calendar.view.currentEnd)) calendar.gotoDate(selected);
+      if (isMonth() && (selected < calendar?.view.currentStart || selected >= calendar?.view.currentEnd)) calendar?.gotoDate(selected);
       await refresh();
       highlightCreatedDates([new Date(out.reminder.at)]);
       const d = new Date(out.reminder.at);

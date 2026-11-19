@@ -1,7 +1,8 @@
 // 파일 · 소리 · 그림 이름 바꾸기 (PC 오른쪽 클릭 메뉴 › 이름 변경…)
 //   파일 칩의 이름 = 칩 글자, 그림 · 소리 · 음성 카드의 이름 = 설명(alt). 메모 폴더의 실제 파일은 그대로 (이름은 보이는 이름)
 //   — 저장 · 공유 · 끌어내기에서 이 이름으로 나간다
-import { isVoiceCard } from './voice-card-view.js';
+import { isVoiceCard } from './core/voice-card.js';
+import { CHOICE_KEY, loadChoices } from './core/choices.js';
 import { chipRanges } from './file-chip-guard.js';
 import { mediaKindOf, mediaWidthOf, plainAlt, withMediaWidth } from './core/memo-file.js';
 
@@ -118,24 +119,8 @@ export function promptName({ title = '이름 변경', value = '', label = '새 �
   });
 }
 
-// "앞으로 이렇게" 로 기억한 고르기 (이 기기에만 — 설정의 "넣을 때 다시 묻기" 로 지운다)
-const CHOICE_KEY = 'memoking.choices';
-const loadChoices = () => {
-  try {
-    return JSON.parse(localStorage.getItem(CHOICE_KEY) ?? '{}') ?? {};
-  } catch {
-    return {};
-  }
-};
-/** 기억한 고르기가 있나 (설정에서 "다시 묻기" 단추를 보일지) */
-export const hasRememberedChoices = () => Object.keys(loadChoices()).length > 0;
-export function forgetChoices() {
-  try {
-    localStorage.removeItem(CHOICE_KEY);
-  } catch {
-    // 지우지 못해도 이번엔 그대로
-  }
-}
+// "앞으로 이렇게" 로 기억한 고르기는 core/choices.js (목록 창 설정이 이 파일 — 편집기 라이브러리 — 을 읽지 않게)
+export { hasRememberedChoices, forgetChoices } from './core/choices.js';
 
 /**
  * 고르기 창 (PC·휴대폰 함께 — promptName 과 같은 모양): 단추 하나를 고르면 그 id, Esc · 바깥 누르기는 null

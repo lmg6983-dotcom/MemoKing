@@ -5,7 +5,6 @@
 //   - 카드는 한 줄(블록)이라 소리 이름 줄이나 받아쓴 글을 꾹 눌러 옮기면 받아쓴 글도 함께 움직인다
 //   - 커서가 접힌 곳으로 들어가면 저절로 펼친다
 import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
-import { mediaKindOf } from './core/memo-file.js';
 import { SPEAKER_LINE } from './core/voice-card.js';
 import { haptic } from './dom.js';
 
@@ -14,20 +13,9 @@ const FOLD_KEY = 'memoking.voiceFold';
 const AUTO_FOLD = 8;
 const SPEAKER_COLORS = 6;
 
-/** 인용이 음성 카드면 그 소리(image 노드), 아니면 null */
-export function voiceAudioOf(node) {
-  if (node?.type.name !== 'blockquote') return null;
-  const first = node.firstChild;
-  if (first?.type.name !== 'paragraph') return null;
-  let img = null;
-  let ok = true;
-  first.forEach((c) => {
-    if (c.type.name === 'image' && !img) img = c;
-    else if (!(c.isText && !c.text.trim()) && c.type.name !== 'hardbreak' && c.type.name !== 'hard_break') ok = false;
-  });
-  return ok && img && mediaKindOf(img.attrs.src, img.attrs.alt) === 'audio' ? img : null;
-}
-export const isVoiceCard = (node) => Boolean(voiceAudioOf(node));
+// 음성 카드인지 보기는 편집기 없이도 쓰도록 core/voice-card.js 에 (목록 창이 편집기 라이브러리를 읽지 않게)
+import { voiceAudioOf, isVoiceCard } from './core/voice-card.js';
+export { voiceAudioOf, isVoiceCard } from './core/voice-card.js';
 
 function speakerOf(paragraph) {
   const first = paragraph?.firstChild;

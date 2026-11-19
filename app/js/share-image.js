@@ -1,10 +1,28 @@
 // 메모를 그림(PNG) 한 장으로 (PC·휴대폰 함께) — 메모 화면에 그려진 본문을 메모 색 종이 위에 옮겨 담아 html-to-image(MIT)로 찍는다.
 //   소리·동영상 플레이어는 "🎙 녹음 이름" 같은 글로, 링크 카드의 ✕ 같은 버튼은 빼고, 아래에 날짜·메모킹 표시.
 import { UI } from './core/ui-text.js';
+import { fontFacesFor } from './core/font-subset.js';
 const WIDTH = 640; // 그림의 본문 폭 (CSS px) — 휴대폰·PC 어디서 열어도 읽기 좋게
 const MAX_PIXELS = 7900; // 캔버스 한 변의 한계(약 8192)를 넘지 않게 배율을 줄인다
 
-let fontCss = null;
+
+// 브랜드 글꼴(Pretendard 나눠 읽기 판)은 base.css 가 @import 로 읽어 html-to-image 가 찾지 못한다 — 직접 고르고 그림에 넣는다
+const FONT_DIR = new URL('../vendor/fonts/pretendard/', import.meta.url);
+const dataUrl = async (url) => {
+  const blob = await (await fetch(url)).blob();
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+};
+async function brandFontCss(text) {
+  const css = fontFacesFor(await (await fetch(new URL('pretendard.css', FONT_DIR))).text(), text);
+  const files = [...new Set([...css.matchAll(/url\(([^)]+)\)/g)].map((m) => m[1]))];
+  const inlined = await Promise.all(files.map(async (f) => [f, await dataUrl(new URL(f.replace(/['"]/g, ''), FONT_DIR))]));
+  return inlined.reduce((out, [f, d]) => out.replaceAll(`url(${f})`, `url(${d})`), css);
+}
 
 /** 메모 → 그림 한 장 (base64 PNG). 너무 길면 PDF 로 저장하라는 오류 */
 export async function renderMemoImage(editor, opts = {}) {
@@ -61,7 +79,9 @@ export async function renderMemoImages(editor, { color = 'yellow', split = true 
     const height = paper.offsetHeight;
     // 길면 배율을 낮춰 캔버스 한계 안에 (1 아래로도) — 너무 길어 글자를 읽을 수 없을 만큼이면 안내
     const ratio = Math.min(2, MAX_PIXELS / Math.max(WIDTH, height));
-    fontCss ??= await getFontEmbedCSS(paper).catch(() => '');
+    // 글꼴: 브랜드 글꼴은 이 메모에 나오는 글자를 가진 조각만 넣는다 (brandFontCss). 수식(KaTeX) 같은 그 밖의 글꼴은 html-to-image 가 찾는다.
+    //   메모마다 글자가 달라 담아 두지 않는다 (창에 몇 MB 를 붙들고 있지 않게)
+    const fontCss = (await brandFontCss(paper.textContent).catch(() => '')) + (await getFontEmbedCSS(paper).catch(() => ''));
     const shoot = async (pixelRatio, clip = null) => {
       const canvas = await toCanvas(paper, {
         pixelRatio,

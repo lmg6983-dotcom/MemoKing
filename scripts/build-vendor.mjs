@@ -125,9 +125,9 @@ copyFileSync(join(MODULES, 'plyr', 'dist', 'plyr.css'), join(OUT, 'plyr.css'));
 // 달력(FullCalendar): 뼈대 · 테마 · 색 한 파일로 (색은 list.css 에서 메모킹 색으로 덮는다)
 writeFileSync(join(OUT, 'fullcalendar.css'), ['skeleton.css', join('themes', 'forma', 'theme.css'), join('themes', 'forma', 'palettes', 'blue.css')]
   .map((f) => `/* fullcalendar/${f.replace(/\\/g, '/')} (MIT) */\n${readFileSync(join(MODULES, 'fullcalendar', f), 'utf8')}`).join('\n'));
-// 브랜드 글꼴 Pretendard (가변 글꼴 하나로 모든 굵기) — 인터넷 없이 쓰도록 앱에 넣는다
-mkdirSync(join(OUT, 'fonts'), { recursive: true });
-copyFileSync(join(MODULES, 'pretendard', 'dist', 'web', 'variable', 'woff2', 'PretendardVariable.woff2'), join(OUT, 'fonts', 'PretendardVariable.woff2'));
+// 브랜드 글꼴 Pretendard (가변 글꼴 — 모든 굵기) — 인터넷 없이 쓰도록 앱에 넣는다.
+//   글자 묶음(unicode-range)마다 나눈 판: 창마다 화면에 나온 글자의 묶음만 읽는다 (한 파일 2MB 를 창마다 풀어 창 하나에 10MB 쯤 들었다)
+writePretendard(join(MODULES, 'pretendard', 'dist', 'web', 'variable'), join(OUT, 'fonts', 'pretendard'));
 // 수식(KaTeX): 글꼴은 woff2 만 넣고(앱 안에서만 쓰므로) css 도 woff2 만 가리키게
 mkdirSync(join(OUT, 'katex', 'fonts'), { recursive: true });
 const katexDist = join(MODULES, 'katex', 'dist');
@@ -156,3 +156,15 @@ writeFileSync(
   ['# 포함된 오픈소스', '', '| 패키지 | 버전 | 라이선스 | 저장소 |', '|---|---|---|---|', ...licenses, ...kept, ''].join('\n'),
 );
 console.log('✔ app/vendor/ 갱신 완료');
+
+/** Pretendard 나눠 읽기 판: woff2 조각들 + @font-face 묶음 (font-display: block — 글꼴이 오기 전 다른 글꼴로 번쩍이지 않게, 예전과 같게) */
+function writePretendard(src, out) {
+  mkdirSync(out, { recursive: true });
+  const dir = join(src, 'woff2-dynamic-subset');
+  for (const f of readdirSync(dir)) if (f.endsWith('.woff2')) copyFileSync(join(dir, f), join(out, f));
+  const css = readFileSync(join(src, 'pretendardvariable-dynamic-subset.css'), 'utf8')
+    .replaceAll('./woff2-dynamic-subset/', './')
+    .replaceAll('font-display: swap;', 'font-display: block;');
+  if (!css.includes('font-display: block;') || css.includes('woff2-dynamic-subset')) throw new Error('Pretendard 나눠 읽기 css 모양이 바뀌었어요');
+  writeFileSync(join(out, 'pretendard.css'), css);
+}
