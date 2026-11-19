@@ -398,7 +398,7 @@ mod tests {
         assert_eq!(small.px[3], 0);
         let mid = (32 * 80 + 40) * 4;
         assert!(small.px[mid + 3] > 150);
-        assert!(small.px.chunks_exact(4).all(|p| p[0] <= p[3] && p[1] <= p[3] && p[2] <= p[3]));
+        assert!(small.px.as_chunks::<4>().0.iter().all(|p| p[0] <= p[3] && p[1] <= p[3] && p[2] <= p[3]));
         // 같은 크기는 그대로
         assert_eq!(resize(crown, 256, 208).px, crown.px);
     }
