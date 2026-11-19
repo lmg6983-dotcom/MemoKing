@@ -455,8 +455,10 @@ pub fn closed_note(app: &AppHandle, id: &str, label: &str) {
     });
 }
 
-fn create_memo(app: &AppHandle, opts: &Value) -> Result<Value, String> {
+/// from: 새 메모를 만든 창 — 새 창은 그 창 옆에 겹치지 않게 (windows::new_memo_spot)
+fn create_memo(app: &AppHandle, from: &str, opts: &Value) -> Result<Value, String> {
     let id = with_vault(app, |v| Ok(v.create(opts["color"].as_str(), opts["mode"].as_str(), opts["folder"].as_str().unwrap_or(""))))?;
+    crate::windows::place_new_memo(app, &id, from);
     open_note(app, &id)?;
     Ok(id.into())
 }
@@ -888,7 +890,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             c @ ("lock" | "unlock" | "versions") => note_command(app, &arg_str(args, 0), c.into()),
             _ => Ok(false.into()),
         },
-        "memo:create" => create_memo(app, args.first().unwrap_or(&Value::Null)),
+        "memo:create" => create_memo(app, label, args.first().unwrap_or(&Value::Null)),
         "memo:save" => {
             let id = arg_str(args, 0);
             let Some(body) = args.get(1).and_then(Value::as_str) else { return Some(Err("본문이 문자열이 아닙니다.".into())) };

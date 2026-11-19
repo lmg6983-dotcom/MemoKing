@@ -6,7 +6,7 @@
 //   잠금 차례: 앱 상태(메모 폴더 · 설정 · note_labels)를 잡은 채로 WM 을 잡지 않고, WM 을 잡은 채로 창을 부르지 않는다.
 use crate::state::state;
 use crate::sticker_win::{self, Leave};
-use memoking_core::placement::{drop_bounds, is_inside, list_beside, place_bubble, Rect, BAR_H, BUBBLE_SIZE, DEFAULT_NOTE_SIZE};
+use memoking_core::placement::{drop_bounds, is_inside, list_beside, new_note_spot, place_bubble, Rect, BAR_H, BUBBLE_SIZE, DEFAULT_NOTE_SIZE};
 use memoking_core::stacks::{Stack, Stacks};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -205,6 +205,23 @@ pub fn bring_list_beside(app: &AppHandle, from: &str) {
     let Some([_, _, w, h]) = bounds(&list) else { return };
     let (x, y) = list_beside(note, (w, h), area_at(app, (note[0] + note[2] / 2.0, note[1] + 10.0)));
     let _ = list.set_position(LogicalPosition::new(x, y));
+}
+
+/// 새 메모 창 자리 — from: 새 메모를 만든 창 (메모 창이면 그 옆, 목록이면 목록 옆, 숨었거나 없으면 화면 가운데). 크기는 연 메모 창과 같게
+pub fn new_memo_spot(app: &AppHandle, from: &str) -> Rect {
+    let anchor_win = app.get_webview_window(from).filter(on_screen).filter(|w| !w.is_maximized().unwrap_or(false) && !w.is_fullscreen().unwrap_or(false));
+    let anchor = anchor_win.as_ref().and_then(bounds);
+    let size = anchor.filter(|_| from != "list").map_or(DEFAULT_NOTE_SIZE, |b| (b[2], b[3]));
+    let at = anchor.map(|[x, y, w, h]| (x + w / 2.0, y + h / 2.0)).or_else(|| cursor(app)).unwrap_or((0.0, 0.0));
+    let labels: Vec<String> = state(app).note_labels.lock().unwrap().values().cloned().collect();
+    let others: Vec<Rect> = labels.iter().map(String::as_str).chain(["list"]).filter(|l| *l != from).filter_map(|l| app.get_webview_window(l)).filter(on_screen).filter_map(|w| bounds(&w)).collect();
+    new_note_spot(anchor, size, area_at(app, at), &others)
+}
+
+/// 새 메모를 그 자리에 열도록 기억해 둔다 (memos::create_note_window 가 기억한 자리로 연다)
+pub fn place_new_memo(app: &AppHandle, id: &str, from: &str) {
+    let r = new_memo_spot(app, from);
+    remember_bounds(app, &[id.to_string()], r);
 }
 
 /// 기억한 이 메모 창 자리 (지금 있는 화면 안일 때만)
