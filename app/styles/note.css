@@ -415,11 +415,6 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 }
 .lc-play::after { content: ''; position: absolute; left: 11px; top: 5px; border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent #fff; }
 @media (max-width: 260px) { .lc-thumb, .lc-play { display: none; } }
-/* 링크 미리보기를 끈 설정: 카드 대신 보통 문단 같은 링크 글자 한 줄 (누르면 열림) */
-.mk-link-card.plain-link { width: fit-content; max-width: 100%; margin: 0 0 0.35em; user-select: auto; }
-.lc-plain { cursor: pointer; overflow-wrap: anywhere; }
-/* 고른 링크 한 줄 (화살표로 고르면 지우기 전에 무엇이 골라졌는지 보이게) */
-.mk-link-card.plain-link.selected { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
 
 /* 파일 칩 위에 뜨는 안내 (이름·크기) */
 .hover-hint {

@@ -46,7 +46,6 @@ import { folderOf } from '../../app/js/core/folders.js';
 import { renderWorkSettings } from '../../app/js/work-settings.js';
 import { workHours, saveWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { hasRememberedChoices, forgetChoices } from '../../app/js/core/choices.js';
 
 const $ = (x) => document.getElementById(x);
 
@@ -1265,8 +1264,6 @@ function fillSettingsFromPhone() {
 function openSettings() {
   $('trash-days').value = String(trashDays());
   $('auto-tags').checked = note.autoTagsOn();
-  paintChoices();
-  $('link-previews').checked = note.linkPreviewsOn();
   $('pen-writing').checked = note.penWriting() !== 'off';
   renderWorkSettings($('work-settings'), {
     enabled: list.workLifeOn(),
@@ -1318,16 +1315,6 @@ on('speakerModel', ({ progress }) => {
 });
 
 $('auto-tags').addEventListener('change', () => note.setAutoTags($('auto-tags').checked));
-// 넣을 때 묻기: "앞으로 이렇게" 로 기억한 것을 지운다 (rename-content.js)
-const paintChoices = () => {
-  $('choices-reset').disabled = !hasRememberedChoices();
-  $('choices-reset').textContent = $('choices-reset').disabled ? '늘 물어요' : '다시 묻기';
-};
-$('choices-reset').addEventListener('click', () => {
-  forgetChoices();
-  paintChoices();
-});
-$('link-previews').addEventListener('change', () => note.setLinkPreviews($('link-previews').checked));
 $('pen-writing').addEventListener('change', () => note.setPenWriting($('pen-writing').checked ? 'edit' : 'off'));
 $('rec-stt').addEventListener('change', () => recorder.setStt($('rec-stt').checked));
 $('settings-btn').addEventListener('click', openSettings);

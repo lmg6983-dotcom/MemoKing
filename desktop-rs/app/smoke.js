@@ -173,13 +173,6 @@ window.addEventListener('load', () => setTimeout(async () => {
       const img = await pic(`${mk.vaultBase}${big}?thumb=256`);
       return bytes.length > 150 * 1024 && img.naturalWidth === 256 && Math.abs(img.naturalHeight - 171) <= 1; // 400 × 256 / 600 = 170.7
     });
-    await check('빠르게 열기 스위치 (끄고 켜기)', async () => {
-      const off = await mk.settings.setPerf('perfPreload', false);
-      const read = (await mk.settings.get()).perf;
-      const on = await mk.settings.setPerf('perfPreload', true);
-      return off === false && read.perfPreload === false && read.perfSnapshot === true && on === true;
-    });
-    await check('모르는 설정 이름은 거절', () => mk.settings.setPerf('vaultPath', false).then(() => false, () => true));
     await check('AI 엔진: 받을 수 있음 (설치 파일에 없어도)', async () => (await mk.ai.status()).engine === true);
     await check('속도 기록', async () => (await mk.perf.log('점검')) === null);
     // 앱 화면 밖으로 넘어가지 않는다 (넘어가면 이 점검이 끝나지 않아 실패로 보인다)

@@ -284,7 +284,6 @@ const bodyHash = (text) => {
 };
 function saveSnapshot() {
   try {
-    if (memo?.snapshots === false) return void localStorage.removeItem(snapKey(id)); // 설정 › 빠르게 열기에서 껐다
     // 잠긴 메모: 남기지 않고, 잠그기 전에 남긴 것도 지운다 (잠근 글이 평문으로 남지 않게)
     if (memo?.locked) return void localStorage.removeItem(snapKey(id));
     const html = editor ? el.editorRoot.querySelector('.milkdown:not(.mk-snapshot)')?.outerHTML : null;
@@ -302,7 +301,7 @@ function saveSnapshot() {
 function showSnapshot(body) {
   try {
     // 잠긴 메모(다른 기기에서 잠갔을 수도): 보이지 않고 남은 것도 지운다
-    if (memo?.locked || memo?.snapshots === false) {
+    if (memo?.locked) {
       localStorage.removeItem(snapKey(id));
       return false;
     }
@@ -409,7 +408,6 @@ api.on('memo:external', async (next) => {
   await flush();
   showBanner(conflictCopy ? UI.conflictSaved : UI.conflict, { load: conflictCopy ? UI.showTheirs : null, keep: '확인' });
 });
-api.on('settings:link-previews', (on) => editor?.setLinkPreviews(on));
 // Work / Life 나누기: 메뉴의 "Work로 옮기기"는 나눠 쓸 때만 (밝기는 늘 시스템 설정 — 0.70.0)
 function showModeTheme() {
   $('mode-btn').hidden = !memo?.workLife;
@@ -1642,7 +1640,6 @@ setZoom(zoom, { show: false });
 // ---------- 표가 넘치면 메모를 줄여 맞추고, 더 못 줄이면 창을 넓힌다 (v0.17.13, 설정으로 끄고 켬) ----------
 // 열 너비를 줄이지 않고(사용자 요청) 본문 배율(--note-zoom)을 낮춰 표 가로가 잘리지 않게 한다.
 // 측정은 화면 px로 (표는 배율이 걸린 .mk-doc 안, 편집 영역은 배율이 없음).
-let fitTables = true;
 let fitTimer = 0;
 let growing = false;
 const MIN_ZOOM = 0.5;
@@ -1658,7 +1655,7 @@ function availWidth() {
 }
 
 async function fitWide() {
-  if (!fitTables || growing) return;
+  if (growing) return;
   const avail = availWidth();
   const widest = widestTableWidth();
   if (widest <= 1 || avail <= 1) return;
@@ -2124,14 +2121,13 @@ if (!memo) {
   document.title = memo.title;
   current = saved = fileBody = memo.body;
   // 링크 미리보기 설정 (끄면 카드 대신 링크 글자) — 설정을 바꾸면 바로
-  const linkPreviews = memo.linkPreviews !== false; // memo:get이 함께 보낸다 (창을 열 때 설정을 따로 묻지 않게)
   // 지난번 모습이 남아 있으면 먼저 보이고 창을 띄운다 — 편집기는 그 뒤에 만들어 바꿔 낀다
   if (showSnapshot(memo.body)) {
     perf.snap = performance.now();
     markPainted();
   }
   editor = await createNoteEditor(el.editorRoot, {
-    markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus, linkPreviews,
+    markdown: memo.body, onChange, onState: showActive, saveFile, fetchImage, onNotice: setStatus,
     tables: memo.tables ?? [], onTables: saveTables,
     readAttachment: async (src) => new TextDecoder().decode(await api.attachments.read(decodePath(src))),
     fetchPreview: (url) => api.links.preview(url),
@@ -2213,13 +2209,12 @@ if (!memo) {
   });
   annotation.start();
   annotation.load(Boolean(memo.ink));
-  // 표가 넘치면 메모를 줄여 맞추기 (설정) — 열 때 한 번, 그리고 본문이 바뀔 때(표 붙여넣기·넣기)
+  // 표가 넘치면 메모를 줄여 맞추기 — 열 때 한 번, 그리고 본문이 바뀔 때(표 붙여넣기·넣기). 단축키도 읽는다
   try {
     const st = await api.settings.get();
-    fitTables = st?.fitTables !== false;
     useKeymap(st?.keymap);
   } catch {
-    // 설정을 못 읽으면 기본(켜짐)
+    // 설정을 못 읽으면 기본 단축키
   }
   new MutationObserver(scheduleFit).observe(el.editorRoot, { childList: true, subtree: true, characterData: true });
   scheduleFit();

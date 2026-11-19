@@ -1,5 +1,5 @@
 // 단축키 설정 창 — 기능마다 지금 키를 보이고, 키 칸을 눌러 새 키를 받아 바꾼다
-//   메모 창 기능: core/keymap.js (바꾼 것만 설정에) · 어디서든(매직 카피): 전역 단축키 (설정의 같은 칸과 같은 값)
+//   메모 창 기능: core/keymap.js (바꾼 것만 설정에) · 어디서든(매직 카피 · 메모 목록): 전역 단축키 (단축키는 모두 이 창에서 — 설정에는 여는 단추만)
 import { keymapGroups, comboFromEvent, comboLabel, comboFromAccelerator } from './core/keymap.js';
 import { displayAccelerator, DEFAULT_SHORTCUTS } from './core/accelerators.js';
 import { startKeyCapture, stopKeyCapture, isCapturing, modsLabel, globalShortcutResult, captureGlobalKey } from './key-capture.js';
@@ -9,6 +9,7 @@ const $ = (id) => document.getElementById(id);
 
 const GLOBAL = [
   { id: 'quickMemo', label: '매직 카피, 화면 캡처', help: '어느 앱에서든 고른 글, 파일, 이미지를 바로 메모로 만들어요. 빠르게 두 번 누르면 화면의 원하는 부분을 잘라 담아요.' },
+  { id: 'list', label: '메모 목록 띄우기, 숨기기', help: '어느 앱에서든 이 키로 메모 목록 창을 띄우고, 다시 누르면 숨겨요.' },
 ];
 
 let state = { overrides: {}, shortcuts: {} };
@@ -73,7 +74,7 @@ function keyRow({ label, help, keys, changed, onCapture, onReset }) {
 }
 
 function render() {
-  // 어디서든 (매직 카피)
+  // 어디서든 (매직 카피 · 메모 목록)
   const sections = [section('어디서든', GLOBAL.map((g) => {
     const st = state.shortcuts?.[g.id];
     return keyRow({
@@ -146,7 +147,7 @@ function applyFind() {
 
 const HELP = 'Esc는 그만두기, Backspace는 이 기능의 키 없애기예요';
 
-// 메모 창 기능의 키 칸 (key-capture.js — 설정 창의 매직 카피 칸과 같은 동작)
+// 메모 창 기능의 키 칸 (key-capture.js)
 function captureAction(btn, a) {
   if (isCapturing(btn)) return stopKeyCapture('cancel');
   setStatus(HELP);
@@ -180,7 +181,7 @@ function captureAction(btn, a) {
   });
 }
 
-// 매직 카피 칸
+// 어디서든 칸 (매직 카피 · 메모 목록)
 function captureGlobal(btn, g) {
   if (isCapturing(btn)) return stopKeyCapture('cancel');
   captureGlobalKey(btn, {
@@ -262,7 +263,7 @@ $('reset-all').addEventListener('click', async () => {
   if (!b.classList.contains('confirm')) {
     b.classList.add('confirm');
     b.textContent = '한 번 더 누르면 초기화';
-    setStatus('메모 창 단축키와 매직 카피 키를 모두 처음대로 되돌려요');
+    setStatus('메모 창 단축키와 매직 카피 · 메모 목록 키를 모두 처음대로 되돌려요');
     clearTimeout(confirmTimer);
     confirmTimer = setTimeout(() => {
       b.classList.remove('confirm');
@@ -289,9 +290,11 @@ $('reset-all').addEventListener('click', async () => {
   if (failed.length) setStatus(`메모 창 단축키는 처음대로 되돌렸어요. ${failed.join(', ')}의 처음 키는 다른 앱이 쓰고 있어 되돌리지 못했어요`, true);
   else setStatus('모든 단축키를 처음대로 되돌렸어요');
 });
-$('done').addEventListener('click', () => window.close());
+// 창 닫기는 앱에 맡긴다 — window.close() 는 WebView2 의 화면만 닫아 흰 창이 남았다
+const closeWindow = () => api.win.close();
+$('done').addEventListener('click', closeWindow);
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !isCapturing()) window.close();
+  if (e.key === 'Escape' && !isCapturing()) closeWindow();
 });
 
 async function load() {
@@ -303,4 +306,7 @@ api.on('keymap:changed', (o) => !isCapturing() && JSON.stringify(o ?? {}) !== JS
 api.on('shortcuts:changed', () => !isCapturing() && load());
 
 await load();
+// 다른 앱이 먼저 쓰고 있어 작동하지 않는 어디서든 키 (예전엔 설정의 같은 칸에 보였다)
+const taken = GLOBAL.filter((g) => state.shortcuts?.[g.id]?.enabled && !state.shortcuts[g.id].registered).map((g) => g.label);
+if (taken.length) setStatus(`${taken.join(', ')}: 다른 앱이 이 키를 먼저 쓰고 있어서 작동하지 않아요. 다른 키로 바꿔 주세요`, true);
 document.documentElement.dataset.ready = 'true';

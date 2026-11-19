@@ -646,9 +646,6 @@ pub fn retire_note(app: &AppHandle, label: &str) {
 const DISCARD_AFTER: Duration = Duration::from_secs(10 * 60);
 pub fn discard_tick(app: &AppHandle) {
     static LAST: Mutex<Option<Instant>> = Mutex::new(None);
-    if !crate::memos::perf_on(app, "perfDiscard") {
-        return;
-    }
     {
         let mut last = LAST.lock().unwrap();
         if last.is_some_and(|t| t.elapsed() < Duration::from_secs(30)) {

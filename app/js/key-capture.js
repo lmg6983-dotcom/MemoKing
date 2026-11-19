@@ -57,19 +57,18 @@ function onPointerDown(e) {
 }
 
 /**
- * 전역 단축키(매직 카피 · 매직키) 칸: 새 키를 받아 저장 — 설정 창과 단축키 설정 창이 함께
+ * 전역 단축키(매직 카피 · 메모 목록) 칸: 새 키를 받아 저장 — 단축키 설정 창
  *   받는 동안 지금 키를 놓아 두고(누르면 메모가 뜨지 않게), 키를 받으면 먼저 되살린 뒤 저장한다
  *   (놓인 채 저장하면 "다른 앱이 쓰는 키" 로 잘못 보임)
- * @param {{ api: object, name: string, note: (text: string, warn?: boolean) => void, done?: (res: object) => any, stopped?: (reason: string) => any }} o
+ * @param {{ api: object, name: string, note: (text: string, warn?: boolean) => void, done?: (res: object) => any }} o
  */
-export function captureGlobalKey(btn, { api, name, note, done, stopped }) {
+export function captureGlobalKey(btn, { api, name, note, done }) {
   note('Ctrl, Alt, Win 중 하나와 함께 눌러요. Esc는 그만');
   return startKeyCapture(btn, {
     prompt: '새 키 조합을 누르세요',
     pause: (on) => api.settings.pauseShortcuts(on),
     onStop: (reason) => {
       if (reason === 'cancel' || reason === 'away') note('');
-      return stopped?.(reason);
     },
     onKey: async (e, _btn, cap) => {
       const r = acceleratorFromKey(e);

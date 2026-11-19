@@ -227,8 +227,7 @@ fn preview_view(root: &Path, url: &str, entry: Option<&Value>) -> Value {
 
 // shortcut: 같은 주소를 동시에 물으면 두 번 받는다 (Electron 은 하나로 묶음) — 같은 카드가 여러 창에 잦으면 받는 중 표시를 두기
 fn link_preview(app: &AppHandle, url: &str, refresh: bool) -> Value {
-    // 미리보기를 끄면 사이트에 가지 않는다 (화면 쪽이 깜빡 묻더라도)
-    let Some(root) = vault_root(app).filter(|_| state(app).setting("linkPreviews") != false) else { return Value::Null };
+    let Some(root) = vault_root(app) else { return Value::Null };
     let dir = root.join("_memoking");
     let cached = {
         let mut guard = PREVIEWS.lock().unwrap();

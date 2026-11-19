@@ -4,7 +4,6 @@ import { setupAiAsk } from './ai-ask.js';
 import { DEFAULT_MODEL } from './core/model-catalog.js';
 import { daysAgoText } from './core/time.js';
 import { trashedText } from './core/format.js';
-import { captureGlobalKey, stopKeyCapture, isCapturing, globalShortcutResult } from './key-capture.js';
 import { injectIcons, icon } from './icons.js';
 import { handoffText } from './core/handoff.js';
 import { friendlyTime, shortUrls } from './core/format.js';
@@ -37,10 +36,8 @@ import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT, slideSide, busyWhile, busyUntilBlur } from './dom.js';
 import { UI } from './core/ui-text.js';
-import { holdTune, setHoldTune } from './hold-tune.js';
 import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet, pinItem } from './folder-ui.js';
 import { folderList, movedText, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
-import { hasRememberedChoices, forgetChoices } from './core/choices.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
@@ -1152,13 +1149,8 @@ async function loadSettings() {
   $('auto-start-note').textContent = s.autoStart.available ? '알림 영역에서 조용히 시작해요' : '설치한 메모킹에서 쓸 수 있어요';
   $('history-enabled').checked = s.historyEnabled;
   showBlockedCount();
-  $('fit-tables').checked = s.fitTables !== false;
   $('magic-polish').checked = s.magicPolish !== false;
-  $('link-previews').checked = s.linkPreviews !== false;
-  $('perf-group').hidden = !s.perf; // PC Rust 판만 보낸다
-  for (const box of document.querySelectorAll('.perf-flag')) box.checked = s.perf?.[box.dataset.perf] !== false;
   showQuickMemo(s.quickMemo);
-  showShortcuts(s.shortcuts);
   $('trash-days').value = String(s.trashDays);
   renderWorkSettings($('work-settings'), {
     enabled: s.workLife === true,
@@ -1175,7 +1167,7 @@ async function loadSettings() {
 function showQuickMemo(q) {
   $('quick-memo').checked = q.enabled && q.registered;
   $('quick-memo-note').textContent = q.enabled && !q.registered
-    ? '다른 앱이 이 단축키를 먼저 쓰고 있어서 작동하지 않아요. 아래에서 다른 키로 바꿔 주세요'
+    ? '다른 앱이 이 단축키를 먼저 쓰고 있어서 작동하지 않아요. 단축키 설정에서 다른 키로 바꿔 주세요'
     : '어디서든 고른 내용을 바로 메모로 만들어요. 두 번 누르면 화면 영역 캡처';
 }
 
@@ -1207,62 +1199,10 @@ $('share-both').addEventListener('click', async () => {
   $('pc-note').textContent = 'PC와 휴대폰 설치 링크를 함께 복사했어요';
 });
 
-// ---------- 전역 단축키 바꾸기 (매직 카피 · 메모 목록) ----------
-// 키 단추를 누르고 새 조합을 누르면 바뀐다. 다른 앱이 이미 쓰는 키면 바꾸지 않고 알려 준다 (Esc·다른 곳 누르기 = 그만)
-let shortcutState = {};
-const SC_TAKEN = '다른 앱이 이 키를 먼저 쓰고 있어서 작동하지 않아요 (예: 같은 단축키를 쓰는 다른 프로그램). 다른 키로 바꿔 주세요';
-function showShortcuts(sc) {
-  shortcutState = sc ?? {};
-  for (const name of ['quickMemo', 'list']) {
-    const st = shortcutState[name];
-    if (!st || !$(`sc-${name}`)) continue;
-    $(`sc-${name}`).textContent = st.label;
-    $(`sc-${name}`).setAttribute('aria-label', `${name === 'quickMemo' ? '매직 카피' : '메모 목록'} 단축키 ${st.label}, 눌러서 바꾸기`);
-    $(`sc-${name}-reset`).hidden = st.isDefault;
-    $(`sc-${name}-note`).textContent = st.enabled && !st.registered ? SC_TAKEN : '';
-    $(`sc-${name}-note`).classList.toggle('warn', st.enabled && !st.registered);
-  }
-}
-function setScNote(name, text, warn = false) {
-  if (!$(`sc-${name}-note`)) return;
-  $(`sc-${name}-note`).textContent = text;
-  $(`sc-${name}-note`).classList.toggle('warn', warn);
-}
-/** onlyIfChanged: 키도 상태도 그대로면 칸은 다시 그리지 않는다 (방금 띄운 "바꿨어요" 안내가 지워지지 않게) */
-async function refreshShortcuts({ onlyIfChanged = false } = {}) {
-  const s = await api.settings.get();
-  const same = onlyIfChanged && ['quickMemo', 'list'].every((n) => JSON.stringify(s.shortcuts?.[n]) === JSON.stringify(shortcutState[n]));
-  if (!same) showShortcuts(s.shortcuts);
-  showQuickMemo(s.quickMemo);
-}
-// 매직 카피 · 메모 목록 칸: 새 키 받기 (key-capture.js — 단축키 설정 창과 같은 동작)
-function startCapture(name) {
-  const el = $(`sc-${name}`);
-  if (!el) return;
-  captureGlobalKey(el, {
-    api,
-    name,
-    note: (text, warn) => setScNote(name, text, warn),
-    done: () => refreshShortcuts(),
-    stopped: (reason) => reason !== 'commit' && refreshShortcuts(),
-  });
-}
+// ---------- 단축키: 모두 단축키 설정 창에서 (shortcuts-window.js) ----------
 $('keymap-open').addEventListener('click', () => api.keymap.openWindow());
-for (const name of ['quickMemo', 'list']) {
-  const btn = $(`sc-${name}`);
-  const rst = $(`sc-${name}-reset`);
-  if (btn) btn.addEventListener('click', () => (isCapturing(btn) ? stopKeyCapture('cancel') : startCapture(name)));
-  if (rst) rst.addEventListener('click', async () => {
-    const res = await api.settings.setShortcut(name, null);
-    await refreshShortcuts();
-    if (!res.ok) setScNote(name, globalShortcutResult(res, '', { reset: true }).text, true);
-  });
-}
-// 다른 앱이 놓아 주어 1분마다 다시 잡기에 성공했을 때 등
-api.on('shortcuts:changed', async () => {
-  if (isCapturing()) return; // 여기서 바꾸는 중이면 끝날 때 다시 그린다
-  await refreshShortcuts({ onlyIfChanged: true });
-});
+// 단축키 창에서 바꿨거나, 다른 앱이 놓아 주어 1분마다 다시 잡기에 성공했을 때: 매직 카피 칸의 안내도 새로
+api.on('shortcuts:changed', async () => showQuickMemo((await api.settings.get()).quickMemo));
 // ---------- 음성 녹음 · 받아쓰기 (desktop-rs/app/src/stt.rs) ----------
 // 데이터는 처음 한 번 받는다 (받아쓰기 약 80MB, 말한 사람 나누기 약 30MB) — 이 PC 의 앱 데이터 폴더에, 메모 폴더에는 넣지 않음
 function renderStt(st) {
@@ -1377,50 +1317,10 @@ $('quick-memo').addEventListener('change', async (e) => showQuickMemo(await api.
 $('auto-start').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setAutoStart(e.target.checked);
 });
-$('fit-tables').addEventListener('change', async (e) => {
-  e.target.checked = await api.settings.setFitTables(e.target.checked);
-});
-$('link-previews').addEventListener('change', async (e) => {
-  e.target.checked = await api.settings.setLinkPreviews(e.target.checked);
-});
-for (const box of document.querySelectorAll('.perf-flag')) {
-  box.addEventListener('change', async (e) => {
-    e.target.checked = await api.settings.setPerf(e.target.dataset.perf, e.target.checked);
-  });
-}
 $('magic-polish').addEventListener('change', async (e) => {
   e.target.checked = await api.settings.setMagicPolish(e.target.checked);
 });
 
-// 메모 보기 › 내 손에 맞추기: 꾹 눌러 줄 옮기기 시간 (메모 창들과 같은 저장소 — hold-tune.js)
-// 메모 보기 › 넣을 때 묻기: "앞으로 이렇게" 로 기억한 것을 지운다 (메모 창들과 같은 저장소 — rename-content.js)
-const choicesBtn = $('choices-reset');
-const paintChoices = () => {
-  const kept = hasRememberedChoices();
-  choicesBtn.hidden = !kept; // 지울 것이 없으면 꺼진 단추 대신 지금 상태만 글로
-  $('choices-note').textContent = kept
-    ? '이미지 여러 장 · 문서를 넣을 때 "앞으로 이렇게" 로 정해 둔 것이 있어요. 삭제하면 다시 물어요'
-    : '이미지 여러 장 · 문서를 넣을 때마다 어떻게 넣을지 물어요';
-};
-choicesBtn.addEventListener('click', () => {
-  forgetChoices();
-  paintChoices();
-});
-window.addEventListener('focus', paintChoices); // 메모 창에서 정하고 돌아왔을 때
-window.addEventListener('storage', (e) => e.key === 'memoking.choices' && paintChoices()); // 메모 창에서 정하면 바로
-paintChoices();
-$('hold-tune').checked = holdTune().on;
-$('hold-tune').addEventListener('change', (e) => setHoldTune({ on: e.target.checked }));
-$('hold-reset').addEventListener('click', () => {
-  setHoldTune({ reset: true });
-  const b = $('hold-reset');
-  b.textContent = '되돌렸어요';
-  b.disabled = true;
-  setTimeout(() => {
-    b.textContent = '처음 값으로';
-    b.disabled = false;
-  }, 1500);
-});
 $('history-enabled').addEventListener('change', async (e) => {
   e.target.checked = await api.history.setEnabled(e.target.checked);
   historyTab.refresh();
