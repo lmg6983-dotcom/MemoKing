@@ -110,7 +110,17 @@ pub fn bezier((x1, y1, x2, y2): (f64, f64, f64, f64), t: f64) -> f64 {
 /// art.css 의 움직임 곡선 (부드럽게 멈춤) · 마우스 올림 transition: ease-out
 const SNAP: (f64, f64, f64, f64) = (0.23, 1.0, 0.32, 1.0);
 const EASE_OUT: (f64, f64, f64, f64) = (0.0, 0.0, 0.58, 1.0);
+/// 떼어질 때 · 들어갈 때의 움직임 (easeOutCubic) — SNAP 은 0.2초 중 첫 0.04초에 70% 를 가 사라짐이 툭 끊겨 보였다
+const GLIDE: (f64, f64, f64, f64) = (0.33, 1.0, 0.68, 1.0);
 pub const HOVER_MS: f64 = 150.0;
+pub const PEEL_MS: f64 = 320.0;
+pub const DOCK_MS: f64 = 240.0;
+
+/// 투명도는 처음과 끝을 부드럽게 (smoothstep) — 한 장면 사이에 크게 바뀌지 않게
+fn fade(t: f64) -> f64 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
 
 /// 2D 변환 (x, y) → (a x + c y + e, b x + d y + f)
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -161,25 +171,25 @@ pub fn pose(kind: &str, leave: Option<Leave>, ms: f64, reduce: bool, (w, h): (f6
             let t = (ms / 160.0).min(1.0);
             Pose { opacity: 1.0 - t, transform: Affine::ID, done: t >= 1.0 } // 흐려지기만 (떼어졌다는 것은 보이게)
         }
-        // sticker-stick 0.32s: 0% { opacity 0; translateY(-12px) rotate(-12deg) scale(1.16) } 55% { opacity 1 } 100% { none }
+        // sticker-stick 0.32s: 0% { opacity 0; translateY(-12px) rotate(-12deg) scale(1.16) } 100% { none } — 투명도는 80% 까지 부드럽게 (art.css 는 55% 라 툭 나타났다)
         (None, false) => {
             let t = (ms / 320.0).min(1.0);
             let p = bezier(SNAP, t);
             let origin = if crown { at(0.5, 0.7) } else { at(0.5, 0.6) };
-            Pose { opacity: bezier(SNAP, t / 0.55), transform: css(origin, -12.0 * (1.0 - p), -12.0 * (1.0 - p), 1.16 - 0.16 * p), done: t >= 1.0 }
+            Pose { opacity: fade(t / 0.8), transform: css(origin, -12.0 * (1.0 - p), -12.0 * (1.0 - p), 1.16 - 0.16 * p), done: t >= 1.0 }
         }
-        // sticker-peel 0.2s: to { opacity 0; translateY(-10px) rotate(10deg) scale(1.08) }
+        // sticker-peel: to { opacity 0; translateY(-10px) rotate(10deg) scale(1.08) } — 길이 · 곡선은 GLIDE 참고
         (Some(Leave::Peel), false) => {
-            let t = (ms / 200.0).min(1.0);
-            let p = bezier(SNAP, t);
+            let t = (ms / PEEL_MS).min(1.0);
+            let p = bezier(GLIDE, t);
             let origin = if crown { at(0.3, 0.8) } else { at(0.5, 0.6) };
-            Pose { opacity: 1.0 - p, transform: css(origin, -10.0 * p, 10.0 * p, 1.0 + 0.08 * p), done: t >= 1.0 }
+            Pose { opacity: 1.0 - fade(t), transform: css(origin, -10.0 * p, 10.0 * p, 1.0 + 0.08 * p), done: t >= 1.0 }
         }
-        // sticker-dock 0.15s: to { opacity 0; translateY(8px) scale(0.4) } (제목 줄 작은 왕관 쪽으로)
+        // sticker-dock: to { opacity 0; translateY(8px) scale(0.4) } (제목 줄 작은 왕관 쪽으로)
         (Some(Leave::Dock), false) => {
-            let t = (ms / 150.0).min(1.0);
-            let p = bezier(SNAP, t);
-            Pose { opacity: 1.0 - p, transform: css(at(0.5, 0.8), 8.0 * p, 0.0, 1.0 - 0.6 * p), done: t >= 1.0 }
+            let t = (ms / DOCK_MS).min(1.0);
+            let p = bezier(GLIDE, t);
+            Pose { opacity: 1.0 - fade(t), transform: css(at(0.5, 0.8), 8.0 * p, 0.0, 1.0 - 0.6 * p), done: t >= 1.0 }
         }
     }
 }
@@ -597,9 +607,18 @@ mod tests {
         let c = end.transform.apply((5.0, 7.0));
         assert!((c.0 - 5.0).abs() < 1e-6 && (c.1 - 7.0).abs() < 1e-6, "끝나면 제자리");
         assert!(pose("tape", None, 0.0, true, size).done, "움직임을 줄이면 바로");
-        let peel = pose("crown", Some(Leave::Peel), 200.0, false, size);
+        let peel = pose("crown", Some(Leave::Peel), PEEL_MS, false, size);
         assert!(peel.opacity.abs() < 1e-6 && peel.done);
         assert!(peel.transform.apply((19.2, 41.6)).1 < 41.6 - 9.0, "위로 들리며");
+        // 한 장면(16ms)마다 투명도가 10% 넘게 바뀌지 않는다 (붙기 · 떼기 · 들어가기)
+        for leave in [None, Some(Leave::Peel), Some(Leave::Dock)] {
+            let mut last = pose("crown", leave, 0.0, false, size).opacity;
+            for f in 1..=40 {
+                let now = pose("crown", leave, f as f64 * 16.0, false, size).opacity;
+                assert!((now - last).abs() <= 0.1, "{leave:?} {f}: {last} → {now}");
+                last = now;
+            }
+        }
         let dock = pose("crown", Some(Leave::Dock), 75.0, true, size);
         assert!((dock.opacity - 0.53).abs() < 0.01 && !dock.done && dock.transform == Affine::ID);
         // 들림: 반쯤에서 마우스가 나가면 그 자리에서 내려앉는다
