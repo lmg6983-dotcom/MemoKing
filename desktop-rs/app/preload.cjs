@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('memoking', {
     list: invoke('memos:list'),
     search: invoke('memos:search'),
     folders: invoke('memos:folders'), // 메모킹 폴더 이름들 (빈 폴더도)
+    pinnedFolders: invoke('folders:pinned'), // 맨 위에 고정한 폴더 이름들
+    pinFolder: invoke('folders:pin'), // (이름, 고정?) → 새 목록
     createFolder: invoke('folders:create'),
     renameFolder: invoke('folders:rename'), // (옛 이름, 새 이름) → 새 이름
     deleteFolder: invoke('folders:delete'), // 이름 → { moved, removed } (메모는 폴더 밖으로)

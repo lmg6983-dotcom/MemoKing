@@ -38,7 +38,7 @@ import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT, slideSide, busyWhile, busyUntilBlur } from './dom.js';
 import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
-import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet } from './folder-ui.js';
+import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet, pinItem } from './folder-ui.js';
 import { folderList, movedText, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
 import { hasRememberedChoices, forgetChoices } from './rename-content.js';
 
@@ -90,6 +90,7 @@ const state = {
   filter: { tags: [], colors: [], kinds: [] },
   folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 PC 에 기억
   folderDirs: null, // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도) — 받기 전에는 null
+  pinnedFolders: [], // 맨 위에 고정한 폴더 (_memoking/pinned-folders.json)
   picking: false, // 여러 장 고르기 중 (카드를 누르면 열지 않고 고른다)
   picked: new Set(), // 고른 카드 (폴더로 옮기기)
 };
@@ -209,9 +210,10 @@ const inFolder = (memos) => memosInFolder(memos, state.folder);
 const newMemo = (opts = {}) => api.memo.create({ ...opts, ...(state.folder && state.folder !== UNFILED ? { folder: state.folder } : {}) });
 
 async function loadFolders() {
-  const dirs = await api.memos.folders?.().catch(() => []) ?? [];
-  if (state.folderDirs && dirs.join('\n') === state.folderDirs.join('\n')) return; // 그대로면 다시 그리지 않는다
+  const [dirs, pins] = await Promise.all([api.memos.folders?.().catch(() => []) ?? [], api.memos.pinnedFolders?.().catch(() => []) ?? []]);
+  if (state.folderDirs && dirs.join('\n') === state.folderDirs.join('\n') && pins.join('\n') === state.pinnedFolders.join('\n')) return; // 그대로면 다시 그리지 않는다
   state.folderDirs = dirs;
+  state.pinnedFolders = pins;
   render(); // 카드도 (고른 폴더가 없어졌으면 전체로 — keepFolderValid)
 }
 
@@ -249,9 +251,16 @@ async function folderMenu(name, anchor) {
   const r = anchor.getBoundingClientRect();
   const pick = await openContextMenu({
     x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
-    items: [{ id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
+    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
   });
-  if (pick === 'rename') {
+  if (pick === 'pin') {
+    try {
+      state.pinnedFolders = await api.memos.pinFolder(name, !state.pinnedFolders.includes(name));
+      render();
+    } catch (err) {
+      flashStatus(err.message || '폴더를 고정하지 못했어요');
+    }
+  } else if (pick === 'rename') {
     const to = await askFolderName({ existing: (state.folderDirs ?? []).filter((f) => f !== name), title: '폴더 이름 바꾸기', value: name, okLabel: '바꾸기' });
     if (!to || to === name) return;
     try {
@@ -291,7 +300,7 @@ async function createAndOpenFolder(name) {
   setFolder(name);
 }
 
-const currentFolders = () => folderList(state.folderDirs ?? [], modeMemos());
+const currentFolders = () => folderList(state.folderDirs ?? [], modeMemos(), state.pinnedFolders);
 
 // PC 의 폴더는 왼쪽 목록 하나 (탐색기처럼) — 카드 위에 줄을 따로 두지 않는다. 메모를 끌어 폴더에 놓으면 그 폴더로 옮긴다
 function renderFolders() {

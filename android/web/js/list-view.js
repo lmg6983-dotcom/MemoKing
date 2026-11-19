@@ -22,7 +22,7 @@ import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { pickFolder, createPickBar, askFolderName, renderFolderList, markCurrentFolder } from '../../app/js/folder-ui.js';
+import { pickFolder, createPickBar, askFolderName, renderFolderList, markCurrentFolder, pinItem } from '../../app/js/folder-ui.js';
 import { openContextMenu } from '../../app/js/ctx-menu.js';
 import { folderList, movedText, isFolderName, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from '../../app/js/core/folders.js';
 
@@ -80,6 +80,7 @@ const state = {
   workLife: null, // 설정 › Work / Life 나누기 (null: 정한 적 없음 — 처음 목록을 읽을 때 Work 메모가 있으면 켬)
   folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 휴대폰에 기억
   folderDirs: null, // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도) — 앱에 묻는 일이라 기억해 두고 필요할 때만 다시 (loadFolderDirs)
+  pinnedFolders: [], // 맨 위에 고정한 폴더 (_memoking/pinned-folders.json, loadFolderDirs)
   picking: false, // 여러 장 고르기 (메모 메뉴 › 여러 개 고르기) — 카드를 누르면 열지 않고 고른다
   picked: new Set(),
 };
@@ -476,6 +477,7 @@ export function render() {
 
 function loadFolderDirs() {
   state.folderDirs = app.vault?.folders?.() ?? [];
+  state.pinnedFolders = app.vault?.pinnedFolders?.() ?? [];
 }
 
 // 폴더 목록: 기억해 둔 것 + 메모가 든 폴더 (처음 · 모르는 폴더의 메모가 들어왔을 때만 앱에 다시 묻는다)
@@ -483,7 +485,7 @@ function folders() {
   const memos = modeMemos();
   // (폴더 이름으로 못 쓰는 폴더 — Drive 웹에서 만든 "회의:2026" 등 — 는 목록에 들지 않으니 묻지 않는다: 그리면서 매번 묻게 되므로)
   if (!state.folderDirs || memos.some((m) => isFolderName(m.folder) && !state.folderDirs.includes(m.folder))) loadFolderDirs();
-  return folderList(state.folderDirs, memos);
+  return folderList(state.folderDirs, memos, state.pinnedFolders);
 }
 
 // 고른 폴더가 없어졌으면(다른 기기 · 파일 앱에서 지움) 전체로 — 카드를 거르기 전에
@@ -599,16 +601,19 @@ el.folderBtn.addEventListener('click', async () => {
   applyFolderSide();
 });
 
-// 폴더 메뉴 (폴더 목록에서 꾹 누르기): 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
+// 폴더 메뉴 (폴더 목록에서 꾹 누르기): 맨 위에 고정 · 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
 async function folderMenu(name, anchor) {
   haptic(12);
   const r = anchor.getBoundingClientRect();
   const pick = await openContextMenu({
     x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
-    items: [{ id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
+    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
   });
   try {
-    if (pick === 'rename') {
+    if (pick === 'pin') {
+      state.pinnedFolders = app.vault.pinFolder(name, !state.pinnedFolders.includes(name));
+      render();
+    } else if (pick === 'rename') {
       const to = await askFolderName({ existing: (state.folderDirs ?? []).filter((f) => f !== name), title: '폴더 이름 바꾸기', value: name, okLabel: '바꾸기' });
       if (!to || to === name) return;
       const done = app.vault.renameFolder(name, to);

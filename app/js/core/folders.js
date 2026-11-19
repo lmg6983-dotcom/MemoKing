@@ -41,16 +41,40 @@ export const withUnfiled = (list, memos) => (list.length ? [{ name: UNFILED, lab
 export const isFolderName = (name) => Boolean(name) && cleanFolderName(name) === name;
 
 /**
- * 폴더 목록 [{ name, count }] (이름순) — 디스크의 폴더 + 메모가 든 폴더, count 는 넘긴 메모(지금 모드) 중 그 폴더의 수
+ * 폴더 목록 [{ name, count, pinned? }] (고정한 폴더가 먼저, 그 안에서 이름순) — 디스크의 폴더 + 메모가 든 폴더, count 는 넘긴 메모(지금 모드) 중 그 폴더의 수
  * @param {string[]} dirs 디스크의 맨 위 하위 폴더 이름
  * @param {{ folder?: string }[]} memos
+ * @param {string[]} [pinned] 맨 위에 고정한 폴더
  */
-export function folderList(dirs, memos) {
+export function folderList(dirs, memos, pinned = []) {
   const counts = new Map();
   for (const d of dirs ?? []) if (isFolderName(d)) counts.set(d, 0);
   for (const m of memos ?? []) if (m.folder) counts.set(m.folder, (counts.get(m.folder) ?? 0) + 1);
-  return [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const pins = new Set(pinned);
+  return [...counts]
+    .map(([name, count]) => (pins.has(name) ? { name, count, pinned: true } : { name, count }))
+    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || a.name.localeCompare(b.name, 'ko'));
 }
+
+// 맨 위에 고정한 폴더 (_memoking/pinned-folders.json — 기기끼리 함께. desktop-rs/core/src/vault.rs 와 같음)
+//   지운 폴더의 이름은 남겨 둔다: 지우기를 되돌려 다시 만들면 그대로 고정 (목록에는 있는 폴더만 나온다)
+export const PINNED_FOLDERS_FILE = '_memoking/pinned-folders.json';
+
+/** 파일 글 → 고정한 폴더 이름들 (망가졌으면 없음) */
+export function parsePinned(text) {
+  try {
+    const v = JSON.parse(text ?? '[]');
+    return Array.isArray(v) ? [...new Set(v.filter(isFolderName))].slice(0, 200) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 고정 · 풀기 → 새 목록 */
+export const pinFolder = (list, name, on) => (on ? [...list.filter((n) => n !== name), name] : list.filter((n) => n !== name));
+
+/** 폴더 이름을 바꾸면 고정도 새 이름으로 */
+export const renamePinned = (list, from, to) => (list.includes(from) ? pinFolder(pinFolder(list, from, false), to, true) : list);
 
 const time = (v) => Date.parse(v ?? '') || 0;
 

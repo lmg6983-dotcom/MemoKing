@@ -1019,6 +1019,8 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             found.map(|list| with_open_flag(app, list))
         }
         "tags:list" => with_vault(app, |v| Ok(json!(memoking_core::search::collect_tags(&v.list())))),
+        "folders:pinned" => with_vault(app, |v| Ok(json!(v.pinned_folders()))),
+        "folders:pin" => with_vault(app, |v| v.set_folder_pinned(&arg_str(args, 0), args.get(1) == Some(&Value::Bool(true))).map(|l| json!(l))),
         "folders:create" => with_vault(app, |v| v.create_folder(&arg_str(args, 0)).map(Value::from)),
         "folders:rename" => {
             let r = with_vault(app, |v| v.rename_folder(&arg_str(args, 0), &arg_str(args, 1)).map(Value::from));

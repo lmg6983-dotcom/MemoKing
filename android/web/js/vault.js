@@ -12,7 +12,7 @@ import { isLockedBody, parseLocked } from '../../app/js/core/memo-lock.js';
 import { isLiveCached } from '../../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles, diskCopy } from '../../app/js/core/vault-locks.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
-import { folderOf, cleanFolderName, isFolderName, resolveMovedTwin, withoutId } from '../../app/js/core/folders.js';
+import { folderOf, cleanFolderName, isFolderName, resolveMovedTwin, withoutId, PINNED_FOLDERS_FILE, parsePinned, pinFolder, renamePinned } from '../../app/js/core/folders.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
   describeVersions } from '../../app/js/core/versions.js';
@@ -676,7 +676,28 @@ export class Vault extends EventTarget {
       ids.push(e.id);
     }
     if (ids.length) this.changed(ids);
+    const pins = this.pinnedFolders();
+    if (pins.includes(from)) {
+      try { fs.writeText(PINNED_FOLDERS_FILE, JSON.stringify(renamePinned(pins, from, dst))); } catch (err) { this.emit('error', err); } // 고정도 새 이름으로 (못 써도 이름 바꾸기는 됐다)
+    }
     return dst;
+  }
+
+  /** 맨 위에 고정한 폴더 이름들 (core/folders.js — 기기끼리 함께) */
+  pinnedFolders() {
+    try {
+      return parsePinned(fs.readText(PINNED_FOLDERS_FILE));
+    } catch {
+      return [];
+    }
+  }
+
+  /** 폴더 고정 · 풀기 → 새 목록 */
+  pinFolder(name, on) {
+    if (!isFolderName(name)) throw new Error('폴더 이름으로 쓸 수 없어요');
+    const list = pinFolder(this.pinnedFolders(), name, on);
+    fs.writeText(PINNED_FOLDERS_FILE, JSON.stringify(list));
+    return list;
   }
 
   /** 폴더 지우기: 안의 메모는 폴더 밖으로, 그러고 나서 메모가 아닌 파일이 없으면 폴더를 지운다 → { moved, removed, ids } (ids: 되돌리기용) */

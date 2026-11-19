@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 pub const APP_DIR: &str = "_memoking";
+const PINNED_FOLDERS: &str = "pinned-folders.json";
 pub const ATTACH_DIR: &str = "attachments";
 const VERSION_GAP_MS: u128 = 10 * 60 * 1000;
 const MAX_VERSIONS: usize = 30;
@@ -1308,7 +1309,37 @@ impl Vault {
             e.file = Some(format!("{dst}{}", &f[from.len()..]));
             self.stamp_moved(id);
         }
+        if self.pinned_folders().iter().any(|n| n == from) {
+            let _ = self.set_folder_pinned(from, false).and_then(|_| self.set_folder_pinned(&dst, true)); // 고정도 새 이름으로 (못 써도 이름 바꾸기는 됐다)
+        }
         Ok(dst)
+    }
+
+    /// 맨 위에 고정한 폴더 (_memoking/pinned-folders.json — 기기끼리 함께. app/js/core/folders.js parsePinned 와 같음)
+    pub fn pinned_folders(&self) -> Vec<String> {
+        let text = fs::read_to_string(self.app_dir().join(PINNED_FOLDERS)).unwrap_or_default();
+        let list: Vec<Value> = serde_json::from_str(&text).unwrap_or_default();
+        let mut out: Vec<String> = vec![];
+        for n in list.iter().filter_map(Value::as_str) {
+            if memo_file::clean_folder_name(n) == n && !n.is_empty() && !out.iter().any(|o| o == n) && out.len() < 200 {
+                out.push(n.to_string());
+            }
+        }
+        out
+    }
+
+    /// 폴더 고정 · 풀기 → 새 목록 (지운 폴더 이름은 남긴다: 지우기를 되돌리면 그대로 고정)
+    pub fn set_folder_pinned(&self, name: &str, on: bool) -> Result<Vec<String>, String> {
+        if memo_file::clean_folder_name(name) != name || name.is_empty() {
+            return Err("폴더 이름으로 쓸 수 없어요".into());
+        }
+        let mut list: Vec<String> = self.pinned_folders().into_iter().filter(|n| n != name).collect();
+        if on {
+            list.push(name.to_string());
+        }
+        fs::create_dir_all(self.app_dir()).map_err(|e| e.to_string())?;
+        write_atomic(&self.app_dir().join(PINNED_FOLDERS), json!(list).to_string().as_bytes()).map_err(|e| e.to_string())?;
+        Ok(list)
     }
 
     /// 폴더 지우기: 안의 메모는 모두 맨 위로 꺼내고, 그러고 나서 비었으면 폴더를 지운다 (메모가 아닌 파일이 남으면 그대로)
@@ -1828,6 +1859,24 @@ mod tests {
         assert!(fs::read_to_string(root.join("치과.md")).unwrap().contains("reminders:"));
         assert_eq!(v.get(&id).unwrap()["updated"], before, "알림은 내용 수정이 아니다");
         assert!(v.set_reminders("없음", vec![]).unwrap().is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn pinned_folders_follow_rename() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        assert!(v.pinned_folders().is_empty());
+        v.create_folder("업무").unwrap();
+        assert_eq!(v.set_folder_pinned("업무", true).unwrap(), ["업무"]);
+        assert_eq!(v.set_folder_pinned("집", true).unwrap(), ["업무", "집"]);
+        assert!(v.set_folder_pinned("a:b", true).is_err());
+        v.rename_folder("업무", "회사").unwrap();
+        assert_eq!(v.pinned_folders(), ["집", "회사"]);
+        assert_eq!(v.set_folder_pinned("집", false).unwrap(), ["회사"]);
+        fs::write(root.join("_memoking/pinned-folders.json"), "{망가짐").unwrap();
+        assert!(v.pinned_folders().is_empty());
         fs::remove_dir_all(root).unwrap();
     }
 
