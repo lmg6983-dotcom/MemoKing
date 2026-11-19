@@ -1940,7 +1940,7 @@ async function moveToFolder(ids, current, to = undefined) {
   if (!ids.length) return;
   let target = to;
   if (target === undefined) {
-    target = await pickFolder({ folders: state.folderDirs ?? [], current: ids.length === 1 ? current : null, count: ids.length });
+    target = await pickFolder({ folders: folderList(state.folderDirs ?? [], [], state.pinnedFolders).map((f) => f.name), current: ids.length === 1 ? current : null, count: ids.length });
     if (target === null) return;
   }
   const before = new Map(ids.map((id) => [id, state.memos.find((m) => m.id === id)?.folder ?? ''])); // 되돌리기용

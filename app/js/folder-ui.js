@@ -15,7 +15,7 @@ function el(tag, className = '', text = '') {
   return node;
 }
 
-function folderButton({ name, label, count, current, iconName, pinned = false }) {
+function folderButton({ name, label, count, current, iconName }) {
   const b = el('button', 'mf-item');
   b.type = 'button';
   b.dataset.folder = name;
@@ -32,10 +32,6 @@ function folderButton({ name, label, count, current, iconName, pinned = false })
   }
   nameEl.append(text);
   b.append(nameEl);
-  if (pinned) {
-    b.append(icon('pin-fill', 'mf-pin'));
-    b.title += ' (맨 위에 고정)';
-  }
   if (count) b.append(el('small', 'mf-count', String(count))); // 0 은 적지 않는다 (빈 폴더가 많아도 목록이 조용하게 — 칩 줄과 같게)
   return b;
 }
@@ -50,7 +46,7 @@ function folderButton({ name, label, count, current, iconName, pinned = false })
  *   total: 전체 메모 수
  */
 /** 폴더 메뉴의 고정 항목 (PC · 휴대폰 같게) */
-export const pinItem = (pinned, name) => ({ id: 'pin', label: pinned?.includes(name) ? '고정 풀기' : '맨 위에 고정' });
+export const pinItem = (pinned, name) => ({ id: 'pin', label: pinned?.includes(name) ? '상단 고정 풀기' : '상단 고정' });
 
 export function renderFolderList(container, { folders, current, total = 0, onPick, onNew, onMenu }) {
   // 폴더 · 수가 그대로면 목록을 다시 만들지 않고 고른 줄만 바꾼다 (폴더를 누를 때마다 목록을 통째로 새로 만들고 이름 길이를 다시 재 멈칫했다)
@@ -70,7 +66,7 @@ export function renderFolderList(container, { folders, current, total = 0, onPic
       more.type = 'button';
       more.tabIndex = -1; // 키보드는 F2 · 메뉴 키로 (줄마다 Tab 이 서지 않게)
       more.dataset.folderMenu = name;
-      more.title = '고정, 이름 바꾸기, 지우기';
+      more.title = '상단 고정, 이름 바꾸기, 지우기';
       more.setAttribute('aria-label', `${name} 폴더 메뉴`);
       more.append(icon('more'));
       li.append(more);
@@ -78,14 +74,18 @@ export function renderFolderList(container, { folders, current, total = 0, onPic
     return li;
   };
   list.append(item(folderButton({ name: '', label: '전체', count: total, current: !current, iconName: 'note' }), ''));
-  const make = (f) => item(folderButton({ name: f.name, label: f.label ?? f.name, count: f.count, current: f.name === current, iconName: isReal(f.name) ? '' : 'inbox', pinned: f.pinned }), f.name);
+  const make = (f) => item(folderButton({ name: f.name, label: f.label ?? f.name, count: f.count, current: f.name === current, iconName: isReal(f.name) ? '' : 'inbox' }), f.name);
   for (const f of folders) if (!isReal(f.name)) list.append(make(f));
-  if (folders.some((f) => isReal(f.name))) {
-    const head = el('li', 'mf-sep', '폴더');
+  // 전체 · 미분류 | 상단 고정 | 폴더 — 묶음마다 선과 이름으로 나눈다 (상단 고정한 폴더가 없으면 그 묶음도 없음)
+  const section = (title, items) => {
+    if (!items.length) return;
+    const head = el('li', 'mf-sep', title);
     head.setAttribute('aria-hidden', 'true');
-    list.append(head);
-  }
-  for (const f of folders) if (isReal(f.name)) list.append(make(f));
+    list.append(head, ...items.map(make));
+  };
+  const real = folders.filter((f) => isReal(f.name));
+  section('상단 고정', real.filter((f) => f.pinned));
+  section('폴더', real.filter((f) => !f.pinned));
   list.addEventListener('click', (e) => {
     const m = e.target.closest('[data-folder-menu]');
     if (m) return onMenu?.(m.dataset.folderMenu, m);

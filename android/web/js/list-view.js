@@ -649,7 +649,7 @@ async function folderMenu(name, anchor) {
 export async function moveToFolder(ids, current) {
   if (!ids.length || !app.vault) return;
   loadFolderDirs();
-  const to = await pickFolder({ folders: state.folderDirs, current: ids.length === 1 ? current ?? '' : null, count: ids.length });
+  const to = await pickFolder({ folders: folderList(state.folderDirs ?? [], [], state.pinnedFolders).map((f) => f.name), current: ids.length === 1 ? current ?? '' : null, count: ids.length });
   if (to === null) return;
   let moved = 0;
   try {

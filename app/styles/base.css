@@ -1670,7 +1670,6 @@ dialog.quick-event[open] {
 }
 @keyframes mf-run { 0%, 12% { transform: none; } 88%, 100% { transform: translateX(calc(var(--mf-w, 0px) - 100%)); } }
 /* 메모 수: 이름과 떨어진 작은 알약 (Apple 메일처럼) */
-.mf-pin { flex: none; width: 13px; height: 13px; color: var(--muted); } /* 맨 위에 고정한 폴더 */
 .mf-count { flex: none; min-width: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--muted); font-size: 11.5px; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
 .mf-item[aria-current="true"] .mf-count { background: color-mix(in srgb, var(--brand-yellow) 40%, transparent); }
 /* 두 묶음 사이: 가는 선과 "폴더" 머리글 */
