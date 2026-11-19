@@ -7,7 +7,7 @@ const EVENTS = [
   'memos:changed', 'shortcuts:changed', 'memo:external', 'memo:removed', 'memo:trashed', 'memo:meta', 'memo:links-changed', 'vault:opened',
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
-  'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:show', 'sticker:peel', 'sticker:dock', 'sticker:hover', 'list:on-top', 'list:crown-docked',
+  'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:hover', 'list:on-top', 'list:crown-docked',
   'stt:status', 'ai:status', 'ai:notice', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'edit:paste-plain', 'edit:clear-format',
   'media:converting', 'media:ready', // PC Rust 판만 보낸다: HEVC 영상의 H.264 사본 (desktop-rs/app/src/video.rs)
@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('memoking', {
     list: invoke('memos:list'),
     search: invoke('memos:search'),
     folders: invoke('memos:folders'), // 메모킹 폴더 이름들 (빈 폴더도)
+    pinnedFolders: invoke('folders:pinned'), // 맨 위에 고정한 폴더 이름들
+    pinFolder: invoke('folders:pin'), // (이름, 고정?) → 새 목록
     createFolder: invoke('folders:create'),
     renameFolder: invoke('folders:rename'), // (옛 이름, 새 이름) → 새 이름
     deleteFolder: invoke('folders:delete'), // 이름 → { moved, removed } (메모는 폴더 밖으로)
@@ -226,10 +228,7 @@ contextBridge.exposeInMainWorld('memoking', {
     save: invoke('pdf:save'),
   },
   // 왕관 스티커 창: 왕관 위 마우스, 눌러서 떼기
-  sticker: {
-    hover: (over) => ipcRenderer.send('sticker:hover', Boolean(over)),
-    peel: invoke('sticker:peel'),
-  },
+
 
   // 영역 캡처 오버레이 (Ctrl+Alt+C 두 번)
   capture: {

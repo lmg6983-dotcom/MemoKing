@@ -27,6 +27,7 @@ mod shortcuts;
 mod state;
 mod stt;
 mod video;
+mod sticker_win;
 mod windows;
 
 use tauri::{http, AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};

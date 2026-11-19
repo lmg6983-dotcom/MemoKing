@@ -440,6 +440,9 @@ function nextRepeat(at, repeat, now) {
  * @param {Date} [now]
  * @returns {{ from: number, to: number, text: string, at: Date, hasTime: boolean, end?: Date, repeat?: { every: 'day'|'week'|'month'|'year', weekdays?: number[], interval?: number, from?: string, day?: number, month?: number, time: string } }[]}
  */
+// 날짜만 적은 말(종일)은 그날이 다 가기 전까지는 앞으로의 날 — 오늘 날짜를 기본 9시가 지나 버리지 않게
+const dayLeft = (at, now) => new Date(at.getFullYear(), at.getMonth(), at.getDate() + 1) > now;
+
 export function findDates(text, now = new Date(), { allowPast = false } = {}) {
   const s = String(text ?? '');
   const found = [];
@@ -455,7 +458,7 @@ export function findDates(text, now = new Date(), { allowPast = false } = {}) {
     }
     // 되풀이는 이미 지났으면 다음 차례로
     if (repeat) at = nextRepeat(at, repeat, now);
-    if (!allowPast && at.getTime() <= now.getTime() + 30_000) return;
+    if (!allowPast && (hasTime ? at.getTime() <= now.getTime() + 30_000 : !dayLeft(at, now))) return;
     const item = { from, to, text: s.slice(from, to).trim(), at, hasTime };
     // 요일만 적은 말("화요일")인지 — 영어 시각을 붙일 때 이번 주/다음 주를 다시 고른다 (findAllDates). 결과 모양에는 드러내지 않음
     if (rollWeek) Object.defineProperty(item, 'rollWeek', { value: true });
@@ -546,7 +549,7 @@ export function findEnglishDates(text, chrono, now = new Date()) {
     if (/^(now|today|tonight)$/i.test(r.text.trim())) continue;
     const at = r.start.date();
     if (!hasTime) at.setHours(DEFAULT_HOUR, 0, 0, 0);
-    if (at.getTime() <= now.getTime() + 30_000) continue;
+    if (hasTime ? at.getTime() <= now.getTime() + 30_000 : !dayLeft(at, now)) continue;
     out.push({ from: r.index, to: r.index + r.text.length, text: r.text, at, hasTime });
   }
   return out;

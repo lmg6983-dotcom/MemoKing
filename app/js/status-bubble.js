@@ -1,6 +1,7 @@
 // 윗막대 상태 줄이 창이 좁아 잘리면 전문을 말풍선으로 — 왕관 · 테이프 스티커처럼 메모 창 바깥에 매달린다
 //   (메모 내용을 가리지 않게. 그리는 창은 메인이 띄운다 — desktop-rs/app/src/windows.rs)
 //   · 새 글이 오면 잠깐 (길이에 맞춰 3~8초). 오류는 30초 (다음 말이 오기 전에는 놓치지 않게) — 놓치면 안 되니까
+//   · "저장했어요" 는 쓸 때마다 오니 말풍선 없이 상태 줄만
 //   · "…중" 처럼 곧 바뀔 진행 안내는 말풍선 없이 상태 줄만 (떴다 바로 바뀌어 정신없지 않게)
 //   · 잘린 상태 줄은 점선 밑줄 (title 도 달지만, 상태 줄은 글자가 있어도 늘 창을 끄는 자리(drag)라 마우스 안내는 뜨지 않을 수 있다 —
 //     잘린 칸을 끌어도 창이 옮겨지지 않던 것보다 낫다. 전문은 말풍선으로)
@@ -12,6 +13,8 @@ let seq = 0; // 마지막으로 띄우려던 것 (늦게 온 대답이 지난 �
 let shown = false;
 
 const PROGRESS = /중(이에요)?(\s*(…|\.\.\.)|\s*[\d(]|[.,]\s|$)/; // "그림을 만드는 중" · "받아쓰는 중 (1/3)" · "받는 중 40%" · "맞추는 중, 약 2분" (예전 글처럼 … 가 붙어도)
+// 저절로 저장할 때마다 오는 말 — 좁은 창에서 말풍선이 쓸 때마다 떴다 꺼지며 타자를 방해하지 않게 상태 줄만
+const ROUTINE = /^저장했어요$/;
 const isClipped = (el) => el.scrollWidth > el.clientWidth + 1;
 
 function hide() {
@@ -35,7 +38,7 @@ function markClipped(el) {
 function show(el) {
   const text = el.textContent.trim();
   markClipped(el);
-  if (!text || !isClipped(el) || !document.hasFocus() || (PROGRESS.test(text) && !el.classList.contains('error'))) return hide();
+  if (!text || !isClipped(el) || !document.hasFocus() || ((PROGRESS.test(text) || ROUTINE.test(text)) && !el.classList.contains('error'))) return hide();
   clearTimeout(timer);
   const mine = ++seq;
   const error = el.classList.contains('error');

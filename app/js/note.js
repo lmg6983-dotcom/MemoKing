@@ -1404,6 +1404,28 @@ tableBar?.addEventListener('wheel', (e) => {
   e.preventDefault();
   tableBar.scrollLeft += e.deltaY;
 }, { passive: false });
+// 마우스로 끌어서도 옆으로 (버튼 위에서 끌어도) — 조금이라도 끌었으면 그 클릭은 버튼을 누른 것으로 치지 않는다
+let barDrag = null;
+tableBar?.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'mouse' || e.button !== 0 || tableBar.scrollWidth <= tableBar.clientWidth) return;
+  barDrag = { x: e.clientX, left: tableBar.scrollLeft, moved: false, pointerId: e.pointerId };
+});
+tableBar?.addEventListener('pointermove', (e) => {
+  if (!barDrag || e.pointerId !== barDrag.pointerId) return;
+  const dx = e.clientX - barDrag.x;
+  if (!barDrag.moved && Math.abs(dx) < 5) return;
+  if (!barDrag.moved) tableBar.setPointerCapture(e.pointerId);
+  barDrag.moved = true;
+  tableBar.scrollLeft = barDrag.left - dx;
+});
+const endBarDrag = () => setTimeout(() => (barDrag = null)); // click 이 먼저 moved 를 보게
+tableBar?.addEventListener('pointerup', endBarDrag);
+tableBar?.addEventListener('pointercancel', endBarDrag);
+tableBar?.addEventListener('click', (e) => {
+  if (!barDrag?.moved) return;
+  e.stopPropagation();
+  e.preventDefault();
+}, true);
 function showTableBar(table) {
   if (!table) closeTableMore();
   tableBar.hidden = !table;
@@ -1803,7 +1825,7 @@ const closeWindow = () => finishClose(api.win.hideForClose?.(), true);
 // Ctrl+W: 스택이면 보이는 탭만 닫는다 (탭의 × 와 같음 — 옆 탭이 바로 보인다). 스택이 아니면 창을 닫는다.
 const closeTabOrWindow = () => (tabsEl.hidden ? closeWindow() : finishClose(api.stack.removeHidden(id)));
 
-// 윗막대 + : 새 메모를 이 창의 새 탭으로 (스택이 아니면 스택이 된다). 따로 새 창은 Ctrl+N
+// 새 탭 (탭 줄 + · 스택이 아닐 때 윗막대 +): 새 메모를 이 창의 새 탭으로 (스택이 아니면 스택이 된다). 따로 새 창은 Ctrl+N
 // 빠르게 두 번 눌러도 새 메모는 하나만 (예전: 빈 메모 탭이 두 개 생겼다)
 let addingTab = false;
 async function newTab() {
@@ -1816,7 +1838,14 @@ async function newTab() {
     setTimeout(() => (addingTab = false), 400);
   }
 }
-$('new-btn').addEventListener('click', newTab);
+// 스택이면 탭 줄에 새 탭(+)이 따로 있으니 윗막대 + 는 새 창 (Ctrl+N 과 같음). 스택이 아니면 새 탭으로 쌓는다
+const isStacked = () => !tabsEl.hidden;
+function paintNewBtn(stacked) {
+  const b = $('new-btn');
+  b.title = stacked ? '새 창: 새 메모를 따로 된 창으로 열어요 (Ctrl+N). 새 탭은 왼쪽 아래 +' : '새 탭: 이 창에 메모를 하나 더 쌓아요 (새 창은 Ctrl+N)';
+  b.setAttribute('aria-label', stacked ? '새 창으로 메모 추가' : '새 탭으로 메모 추가');
+}
+$('new-btn').addEventListener('click', () => (isStacked() ? api.memo.create({ color: memo?.color }) : newTab()));
 $('close-btn').addEventListener('click', closeWindow);
 el.editorRoot.addEventListener('mousedown', (e) => {
   // 글 아래 빈 곳을 눌러도 편집을 시작할 수 있게
@@ -1850,6 +1879,7 @@ function renderStack(state) {
   const stacked = members.length >= 2;
   tabsEl.hidden = !stacked;
   document.body.classList.toggle('stacked', stacked);
+  paintNewBtn(stacked);
   if (stacked) setTimeout(() => hintOnce('stack-reorder', '탭을 위아래로 끌어 순서를 바꾸고, 옆으로 끌어내면 따로 떼어져요', { anchor: tabsEl }), 800);
   if (!stacked) return tabsEl.replaceChildren();
   const tabs = members.map((m) => {

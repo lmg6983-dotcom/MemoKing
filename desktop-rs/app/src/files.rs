@@ -628,6 +628,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
     let arg = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
     Some(match channel {
         "list:show" => {
+            crate::windows::bring_list_beside(app, label); // 이미 떠 있으면 누른 메모 창 옆으로
             crate::os::show_list(app);
             Ok(Value::Null)
         }

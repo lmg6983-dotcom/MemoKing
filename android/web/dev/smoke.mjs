@@ -176,7 +176,13 @@ try {
     await page.evaluate(([px, py]) => document.elementFromPoint(px, py).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: px, clientY: py })), [x, y]);
     await page.mouse.up();
     await page.waitForTimeout(250);
-    check('폴더 꾹 누르기: 뜬 메뉴가 손을 뗀 뒤에도 그대로 (이름 바꾸기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 2);
+    check('폴더 꾹 누르기: 뜬 메뉴가 손을 뗀 뒤에도 그대로 (맨 위에 고정 · 이름 바꾸기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 3);
+    await page.locator('.mk-ctx-item[data-id="pin"]').click();
+    await page.waitForTimeout(300);
+    check('맨 위에 고정: 폴더에 핀 · 기기끼리 함께 쓰는 파일에', await page.isVisible('#folder-side [data-folder="점검폴더"] .mf-pin')
+      && JSON.parse(read('_memoking/pinned-folders.json')).includes('점검폴더'));
+    await page.evaluate(() => document.querySelector('#folder-side [data-folder-menu="점검폴더"]')?.click());
+    await page.waitForTimeout(300);
     await page.locator('.mk-ctx-item[data-id="delete"]').click();
     await page.waitForTimeout(300);
     check('폴더 지우기: 목록에서 사라지고 메모는 폴더 밖으로', (await page.locator('#folder-side [data-folder="점검폴더"]').count()) === 0

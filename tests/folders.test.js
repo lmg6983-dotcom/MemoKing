@@ -1,7 +1,7 @@
 // 메모 폴더 — 폴더 이름 정리, 목록, 옮긴 사이 다른 기기에서 고쳐 생긴 같은 id 의 두 파일 맞추기
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { folderOf, cleanFolderName, isFolderName, folderList, resolveMovedTwin, UNFILED, memosInFolder, withUnfiled } from '../app/js/core/folders.js';
+import { folderOf, cleanFolderName, isFolderName, folderList, resolveMovedTwin, UNFILED, memosInFolder, withUnfiled, parsePinned, pinFolder, renamePinned } from '../app/js/core/folders.js';
 
 test('메모 파일 → 폴더: 맨 위 하위 폴더 하나, 더 깊으면 맨 위 것', () => {
   assert.equal(folderOf('회의.md'), '');
@@ -47,4 +47,16 @@ test('미분류: 폴더에 넣지 않은 메모만 — 목록에는 폴더가 �
   assert.equal(list[0].label, '미분류');
   assert.deepEqual(withUnfiled([], memos), []); // 폴더가 없으면 전체와 같아 두지 않는다
   assert.equal(isFolderName(UNFILED), false); // 사용자가 같은 이름의 폴더를 만들 수 없다
+});
+
+test('맨 위에 고정한 폴더: 먼저, 그 안에서 이름순 · 파일 읽기 · 이름 바꾸기', () => {
+  const list = folderList(['집', '업무', '공부', '취미'], [], ['취미', '공부', '없는폴더']);
+  assert.deepEqual(list.map((f) => [f.name, Boolean(f.pinned)]), [['공부', true], ['취미', true], ['업무', false], ['집', false]]);
+  assert.deepEqual(parsePinned('["업무","업무","_memoking",3,"a:b"]'), ['업무']);
+  assert.deepEqual(parsePinned('{망가짐'), []);
+  assert.deepEqual(parsePinned(null), []);
+  assert.deepEqual(pinFolder(['a'], 'b', true), ['a', 'b']);
+  assert.deepEqual(pinFolder(['a', 'b'], 'a', false), ['b']);
+  assert.deepEqual(renamePinned(['a', 'b'], 'a', 'c'), ['b', 'c']);
+  assert.deepEqual(renamePinned(['b'], 'a', 'c'), ['b']);
 });
