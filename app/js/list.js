@@ -2504,7 +2504,9 @@ api.on('mode:changed', ({ mode, enabled } = {}) => {
     remindersTab.modeChanged();
   }).then(syncSwitch);
 });
-await refresh();
+// 처음 그리기에서 오류가 나도 아래 준비(탭 · 준비 끝 표시)는 이어 간다 — 오류는 기록만 (문제 보내기에 남는다).
+//   예전엔 카드 그리기 오류 하나로 폴더 · 메모가 통째로 비었다 (1.2.2)
+await refresh().catch(reportError);
 showMode();
 // 설정 파일이 깨져 새로 시작했으면: 메모 폴더가 기본 폴더로 바뀌어 메모가 사라진 것처럼 보인다 → 쓰던 폴더를 고르게
 if (state.info?.settingsReset) {
@@ -2518,7 +2520,7 @@ api.recovered?.count().then((n) => {
     flashStatus(back ? `메모 ${back}개로 되살렸어요` : '되살리지 못했어요. 메모 폴더를 확인하고 다시 해 주세요');
   }, { label: '되살리기', ms: 20_000 });
 }, () => {});
-await remindersTab.refresh();
+await remindersTab.refresh().catch(reportError);
 showTab(new URLSearchParams(location.search).get('tab') ?? 'memos');
 document.documentElement.dataset.ready = 'true';
 liftBoot();
