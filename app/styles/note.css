@@ -56,7 +56,7 @@ body, .note-screen, .share-paper {
   background: color-mix(in srgb, var(--note-text) 13%, transparent);
   color: var(--note-text);
 }
-/* 켜짐 표시는 창 위 가장자리에 걸친 왕관 스티커 (sticker.html, 따로 띄운 창) */
+/* 켜짐 표시는 창 위 가장자리에 걸친 왕관 스티커 (따로 띄운 그림 창 — desktop-rs/app/src/sticker_win.rs) */
 
 .count-btn { width: auto; min-width: 30px; padding: 0 6px; gap: 2px; display: inline-flex; }
 .count-btn .count { font-size: 12px; font-weight: 700; }

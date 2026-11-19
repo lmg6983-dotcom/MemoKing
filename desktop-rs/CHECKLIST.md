@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **182 / 193**
-- 이벤트 (Rust → 화면): **60 / 61**
+- 채널 (화면 → Rust): **179 / 179**
+- 이벤트 (Rust → 화면): **57 / 57**
 
 ➖ 는 Rust 판에 일부러 두지 않은 것 (AI 비서 연결 MCP: AI 는 Google Drive 의 메모 폴더를 직접 읽고 쓴다)
 
@@ -28,10 +28,7 @@
 | ✅ | `app:info` |
 | ✅ | `app:report-problem` |
 | ✅ | `app:restoring` |
-| ⬜ | `app:set-ai-phone` |
-| ⬜ | `app:set-auto-events` |
 | ✅ | `app:set-auto-start` |
-| ⬜ | `app:set-auto-tags` |
 | ✅ | `app:set-fit-tables` |
 | ✅ | `app:set-link-previews` |
 | ✅ | `app:set-magic-polish` |
@@ -80,6 +77,8 @@
 | ✅ | `edit:run` |
 | ✅ | `folders:create` |
 | ✅ | `folders:delete` |
+| ✅ | `folders:pin` |
+| ✅ | `folders:pinned` |
 | ✅ | `folders:rename` |
 | ✅ | `history:apps` |
 | ✅ | `history:block` |
@@ -103,9 +102,6 @@
 | ✅ | `list:on-top` |
 | ✅ | `list:show` |
 | ✅ | `list:toggle-top` |
-| ➖ | `mcp:connect` |
-| ➖ | `mcp:copy` |
-| ➖ | `mcp:set-write` |
 | ✅ | `memo:create` |
 | ✅ | `memo:get` |
 | ✅ | `memo:handoff` |
@@ -157,8 +153,6 @@
 | ✅ | `stack:tear-end` |
 | ✅ | `stack:tear-move` |
 | ✅ | `stack:tear-start` |
-| ✅ | `sticker:hover` |
-| ✅ | `sticker:peel` |
 | ✅ | `stt:audio` |
 | ✅ | `stt:download` |
 | ✅ | `stt:options` |
@@ -166,15 +160,7 @@
 | ✅ | `stt:start` |
 | ✅ | `stt:status` |
 | ✅ | `stt:stop` |
-| ⬜ | `tags:ai` |
-| ⬜ | `tags:ai-all` |
-| ⬜ | `tags:ai-auto` |
-| ⬜ | `tags:ai-clear` |
-| ⬜ | `tags:ai-status` |
-| ⬜ | `tags:ai-stop` |
-| ⬜ | `tags:auto` |
 | ✅ | `tags:list` |
-| ⬜ | `tags:suggest` |
 | ✅ | `trash:delete` |
 | ✅ | `trash:empty` |
 | ✅ | `trash:list` |
@@ -212,7 +198,6 @@
 | ✅ | `ai:notice` |
 | ✅ | `ai:progress` |
 | ✅ | `ai:status` |
-| ⬜ | `ai:tagging` |
 | ✅ | `ai:token` |
 | ✅ | `app:ready` |
 | ✅ | `bubble:hide` |
@@ -256,10 +241,7 @@
 | ✅ | `stack:leaving` |
 | ✅ | `stack:state` |
 | ✅ | `status-bubble:gone` |
-| ✅ | `sticker:dock` |
 | ✅ | `sticker:hover` |
-| ✅ | `sticker:peel` |
-| ✅ | `sticker:show` |
 | ✅ | `stt:line` |
 | ✅ | `stt:speakers` |
 | ✅ | `stt:speaking` |

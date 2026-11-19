@@ -11,7 +11,7 @@ const readCss = (rel) => read(rel).replace(/\/\*[\s\S]*?\*\//g, ''); // 주석 �
 const DRAG = /app-region:\s*drag/;
 
 // 사람이 옮기지 않는 창 — 다른 창을 따라다니거나(말풍선 · 스티커 · 끌기 그림자) 화면 전체이거나(캡처) 숨은 창(인쇄)
-const NOT_MOVABLE = new Set(['bubble.html', 'capture.html', 'ghost.html', 'hud.html', 'sticker.html', 'print.html']);
+const NOT_MOVABLE = new Set(['bubble.html', 'capture.html', 'ghost.html', 'hud.html', 'print.html']);
 
 test('옮길 수 있는 창은 모두 창 끌기 영역이 있다', () => {
   const pages = fs.readdirSync(app).filter((f) => f.endsWith('.html') && !NOT_MOVABLE.has(f));
