@@ -5,7 +5,7 @@
 //   Tauri 에는 창 보이기 · 숨기기 이벤트가 없어 메모 창을 보이고 숨기는 곳에서 스티커도 직접 맞춘다 (shown · hide_note).
 //   잠금 차례: 앱 상태(메모 폴더 · 설정 · note_labels)를 잡은 채로 WM 을 잡지 않고, WM 을 잡은 채로 창을 부르지 않는다.
 use crate::state::state;
-use memoking_core::placement::{drop_bounds, is_inside, place_bubble, Rect, BAR_H, BUBBLE_SIZE, DEFAULT_NOTE_SIZE};
+use memoking_core::placement::{drop_bounds, is_inside, list_beside, place_bubble, Rect, BAR_H, BUBBLE_SIZE, DEFAULT_NOTE_SIZE};
 use memoking_core::stacks::{Stack, Stacks};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -194,6 +194,15 @@ fn cursor(app: &AppHandle) -> Option<(f64, f64)> {
     let p = app.cursor_position().ok()?;
     let s = app.monitor_from_point(p.x, p.y).ok().flatten().map_or(1.0, |m| m.scale_factor());
     Some((p.x / s, p.y / s))
+}
+
+/// 목록 창이 이미 떠 있을 때 메모 창의 목록 단추를 누르면: 목록을 그 메모 창 옆으로 (크기는 그대로)
+pub fn bring_list_beside(app: &AppHandle, from: &str) {
+    let Some(list) = app.get_webview_window("list").filter(on_screen) else { return };
+    let Some(note) = app.get_webview_window(from).filter(|_| from != "list").and_then(|w| bounds(&w)) else { return };
+    let Some([_, _, w, h]) = bounds(&list) else { return };
+    let (x, y) = list_beside(note, (w, h), area_at(app, (note[0] + note[2] / 2.0, note[1] + 10.0)));
+    let _ = list.set_position(LogicalPosition::new(x, y));
 }
 
 /// 기억한 이 메모 창 자리 (지금 있는 화면 안일 때만)

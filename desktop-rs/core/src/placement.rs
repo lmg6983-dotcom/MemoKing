@@ -30,6 +30,14 @@ pub fn drop_bounds((px, py): (f64, f64), (w, h): (f64, f64), [ax, ay, aw, ah]: R
     [round(clamp_min(px - GRAB.0, ax, ax + aw - w)), round(clamp_min(py - GRAB.1, ay, ay + ah - h)), w, h]
 }
 
+/// 목록 창을 메모 창 옆으로 → 목록 창 자리 (x, y). 왼쪽에 들어가면 왼쪽, 아니면 오른쪽, 둘 다 모자라면 넓은 쪽에 화면 안으로
+pub fn list_beside([nx, ny, nw, _]: Rect, (w, h): (f64, f64), [ax, ay, aw, ah]: Rect) -> (f64, f64) {
+    const SIDE_GAP: f64 = 8.0;
+    let (left, right) = (nx - ax, ax + aw - (nx + nw));
+    let x = if left >= w + SIDE_GAP || (right < w + SIDE_GAP && left >= right) { nx - w - SIDE_GAP } else { nx + nw + SIDE_GAP };
+    (round(clamp_min(x, ax, ax + aw - w)), round(clamp_min(ny, ay, ay + ah - h)))
+}
+
 /// 상태 말풍선 창을 어디에 둘지 → { bounds, place, ax | ay, avoid? } (bubble-place.js placeBubble)
 ///   b: 메모 창, area: 그 화면의 작업 영역, anchor: 상태 줄 글이 시작하는 화면 x, sticker: 위 가장자리 스티커 창
 pub fn place_bubble(b: Rect, area: Rect, anchor: f64, bar_h: f64, sticker: Option<Rect>) -> Value {
@@ -56,4 +64,20 @@ pub fn place_bubble(b: Rect, area: Rect, anchor: f64, bar_h: f64, sticker: Optio
     }
     let x = round(clamp(anchor - 24.0, area[0], right - w));
     json!({ "bounds": rect([x, by, w, h]), "place": "over", "ax": anchor - x + 10.0 })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_goes_left_then_right() {
+        let area = [0.0, 0.0, 1920.0, 1040.0];
+        // 왼쪽에 자리가 있으면 왼쪽
+        assert_eq!(list_beside([1000.0, 100.0, 340.0, 380.0], (420.0, 640.0), area), (572.0, 100.0));
+        // 왼쪽이 모자라면 오른쪽
+        assert_eq!(list_beside([100.0, 100.0, 340.0, 380.0], (420.0, 640.0), area), (448.0, 100.0));
+        // 둘 다 모자라면 넓은 쪽, 화면 안으로 (아래로도 넘치지 않게)
+        assert_eq!(list_beside([300.0, 900.0, 1400.0, 380.0], (420.0, 640.0), [0.0, 0.0, 1920.0, 1040.0]), (0.0, 400.0));
+    }
 }
