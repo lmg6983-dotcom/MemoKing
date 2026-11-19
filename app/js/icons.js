@@ -2,7 +2,8 @@
 const stroke = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
 
 const ICONS = {
-  crown: '<path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5L3 7z" fill="currentColor"/>',
+  // 왕관 (설정 · 업데이트 배지): 스티커 버튼의 선 왕관과 같은 모양을 채운 것
+  crown: `<path d="M4 8.5l4 3.5L12 5.5l4 6.5 4-3.5-1.6 9H5.6L4 8.5z" fill="currentColor" ${stroke.replace('fill="none" ', '')}/><circle cx="4" cy="7" r="1.6" fill="currentColor"/><circle cx="12" cy="4" r="1.6" fill="currentColor"/><circle cx="20" cy="7" r="1.6" fill="currentColor"/><path d="M6 20.5h12" ${stroke}/>`,
   // 목록 늘 위에 두기 버튼: 선 왕관 (누르면 이 왕관이 창 위 가장자리 스티커가 된다)
   'crown-line': `<path d="M4 8.5l4 3.5L12 5.5l4 6.5 4-3.5-1.6 9H5.6L4 8.5z" ${stroke}/><circle cx="4" cy="7" r="1.3" fill="currentColor"/><circle cx="12" cy="4" r="1.3" fill="currentColor"/><circle cx="20" cy="7" r="1.3" fill="currentColor"/><path d="M6 20.5h12" ${stroke}/>`,
   // 메모 단축키 (Ctrl+Alt+숫자로 바로 불러오기)
