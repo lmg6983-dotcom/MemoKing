@@ -1413,7 +1413,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       console.warn('손 메모를 읽지 못했어요', err);
     }
     if (!doc) {
-      onNotice?.('이 그림은 고칠 수 없어요 (메모킹으로 그린 손 메모가 아니에요)', true);
+      onNotice?.('이 이미지는 고칠 수 없어요 (메모킹으로 그린 손 메모가 아니에요)', true);
       return;
     }
     openInkEditor({
@@ -1492,7 +1492,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       onDraw: !editable ? null : async (i, png) => {
         const it = images[i];
         const ext = { 'image/jpeg': 'jpg', 'image/webp': 'webp' }[png.type] ?? 'png';
-        const src = await saveFile(new File([png], `${baseName(it.alt || '그림')} 그림.${ext}`, { type: png.type || 'image/png' }));
+        const src = await saveFile(new File([png], `${baseName(it.alt || '이미지')} 이미지.${ext}`, { type: png.type || 'image/png' }));
         const cur = nodeOf(it);
         if (!cur) return null;
         it.src = src; // 같은 장을 또 그리면 이번 그림에서 이어서
@@ -1544,13 +1544,13 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       // 오른쪽으로 90도: 돌린 그림을 새 파일로 저장해 이 장만 바꾼다 (원본은 그대로 — 메모의 되돌리기로 원래 장)
       onRotate: !editable ? null : async (i) => {
         const it = images[i];
-        if (/\.gif$/i.test(it.src)) throw new Error('움직이는 그림(GIF)은 돌리면 멈춘 그림이 돼서 돌리지 않았어요');
+        if (/\.gif$/i.test(it.src)) throw new Error('움직이는 이미지(GIF)는 돌리면 멈춘 이미지가 돼서 돌리지 않았어요');
         // PC Rust 판은 메인이 뒤에서 돌린다 (큰 사진을 화면에서 풀고 돌리는 동안 창이 멈췄다) — 못 하면(HEIC · 다른 판) 예전처럼 여기서
         let src = await window.memoking?.attachments?.rotate?.(it.src).catch(() => null);
         if (!src) {
           const blob = await rotatedBlob(vaultUrl(it.src), it.src);
           const ext = { 'image/png': 'png', 'image/webp': 'webp' }[blob.type] ?? 'jpg';
-          src = await saveFile(new File([blob], `${baseName(it.alt || '사진')}.${ext}`, { type: blob.type }));
+          src = await saveFile(new File([blob], `${baseName(it.alt || '이미지')}.${ext}`, { type: blob.type }));
         }
         const cur = nodeOf(it);
         if (!cur) return null;
@@ -1569,7 +1569,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
         });
         if (lines.length < 2) return false;
         v.dispatch(v.state.tr.replaceWith(para, para + node.nodeSize, lines).scrollIntoView());
-        onNotice?.(`묶음을 풀어 사진 ${lines.length}장을 따로 두었어요`);
+        onNotice?.(`묶음을 풀어 이미지 ${lines.length}장을 따로 두었어요`);
         return true;
       },
     });
@@ -1590,7 +1590,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     g.rotate(Math.PI / 2);
     g.drawImage(im, 0, 0, canvas.height, canvas.width);
     const jpeg = /\.(jpe?g|heic|heif)$/i.test(src); // 투명한 곳이 있을 수 있는 그림은 WebP 로 (PNG 보다 몇 배 빨리 만들고 작다 · 못 만들면 브라우저가 PNG 로)
-    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진을 돌리지 못했어요'))), jpeg ? 'image/jpeg' : 'image/webp', 0.92));
+    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('이미지를 돌리지 못했어요'))), jpeg ? 'image/jpeg' : 'image/webp', 0.92));
   }
 
   // 파일들을 메모 폴더에 저장 → 넣을 줄들. 하나가 안 읽혀도(폴더 · 잠긴 파일 · 너무 큰 파일) 나머지는 그대로 넣고 알린다
@@ -1652,9 +1652,9 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const paired = new Set(docs);
     const photos = items.filter((it) => it.kind === 'image');
     const asAlbum = photos.length > 1 && await promptChoice({
-      title: `사진 ${photos.length}장을 어떻게 넣을까요?`,
-      message: '묶음 사진은 몇 장만 모아 보이고, 누르면 크게 넘겨 봐요',
-      choices: [{ id: 'each', label: '따로따로' }, { id: 'album', label: '묶음 사진으로', primary: true }],
+      title: `이미지 ${photos.length}장을 어떻게 넣을까요?`,
+      message: '묶음 이미지는 몇 장만 모아 보이고, 누르면 크게 넘겨 봐요',
+      choices: [{ id: 'each', label: '따로따로' }, { id: 'album', label: '묶음 이미지로', primary: true }],
       remember: 'photos-insert',
     }) === 'album';
     const out = [];
@@ -1744,19 +1744,19 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   async function documentAlbum(it) {
     const name = it.name;
     try {
-      onNotice?.(`${name}을 그림으로 바꾸고 있어요`);
+      onNotice?.(`${name}을 이미지로 바꾸고 있어요`);
       const srcFile = await documentSource(it);
-      const { pages, total } = await documentPages(srcFile, (n, all) => onNotice?.(`${name}을 그림으로 바꾸고 있어요 (${n}/${all})`));
+      const { pages, total } = await documentPages(srcFile, (n, all) => onNotice?.(`${name}을 이미지로 바꾸고 있어요 (${n}/${all})`));
       const images = [];
       for (let i = 0; i < pages.length; i++) {
         const alt = `${baseName(name)} ${i + 1}쪽`;
         images.push({ src: await saveFile(new File([pages[i]], `${alt}.png`, { type: 'image/png' })), alt, page: true });
       }
-      onNotice?.(total > pages.length ? `${name}의 앞 ${pages.length}장을 넣었어요 (모두 ${total}장)` : `${name}을 ${pages.length}장의 그림으로 넣었어요`);
+      onNotice?.(total > pages.length ? `${name}의 앞 ${pages.length}장을 넣었어요 (모두 ${total}장)` : `${name}을 ${pages.length}장의 이미지로 넣었어요`);
       return { kind: 'album', images };
     } catch (err) {
-      console.warn('문서를 그림으로 바꾸지 못했어요', name, err);
-      onNotice?.(`${name}은 그림으로 바꾸지 못해 파일로 넣었어요`, true);
+      console.warn('문서를 이미지로 바꾸지 못했어요', name, err);
+      onNotice?.(`${name}은 이미지로 바꾸지 못해 파일로 넣었어요`, true);
       return it;
     }
   }
@@ -1825,11 +1825,11 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
 
   async function localizeImages(srcs) {
     if (!srcs.length || !fetchImage) return;
-    onNotice?.(`사진 ${srcs.length}개를 메모 폴더에 받고 있어요`);
+    onNotice?.(`이미지 ${srcs.length}개를 메모 폴더에 받고 있어요`);
     const results = await Promise.all(srcs.map((src) => fetchImage(src).then(
       (rel) => [src, rel],
       (err) => {
-        console.warn('사진을 받지 못했어요', src.slice(0, 120), err?.message);
+        console.warn('이미지를 받지 못했어요', src.slice(0, 120), err?.message);
         return [src, null];
       },
     )));
@@ -1847,8 +1847,8 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     }
     const failed = srcs.length - saved.size;
     onNotice?.(failed
-      ? `사진 ${saved.size}개를 저장했어요. ${failed}개는 받지 못해서 인터넷 주소로 두었어요`
-      : `사진 ${saved.size}개를 메모 폴더에 저장했어요`, failed > 0);
+      ? `이미지 ${saved.size}개를 저장했어요. ${failed}개는 받지 못해서 인터넷 주소로 두었어요`
+      : `이미지 ${saved.size}개를 메모 폴더에 저장했어요`, failed > 0);
   }
 
   // 웹페이지의 지연 로딩 사진: src 는 빈 자리표시, 진짜 주소는 data-src·srcset 에 있다
@@ -2958,7 +2958,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   const commands = {
     clearFormat: () => {
       if (readOnly) return;
-      onNotice?.(clearFormat() ? '서식을 지웠어요 (되돌리기 Ctrl+Z)' : '지울 서식이 없어요');
+      onNotice?.(clearFormat() ? '서식을 삭제했어요 (되돌리기 Ctrl+Z)' : '삭제할 서식이 없어요');
     },
     // 끌지 않고 한 줄 위·아래로 (Alt+↑/↓ 와 같음 — 목록 안에서는 그 항목, 아니면 그 줄)
     moveUp: () => moveLineBy(view().state, view().dispatch, -1),

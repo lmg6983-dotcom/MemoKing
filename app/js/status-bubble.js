@@ -18,7 +18,7 @@ let typedAt = -Infinity; // 마지막으로 글자를 친 때 (performance.now)
 let later = 0;
 const TYPING_PAUSE = 1200; // 이만큼 손을 멈추면 미뤄 둔 말풍선을 띄운다
 
-const PROGRESS = /중(이에요)?(\s*(…|\.\.\.)|\s*[\d(]|[.,]\s|$)/; // "그림을 만드는 중" · "받아쓰는 중 (1/3)" · "받는 중 40%" · "맞추는 중, 약 2분" (예전 글처럼 … 가 붙어도)
+const PROGRESS = /중(이에요)?(\s*(…|\.\.\.)|\s*[\d(]|[.,]\s|$)/; // "이미지를 만드는 중" · "받아쓰는 중 (1/3)" · "받는 중 40%" · "맞추는 중, 약 2분" (예전 글처럼 … 가 붙어도)
 // 저절로 저장할 때마다 오는 말 — 좁은 창에서 말풍선이 쓸 때마다 떴다 꺼지며 타자를 방해하지 않게 상태 줄만
 const ROUTINE = /^저장했어요$/;
 const isClipped = (el) => el.scrollWidth > el.clientWidth + 1;

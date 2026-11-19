@@ -14,7 +14,7 @@ pub struct Image {
 }
 
 fn decode(bytes: &[u8]) -> Image {
-    let rgba = image::load_from_memory_with_format(bytes, image::ImageFormat::Png).expect("스티커 그림 (render.mjs)").to_rgba8();
+    let rgba = image::load_from_memory_with_format(bytes, image::ImageFormat::Png).expect("스티커 이미지 (render.mjs)").to_rgba8();
     let mut px = Vec::with_capacity(rgba.len());
     for p in rgba.pixels() {
         let [r, g, b, a] = p.0;

@@ -199,6 +199,6 @@ export async function monthSketchPng({ start, end = null, allDay = false, title 
   }
 
   const blob = await new Promise((done) => canvas.toBlob(done, 'image/png'));
-  if (!blob) throw new Error('달력 그림을 만들지 못했어요');
+  if (!blob) throw new Error('달력 이미지를 만들지 못했어요');
   return new Uint8Array(await blob.arrayBuffer());
 }

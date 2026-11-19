@@ -86,7 +86,7 @@ export function createPalette({ palette, palettes, place, afterApply = () => {} 
         b.style.color = value;
       } else b.style.background = value;
       b.setAttribute('aria-checked', String(sameColor(value, applied[which] ?? last[which])));
-      if (sameColor(value, applied[which])) b.title = `${name} (다시 누르면 색을 지워요)`;
+      if (sameColor(value, applied[which])) b.title = `${name} (다시 누르면 색을 삭제해요)`;
       return b;
     }));
     palette.hidden = false;

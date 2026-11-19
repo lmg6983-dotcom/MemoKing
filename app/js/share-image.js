@@ -79,7 +79,7 @@ export async function renderMemoImages(editor, { color = 'yellow', split = true 
       return base64;
     };
     if (ratio >= 0.4) return [await shoot(ratio)];
-    const tooLong = new Error('메모가 너무 길어 그림 한 장으로 만들 수 없어요. PDF로 저장해 주세요');
+    const tooLong = new Error('메모가 너무 길어 이미지 한 장으로 만들 수 없어요. PDF로 저장해 주세요');
     if (!split) throw tooLong;
     // 문단(맨 위 덩어리) 사이에서 끊는다 — 한 덩어리가 한 장보다 길면 그 안에서
     const top0 = inner.getBoundingClientRect().top;
@@ -109,7 +109,7 @@ export async function renderMemoImages(editor, { color = 'yellow', split = true 
   } catch (err) {
     // 그림 그리기 도구는 Error 가 아닌 것(불러오기 실패 Event 등)으로 거절하기도 한다 → 알아들을 수 있는 말로
     if (err instanceof Error) throw err;
-    console.error('[그림으로 공유]', err);
+    console.error('[이미지로 공유]', err);
     throw new Error(UI.imageMakeFail);
   } finally {
     paper.remove();

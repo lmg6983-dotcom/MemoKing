@@ -87,7 +87,7 @@ export async function renderCollage({ title, sub = '', photos = [], memos = [], 
     const i = notes.findIndex((m) => m.id === x.memo);
     return (i < 0 ? notes.length : i) * 2 + (x.note ? 0 : 1);
   }
-  if (!items.length) throw new Error('그림으로 담을 사진이나 메모가 없어요');
+  if (!items.length) throw new Error('이미지로 담을 이미지나 메모가 없어요');
 
   const polH = cell + 70; // 사진 + 아래 이름 칸
   const rows = Math.ceil(items.length / cols);

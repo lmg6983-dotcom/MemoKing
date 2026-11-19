@@ -358,7 +358,7 @@ export async function pdfThumbnail(bytes, width = 600) {
 
 /** 쪽 캔버스 → PDF 에 담을 JPEG { bytes, w, h } */
 export async function pageJpeg(canvas) {
-  const blob = await new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('쪽 그림을 만들지 못했어요'))), 'image/jpeg', 0.88));
+  const blob = await new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('쪽 이미지를 만들지 못했어요'))), 'image/jpeg', 0.88));
   return { bytes: new Uint8Array(await blob.arrayBuffer()), w: canvas.width, h: canvas.height };
 }
 

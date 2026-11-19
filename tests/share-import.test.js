@@ -10,7 +10,7 @@ test('보내기 글: 목록 서식이 보이는 모양 그대로 (점·번호·�
 
 test('보내기 글: 번호는 이어지고, 링크·카드·사진·표', () => {
   const md = '3. 셋\n1. 넷\n\n[구글](https://google.com) · [https://a.com](https://a.com "미리보기")\n\n![로고](attachments/a.png)\n\n| 품목 | 값 |\n| --- | --- |\n| 사과 | 1 |\n';
-  assert.equal(shareText(md), '3. 셋\n4. 넷\n\n구글 (https://google.com) · https://a.com\n\n[사진 로고]\n\n품목 | 값\n사과 | 1');
+  assert.equal(shareText(md), '3. 셋\n4. 넷\n\n구글 (https://google.com) · https://a.com\n\n[이미지 로고]\n\n품목 | 값\n사과 | 1');
 });
 
 test('보내기 글: 느슨한 목록(항목 사이 빈 줄)은 붙이고, 이스케이프는 푼다', () => {

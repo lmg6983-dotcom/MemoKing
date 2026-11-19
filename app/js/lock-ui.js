@@ -41,7 +41,7 @@ export function lockDialog({ onLock, title = '' }) {
     actions.append(cancel, ok);
     form.append(
       el('h2', { id: 'lock-dialog-title' }, '메모 잠그기'),
-      el('p', { class: 'lock-note' }, '비밀번호를 잊으면 아무도 열 수 없어요. 메모킹도 되찾아 드릴 수 없어요.\n제목(첫 줄)은 목록에 보이고, 넣은 사진과 파일은 잠기지 않아요.'),
+      el('p', { class: 'lock-note' }, '비밀번호를 잊으면 아무도 열 수 없어요. 메모킹도 되찾아 드릴 수 없어요.\n제목(첫 줄)은 목록에 보이고, 넣은 이미지와 파일은 잠기지 않아요.'),
       first.wrap, second.wrap, hideRow, error, actions,
     );
     dialog.append(form);

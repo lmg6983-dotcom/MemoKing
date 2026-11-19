@@ -66,7 +66,7 @@ export function renderFolderList(container, { folders, current, total = 0, onPic
       more.type = 'button';
       more.tabIndex = -1; // 키보드는 F2 · 메뉴 키로 (줄마다 Tab 이 서지 않게)
       more.dataset.folderMenu = name;
-      more.title = '상단 고정, 이름 바꾸기, 지우기';
+      more.title = '상단 고정, 이름 바꾸기, 삭제';
       more.setAttribute('aria-label', `${name} 폴더 메뉴`);
       more.append(icon('more'));
       li.append(more);
@@ -172,7 +172,7 @@ export function renderFolderChips(container, { folders, current, onPick, onCreat
     if (!name) b.append(icon('note'));
     b.append(el('span', 'fchip-name', label));
     if (count) b.append(el('small', 'fchip-count', String(count))); // 0 은 적지 않는다 (줄이 시끄럽지 않게)
-    if (isReal(name)) b.title = touch ? label : `${label} (오른쪽 클릭: 이름 바꾸기, 지우기)`;
+    if (isReal(name)) b.title = touch ? label : `${label} (오른쪽 클릭: 이름 바꾸기, 삭제)`;
     else if (name) b.title = '어느 폴더에도 넣지 않은 메모';
     return b;
   };
@@ -185,7 +185,7 @@ export function renderFolderChips(container, { folders, current, onPick, onCreat
   // 폴더 목록: 폴더 칩과 다른 모양의 그림 단추 (전체 · 모두 처럼 같은 뜻의 낱말이 나란히 서지 않게)
   const all = el('button', 'icon-btn fchip-all');
   all.type = 'button';
-  all.title = '폴더 목록 (이름 바꾸기, 지우기)';
+  all.title = '폴더 목록 (이름 바꾸기, 삭제)';
   all.setAttribute('aria-label', '폴더 목록');
   all.setAttribute('aria-haspopup', 'dialog');
   all.setAttribute('aria-expanded', 'false');

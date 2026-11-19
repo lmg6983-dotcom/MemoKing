@@ -1299,7 +1299,7 @@ impl Vault {
         }
         let a = self.root.join(from);
         if !a.is_dir() {
-            return Err("폴더를 찾지 못했어요. 다른 곳에서 지웠을 수 있어요".into());
+            return Err("폴더를 찾지 못했어요. 다른 곳에서 삭제했을 수 있어요".into());
         }
         let case_only = dst.to_lowercase() == from.to_lowercase(); // Windows 는 대소문자만 다른 이름을 같은 폴더로 본다
         if !case_only && self.root.join(&dst).exists() {
@@ -1758,7 +1758,7 @@ mod tests {
         let m = v.set_meta(&a, &json!({ "color": "blue", "pinned": true })).unwrap().unwrap();
         assert!(m["color"] == "blue" && m["pinned"] == true);
         assert!(m["pinnedAt"].is_string(), "상단 고정한 때");
-        assert!(v.set_meta(&a, &json!({ "pinned": false })).unwrap().unwrap()["pinnedAt"].is_null(), "풀면 지운다");
+        assert!(v.set_meta(&a, &json!({ "pinned": false })).unwrap().unwrap()["pinnedAt"].is_null(), "풀면 삭제한다");
         v.set_meta(&a, &json!({ "pinned": true })).unwrap();
         assert_eq!(v.list()[0]["id"], json!(a), "상단 고정한 메모가 먼저");
         // 연결 · 나를 연결한 메모
@@ -1780,7 +1780,7 @@ mod tests {
         assert_eq!(v.trash_preview(&name).as_deref(), Some("장보기 목록"));
         let back = v.restore_trash(&name).unwrap().unwrap();
         assert_eq!(back, b);
-        assert_eq!(v.entry(&b).unwrap().file.as_deref(), Some("보관/나.md"), "지운 폴더로 되살린다");
+        assert_eq!(v.entry(&b).unwrap().file.as_deref(), Some("보관/나.md"), "삭제한 폴더로 되살린다");
         assert!(!fs::read_to_string(root.join("보관/나.md")).unwrap().contains("trashedFrom"));
         // 영구 삭제 · 비우기
         let n = v.trash(&b).unwrap().unwrap();
@@ -1810,7 +1810,7 @@ mod tests {
         let s = lock::new_session("비밀번호", 1000).unwrap();
         let m = v.lock(&id, s.clone(), true, false).unwrap().unwrap();
         assert!(m["locked"] == true && m["needsPassword"] == false && m["body"].as_str().unwrap().contains("둘째 글"));
-        assert!(v.versions(&id).is_empty(), "잠그기 전 풀린 버전은 지운다");
+        assert!(v.versions(&id).is_empty(), "잠그기 전 풀린 버전은 삭제한다");
         let file = root.join("비밀.md");
         let text = fs::read_to_string(&file).unwrap();
         assert!(!text.contains("둘째 글") && text.contains("lockRefs") && text.contains("memoking-lock v1"));

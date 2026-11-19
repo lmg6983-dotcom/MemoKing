@@ -8,7 +8,7 @@ const api = window.memoking;
 const $ = (id) => document.getElementById(id);
 
 const GLOBAL = [
-  { id: 'quickMemo', label: '매직 카피, 화면 캡처', help: '어느 앱에서든 고른 글, 파일, 그림을 바로 메모로 만들어요. 빠르게 두 번 누르면 화면의 원하는 부분을 잘라 담아요.' },
+  { id: 'quickMemo', label: '매직 카피, 화면 캡처', help: '어느 앱에서든 고른 글, 파일, 이미지를 바로 메모로 만들어요. 빠르게 두 번 누르면 화면의 원하는 부분을 잘라 담아요.' },
 ];
 
 let state = { overrides: {}, shortcuts: {} };

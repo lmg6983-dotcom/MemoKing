@@ -555,7 +555,7 @@ function renderFolderSide() {
   // 폴더가 생기면 한 번: 메모를 꾹 눌러 끌면 폴더로 (눈에 안 보이는 동작)
   if (list.length && !el.folderSide.hidden) setTimeout(() => {
     const first = el.folderSide.querySelector(`[data-folder]:not([data-folder=""]):not([data-folder="${UNFILED}"])`);
-    if (first?.getClientRects().length && state.tab === 'memos') hintOnce('folder-drag', '메모를 꾹 누른 채 끌어 폴더에 놓으면 옮겨져요. 폴더를 꾹 누르면 이름을 바꾸거나 지울 수 있어요', { anchor: first });
+    if (first?.getClientRects().length && state.tab === 'memos') hintOnce('folder-drag', '메모를 꾹 누른 채 끌어 폴더에 놓으면 옮겨져요. 폴더를 꾹 누르면 이름을 바꾸거나 삭제할 수 있어요', { anchor: first });
   }, 900);
 }
 
@@ -611,7 +611,7 @@ async function folderMenu(name, anchor) {
   const r = anchor.getBoundingClientRect();
   const pick = await openContextMenu({
     x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
-    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
+    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 삭제', danger: true }],
   });
   try {
     if (pick === 'pin') {
@@ -632,7 +632,7 @@ async function folderMenu(name, anchor) {
       else render();
       // 메모는 지우지 않고 폴더 밖으로 — 되돌리기: 폴더를 다시 만들고 꺼낸 메모를 그 폴더로
       toast(!removed ? `메모 ${moved}개를 폴더 밖으로 옮겼어요. 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
-        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 지웠어요`, false, {
+        : moved ? `${name} 폴더를 삭제했어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 삭제했어요`, false, {
         label: '되돌리기',
         run: () => {
           app.vault.createFolder(name);

@@ -616,16 +616,16 @@ window.addEventListener('blur', () => {
 async function memoImage(kind) {
   closeMenu();
   await flush();
-  setStatus('그림을 만드는 중');
+  setStatus('이미지를 만드는 중');
   try {
     const base64 = await renderMemoImage(editor, { color: memo?.color ?? document.body.dataset.color });
     const r = kind === 'copy' ? await api.image.copy(base64) : await api.image.save(id, base64);
     if (r?.cancelled) return setStatus('');
-    setStatus(kind === 'copy' ? '그림을 복사했어요. 붙여 넣으면 돼요' : `그림으로 저장했어요: ${r?.name ?? ''}`);
+    setStatus(kind === 'copy' ? '이미지를 복사했어요. 붙여 넣으면 돼요' : `이미지로 저장했어요: ${r?.name ?? ''}`);
   } catch (err) {
     console.error(err);
     // 너무 길어 그림 한 장이 안 되는 것은 다시 해도 같다 — 그 까닭(PDF로 저장)을 그대로
-    setStatus(/PDF로 저장/.test(err?.message ?? '') ? err.message : '그림을 만들지 못했어요. 다시 해 주세요', true);
+    setStatus(/PDF로 저장/.test(err?.message ?? '') ? err.message : '이미지를 만들지 못했어요. 다시 해 주세요', true);
   }
 }
 // 메뉴 맨 위 아이콘: 목록 카드 메뉴와 같은 그림 · 같은 순서 · 같은 일 (같은 아이콘은 같은 뜻)
@@ -1019,7 +1019,7 @@ async function applyCapture(c) {
   editor.focusEnd();
   // 웹 사진을 받는 중에 저장하면 주소 교체와 엇갈릴 수 있어, 받기가 끝난 뒤 한 번에 저장
   if (c.html) {
-    setStatus('사진을 저장하는 중');
+    setStatus('이미지를 저장하는 중');
     await editor.imagesSettled();
   }
   // 태그를 저절로: 화면 캡처는 #캡처, 웹에서 가져온 것은 링크, 그 밖은 공유 (+ 내용에 맞는 기존 태그)

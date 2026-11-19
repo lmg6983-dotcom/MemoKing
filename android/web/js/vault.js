@@ -663,7 +663,7 @@ export class Vault extends EventTarget {
     const dst = cleanFolderName(to);
     if (!isFolderName(from) || !dst) throw new Error('폴더 이름으로 쓸 수 없어요');
     if (dst === from) return dst;
-    if (!fs.stat(from)?.dir) throw new Error('폴더를 찾지 못했어요. 다른 곳에서 지웠을 수 있어요');
+    if (!fs.stat(from)?.dir) throw new Error('폴더를 찾지 못했어요. 다른 곳에서 삭제했을 수 있어요');
     const caseOnly = dst.toLowerCase() === from.toLowerCase(); // 대소문자만 다른 이름을 같은 폴더로 보는 저장소가 있다
     if (!caseOnly && fs.stat(dst)) throw new Error(`"${dst}" 폴더가 이미 있어요. 다른 이름을 써 주세요`);
     const ok = caseOnly

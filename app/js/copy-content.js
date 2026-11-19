@@ -54,7 +54,7 @@ export function imageIn(el) {
 function toPng(img) {
   const w = img.naturalWidth || img.width;
   const h = img.naturalHeight || img.height;
-  if (!w || !h) throw new Error('그림을 아직 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요');
+  if (!w || !h) throw new Error('이미지를 아직 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요');
   const canvas = document.createElement('canvas');
   // 너무 큰 그림은 줄여서 (클립보드 · 메모리 한도) — 긴 변 8000px
   const k = Math.min(1, 8000 / Math.max(w, h));
@@ -188,14 +188,14 @@ export async function copyBlock(view, pos, node, target) {
   // 묶음 사진: 누른 한 장이 아니라 묶음의 모든 장을 파일로 (예전에는 첫 장 · 누른 장만 그림으로 복사됐다)
   //   메모킹에 붙이면 사진들로(묶음으로 할지 묻는다), 탐색기 · 메신저에는 사진 파일들로
   const album = albumFiles(node);
-  if (album && host.files && (await host.files(album).catch(() => false))) return `사진 ${album.length}장`;
+  if (album && host.files && (await host.files(album).catch(() => false))) return `이미지 ${album.length}장`;
   const media = isImageNode(node) ? node : loneImage(node) ? node.firstChild : imageOfLine(node, target, view, pos); // 그림 · 소리 · 동영상 · 손 메모 노드 (묶음 사진은 그 장)
   if (media) {
     const img = imageIn(target) ?? imageIn(view.nodeDOM(pos));
     if (img) {
       try {
         await copyImage(img);
-        return '그림';
+        return '이미지';
       } catch (err) {
         // 다른 사이트 그림이 CORS 를 막아 그림으로는 못 읽으면 그 주소라도
         if (err?.name !== 'SecurityError' && err?.name !== 'EncodingError') throw err;
@@ -235,7 +235,7 @@ export function handleImageCopy(view, event) {
     .then(() => {
       if (cut && !view.isDestroyed && view.state.doc.nodeAt(from) === node) view.dispatch(view.state.tr.delete(from, to).scrollIntoView());
     })
-    .catch((err) => console.warn('그림 복사', err));
+    .catch((err) => console.warn('이미지 복사', err));
   return true;
 }
 
@@ -306,7 +306,7 @@ export async function blockPayload(view, pos, node, target) {
       const rel = decodeRel(src);
       return { rel, name: baseNameOf(rel), mime: '' };
     }
-    if (img) return { base64: await pngBase64(img), name: `${fileNameOf(alt, '그림')}.png`, mime: 'image/png' };
+    if (img) return { base64: await pngBase64(img), name: `${fileNameOf(alt, '이미지')}.png`, mime: 'image/png' };
   }
   if (node.type.name === 'table') {
     const first = node.firstChild?.firstChild?.textContent;

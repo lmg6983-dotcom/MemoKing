@@ -465,11 +465,11 @@ class Bridge(private val activity: MainActivity) {
             // 메모 안의 그림 복사: PNG(base64) → 보내기 자리(cache/share)에 두고 content:// 주소로 클립보드에 (다른 앱에 그림으로 붙음)
             "copyImage" -> pool.execute {
                 resolve(id) {
-                    val file = shareFile("메모킹 그림.png")
+                    val file = shareFile("메모킹 이미지.png")
                     file.writeBytes(Base64.decode(a.getString("base64"), Base64.DEFAULT))
                     val uri = VaultFileProvider.shareUriFor(file.name)
                     val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newUri(ctx.contentResolver, "메모킹 그림", uri))
+                    clipboard.setPrimaryClip(ClipData.newUri(ctx.contentResolver, "메모킹 이미지", uri))
                     true
                 }
             }
@@ -515,7 +515,7 @@ class Bridge(private val activity: MainActivity) {
                         mimes += VaultFileProvider.mimeOf(file.name)
                     }
                     if (uris.isEmpty()) throw IllegalArgumentException("파일을 찾지 못했어요")
-                    val label = "사진 ${uris.size}장"
+                    val label = "이미지 ${uris.size}장"
                     val desc = ClipDescription(label, (mimes + ClipDescription.MIMETYPE_TEXT_PLAIN).toTypedArray())
                     val clip = ClipData(desc, ClipData.Item(label, null, uris[0]))
                     for (u in uris.drop(1)) clip.addItem(ClipData.Item(u))

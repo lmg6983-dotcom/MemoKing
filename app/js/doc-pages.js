@@ -12,7 +12,7 @@ export { isDocumentFile };
 const MAX_PAGES = 60; // shortcut: 아주 긴 문서는 앞 60장만, 더 필요하면 나눠 넣기 (메모 폴더 · 동기화 부담)
 const PAGE_WIDTH = 1240; // A4 를 150dpi 쯤으로 — 글자가 또렷하면서 파일이 너무 크지 않게
 
-const canvasBlob = (canvas) => new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('그림을 만들지 못했어요'))), 'image/png'));
+const canvasBlob = (canvas) => new Promise((done, fail) => canvas.toBlob((b) => (b ? done(b) : fail(new Error('이미지를 만들지 못했어요'))), 'image/png'));
 
 /**
  * @param {File} file
@@ -89,7 +89,7 @@ async function documentCanvases(ext, data, onProgress, take) {
   if (ext === 'pptx') return domPages((box) => pptxPages(lib, data, box), onProgress, keep);
   if (ext === 'hwp') return domPages((box) => hwpPages(lib, data, box), onProgress, keep);
   if (ext === 'hwpx') return domPages((box) => hwpxPages(lib, data, box), onProgress, keep);
-  throw new Error('그림으로 바꿀 수 없는 문서예요');
+  throw new Error('이미지로 바꿀 수 없는 문서예요');
 }
 
 async function pdfPages(data, onProgress) {

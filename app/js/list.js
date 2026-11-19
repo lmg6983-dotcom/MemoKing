@@ -251,7 +251,7 @@ async function folderMenu(name, anchor) {
   const r = anchor.getBoundingClientRect();
   const pick = await openContextMenu({
     x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
-    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 지우기', danger: true }],
+    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 삭제', danger: true }],
   });
   if (pick === 'pin') {
     try {
@@ -278,14 +278,14 @@ async function folderMenu(name, anchor) {
       await loadFolders();
       // 메모는 지우지 않고 폴더 밖으로 — 되돌리기: 폴더를 다시 만들고 꺼낸 메모를 그 폴더로
       showUndoBar(!removed ? `메모 ${moved}개를 폴더 밖으로 옮겼어요. 메모가 아닌 파일이 있어 폴더는 남겨 뒀어요`
-        : moved ? `${name} 폴더를 지웠어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 지웠어요`, async () => {
+        : moved ? `${name} 폴더를 삭제했어요. 메모 ${moved}개는 폴더 밖에 그대로 있어요` : `${name} 폴더를 삭제했어요`, async () => {
         await api.memos.createFolder(name);
         if (ids.length) await api.memos.moveToFolder(ids, name);
         await loadFolders();
         setFolder(name);
       });
     } catch (err) {
-      flashStatus(err.message || '폴더를 지우지 못했어요');
+      flashStatus(err.message || '폴더를 삭제하지 못했어요');
     }
   }
 }
@@ -906,7 +906,7 @@ const MAX_TEXT_BYTES = 5 * 1024 * 1024;
 const dropShade = document.createElement('div');
 dropShade.className = 'file-drop';
 dropShade.hidden = true;
-dropShade.innerHTML = '<div class="file-drop-box"><b>놓으면 메모로 만들어요</b><span>.md, .txt는 글 그대로, 그림과 파일은 메모 안에</span></div>';
+dropShade.innerHTML = '<div class="file-drop-box"><b>놓으면 메모로 만들어요</b><span>.md, .txt는 글 그대로, 이미지와 파일은 메모 안에</span></div>';
 document.body.append(dropShade);
 const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
 let dragDepth = 0;
@@ -1398,8 +1398,8 @@ const paintChoices = () => {
   const kept = hasRememberedChoices();
   choicesBtn.hidden = !kept; // 지울 것이 없으면 꺼진 단추 대신 지금 상태만 글로
   $('choices-note').textContent = kept
-    ? '사진 여러 장 · 문서를 넣을 때 "앞으로 이렇게" 로 정해 둔 것이 있어요. 지우면 다시 물어요'
-    : '사진 여러 장 · 문서를 넣을 때마다 어떻게 넣을지 물어요';
+    ? '이미지 여러 장 · 문서를 넣을 때 "앞으로 이렇게" 로 정해 둔 것이 있어요. 삭제하면 다시 물어요'
+    : '이미지 여러 장 · 문서를 넣을 때마다 어떻게 넣을지 물어요';
 };
 choicesBtn.addEventListener('click', () => {
   forgetChoices();
@@ -1724,7 +1724,7 @@ function compareConflict({ copy, original }) {
     t.textContent = label;
     const sub = document.createElement('div');
     sub.className = 'compare-sub';
-    sub.textContent = m ? `${m.file}${m.updated ? `, ${new Date(m.updated).toLocaleString('ko-KR')}` : ''}` : '원본을 찾지 못했어요 (이름을 바꿨거나 지웠어요)';
+    sub.textContent = m ? `${m.file}${m.updated ? `, ${new Date(m.updated).toLocaleString('ko-KR')}` : ''}` : '원본을 찾지 못했어요 (이름을 바꿨거나 삭제했어요)';
     const pre = document.createElement('pre');
     pre.className = 'compare-body';
     pre.textContent = !m ? '' : m.locked ? '(잠긴 메모라 내용을 볼 수 없어요)' : m.body;
@@ -1760,7 +1760,7 @@ function compareConflict({ copy, original }) {
   const locked = copy.locked || original?.locked;
   actions.append(
     btn('둘 다 두기', '', () => dialog.close()),
-    btn('사본 지우기', '', resolve('original')),
+    btn('사본 삭제', '', resolve('original')),
     btn('사본 내용으로 바꾸기', 'primary', resolve('copy')),
   );
   if (locked || !original) actions.lastChild.disabled = true;

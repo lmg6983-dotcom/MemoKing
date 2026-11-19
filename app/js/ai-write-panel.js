@@ -128,7 +128,7 @@ export function createAiWritePanel({ panel, api, editor, title, onOpen, show, hi
   // ---------- 문체 ----------
   async function restyle(style) {
     const range = editor().aiRange();
-    if (!range) return (state.textContent = '그림, 표, 파일이 섞인 곳은 문체를 바꿀 수 없어요. 글만 골라 주세요');
+    if (!range) return (state.textContent = '이미지, 표, 파일이 섞인 곳은 문체를 바꿀 수 없어요. 글만 골라 주세요');
     if (!range.text.trim()) return (state.textContent = '바꿀 글이 없어요');
     if (range.text.length > MAX_CHARS) return (state.textContent = `글이 길어요. ${MAX_CHARS}자 안으로 골라 주세요`);
     const r = await run({ task: 'style', text: range.text, style }, `${style}로 바꾸는 중`);

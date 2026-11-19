@@ -646,7 +646,7 @@ let compareFor = null;
 function openCompare(copyId) {
   const copy = app.vault.get(copyId);
   const orig = conflictOriginal(copy);
-  if (!copy || !orig) return toast('원본 메모를 찾지 못했어요. 이름을 바꿨거나 지웠을 수 있어요', true);
+  if (!copy || !orig) return toast('원본 메모를 찾지 못했어요. 이름을 바꿨거나 삭제했을 수 있어요', true);
   note.flush();
   const original = app.vault.get(orig.id);
   compareFor = { copyId, origId: orig.id };
@@ -803,7 +803,7 @@ shareSheet.addEventListener('click', async (e) => {
   // 그림은 메모 화면에 그려진 모습으로 만든다 (닫혀 있으면 연다)
   for (const x of shareSheet.querySelectorAll('[data-share]')) x.disabled = true;
   $('share-busy').hidden = false;
-  $('share-busy-text').textContent = '그림을 만드는 중';
+  $('share-busy-text').textContent = '이미지를 만드는 중';
   try {
     if (note.currentId() !== id) {
       closeSheet(shareSheet);
@@ -1660,7 +1660,7 @@ function sharedFilesTitle(files, audioCount, fromApp = '') {
   const images = files.filter((f) => mediaKind({ name: f.name || '', type: f.mime || '' }) === 'image');
   if (images.length === files.length) {
     if (files.some((f) => SCREENSHOT.test(f.name || '')) || SCREENSHOT.test(fromApp)) return `화면 캡처 ${when}`;
-    return files.length === 1 ? `사진 ${when}` : `사진 ${files.length}장 ${when}`;
+    return files.length === 1 ? `이미지 ${when}` : `이미지 ${files.length}장 ${when}`;
   }
   return files.length === 1 ? files[0].name : `파일 ${files.length}개 ${when}`;
 }
