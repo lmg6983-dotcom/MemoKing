@@ -80,7 +80,7 @@ const state = {
   workLife: null, // 설정 › Work / Life 나누기 (null: 정한 적 없음 — 처음 목록을 읽을 때 Work 메모가 있으면 켬)
   folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 휴대폰에 기억
   folderDirs: null, // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도) — 앱에 묻는 일이라 기억해 두고 필요할 때만 다시 (loadFolderDirs)
-  pinnedFolders: [], // 맨 위에 고정한 폴더 (_memoking/pinned-folders.json, loadFolderDirs)
+  pinnedFolders: [], // 상단 고정한 폴더 (_memoking/pinned-folders.json, loadFolderDirs)
   picking: false, // 여러 장 고르기 (메모 메뉴 › 여러 개 고르기) — 카드를 누르면 열지 않고 고른다
   picked: new Set(),
 };
@@ -605,7 +605,7 @@ el.folderBtn.addEventListener('click', async () => {
   applyFolderSide();
 });
 
-// 폴더 메뉴 (폴더 목록에서 꾹 누르기): 맨 위에 고정 · 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
+// 폴더 메뉴 (폴더 목록에서 꾹 누르기): 상단 고정 · 이름 바꾸기 · 지우기 (메모는 폴더 밖으로)
 async function folderMenu(name, anchor) {
   haptic(12);
   const r = anchor.getBoundingClientRect();

@@ -170,7 +170,7 @@ const ACTIONS: &[(&str, &str, &[&str])] = &[
     ("list", "메모 목록 열기", &["ctrl+shift+KeyM"]),
     ("imageCopy", "그림으로 복사", &[]),
     ("imageSave", "그림으로 저장", &[]),
-    ("pin", "목록 맨 위에 고정", &[]),
+    ("pin", "상단 고정", &[]),
     ("lock", "잠그기", &[]),
     ("find", "찾기", &["ctrl+KeyF"]),
     ("replace", "바꾸기", &["ctrl+KeyH"]),

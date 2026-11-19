@@ -90,7 +90,7 @@ const state = {
   filter: { tags: [], colors: [], kinds: [] },
   folder: '', // 보고 있는 메모킹 폴더 ("" = 전체, core/folders.js) — 이 PC 에 기억
   folderDirs: null, // 메모 폴더 맨 위의 하위 폴더 (빈 폴더도) — 받기 전에는 null
-  pinnedFolders: [], // 맨 위에 고정한 폴더 (_memoking/pinned-folders.json)
+  pinnedFolders: [], // 상단 고정한 폴더 (_memoking/pinned-folders.json)
   picking: false, // 여러 장 고르기 중 (카드를 누르면 열지 않고 고른다)
   picked: new Set(), // 고른 카드 (폴더로 옮기기)
 };
@@ -258,7 +258,7 @@ async function folderMenu(name, anchor) {
       state.pinnedFolders = await api.memos.pinFolder(name, !state.pinnedFolders.includes(name));
       render();
     } catch (err) {
-      flashStatus(err.message || '폴더를 고정하지 못했어요');
+      flashStatus(err.message || '폴더를 상단 고정하지 못했어요');
     }
   } else if (pick === 'rename') {
     const to = await askFolderName({ existing: (state.folderDirs ?? []).filter((f) => f !== name), title: '폴더 이름 바꾸기', value: name, okLabel: '바꾸기' });
@@ -1165,7 +1165,7 @@ async function loadSettings() {
     hours: s.workHours,
     save: (h) => api.mode?.setHours(h),
     openHelper: () => openHelper(),
-    quietNote: '업무 시간 밖에는 Work 메모의 알림을 띄우지 않고 알림 보관함에 모아요. 고정한 메모의 알림은 늘 울려요',
+    quietNote: '업무 시간 밖에는 Work 메모의 알림을 띄우지 않고 알림 보관함에 모아요. 상단 고정한 메모의 알림은 늘 울려요',
   });
   if (api.stt) renderStt(await api.stt.status());
   if (api.ai) renderAi(await api.ai.status());
@@ -1614,7 +1614,7 @@ async function togglePin(m) {
     clearTimeout(hoverTimer);
     const card = e.target.closest?.('.card');
     if (!card || !api.memo.cardCommand) return;
-    hoverTimer = setTimeout(() => card.isConnected && card.matches(':hover') && hintOnce('card-menu', '카드를 오른쪽 클릭하면 복사, 공유, 색, 고정, 폴더로 옮기기 같은 메뉴가 떠요', { anchor: card }), 1500);
+    hoverTimer = setTimeout(() => card.isConnected && card.matches(':hover') && hintOnce('card-menu', '카드를 오른쪽 클릭하면 복사, 공유, 색, 상단 고정, 폴더로 옮기기 같은 메뉴가 떠요', { anchor: card }), 1500);
   });
   el.cards.addEventListener('mouseleave', () => clearTimeout(hoverTimer));
 }

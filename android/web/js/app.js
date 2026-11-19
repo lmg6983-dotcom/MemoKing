@@ -537,8 +537,8 @@ memoSheet.addEventListener('click', async (e) => {
     case 'pin':
       note.flush();
       closeSheet(memoSheet);
-      if (!app.vault.setMeta(id, { pinned: !memo.pinned })) toast('고정을 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
-      else toast(memo.pinned ? '목록 고정을 풀었어요' : '목록 맨 위에 고정했어요');
+      if (!app.vault.setMeta(id, { pinned: !memo.pinned })) toast('상단 고정을 저장하지 못했어요. 잠시 뒤 다시 해 주세요', true);
+      else toast(memo.pinned ? '상단 고정을 풀었어요' : '상단 고정했어요');
       break;
     case 'day': {
       // 회상 달력에서 이 메모를 둘 날 (memory-day.js)
@@ -1277,7 +1277,7 @@ function openSettings() {
       closeSheet($('settings-sheet'));
       list.openHelper();
     },
-    quietNote: '업무 시간 밖에는 Work 메모의 알림을 울리지 않아요. 고정한 메모의 알림은 늘 울려요',
+    quietNote: '업무 시간 밖에는 Work 메모의 알림을 울리지 않아요. 상단 고정한 메모의 알림은 늘 울려요',
   });
   openSheet($('settings-sheet'));
   const my = ++settingsSeq;

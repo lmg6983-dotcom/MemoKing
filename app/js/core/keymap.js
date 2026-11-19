@@ -21,7 +21,7 @@ export const KEYMAP_ACTIONS = [
   { id: 'list', group: '메모 창', label: UI.openList, help: '모든 메모가 모인 목록 창을 앞으로 가져와요.', keys: ['ctrl+shift+KeyM'], run: ['menu', 'show-list'] },
   { id: 'imageCopy', group: '메모 창', label: '그림으로 복사', help: '메모를 보이는 그대로 그림으로 복사해요. 메신저나 문서에 바로 붙여 넣을 수 있어요.', keys: [], run: ['menu', 'image-copy-btn'] },
   { id: 'imageSave', group: '메모 창', label: UI.saveAsImage, help: '메모를 보이는 그대로 그림 파일(PNG)로 저장해요.', keys: [], run: ['menu', 'image-save-btn'] },
-  { id: 'pin', group: '메모 창', label: UI.pin, help: '이 메모를 메모 목록의 맨 위에 붙여 두거나 풀어요.', keys: [], run: ['menu', 'pin-toggle'] },
+  { id: 'pin', group: '메모 창', label: UI.pin, help: '이 메모를 메모 목록에 상단 고정하거나 풀어요.', keys: [], run: ['menu', 'pin-toggle'] },
   { id: 'lock', group: '메모 창', label: '잠그기', help: '비밀번호로 이 메모를 잠가요. 잠근 메모는 비밀번호를 넣어야 볼 수 있어요.', keys: [], run: ['menu', 'lock-btn'] },
   { id: 'find', group: '메모 창', label: '찾기', help: '이 메모 안에서 낱말을 찾아요. Enter는 다음, Shift+Enter는 이전이에요.', keys: ['ctrl+KeyF'], run: ['app', 'find'] },
   { id: 'replace', group: '메모 창', label: '바꾸기', help: '이 메모 안에서 낱말을 찾아 다른 말로 하나씩, 또는 모두 바꿔요.', keys: ['ctrl+KeyH'], run: ['app', 'replace'] },

@@ -1324,7 +1324,7 @@ impl Vault {
         Ok(dst)
     }
 
-    /// 맨 위에 고정한 폴더 (_memoking/pinned-folders.json — 기기끼리 함께. app/js/core/folders.js parsePinned 와 같음)
+    /// 상단 고정한 폴더 (_memoking/pinned-folders.json — 기기끼리 함께. app/js/core/folders.js parsePinned 와 같음)
     pub fn pinned_folders(&self) -> Vec<String> {
         let text = fs::read_to_string(self.app_dir().join(PINNED_FOLDERS)).unwrap_or_default();
         let list: Vec<Value> = serde_json::from_str(&text).unwrap_or_default();
@@ -1337,7 +1337,7 @@ impl Vault {
         out
     }
 
-    /// 폴더 고정 · 풀기 → 새 목록 (지운 폴더 이름은 남긴다: 지우기를 되돌리면 그대로 고정)
+    /// 폴더 상단 고정 · 풀기 → 새 목록 (지운 폴더 이름은 남긴다: 지우기를 되돌리면 그대로 고정)
     pub fn set_folder_pinned(&self, name: &str, on: bool) -> Result<Vec<String>, String> {
         if memo_file::clean_folder_name(name) != name || name.is_empty() {
             return Err("폴더 이름으로 쓸 수 없어요".into());
@@ -1760,7 +1760,7 @@ mod tests {
         assert!(m["pinnedAt"].is_string(), "상단 고정한 때");
         assert!(v.set_meta(&a, &json!({ "pinned": false })).unwrap().unwrap()["pinnedAt"].is_null(), "풀면 지운다");
         v.set_meta(&a, &json!({ "pinned": true })).unwrap();
-        assert_eq!(v.list()[0]["id"], json!(a), "고정한 메모가 먼저");
+        assert_eq!(v.list()[0]["id"], json!(a), "상단 고정한 메모가 먼저");
         // 연결 · 나를 연결한 메모
         v.link(&a, &b, true).unwrap().unwrap();
         assert_eq!(v.links(&b)["backlinks"][0]["id"], json!(a));

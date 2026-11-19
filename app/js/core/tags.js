@@ -91,7 +91,7 @@ export function suggestTags(tags, prefix, limit = 8) {
 // ---------- 목록 필터 ----------
 
 export const KIND_FILTERS = [
-  { id: 'pinned', label: '고정', test: (m) => m.pinned },
+  { id: 'pinned', label: '상단 고정', test: (m) => m.pinned },
   { id: 'reminder', label: '알림', test: (m) => m.reminderCount > 0 },
   { id: 'image', label: '사진', test: (m) => m.hasImage },
   { id: 'file', label: '파일', test: (m) => m.hasFile || m.hasAudio || m.hasVideo },

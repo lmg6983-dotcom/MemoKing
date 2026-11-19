@@ -685,7 +685,7 @@ export class Vault extends EventTarget {
     return dst;
   }
 
-  /** 맨 위에 고정한 폴더 이름들 (core/folders.js — 기기끼리 함께) */
+  /** 상단 고정한 폴더 이름들 (core/folders.js — 기기끼리 함께) */
   pinnedFolders() {
     try {
       return parsePinned(fs.readText(PINNED_FOLDERS_FILE));
@@ -694,7 +694,7 @@ export class Vault extends EventTarget {
     }
   }
 
-  /** 폴더 고정 · 풀기 → 새 목록 */
+  /** 폴더 상단 고정 · 풀기 → 새 목록 */
   pinFolder(name, on) {
     if (!isFolderName(name)) throw new Error('폴더 이름으로 쓸 수 없어요');
     const list = pinFolder(this.pinnedFolders(), name, on);
