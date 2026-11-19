@@ -332,7 +332,8 @@ function layoutCards(memos) {
   //   남은 카드는 제 줄에서 위로 미끄러진다 (glideCards). 줄 길이가 조금 어긋나는 것은 다음에 다시 쌓을 때 맞춘다
   const ids = memos.map((m) => m.id);
   const pinnedCount = memos.filter((m) => m.pinned).length;
-  if (cols === lastCols && pinnedCount === shownPinned && shownIds.length > ids.length && el.cards.querySelector('.item')) {
+  // 상단 고정 수가 그대로고 일반 메모가 남을 때만 (일반 메모가 다 빠지면 "메모" 이름 줄도 없애야 해서 다시 쌓는다)
+  if (cols === lastCols && pinnedCount === shownPinned && (pinnedCount === 0 || ids.length > pinnedCount) && shownIds.length > ids.length && el.cards.querySelector('.item')) {
     const keep = new Set(ids);
     const gone = shownIds.filter((id) => !keep.has(id));
     const same = gone.length === shownIds.length - ids.length && shownIds.filter((id) => keep.has(id)).every((id, i) => id === ids[i])

@@ -384,7 +384,8 @@ function layoutCards(memos) {
   el.cards.replaceChildren(...(pinned.length ? [cardSep('상단 고정'), ...pinCols, ...(rest.length ? [cardSep('메모')] : [])] : []), ...(rest.length || !pinned.length ? columns : []));
   // 미리 보기는 보일 만큼만 그린다: 줄 수 x 카드 폭 / 3px (글자가 3px 보다 좁지 않다), 200자 단위로 (폭이 조금 바뀔 때마다 카드를 새로 만들지 않게).
   //   1,200자를 다 그리면 메모 2,000개를 처음 쌓는 데 1초 더 걸렸다. 줄 수가 그대로인 채 폭만 1.5배 넘게 늘면 relayoutIfNeeded 가 다시 쌓는다
-  previewCap = Math.ceil(((layout === 'rows' ? 2 : 6) * (columns[0].clientWidth || 4000)) / 600) * 200;
+  // 화면에 붙은 열로 잰다 (상단 고정만 보일 때는 "메모" 묶음 열이 붙지 않아 폭이 0)
+  previewCap = Math.ceil(((layout === 'rows' ? 2 : 6) * ((rest.length ? columns : pinCols)[0].clientWidth || 4000)) / 600) * 200;
   previewCapFor = el.cards.clientWidth;
   if (pinned.length) stackCards(pinCols, pinned.map(cardFor), { chunk: false }); // 고정 묶음은 한 번에 (뒤 묶음 쌓기가 이어 쌓기를 끊지 않게)
   stackCards(columns, rest.map(cardFor), { chunk: !had }); // 높이는 한 번에 재고 나눈다 (dom.js — 카드마다 재면 메모가 많을 때 느렸다). 나눠 쌓기는 처음에만 (보던 자리가 튀지 않게)

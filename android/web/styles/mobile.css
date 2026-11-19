@@ -265,8 +265,6 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 }
 .card-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; }
 .card-badge svg { width: 13px; height: 13px; }
-.card-badge.pin { margin-top: 3px; }
-.card-badge.pin svg { width: 15px; height: 15px; }
 .card-preview {
   display: -webkit-box;
   overflow: hidden;
