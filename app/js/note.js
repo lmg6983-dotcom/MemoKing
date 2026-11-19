@@ -1404,6 +1404,28 @@ tableBar?.addEventListener('wheel', (e) => {
   e.preventDefault();
   tableBar.scrollLeft += e.deltaY;
 }, { passive: false });
+// 마우스로 끌어서도 옆으로 (버튼 위에서 끌어도) — 조금이라도 끌었으면 그 클릭은 버튼을 누른 것으로 치지 않는다
+let barDrag = null;
+tableBar?.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'mouse' || e.button !== 0 || tableBar.scrollWidth <= tableBar.clientWidth) return;
+  barDrag = { x: e.clientX, left: tableBar.scrollLeft, moved: false, pointerId: e.pointerId };
+});
+tableBar?.addEventListener('pointermove', (e) => {
+  if (!barDrag || e.pointerId !== barDrag.pointerId) return;
+  const dx = e.clientX - barDrag.x;
+  if (!barDrag.moved && Math.abs(dx) < 5) return;
+  if (!barDrag.moved) tableBar.setPointerCapture(e.pointerId);
+  barDrag.moved = true;
+  tableBar.scrollLeft = barDrag.left - dx;
+});
+const endBarDrag = () => setTimeout(() => (barDrag = null)); // click 이 먼저 moved 를 보게
+tableBar?.addEventListener('pointerup', endBarDrag);
+tableBar?.addEventListener('pointercancel', endBarDrag);
+tableBar?.addEventListener('click', (e) => {
+  if (!barDrag?.moved) return;
+  e.stopPropagation();
+  e.preventDefault();
+}, true);
 function showTableBar(table) {
   if (!table) closeTableMore();
   tableBar.hidden = !table;
