@@ -1,6 +1,7 @@
 // 다른 캘린더 일정 → 메모로 가져올 때 넣는 한 달 달력 그림 (PC·휴대폰 같음, 화면의 canvas 로 그린다)
 //   종이 같은 바탕에 그 달 달력, 일정 날짜에는 색연필로 그린 듯한 동그라미 (손으로 두 바퀴 돌린 것처럼 · 결이 있는 선)
 //   같은 일정은 늘 같은 그림 (흔들림은 날짜로 정한 씨앗의 난수)
+import { loadFontFor } from './core/font-subset.js';
 
 const W = 1080; // 2배로 그려 휴대폰 · 큰 화면에서도 또렷하게
 const PAD = 56;
@@ -108,6 +109,8 @@ export async function monthSketchPng({ start, end = null, allDay = false, title 
   const weeks = Math.ceil((lead + days) / 7);
   const H = HEAD + weeks * WEEK_H + FOOT;
   const cellW = (W - PAD * 2) / 7;
+  // 그릴 글자의 글꼴 조각을 먼저 (core/font-subset.js) — 제목 · 요일 · 날짜 · 아래 글
+  await loadFontFor(font, `${y0}년 ${m0 + 1}월 일월화수목금토 0123456789… · ${when}${title}`);
 
   const canvas = document.createElement('canvas');
   canvas.width = W;

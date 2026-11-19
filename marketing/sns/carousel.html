@@ -5,13 +5,13 @@
 <title>메모킹 SNS 카드</title>
 <!-- 인스타그램 카드 12장 (1080x1350). render.mjs 가 .slide 마다 PNG 로 찍는다. 화면은 out/sns 를 복사한 shots/ (npm run shots:sns) -->
 <style>
-  @font-face { font-family: 'Pretendard'; src: url('../../app/vendor/fonts/PretendardVariable.woff2') format('woff2'); font-weight: 100 900; }
+  @import url('../../app/vendor/fonts/pretendard/pretendard.css');
   :root {
     --paper: #f6f2e9; --ink: #1c1a15; --muted: #6b655a; --yellow: #ffcd00; --yellow-soft: #fff1b3; --line: rgba(28, 26, 21, 0.1);
     --shadow: 0 2px 6px rgba(40, 30, 10, 0.08), 0 24px 60px rgba(40, 30, 10, 0.18);
   }
   * { box-sizing: border-box; margin: 0; }
-  body { background: #d9d4c8; font-family: 'Pretendard', sans-serif; color: var(--ink); display: grid; gap: 40px; padding: 40px; justify-content: center; }
+  body { background: #d9d4c8; font-family: 'Pretendard Variable', sans-serif; color: var(--ink); display: grid; gap: 40px; padding: 40px; justify-content: center; }
   .slide { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: var(--paper); padding: 92px 84px 0; }
   .eyebrow { display: flex; align-items: center; gap: 14px; font-size: 26px; font-weight: 700; color: var(--muted); letter-spacing: -0.01em; }
   .eyebrow .num { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }

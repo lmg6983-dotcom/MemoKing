@@ -1,6 +1,7 @@
 // 회상 "한 장으로" — 그날(또는 그 달)의 사진 · 메모를 스크랩북 한 쪽 그림(PNG)으로 (PC 복사·저장 · 휴대폰 공유)
 //   화면의 그날의 기록과 같은 모양: 줄 노트 종이 위에 테이프 붙인 폴라로이드 · 메모지 조각, 맨 아래 날짜와 "메모킹".
 //   사진은 fetch 로 받아 그린다 (img 를 바로 그리면 다른 출처 그림이라 캔버스를 내보낼 수 없다)
+import { loadFontFor } from './core/font-subset.js';
 import { vaultUrl } from './media.js';
 import { NOTE_BG } from './core/memo-file.js';
 import { UI } from './core/ui-text.js';
@@ -66,6 +67,8 @@ function shadow(ctx, blur = 18, y = 6, a = 0.16) {
  * @returns {Promise<string>} PNG base64
  */
 export async function renderCollage({ title, sub = '', photos = [], memos = [], kind = 'day' }) {
+  // 그릴 글자의 글꼴 조각을 먼저 (core/font-subset.js) — 날짜 글 · 숫자 · 메모킹 표시까지
+  await loadFontFor(FONT, [title, sub, ...photos.map((p) => `${p.title ?? ''}${dayLabel(p.day)}`), ...memos.map((n) => `${n.title ?? ''}${n.preview ?? ''}${dayLabel(n.day)}`), '메모킹 0123456789월일…'].join(''));
   const month = kind === 'month';
   const cols = month ? 3 : photos.length + memos.length <= 2 ? 2 : 3;
   const gap = 34;

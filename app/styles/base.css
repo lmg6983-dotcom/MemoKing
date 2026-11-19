@@ -1,11 +1,6 @@
 /* 모든 창이 함께 쓰는 기본 스타일 — 값은 메모킹 디자인 시스템(노랑·검정) 토큰 */
-@font-face {
-  font-family: "Pretendard Variable";
-  src: url("../vendor/fonts/PretendardVariable.woff2") format("woff2-variations");
-  font-weight: 45 920;
-  font-style: normal;
-  font-display: block;
-}
+/* 브랜드 글꼴 Pretendard Variable: 글자 묶음별로 나눈 판 — 창마다 화면에 나온 글자의 묶음만 읽는다 (scripts/build-vendor.mjs) */
+@import url("../vendor/fonts/pretendard/pretendard.css");
 
 :root {
   /* 브랜드 */
