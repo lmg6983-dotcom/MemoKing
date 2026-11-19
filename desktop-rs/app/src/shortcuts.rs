@@ -255,7 +255,7 @@ fn memo_hotkey_pressed(app: &AppHandle, slot: &str) {
     }
 }
 
-// ---------- 전역 단축키 바꾸기 (설정 › 단축키) ----------
+// ---------- 전역 단축키 바꾸기 (단축키 설정 창 › 어디서든) ----------
 
 fn set_shortcut(app: &AppHandle, name: &str, wanted: Option<String>) -> Value {
     let Some(&(_, def, _)) = SHORTCUTS.iter().find(|s| s.0 == name) else { return json!({ "ok": false, "reason": "invalid" }) };

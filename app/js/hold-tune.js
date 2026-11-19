@@ -1,7 +1,7 @@
 // 꾹 눌러 줄 들어 올리기 — 쓰는 사람 손에 맞춘 시간 (PC 마우스만, 이 PC 에만 저장)
 //   규칙은 core/hold-tuning.js. 메모 창마다 같은 값을 쓰도록 localStorage (다른 창이 바꾸면 storage 알림으로 따라감)
-//   설정 › 메모 보기 › 내 손에 맞추기 에서 끄거나 처음 값으로
-import { HOLD_BASE, nextHold, readHold, isMisfireUndo, isLateRetry } from './core/hold-tuning.js';
+//   늘 켜짐 (예전 설정에서 껐어도 — 1.3.0 에 설정 칸을 없앴다)
+import { nextHold, readHold, isMisfireUndo, isLateRetry } from './core/hold-tuning.js';
 
 const KEY = 'memoking.holdTune';
 let cache = null;
@@ -14,7 +14,7 @@ function load() {
   } catch {
     raw = null;
   }
-  cache = readHold(raw);
+  cache = { ...readHold(raw), on: true };
   return cache;
 }
 function save(next) {
@@ -33,19 +33,12 @@ try {
   // window 가 없는 곳 (점검)
 }
 
-/** 지금 쓸 시간 — 끄면 처음 값 */
-export const holdMs = () => (load().on ? load().ms : HOLD_BASE);
-export const holdTune = () => ({ ...load() });
-export function setHoldTune({ on, reset } = {}) {
-  const now = load();
-  save({ on: on ?? now.on, ms: reset ? HOLD_BASE : now.ms });
-  return holdTune();
-}
+/** 지금 쓸 시간 */
+export const holdMs = () => load().ms;
 
-/** 실수 · 늦음을 알린다 (끄면 배우지 않음) */
+/** 실수 · 늦음을 알린다 */
 export function holdSignal(signal) {
   const now = load();
-  if (!now.on) return;
   const ms = nextHold(now.ms, signal);
   if (ms !== now.ms) save({ ...now, ms });
   if (document.body) document.body.dataset.holdMs = String(holdMs()); // 점검용

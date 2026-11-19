@@ -452,9 +452,7 @@ function el(tag, className, text) {
   return node;
 }
 
-// 링크 미리보기를 끈 설정이면 카드 대신 링크 글자 한 줄 (파일의 [제목](주소 "미리보기") 는 그대로 — 다시 켜면 카드)
-//   cards: 그 편집기에 그려진 카드들 (설정을 바꾸면 바로 다시 그린다)
-function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn = () => true, cards }) {
+function linkCardView(node, view, getPos, { fetchPreview, openLink }) {
   const dom = el('div', 'mk-link-card');
   dom.contentEditable = 'false';
   const main = el('div', 'lc-main');
@@ -477,7 +475,6 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
   main.append(text, thumb);
   // 지우기 · 복사는 다른 내용(그림 · 파일)과 같은 단추로 (block-move.js · delete-button.js) — 카드에 따로 × 를 두면 두 개가 겹쳐 뜬다
   dom.append(main);
-  const plain = el('a', 'lc-plain');
 
   let current = node;
   let preview = null;
@@ -485,16 +482,6 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
 
   function render() {
     const { href, title: saved } = current.attrs;
-    const on = previewsOn();
-    dom.classList.toggle('plain-link', !on);
-    if (!on) {
-      plain.href = href;
-      plain.textContent = saved || href;
-      plain.title = `누르면 브라우저로 열려요\n${href}`; // 글자만 보이니 어디로 가는지 주소를
-      if (!plain.isConnected) dom.replaceChildren(plain);
-      return;
-    }
-    if (!main.isConnected) dom.replaceChildren(main);
     if (!loaded) load();
     main.title = `열기 버튼으로 브라우저에서 열어요\n${href}`;
     const state = preview ? (preview.ok ? 'ok' : 'plain') : 'loading';
@@ -551,10 +538,8 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
     openLink?.(current.attrs.href);
   };
   main.addEventListener('click', open);
-  plain.addEventListener('click', open);
 
   render();
-  cards?.add(render);
   return {
     dom,
     update(next) {
@@ -568,7 +553,6 @@ function linkCardView(node, view, getPos, { fetchPreview, openLink, previewsOn =
       render();
       return true;
     },
-    destroy: () => cards?.delete(render),
     selectNode: () => dom.classList.add('selected'),
     deselectNode: () => dom.classList.remove('selected'),
     stopEvent: (e) => ['mousedown', 'click', 'dblclick', 'pointerdown'].includes(e.type),
@@ -1281,13 +1265,10 @@ function normalizePastedTables(html) {
  *           getTags?: () => Promise<{ name: string, count: number }[]> }} options
  *   fetchImage: 인터넷·data: 사진을 메모 폴더에 저장하고 "attachments/..." 를 돌려준다
  *   fetchPreview: 링크 카드에 보여줄 제목·설명·사진 (메인 프로세스가 메모 폴더에 모아 둔 것)
- *   linkPreviews: 링크 미리보기 카드 (설정, 기본 켜짐) — 끄면 주소를 붙여도 링크 글자, 있던 카드도 링크 글자로 보임
  */
 // readOnly: 고칠 수 없이 보여 주기만 (PDF 만들기)
-export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, openFile, linkPreviews = true, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false, scrollMargin = 0, onDateReminder, hasReminderAt }) {
+export async function createNoteEditor(root, { markdown, onChange, onState, onEmpty, onTasks, saveFile, fetchImage, onNotice, fetchPreview, openLink, openFile, getTags, tables = [], onTables, readOnly = false, readAttachment, tapContinuesList = false, scrollMargin = 0, onDateReminder, hasReminderAt }) {
   if (readAttachment) inkReader = readAttachment; // 그림 칸(inkView)이 만들어지기 전에
-  let previewsOn = linkPreviews !== false;
-  const linkCardRenders = new Set(); // 그려진 링크 카드들 — 설정을 바꾸면 다시 그린다
   let ready = false;
   let editor = null;
   const view = () => editor.ctx.get(editorViewCtx);
@@ -1655,7 +1636,6 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       title: `이미지 ${photos.length}장을 어떻게 넣을까요?`,
       message: '묶음 이미지는 몇 장만 모아 보이고, 누르면 크게 넘겨 봐요',
       choices: [{ id: 'each', label: '따로따로' }, { id: 'album', label: '묶음 이미지로', primary: true }],
-      remember: 'photos-insert',
     }) === 'album';
     const out = [];
     let album = null; // 모으는 중인 묶음 (처음 사진 자리에 한 묶음)
@@ -1900,7 +1880,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       v.dispatch(v.state.tr.addMark(from, to, link.create({ href: url })).scrollIntoView());
       return;
     }
-    const card = previewsOn ? schema.nodes.mk_link_card : null; // 미리보기를 끄면 언제나 링크 글자
+    const card = schema.nodes.mk_link_card;
     const parent = $from.parent;
     if (card && parent.type.name === 'paragraph' && parent.content.size === 0 && $from.depth > 0) {
       const container = $from.node($from.depth - 1);
@@ -2339,7 +2319,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
   }));
 
   const media = $view(imageSchema.node, () => (node, v, getPos) => mediaView(node, v, getPos));
-  const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink, previewsOn: () => previewsOn, cards: linkCardRenders }));
+  const cardView = $view(linkCardSchema.node, () => (node, v, getPos) => linkCardView(node, v, getPos, { fetchPreview, openLink }));
   const listDrag = $prose(() => createListDrag({ readOnly }));
   const blockMove = $prose(() => createBlockMove({ readOnly }));
   // 휴대폰: 목록 아래 빈 줄을 누르면 목록이 이어진다 (보기만 할 때는 없음)
@@ -2991,10 +2971,6 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     /** 메모 안 찾기 · 바꾸기 (find-bar.js 가 쓴다) */
     find: findController(view),
     /** 링크 미리보기 설정을 바꾸면 그려진 카드를 바로 카드 ↔ 링크 글자로 */
-    setLinkPreviews(on) {
-      previewsOn = on !== false;
-      for (const render of linkCardRenders) render();
-    },
     setStyle(name) {
       setStyle(name);
       view().focus();

@@ -8,7 +8,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:hover', 'list:on-top', 'list:crown-docked',
-  'stt:status', 'ai:status', 'ai:notice', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'settings:link-previews', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
+  'stt:status', 'ai:status', 'ai:notice', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'edit:paste-plain', 'edit:clear-format',
   'media:converting', 'media:ready', // PC Rust 판만 보낸다: HEVC 영상의 H.264 사본 (desktop-rs/app/src/video.rs)
 ];
@@ -106,10 +106,7 @@ contextBridge.exposeInMainWorld('memoking', {
     get: invoke('app:settings'),
     setAutoStart: invoke('app:set-auto-start'),
     setQuickMemo: invoke('app:set-quick-memo'),
-    setFitTables: invoke('app:set-fit-tables'),
     setMagicPolish: invoke('app:set-magic-polish'),
-    setLinkPreviews: invoke('app:set-link-previews'),
-    setPerf: invoke('app:set-perf'), // 빠르게 열기 기능 켜고 끄기 (이름, 켜짐) → 켜짐 — PC Rust 판
     setTrashDays: invoke('app:set-trash-days'),
     // 전역 단축키 바꾸기: set(이름, 단축키|null=기본값) · pause(true) 는 새 키를 누르는 동안 잠시 놓기
     setShortcut: invoke('shortcuts:set'),

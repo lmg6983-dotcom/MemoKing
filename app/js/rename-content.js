@@ -2,7 +2,6 @@
 //   파일 칩의 이름 = 칩 글자, 그림 · 소리 · 음성 카드의 이름 = 설명(alt). 메모 폴더의 실제 파일은 그대로 (이름은 보이는 이름)
 //   — 저장 · 공유 · 끌어내기에서 이 이름으로 나간다
 import { isVoiceCard } from './core/voice-card.js';
-import { CHOICE_KEY, loadChoices } from './core/choices.js';
 import { chipRanges } from './file-chip-guard.js';
 import { mediaKindOf, mediaWidthOf, plainAlt, withMediaWidth } from './core/memo-file.js';
 
@@ -119,18 +118,12 @@ export function promptName({ title = '이름 변경', value = '', label = '새 �
   });
 }
 
-// "앞으로 이렇게" 로 기억한 고르기는 core/choices.js (목록 창 설정이 이 파일 — 편집기 라이브러리 — 을 읽지 않게)
-export { hasRememberedChoices, forgetChoices } from './core/choices.js';
-
 /**
  * 고르기 창 (PC·휴대폰 함께 — promptName 과 같은 모양): 단추 하나를 고르면 그 id, Esc · 바깥 누르기는 null
- *   remember: 이 이름으로 "앞으로 이렇게" 칸을 보이고, 기억해 둔 것이 있으면 묻지 않고 그것을 돌려준다
- * @param {{ title: string, message?: string, choices: { id: string, label: string, primary?: boolean }[], remember?: string }} o
+ * @param {{ title: string, message?: string, choices: { id: string, label: string, primary?: boolean }[] }} o
  * @returns {Promise<string|null>}
  */
-export function promptChoice({ title, message = '', choices, remember = '' }) {
-  const kept = remember ? loadChoices()[remember] : null;
-  if (kept && choices.some((c) => c.id === kept)) return Promise.resolve(kept);
+export function promptChoice({ title, message = '', choices }) {
   return new Promise((resolve) => {
     const wrap = document.createElement('div');
     wrap.className = 'mk-prompt-back';
@@ -159,15 +152,6 @@ export function promptChoice({ title, message = '', choices, remember = '' }) {
       return b;
     });
     row.append(...buttons);
-    let keep = null;
-    if (remember) {
-      const label = document.createElement('label');
-      label.className = 'mk-prompt-keep';
-      keep = document.createElement('input');
-      keep.type = 'checkbox';
-      label.append(keep, document.createTextNode('앞으로 묻지 않고 이렇게 (설정에서 다시 묻게 할 수 있어요)'));
-      box.append(label);
-    }
     box.append(row);
     wrap.append(box);
     const restore = document.activeElement;
@@ -175,19 +159,12 @@ export function promptChoice({ title, message = '', choices, remember = '' }) {
     const done = (result) => {
       if (closed) return;
       closed = true;
-      if (keep?.checked && result) {
-        try {
-          localStorage.setItem(CHOICE_KEY, JSON.stringify({ ...loadChoices(), [remember]: result }));
-        } catch {
-          // 기억하지 못해도 이번 고르기는 그대로
-        }
-      }
       document.removeEventListener('keydown', onKey, true);
       wrap.remove();
       if (restore instanceof HTMLElement && restore.isConnected) restore.focus({ preventScroll: true });
       resolve(result);
     };
-    const stops = keep ? [keep, ...buttons] : buttons;
+    const stops = buttons;
     const onKey = (e) => {
       if (e.key === 'Tab') {
         const i = stops.indexOf(document.activeElement);
