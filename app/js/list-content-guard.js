@@ -2,7 +2,7 @@
 //   어떤 길로 들어오든(붙여넣기 · 끌어 놓기 · + 메뉴 · 옮기기 · 예전 메모 파일) 맨 바깥 목록이 끝난 바로 뒤로 빼낸다.
 //   항목에 그 내용뿐이면 항목째 지우고(목록이 비면 목록도), 항목의 첫 줄이었으면 빈 글 줄을 남긴다 (항목은 글 줄로 시작해야 한다)
 import { Plugin, PluginKey } from '../vendor/milkdown.js';
-import { isVoiceCard } from './voice-card-view.js';
+import { isVoiceCard } from './core/voice-card.js';
 
 export const listContentGuardKey = new PluginKey('memoking-list-content-guard');
 

@@ -46,7 +46,7 @@ import { folderOf } from '../../app/js/core/folders.js';
 import { renderWorkSettings } from '../../app/js/work-settings.js';
 import { workHours, saveWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
-import { hasRememberedChoices, forgetChoices } from '../../app/js/rename-content.js';
+import { hasRememberedChoices, forgetChoices } from '../../app/js/core/choices.js';
 
 const $ = (x) => document.getElementById(x);
 

@@ -8,7 +8,7 @@
 //   첫 줄이 소리 하나뿐인 인용 = 음성 카드 (편집기가 접을 수 있는 카드로 보여 준다)
 //   받아쓴 글은 문장마다 한 줄, 말한 사람이 바뀌는 줄 앞에 **화자 N:**
 import { pad2, koClock, koMonthDay } from './time.js';
-import { isAudio } from './memo-file.js';
+import { isAudio, mediaKindOf } from './memo-file.js';
 
 export const SPEAKER_LINE = /^화자\s*(\d+)\s*[:：]\s*/;
 
@@ -125,3 +125,18 @@ export function replaceTranscript(body, src, transcript) {
   lines.splice(at + 1, end - at, ...add.flatMap((l) => ['>', `> ${l}`]));
   return lines.join('\n');
 }
+
+/** 인용이 음성 카드면 그 소리(image 노드), 아니면 null */
+export function voiceAudioOf(node) {
+  if (node?.type.name !== 'blockquote') return null;
+  const first = node.firstChild;
+  if (first?.type.name !== 'paragraph') return null;
+  let img = null;
+  let ok = true;
+  first.forEach((c) => {
+    if (c.type.name === 'image' && !img) img = c;
+    else if (!(c.isText && !c.text.trim()) && c.type.name !== 'hardbreak' && c.type.name !== 'hard_break') ok = false;
+  });
+  return ok && img && mediaKindOf(img.attrs.src, img.attrs.alt) === 'audio' ? img : null;
+}
+export const isVoiceCard = (node) => Boolean(voiceAudioOf(node));

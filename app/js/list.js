@@ -40,7 +40,7 @@ import { UI } from './core/ui-text.js';
 import { holdTune, setHoldTune } from './hold-tune.js';
 import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet, pinItem } from './folder-ui.js';
 import { folderList, movedText, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
-import { hasRememberedChoices, forgetChoices } from './rename-content.js';
+import { hasRememberedChoices, forgetChoices } from './core/choices.js';
 
 let listZoom = 1; // 메모 카드 확대 배율 (아래 "메모 카드 확대·축소")
 
