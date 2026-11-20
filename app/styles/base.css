@@ -16,10 +16,10 @@
   --on-black: #ffffff;
 
   /* 바탕 · 글씨 */
-  --surface-0: #f2f2f2;
+  --surface-0: #f4f2ef; /* 아주 살짝 따뜻한 회색 (OKLCH L.962 C.0045 H85) — 노랑 브랜드와 어울리게 */
   --surface-1: #ffffff;
   --surface-2: #ffffff;
-  --line: #e6e6e6;
+  --line: #e7e4df;
   --fill-hover: rgba(17, 17, 17, 0.06);
   --fill-tab: rgba(17, 17, 17, 0.05);
   --text-strong: #111111;
@@ -65,12 +65,12 @@
   --shadow: var(--shadow-pop);
 
   /* 스티커 메모 7색: 바탕 / 윗막대 / 목록에서 보이는 색 칩 */
-  --yellow-bg: #fff4b8; --yellow-bar: #ffe680; --yellow-chip: #ffcc00;
-  --green-bg: #ddf5df; --green-bar: #bfebc3; --green-chip: #4cb35a;
-  --pink-bg: #ffe0ec; --pink-bar: #ffc4da; --pink-chip: #ec5a93;
-  --purple-bg: #ede3ff; --purple-bar: #d9c7ff; --purple-chip: #8f5ce6;
-  --blue-bg: #ddeeff; --blue-bar: #c2e0ff; --blue-chip: #3d8ee6;
-  --gray-bg: #e6e5e1; --gray-bar: #d8d6d0; /* 무채색 앱 바탕(#F2F2F2)과 구별되게 한 단 진하게 */ --gray-chip: #9a978f;
+  --yellow-bg: #ffe99a; --yellow-bar: #f2da7f; --yellow-chip: #ffcc00; /* OKLCH L.935 C.085 — 모든 색이 같은 밝기 · 채도 (노랑만 채도 1.6배: 같은 채도면 크림빛으로 탁해 보여서) */
+  --green-bg: #c1facc; --green-bar: #a3f1b3; --green-chip: #5ac576;
+  --pink-bg: #ffe0eb; --pink-bar: #ffcadd; --pink-chip: #f37fb0;
+  --purple-bg: #ede5fe; --purple-bar: #e1d2ff; --purple-chip: #ba93fb;
+  --blue-bg: #dbecfe; --blue-bar: #c0defe; --blue-chip: #61b0fe;
+  --gray-bg: #e1dfdb; --gray-bar: #d3d1cb; --gray-chip: #95928b;
   --charcoal-bg: #1c1c1b; --charcoal-bar: #111111; --charcoal-chip: #111111;
   --note-text-default: #1f1f1c;
   --note-black-text: #f5f4ef;
@@ -95,10 +95,10 @@
     --brand-yellow-soft: #3d3112; /* 올리브빛(#3a3100) 대신 따뜻한 금빛 */
     --accent-line: #ffcc00;
     --on-brand-soft: #ffd84d;
-    --surface-0: #000000;
-    --surface-1: #171717;
-    --surface-2: #232323;
-    --line: #2a2a2a;
+    --surface-0: #0f0e0d; /* 완전 검정 대신 아주 어두운 따뜻한 회색 */
+    --surface-1: #1d1c1a;
+    --surface-2: #282725;
+    --line: #302f2c;
     --glass-bg: rgba(30, 30, 30, 0.74);
     --glass-line: rgba(255, 255, 255, 0.08);
     --fill-hover: rgba(255, 255, 255, 0.08);
@@ -115,12 +115,12 @@
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 14px rgba(0, 0, 0, 0.45);
 
-    --yellow-bg: #3a3317; --yellow-bar: #4a401a;
-    --green-bg: #1e3322; --green-bar: #26402b; --green-chip: #5cc46a;
-    --pink-bg: #3d2230; --pink-bar: #4c2a3b; --pink-chip: #f07aa8;
-    --purple-bg: #2c2440; --purple-bar: #372d50; --purple-chip: #a980f0;
-    --blue-bg: #1c2d42; --blue-bar: #233852; --blue-chip: #62a6f0;
-    --gray-bg: #262624; --gray-bar: #31302d; --gray-chip: #8a877f;
+    --yellow-bg: #503800; --yellow-bar: #614501; --yellow-chip: #e7b551; /* 어두운 화면 OKLCH L.36 C.10 — 회색기 없이 깊은 색, 노랑은 올리브 대신 호박색(H82) */
+    --green-bg: #024a28; --green-bar: #035a31; --green-chip: #72d699;
+    --pink-bg: #632240; --pink-bar: #762c4d; --pink-chip: #ff99c2;
+    --purple-bg: #462e69; --purple-bar: #543a7c; --purple-chip: #c9acff;
+    --blue-bg: #023f6f; --blue-bar: #0a4c83; --blue-chip: #89c3fe;
+    --gray-bg: #393834; --gray-bar: #474540; --gray-chip: #a19e98;
     --charcoal-bg: #141413; --charcoal-bar: #0a0a0a; --charcoal-chip: #f5f4ef;
     --note-text-default: #f5f4ef;
     color-scheme: dark;
