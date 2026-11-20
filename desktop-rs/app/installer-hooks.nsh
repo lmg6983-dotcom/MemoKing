@@ -53,6 +53,14 @@ Var mkAutoStart
   ${GetOptions} $CMDLINE "--force-run" $0
   IfErrors +2 0
     Exec '"$INSTDIR\MemoKing.exe"'
+  ; 게이지를 끝까지 — 업데이트(자동 업데이트는 /P: 진행 창만 띄우고 끝나면 바로 닫는다)는 마지막 칸을 그리기 전에 창이 닫혀
+  ;   늘 덜 찬 채 끝나 보였다. 다 깔았으니 채우고 잠깐 보여 준 뒤 닫는다 (1004: 설치 진행 막대, 0x0402: PBM_SETPOS, 범위 0~30000)
+  ${IfNot} ${Silent}
+    FindWindow $0 "#32770" "" $HWNDPARENT
+    GetDlgItem $0 $0 1004
+    SendMessage $0 0x0402 30000 0
+    Sleep 400
+  ${EndIf}
 !macroend
 
 ; 지울 때: 메모킹이 켤 때마다 적던 레지스트리도 — 탐색기 오른쪽 클릭 › "메모킹에 저장" 메뉴 (desktop-rs/app/src/shell_menu.rs) · 알림
