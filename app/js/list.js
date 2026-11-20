@@ -2498,7 +2498,7 @@ function showUpdateRow(st) {
   updateEl.check.disabled = st.status === 'checking';
 }
 
-function renderUpdateDialog(st) {
+function renderUpdateDialog(st, fresh = false) {
   const ready = st.status === 'ready';
   const downloading = st.status === 'downloading';
   updateEl.title.textContent = ready ? UI.updReady : UI.updNew;
@@ -2515,8 +2515,13 @@ function renderUpdateDialog(st) {
   to.textContent = `v${st.version ?? ''}`;
   updateEl.version.replaceChildren(from, arrow, to);
   updateEl.version.setAttribute('aria-label', `지금 ${from.textContent}에서 ${to.textContent}으로`);
-  renderReleaseNotes(updateEl.notes, st.notes);
-  updateEl.notes.scrollTop = 0;
+  // 바뀐 점은 창을 열 때 · 버전이 바뀔 때만 다시 그린다 (받는 중 진행률마다 다시 그리면 글이 맨 위로 튀었다)
+  const notesKey = `${st.version}\n${st.notes}`;
+  if (fresh || updateEl.notes.dataset.key !== notesKey) {
+    updateEl.notes.dataset.key = notesKey;
+    renderReleaseNotes(updateEl.notes, st.notes);
+    updateEl.notes.scrollTop = 0;
+  }
   updateEl.progress.hidden = !downloading;
   updateEl.fill.style.transform = `scaleX(${Math.max(0, Math.min(100, st.percent ?? 0)) / 100})`;
   updateEl.progressText.textContent = downloading
@@ -2533,7 +2538,7 @@ function renderUpdateDialog(st) {
 function onUpdate(st, { open = false } = {}) {
   updateSt = st ?? updateSt;
   showUpdateRow(updateSt);
-  if (updateEl.dialog.open || open) renderUpdateDialog(updateSt);
+  if (updateEl.dialog.open || open) renderUpdateDialog(updateSt, open && !updateEl.dialog.open);
   if (open && !updateEl.dialog.open) updateEl.dialog.showModal();
 }
 
