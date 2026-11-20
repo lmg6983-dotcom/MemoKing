@@ -49,8 +49,8 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Securit
 aes-gcm = "0.10"
 # PDF로 저장 (WebView2 PrintToPdf) — Tauri(wry)가 쓰는 판 그대로
 webview2-com = "0.39"
-# 첨부를 메모 밖으로 끌어내기 (OLE DoDragDrop) · PDF 의 COM 형식 · HEVC 디코더가 있는지 (Media Foundation) — webview2-com 이 쓰는 판 그대로 (implement 매크로는 windows_core 이름을 찾는다)
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_System_SystemServices", "Win32_UI_Shell", "Win32_Media_MediaFoundation"] }
+# 첨부를 메모 밖으로 끌어내기 (셸 SHDoDragDrop) · PDF 의 COM 형식 · HEVC 디코더가 있는지 (Media Foundation) — webview2-com 이 쓰는 판 그대로 (implement 매크로는 windows_core 이름을 찾는다)
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_UI_Shell", "Win32_Media_MediaFoundation"] }
 windows-core = "0.62"
 # 화면 캡처 메모 (Linux 빌드에는 pipewire 가 있어야 해 Windows 만)
 xcap = "0.9"
