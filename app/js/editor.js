@@ -1655,14 +1655,33 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return out;
   }
 
-  // 넣은 문서 파일 → 읽을 File. PC: Word · PowerPoint 는 Office 로 만든 PDF (직접 그리면 그림이 깨지고 장이 어긋남 — Office 가 없으면 직접 그린다)
+  // 넣은 문서 파일 → 읽을 File. PC: Word · PowerPoint · Excel 은 Office 로 만든 PDF (직접 그리면 그림이 깨지고 장이 어긋남 — Office 가 없으면 직접 그린다)
   async function documentSource(it) {
     const name = it.name;
     const fileName = extOf(name) ? name : `${name}.${extOf(it.src) || 'txt'}`;
-    const pdf = extOf(fileName) === 'pdf' ? null : await window.memoking?.attachments?.toPdf?.(it.src).catch(() => null);
+    const pdf = extOf(fileName) === 'pdf' ? null : await officePdf(it.src, name);
     if (pdf) return new File([pdf], `${baseName(name)}.pdf`, { type: 'application/pdf' });
     if (it.file instanceof File) return new File([await it.file.arrayBuffer()], fileName, { type: it.file.type });
     return new File([await (await fetch(vaultUrl(it.src))).blob()], fileName);
+  }
+
+  // Office 로 PDF 만들기 — 검토 메모 · 발표자 노트가 있으면 PDF 에 넣을지 먼저 묻는다 (Office 의 PDF 내보내기는 기본으로 빼 버린다)
+  async function officePdf(src, name) {
+    const toPdf = window.memoking?.attachments?.toPdf;
+    if (!toPdf) return null;
+    const got = await toPdf(src).catch(() => null);
+    if (!got?.ask) return got;
+    const yes = async (what, n) => await promptChoice({
+      title: `${name}에 ${what} ${n}개가 있어요`,
+      message: 'PDF에 함께 넣을까요?',
+      choices: [{ id: 'no', label: '넣지 않기' }, { id: 'yes', label: '함께 넣기', primary: true }],
+    }) === 'yes';
+    const opts = {
+      comments: got.ask.comments > 0 && await yes('검토 메모', got.ask.comments),
+      notes: got.ask.notes > 0 && await yes('발표자 노트가 있는 슬라이드', got.ask.notes),
+    };
+    const pdf = await toPdf(src, opts).catch(() => null);
+    return pdf?.ask ? null : pdf;
   }
 
   // 메모 폴더에 넣은 문서 → PDF (PDF 는 그대로) → 첫 쪽 썸네일 그림 (누르면 그 PDF 미리보기). 바꾸지 못하면 null (칩만)

@@ -280,39 +280,86 @@ fn print_to_pdf(_: &tauri::WebviewWindow, _: &Path, _: f64, _: f64) -> bool {
     false
 }
 
-// Word · PowerPoint 문서 → PDF (이 PC 의 Office 로). 경로는 환경 변수로 넘긴다 (명령 줄에 끼우면 따옴표 · 특수 문자가 섞인다)
+// Word · PowerPoint · Excel 문서 → PDF (이 PC 의 Office 로). 경로 · 고르기는 환경 변수로 넘긴다 (명령 줄에 끼우면 따옴표 · 특수 문자가 섞인다)
 //   사용자가 이미 띄워 둔 PowerPoint 에 붙는 경우(PowerPoint 는 한 개만 뜬다) 사용자의 창은 닫지 않는다
+//   MK_PROBE=1: 검토 메모 · 발표자 노트가 있으면 만들지 않고 "ASK comments=N notes=N" 만 알린다 (화면이 넣을지 묻고 다시 부른다)
+//   MK_COMMENTS=1: 검토 메모를 함께 (Word 여백 · PowerPoint 말풍선) · MK_NOTES=1: PowerPoint 를 노트 페이지(슬라이드 + 노트)로
 const OFFICE_PDF: &str = r#"
 $ErrorActionPreference = 'Stop'
-$src = $env:MK_SRC; $out = $env:MK_OUT
-if ($src -match '\.pptx$') {
+$src = $env:MK_SRC; $out = $env:MK_OUT; $probe = $env:MK_PROBE -eq '1'
+$comments = $env:MK_COMMENTS -eq '1'; $notes = $env:MK_NOTES -eq '1'
+$none = [Type]::Missing
+if ($src -match '\.pptx?$') {
   $running = [bool](Get-Process POWERPNT -ErrorAction SilentlyContinue)
   $app = New-Object -ComObject PowerPoint.Application
   try {
     $doc = $app.Presentations.Open($src, -1, 0, 0)
-    try { $doc.SaveAs($out, 32) } finally { $doc.Close() }
+    try {
+      if ($probe) {
+        $c = 0; $n = 0
+        foreach ($s in $doc.Slides) {
+          $c += $s.Comments.Count
+          try { if ($s.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text.Trim()) { $n++ } } catch {}
+        }
+        if ($c -or $n) { "ASK comments=$c notes=$n"; return }
+      }
+      if ($comments -or $notes) {
+        $type = if ($notes) { 5 } else { 1 }
+        try { $doc.ExportAsFixedFormat2($out, 2, 2, 0, 1, $type, 0, $none, 1, '', $false, $true, $true, $true, $false, $comments) }
+        catch { $doc.ExportAsFixedFormat($out, 2, 2, 0, 1, $type) }
+      } else { $doc.SaveAs($out, 32) }
+    } finally { $doc.Close() }
   } finally { if (-not $running -and $app.Presentations.Count -eq 0) { $app.Quit() } }
+} elseif ($src -match '\.xlsx?$') {
+  $app = New-Object -ComObject Excel.Application
+  $app.Visible = $false; $app.DisplayAlerts = $false
+  try {
+    $book = $app.Workbooks.Open($src, 0, $true, $none, 'mk-no-password')
+    try { $book.ExportAsFixedFormat(0, $out) } finally { $book.Close($false) }
+  } finally { $app.Quit() }
 } else {
   $app = New-Object -ComObject Word.Application
   $app.Visible = $false; $app.DisplayAlerts = 0
   try {
     $doc = $app.Documents.Open($src, $false, $true, $false, 'mk-no-password')
-    try { $doc.ExportAsFixedFormat($out, 17) } finally { $doc.Close(0) }
+    try {
+      if ($probe -and $doc.Comments.Count) { "ASK comments=$($doc.Comments.Count) notes=0"; return }
+      $item = if ($comments) { 7 } else { 0 }
+      $doc.ExportAsFixedFormat($out, 17, $false, 0, 0, 1, 1, $item)
+    } finally { $doc.Close(0) }
   } finally { if ($app.Documents.Count -eq 0) { $app.Quit() } }
 }
 "#;
 
-/// 메모 폴더의 Word · PowerPoint 첨부 → PDF 내용 | null (Windows 아님 · Office 없음 · 실패 → 화면이 직접 그린다)
-fn office_to_pdf(app: &AppHandle, rel: &str) -> Value {
+/// Office 로 PDF 를 만들 수 있는 문서 (doc-pages.js 는 doc · ppt · xls 를 직접 그리지 못한다 — core/file-kinds.js OFFICE_ONLY_EXTS)
+const OFFICE_EXTS: [&str; 6] = ["docx", "doc", "pptx", "ppt", "xlsx", "xls"];
+
+/// 메모 폴더의 Word · PowerPoint · Excel 첨부 → PDF 내용 | { ask: { comments, notes } } | null
+///   opts 가 없으면 먼저 검토 메모 · 발표자 노트를 본다: 있으면 만들지 않고 ask (화면이 넣을지 묻고 { comments, notes } 로 다시 부른다)
+///   null: Windows 아님 · Office 없음 · 실패 → 화면이 직접 그린다 (못 그리는 종류는 칩만)
+fn office_to_pdf(app: &AppHandle, rel: &str, opts: Option<&Value>) -> Value {
     let rel = memoking_core::js::decode_uri(rel).unwrap_or_else(|| rel.to_string());
     let file = state(app).vault.lock().unwrap().as_ref().filter(|_| rel.starts_with("attachments/")).and_then(|v| v.resolve(&rel)).filter(|f| f.is_file());
-    let Some(src) = file.filter(|f| cfg!(windows) && !crate::ipc::smoke() && f.extension().is_some_and(|e| e.eq_ignore_ascii_case("docx") || e.eq_ignore_ascii_case("pptx"))) else { return Value::Null };
+    let office = |f: &std::path::PathBuf| f.extension().and_then(|e| e.to_str()).is_some_and(|e| OFFICE_EXTS.contains(&e.to_ascii_lowercase().as_str()));
+    let Some(src) = file.filter(|f| cfg!(windows) && !crate::ipc::smoke() && office(f)) else { return Value::Null };
     let out = std::env::temp_dir().join(format!("memoking-pdf-{}-{}.pdf", chrono::Utc::now().timestamp_millis(), std::process::id()));
-    let child = crate::history::powershell(false).args(["-Command", OFFICE_PDF]).env("MK_SRC", &src).env("MK_OUT", &out).stdout(std::process::Stdio::null()).spawn();
+    let flag = |k: &str| if opts.is_some_and(|o| o[k] == true) { "1" } else { "0" };
+    let child = crate::history::powershell(false)
+        .args(["-Command", OFFICE_PDF])
+        .env("MK_SRC", &src)
+        .env("MK_OUT", &out)
+        .env("MK_PROBE", if opts.is_some() { "0" } else { "1" })
+        .env("MK_COMMENTS", flag("comments"))
+        .env("MK_NOTES", flag("notes"))
+        .stdout(std::process::Stdio::piped())
+        .spawn();
     // shortcut: 암호 걸린 PowerPoint 처럼 Office 가 물어보며 멈추면 90초 뒤 포기 (Office 프로그램은 남을 수 있음)
+    let mut said = String::new();
     let ok = child.is_ok_and(|mut c| {
         for _ in 0..900 {
             if let Ok(Some(status)) = c.try_wait() {
+                use std::io::Read;
+                let _ = c.stdout.take().map(|mut o| o.read_to_string(&mut said));
                 return status.success();
             }
             std::thread::sleep(std::time::Duration::from_millis(100));
@@ -320,6 +367,11 @@ fn office_to_pdf(app: &AppHandle, rel: &str) -> Value {
         let _ = c.kill();
         false
     });
+    if let Some(ask) = said.lines().find_map(|l| l.trim().strip_prefix("ASK ")).filter(|_| ok) {
+        let count = |k: &str| ask.split_whitespace().find_map(|kv| kv.strip_prefix(k)?.strip_prefix('=')?.parse::<u64>().ok()).unwrap_or(0);
+        let _ = std::fs::remove_file(&out);
+        return json!({ "ask": { "comments": count("comments"), "notes": count("notes") } });
+    }
     let pdf = std::fs::read(&out).ok().filter(|_| ok);
     let _ = std::fs::remove_file(&out);
     use base64::Engine;
@@ -518,7 +570,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         // shortcut: PDF 만들기는 WebView2(Windows)의 PrintToPdf 로만 — 그 밖(개발용 Linux)은 실패(null). 다른 OS 판을 낼 때 그 웹뷰의 인쇄로
         "pdf:save" if !cfg!(windows) => Ok(Value::Null),
         "pdf:save" => Ok(save_pdf(app, &memoking_core::js::string(args.first().unwrap_or(&Value::Null)), args.get(1).unwrap_or(&Value::Null))),
-        "attachment:to-pdf" => Ok(office_to_pdf(app, args.first().and_then(Value::as_str).unwrap_or_default())),
+        "attachment:to-pdf" => Ok(office_to_pdf(app, args.first().and_then(Value::as_str).unwrap_or_default(), args.get(1).filter(|o| o.is_object()))),
         "update:state" => Ok(update_state(app)),
         "update:check" => {
             if !update_enabled() {

@@ -189,7 +189,7 @@ contextBridge.exposeInMainWorld('memoking', {
     info: invoke('attachment:info'),
     copy: invoke('attachment:copy'), // 메모 폴더의 첨부를 파일 그대로 클립보드에 → true | false
     copyMany: invoke('attachment:copy-many'), // 여러 첨부를 한 번에 (묶음 사진) → true | false
-    toPdf: invoke('attachment:to-pdf'), // Word · PowerPoint 첨부 → PDF 내용 | null (Office 없음)
+    toPdf: invoke('attachment:to-pdf'), // (첨부, 고르기?) Word · PowerPoint · Excel 첨부 → PDF 내용 | { ask: { comments, notes } } | null (Office 없음)
     // 내용 저장(저장 단추): { name, mime, rel? | base64? } → { name } | { cancelled } | { error }
     saveAs: invoke('attachment:save-as'),
     // 공유: { name, mime, rel? | base64?, via: 'drive' | 'localsend' | 'mail' } → { ok, link? } | { missing } | { error }
