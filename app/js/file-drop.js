@@ -12,8 +12,9 @@ const LINGER_MS = 350; // dragover 는 가만히 있어도 계속 온다 — 이
  * @param {HTMLElement} box 편집기를 담은 스크롤 칸 (#editor)
  * @param {() => { dropFiles: Function, dropTarget: Function } | null} getEditor
  * @param {(err: unknown) => void} onError
+ * @param {() => void} onFolders 폴더만 놓았을 때 (폴더는 넣지 않는다 — 탐색기 · 매직키에서 끌어 온 폴더)
  */
-export function setupFileDrop(box, getEditor, onError) {
+export function setupFileDrop(box, getEditor, onError, onFolders) {
   const zone = document.createElement('div');
   zone.className = 'mk-file-drop';
   zone.hidden = true;
@@ -78,8 +79,11 @@ export function setupFileDrop(box, getEditor, onError) {
     e.preventDefault();
     e.stopPropagation(); // 편집기(ProseMirror · 업로드 플러그인)가 또 넣지 않게
     hide();
-    const files = [...e.dataTransfer.files];
+    // 폴더는 빼고 (폴더는 webkitGetAsEntry 로만 알 수 있다 — 목록 창 list.js 와 같게). 폴더만이면 알린다
+    const entries = [...e.dataTransfer.items].map((it) => it.webkitGetAsEntry?.());
+    const files = [...e.dataTransfer.files].filter((_f, i) => !entries[i]?.isDirectory);
     const editor = getEditor();
+    if (!files.length && entries.some((x) => x?.isDirectory)) return onFolders?.();
     if (!files.length || !editor || isOwnDragOut(e.dataTransfer)) return; // 메모에서 끌어낸 것이 도로 떨어짐 (block-move.js)
     editor.dropFiles(files, e.clientX, e.clientY).catch(onError);
   }, true);

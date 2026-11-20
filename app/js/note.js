@@ -1065,7 +1065,7 @@ async function insertFiles(files) {
 setupFileDrop(el.editorRoot, () => editor, (err) => {
   console.error(err);
   setStatus(UI.fileAddFail, true);
-});
+}, () => setStatus(UI.folderDrop, true));
 
 el.fileInput.addEventListener('change', () => {
   insertFiles([...el.fileInput.files]);

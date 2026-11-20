@@ -935,7 +935,7 @@ window.addEventListener('drop', async (e) => {
   const all = [...e.dataTransfer.files].filter((_f, i) => !entries[i]?.isDirectory);
   const files = all.slice(0, MAX_DROP_FILES);
   const over = all.length - files.length; // 한 번에 넣는 수를 넘은 파일 (예전: 말없이 빠졌다)
-  if (!files.length) return;
+  if (!files.length) return entries.some((x) => x?.isDirectory) && flashStatus(UI.folderDrop);
   const made = [];
   let failed = 0;
   for (const file of files) {
