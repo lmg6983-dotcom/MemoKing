@@ -84,9 +84,25 @@ jobs:
           Check ($links -notcontains '메모킹.lnk') 'Electron 판 바로가기 지움'
           Check ($links -notcontains 'MemoKing Beta.lnk') '베타 바로가기 지움'
           Check ($links -contains 'MemoKing.lnk') '새 판 바로가기'
+          $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut("$menu\MemoKing.lnk")
+          Check ($lnk.TargetPath -eq "$env:LOCALAPPDATA\MemoKing\MemoKing.exe") "바로가기가 새 판을 가리킴 ($($lnk.TargetPath))"
           Check ($null -eq $run.'com.memoking.desktop' -and $null -eq $run.'MemoKing Beta') '예전 자동 시작 지움'
           Check ($run.'MemoKing' -like "*$env:LOCALAPPDATA\MemoKing\MemoKing.exe*--hidden") '자동 시작 옮김'
           $proc = Get-Process MemoKing -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$env:LOCALAPPDATA\MemoKing\*" }
           Check ($null -ne $proc) '다 깔고 새 판이 켜짐 (--force-run)'
           Get-Process MemoKing -ErrorAction SilentlyContinue | Stop-Process -Force
           if ($fail.Count) { throw "갈아타기 점검 실패: $($fail -join ', ')" }
+
+      - name: 업데이트(/UPDATE)로 깔 때 Electron 자리를 가리키는 바로가기를 고치기
+        run: |
+          $lnkPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\MemoKing.lnk"
+          $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut($lnkPath)
+          $lnk.TargetPath = "$env:LOCALAPPDATA\Programs\MemoKing\MemoKing.exe"
+          $lnk.Save()
+          $setup = Get-ChildItem desktop-rs/target/debug/bundle/nsis/*-setup.exe | Select-Object -First 1
+          $p = Start-Process $setup.FullName -ArgumentList '/UPDATE','/S' -PassThru
+          if (-not $p.WaitForExit(300000)) { Stop-Process $p; throw '설치가 5분 안에 끝나지 않았어요' }
+          Get-Process MemoKing -ErrorAction SilentlyContinue | Stop-Process -Force
+          $target = (New-Object -ComObject WScript.Shell).CreateShortcut($lnkPath).TargetPath
+          "바로가기: $target"
+          if ($target -ne "$env:LOCALAPPDATA\MemoKing\MemoKing.exe") { throw '바로가기가 아직 예전 자리를 가리켜요' }
