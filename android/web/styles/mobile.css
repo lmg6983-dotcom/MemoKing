@@ -387,9 +387,9 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .row-sub b { color: var(--text-strong); }
 
 /* 켜기/끄기 스위치 — 모양은 base.css, 휴대폰은 손가락에 맞게 조금 크게 · 손잡이가 통통 튀게 */
-.switch { width: 40px; height: 24px; margin: 0 6px; /* 보이는 크기는 그대로, 누르는 자리는 아래 ::before 로 44px */ background: var(--line); transition: background-color 0.15s ease-out; }
+.switch { width: 46px; height: 26px; margin: 0 2px; /* 보이는 크기는 그대로, 누르는 자리는 아래 ::before 로 44px */ background: var(--line); transition: background-color 0.15s ease-out; }
 .switch::after {
-  top: 3px; left: 3px; width: 18px; height: 18px;
+  top: 3px; left: 3px; width: 20px; height: 20px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   transform-origin: left center;
   transition: transform 0.2s var(--ease-out), background-color 0.15s;
@@ -399,7 +399,8 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 /* 누르는 동안 손잡이가 살짝 늘어난다 (움직일 쪽으로) — 폭 대신 scaleX 로 */
 .switch:active::after { transform: scaleX(1.22); }
 .switch:checked::after { transform-origin: right center; }
-.switch:checked:active::after { transform: translateX(16px) scaleX(1.22); }
+.switch:checked::after { transform: translateX(20px); }
+.switch:checked:active::after { transform: translateX(20px) scaleX(1.22); }
 .seg.wide { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; margin: 6px 0 0; }
 .seg.wide button { height: var(--tap); font-size: 13px; }
 .seg button:disabled { opacity: 0.4; }
@@ -516,7 +517,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   overscroll-behavior: contain;
   padding: 6px 16px calc(20px + env(safe-area-inset-bottom));
   border: 0;
-  border-radius: 22px 22px 0 0;
+  border-radius: 28px 28px 0 0;
   background: var(--surface-2);
   color: var(--text);
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
@@ -530,7 +531,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .sheet-bar-title { flex: 1; min-width: 0; align-self: center; padding: 0 8px 0 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 16px; font-weight: 800; opacity: 0; transition: opacity 0.15s; }
 .sheet.scrolled > .sheet-bar .sheet-bar-title { opacity: 1; }
 .sheet-grip { width: 40px; height: 4px; margin: 4px auto 10px; border-radius: 2px; background: var(--line); }
-.sheet-title { margin: 4px 4px 12px; font-size: 18px; line-height: 26px; font-weight: 800; letter-spacing: -0.015em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sheet-title { margin: 4px 4px 14px; font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: -0.015em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 h2.sheet-title { font-size: 20px; }
 .sheet .menu-item { min-height: 50px; padding: 10px 8px; font-size: 15.5px; }
 .sheet .menu-item svg { width: 21px; height: 21px; }
@@ -570,7 +571,17 @@ h2.sheet-title { font-size: 20px; }
 
 .sheet .label { margin: 18px 4px 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
 /* 설정: 묶음마다 가는 줄로 나누고 묶음 이름은 진하게 (PC 설정과 같은 위계), 묶음 안의 작은 이름은 흐리게 */
-.settings-sheet > .label { margin: 22px 4px 8px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 14px; color: var(--text); }
+.settings-sheet > .label { margin: 26px 8px 8px; font-size: 13.5px; color: var(--muted); }
+/* One UI 설정: 회색 바탕 위에 줄들을 흰 카드로 묶는다 — 이어진 줄의 첫 줄 위 · 끝 줄 아래만 둥글게 */
+.settings-sheet { --flow-bg: var(--surface-0); background: var(--surface-0); }
+.settings-sheet.scrolled > .sheet-bar { background: var(--surface-0); }
+.settings-sheet .setting-row { position: relative; margin: 0; padding: 14px 16px 14px 20px; background: var(--surface-1); }
+.settings-sheet .setting-row:not(.setting-row + .setting-row) { border-top-left-radius: 24px; border-top-right-radius: 24px; }
+.settings-sheet .setting-row:not(:has(+ .setting-row)) { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; }
+.settings-sheet .setting-row + .setting-row::after { content: ""; position: absolute; top: 0; left: 20px; right: 16px; height: 1px; background: var(--line); }
+.settings-sheet > .drive-box, .settings-sheet > .path-box { border-radius: 24px; background: var(--surface-1); box-shadow: none; }
+.settings-sheet .btn:not(.primary):not(.danger) { background: var(--surface-1); }
+.settings-sheet > .hint { margin: 8px 12px 0; }
 .settings-sheet .sub-label { margin: 12px 4px 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .settings-sheet .sheet-actions + .setting-row { margin-top: 6px; }
 .sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }

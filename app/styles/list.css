@@ -412,6 +412,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   margin: 0 -24px; padding: 2px 24px 10px;
   background: var(--surface-2);
 }
+/* 설정 창: One UI 설정처럼 회색 바탕 위에 묶음마다 흰 카드 */
+.panel-dialog#settings-dialog { --surface-2: var(--surface-0); }
+#settings-dialog .set-jump a { background: var(--surface-1); }
 .set-jump::-webkit-scrollbar { display: none; }
 .set-jump a {
   flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 10px;
@@ -423,7 +426,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .panel-dialog .set-sec { scroll-margin-top: 80px; }
 #vault-path b { display: block; font-size: 13.5px; }
 #vault-path small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.set-sec { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.set-sec { margin-top: 14px; padding: 18px 20px; border-radius: 24px; background: var(--surface-1); }
 .set-title { margin: 0 0 12px; font-size: 14px; line-height: 20px; font-weight: 700; color: var(--text-strong); }
 .set-title small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .set-sec > .setting-row:last-child, .set-sec > .dialog-actions:last-child { margin-bottom: 0; }
@@ -739,12 +742,13 @@ body.is-dragging .card:hover { transform: none; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px 16px;
   margin-bottom: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
+  border: 0;
+  border-radius: 18px;
+  background: var(--fill-tab);
 }
+#settings-dialog > .app-box { padding: 16px 16px 16px 20px; border-radius: 24px; background: var(--surface-1); }
 .drive-box-icon { flex: none; width: 22px; height: 22px; color: var(--muted); }
 .drive-box.on .drive-box-icon { color: var(--text-strong); }
 .drive-box.error .drive-box-icon, .drive-box.error small { color: var(--danger); }

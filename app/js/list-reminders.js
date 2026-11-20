@@ -647,7 +647,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     return { domNodes: [wrap] };
   }
   // 날 칸: 고른 날 · 지나간 날 · 일요일(빨강) · 토요일
-  const dayClass = (arg) => [sameDay(arg.date, selected) && 'mk-selected', arg.date.getDay() === 0 && 'mk-sun', arg.date.getDay() === 6 && 'mk-sat'].filter(Boolean).join(' ');
+  const dayClass = (arg) => [sameDay(arg.date, selected) && 'mk-selected', arg.date.getDay() === 0 && 'mk-sun', arg.date.getDay() === 6 && 'mk-sat', arg.isOther && 'mk-other'].filter(Boolean).join(' '); // 다른 달 날은 흐리게 (칸 회색 대신)
 
   /** 달력에 줄 일정들 (FullCalendar 의 일정 모양) */
   function calendarEvents(from, to) {

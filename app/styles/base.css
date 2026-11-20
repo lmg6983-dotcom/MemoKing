@@ -194,10 +194,10 @@ svg { width: 20px; height: 20px; flex: none; }
   height: 40px;
   padding: 0 16px;
   border: 0;
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  box-shadow: inset 0 0 0 1px var(--line);
-  font-weight: 600;
+  border-radius: 999px; /* One UI: 알약 · 테두리 없는 옅은 바탕 */
+  background: var(--fill-tab);
+  box-shadow: none;
+  font-weight: 700;
   cursor: pointer;
   transition: background-color 0.15s ease-out, transform 0.16s var(--ease-out);
 }
@@ -213,14 +213,14 @@ svg { width: 20px; height: 20px; flex: none; }
 .dialog {
   width: min(380px, calc(100vw - 32px));
   padding: 24px 24px 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
+  border: 0;
+  border-radius: 28px; /* One UI 대화상자 */
   background: var(--surface-2);
   color: var(--text);
   box-shadow: var(--shadow-pop);
 }
 .dialog:focus { outline: none; } /* 창 자체(열 때 포커스)에는 테두리 없음 — 안의 단추는 그대로 */
-.dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+.dialog::backdrop { background: rgba(0, 0, 0, 0.32); }
 .dialog h2 { margin: 0 0 12px; font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
 .dialog p { margin: 0 0 16px; line-height: 1.6; white-space: pre-line; }
 /* 긴 창(설정·휴지통 …)의 머리: 제목 + 오른쪽 위 × — 스크롤해도 위에 붙어 있다 */
@@ -454,7 +454,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   transition: transform 0.15s;
 }
 .switch:checked { background: var(--brand-yellow); }
-.switch:checked::after { transform: translateX(16px); background: var(--brand-black); }
+.switch:checked::after { transform: translateX(16px); background: #fff; }
 .switch:disabled { opacity: 0.4; cursor: not-allowed; }
 /* 어두운 화면: 꺼진 스위치의 손잡이는 밝게 (어두운 바탕 · 어두운 손잡이면 스위치가 있는지도 안 보였다) */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .switch:not(:checked)::after { background: #d9d6ce; } }
@@ -905,7 +905,7 @@ dialog.quick-event[open] {
 @media (pointer: coarse) { .event-alerts button { min-height: 44px; padding: 10px 14px; font-size: 14px; } .event-field input { min-height: 48px; font-size: 16px; } }
 
 /* ---------- 일정 탭 (list-reminders.js, PC·휴대폰): 달력(FullCalendar 월 · 주 · 목록) + 고른 날·다가오는 일정 ---------- */
-.cal { margin: 4px 0 6px; padding: 10px 8px 8px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-1); overflow: hidden; }
+.cal { margin: 4px 0 6px; padding: 14px 10px 10px; border: 0; border-radius: 26px; background: var(--surface-1); overflow: hidden; } /* One UI: 테두리 없는 흰 카드 */
 .cal-sliding { animation: cal-slide-in 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes cal-slide-in {
   from { opacity: 0.35; transform: translateX(calc(var(--cal-slide, 1) * 42px)); }
@@ -913,14 +913,15 @@ dialog.quick-event[open] {
 }
 @media (prefers-reduced-motion: reduce) { .cal-sliding { animation: none; } }
 .cal-head { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; }
-.cal-title { flex: 1; min-width: 0; overflow: hidden; text-align: center; font-size: 15px; white-space: nowrap; text-overflow: ellipsis; }
+.cal-title { flex: 1; min-width: 0; overflow: hidden; text-align: center; font-size: 18px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
 .cal-nav { width: 36px; height: 36px; }
 .cal-prev svg { transform: rotate(180deg); }
 .cal-today { margin-left: 4px; font-size: 13px; }
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 2px 8px; }
-.cal-views { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(46px, auto); gap: 2px; padding: 3px; border-radius: 10px; background: var(--fill-tab); }
-.cal-views button { height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-.cal-views button[aria-checked="true"] { background: var(--surface-1); color: var(--text-strong); box-shadow: var(--shadow-card); }
+.cal-views { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(46px, auto); gap: 2px; padding: 3px; border-radius: 999px; background: var(--fill-tab); }
+.cal-views button { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.cal-views button[aria-checked="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); }
+.cal-views > .seg-thumb { background: var(--brand-yellow-soft) !important; box-shadow: none !important; }
 .cal-views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 13px; white-space: nowrap; }
 .cal-link svg { width: 15px; height: 15px; flex: none; }
@@ -1208,7 +1209,7 @@ dialog.quick-event[open] {
 
 .cal-body [role="gridcell"] { cursor: pointer; }
 /* 고른 날: 노란 테두리 없이 옅은 노랑 바탕이 스르르 (고를 때마다 페이드 인) */
-.cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); animation: mk-day-pick 0.24s ease-out; }
+.cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); border-radius: 14px; animation: mk-day-pick 0.24s ease-out; }
 @keyframes mk-day-pick { from { background-color: transparent; } }
 @media (prefers-reduced-motion: reduce) { .cal-body [role="gridcell"].mk-selected { animation: none; } }
 
@@ -1260,7 +1261,8 @@ dialog.quick-event[open] {
 }
 /* 달 보기 — 휴대폰 달력 위젯(삼성 캘린더)처럼: 칸 가운데 작은 날짜 숫자, 칸 폭을 꽉 채운 촘촘한 굵은 칩(모서리 4px · 칩 사이 2px),
    테두리 상자 없이 옅은 선만 — 같은 칸에 일정이 더 많이 보이고 제목이 날짜보다 먼저 눈에 들어온다 */
-.cal[data-view="dayGridMonth"] .cal-body { --fc-forma-border: color-mix(in srgb, var(--text) 9%, transparent); --fc-forma-muted-border: color-mix(in srgb, var(--text) 9%, transparent); }
+.cal[data-view="dayGridMonth"] .cal-body { --fc-forma-border: transparent; --fc-forma-muted-border: transparent; --fc-forma-faint: transparent; } /* 삼성 캘린더처럼 칸 선 · 다른 달 회색 칸 없이 */
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"]:not([aria-current="date"]).mk-other > :first-child { opacity: 0.4; }
 .cal[data-view="dayGridMonth"] .cal-body [role="grid"] { border-radius: 0; }
 .cal[data-view="dayGridMonth"] .cal-body [role="columnheader"] { font-size: 13px; font-weight: 800; color: var(--text-strong); }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { display: flex; justify-content: center; padding-top: 2px; font-size: 12px; line-height: 17px; font-weight: 500; color: var(--muted); }
@@ -1269,10 +1271,11 @@ dialog.quick-event[open] {
 @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff6f61' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } }
 
 /* 오늘: 날짜를 빨간 색연필로 쓱 두른 동그라미 (숫자는 진한 글자 그대로 비쳐 보이게 — 읽기 쉽고 메모지 느낌) */
-.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div { position: relative; background: transparent !important; color: var(--text-strong) !important; }
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div { position: relative; background: var(--brand-yellow) !important; color: var(--on-brand) !important; } /* One UI: 오늘은 꽉 찬 노란 원 */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after {
   content: ""; position: absolute; left: -6px; top: -4px; width: 34px; height: 30px; pointer-events: none; /* 동그라미 가운데가 숫자 칸(22px) 가운데에 */
   background: var(--mk-today-ring) center / contain no-repeat; mix-blend-mode: multiply;
+  display: none; /* 색연필 동그라미는 회상 달력만 — 일정 달력은 노란 원 */
 }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after { background-image: var(--mk-today-ring); mix-blend-mode: screen; }
@@ -1280,12 +1283,12 @@ dialog.quick-event[open] {
 
 /* 날짜 숫자 칸: 22px 정사각 → 오늘의 노란 동그라미가 납작한 타원(22.7×20)이 아닌 원으로, 칸 가운데에 (달력이 붙이던 왼쪽 여백 1px 없이) */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { padding-inline: 0 !important; }
-.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: 22px; min-width: 22px; height: 22px; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; line-height: 1; }
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: 24px; min-width: 24px; height: 24px; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; line-height: 1; }
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: #c4282e; } /* 일요일 빨강은 그대로 */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sat, [role="gridcell"].mk-sat > :first-child) { color: var(--sat); } /* 토요일 파랑도 */
 
-.cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 3px !important; }
+.cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 5px !important; }
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev, .cal[data-view="dayGridMonth"] .cal-body .mk-ev > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
 /* 좁은 창(휴대폰): 달력을 화면 폭 가까이 넓혀 칸마다 글자가 더 들어가게 */
 @media (max-width: 700px) { .cal[data-view="dayGridMonth"] { margin-inline: -9px; padding-inline: 2px; } }
