@@ -32,7 +32,20 @@ Var mkAutoStart
   mk_no_beta:
 !macroend
 
+; 바로가기가 Electron 판 자리(지운 exe)를 가리키면 이 판으로 — 업데이트(/UPDATE)로 깔 때 Tauri 는 바로가기를 건드리지 않아
+;   없는 exe 를 가리킨 채 남았고, 시작 메뉴 아이콘과 Windows 알림(같은 앱 이름이라 이 바로가기의 아이콘을 쓴다) 아이콘이 깨졌다
+!macro MkFixShortcut lnk
+  !insertmacro IsShortcutTarget "${lnk}" "$LOCALAPPDATA\Programs\MemoKing\MemoKing.exe"
+  Pop $0
+  ${If} $0 = 1
+    !insertmacro SetShortcutTarget "${lnk}" "$INSTDIR\${MAINBINARYNAME}.exe"
+    !insertmacro SetLnkAppUserModelId "${lnk}"
+  ${EndIf}
+!macroend
+
 !macro NSIS_HOOK_POSTINSTALL
+  !insertmacro MkFixShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+  !insertmacro MkFixShortcut "$DESKTOP\${PRODUCTNAME}.lnk"
   StrCmp $mkAutoStart "on" 0 +2
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "MemoKing" '"$INSTDIR\MemoKing.exe" --hidden'
   ; Electron 판의 자동 업데이트가 띄웠으면 다 깔고 바로 켠다 (그쪽은 앱을 끄고 이 설치 파일을 띄운다)
