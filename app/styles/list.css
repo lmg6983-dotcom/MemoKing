@@ -1176,3 +1176,18 @@ body > :is(.mem-album, .mem-preview)::before { content: ''; position: absolute; 
 }
 /* 설정 창의 누르는 줄: 마우스를 올린 바탕이 글 둘레로 둥글게 (글 자리는 그대로) */
 .set-sec .setting-row.nav-row { margin-inline: -10px; padding: 6px 10px; border-radius: 14px; }
+
+/* ---------- 설정 창 정렬 (One UI 설정처럼): 묶음 카드 하나 = 한 기준선 ----------
+   카드 안의 회색 상자(동기화 상태 · 메모 폴더 · 휴대폰 QR)는 겹 카드였다 — 상자를 걷고 줄로 펴서 아이콘 · 글 · 단추가 카드 안쪽 20px 선에서 시작하고 끝나게.
+   설정 줄은 모두 같은 높이 리듬(위아래 8px, 줄 사이 4px), 누르는 줄의 올림 바탕도 같은 모양. 카드 맨 아래 요소는 아래 여백 없이 (카드 아래가 들쭉날쭉하던 것) */
+.set-sec :is(.drive-box, .path-row, .phone-box) { margin: 0 0 6px; padding: 6px 0; border-radius: 0; background: none; }
+.set-sec .drive-box + .drive-links { margin: 2px 0 6px; }
+.set-sec .setting-row { margin: 0 -10px 4px; padding: 8px 10px; border-radius: 14px; }
+.set-sec .setting-row.sub-row { margin-left: 10px; } /* 들여 쓴 줄: 글이 위 줄 글보다 20px 안쪽 */
+.set-sec > .setting-row.nav-row { margin-inline: -10px; padding: 8px 10px; }
+.set-sec > :last-child, .set-sec > :last-child > :last-child { margin-bottom: 0 !important; }
+.set-sec .set-title { margin-bottom: 10px; }
+.set-sec .label { margin: 10px 0 6px; }
+.set-sec > .btn { margin: 0 0 8px; }
+.set-sec :is(.drive-box, .path-row) .drive-actions .btn:not(.primary) { background: var(--fill-tab); } /* 상자를 걷었으니 단추는 카드 위 옅은 회색 */
+.set-sec .phone-box .phone-qr { border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); } /* QR 흰 바탕이 흰 카드에 묻히지 않게 */
