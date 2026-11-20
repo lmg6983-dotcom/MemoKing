@@ -419,6 +419,7 @@ api.on('mode:changed', ({ enabled } = {}) => {
 });
 
 api.on('memo:removed', () => {
+  editor?.stopDocWork?.(); // 메모가 사라졌다 — 바꾸는 중인 PDF 를 그만두고 파일을 남기지 않는다
   showBanner('이 메모가 메모 폴더에서 사라졌어요. 계속 쓰면 다시 저장돼요.', { keep: '확인' });
 });
 $('banner-load').addEventListener('click', () => {
@@ -1798,15 +1799,30 @@ function showTasks(tasks, opts) {
 //   (예전: 설정 · AI 상태 · 태그 추천 · 저장을 차례로 기다린 뒤에야 창이 사라져 닫기가 굼떴다)
 //   숨은 동안 같은 메모를 다시 열면 새 창이 뜬다 (메인이 닫는 중으로 적어 둔다). 남은 글은 창을 없앨 때도 동기 저장(flushSync)
 let closingWin = false;
+// 닫는 중에 같은 메모를 다시 열었다 (문서를 PDF 로 바꾸느라 숨은 채 기다리던 창) — 닫기를 그만두고 그대로 쓴다
+let closeGen = 0;
+api.on('close:cancel', () => {
+  closeGen++;
+  closingWin = false;
+  document.documentElement.style.opacity = '';
+});
+const DOC_WAIT_MS = 3 * 60 * 1000; // 문서 바꾸기를 숨은 채 기다리는 최대 시간 (그 뒤에는 칩만 남기고 닫는다 — 칩 오른쪽 클릭 › PDF 짝 만들기)
 async function finishClose(hide, vanish = false) {
   if (closingWin) return;
   closingWin = true;
+  const gen = closeGen;
   const t0 = performance.now();
   // PC Rust 판의 메모 창은 투명 창 — 화면을 바로 투명하게 해 누르는 순간 사라져 보이게 (창을 숨기는 데는 100~300ms 가 걸린다).
   //   스택 탭 하나만 닫을 때는 옆 탭이 이 자리에 뜨니 그대로 둔다 (vanish 없음)
   if (vanish && globalThis.__TAURI_INTERNALS__) document.documentElement.style.opacity = '0';
   await hide?.catch(() => {});
   const hidden = Math.round(performance.now() - t0);
+  // 문서를 PDF 로 바꾸는 중이면: 창은 숨긴 채 끝까지 바꿔 썸네일을 붙이고 저장한 뒤 닫는다 (그사이 같은 메모를 열면 이 창이 다시 뜬다)
+  if (editor?.docBusy?.()) {
+    api.win.closeBusy?.().catch(() => {});
+    await Promise.race([editor.docWork(), new Promise((r) => setTimeout(r, DOC_WAIT_MS))]);
+    if (gen !== closeGen) return; // 다시 열었다 — 닫지 않는다
+  }
   try {
     await recorder?.finish(); // 녹음 중이면 끝내서 메모에 넣고 닫는다
     await annotation?.exit(); // 주석을 그리던 중이면 저장하고 닫는다

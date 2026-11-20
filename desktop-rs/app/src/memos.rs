@@ -208,6 +208,9 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
         return Ok(crate::windows::show_tab(app, id, None, true));
     }
     let label = st.note_labels.lock().unwrap().get(id).cloned();
+    if label.as_deref().and_then(|l| crate::windows::reopen_closing(app, id, l)).is_some() {
+        return Ok(true); // 문서를 PDF 로 바꾸느라 숨은 채 닫는 중이던 창 — 그 창을 다시
+    }
     if let Some(w) = label.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         // 마우스를 올려 미리 그리는 중인 창: 다 그리면 보인다 (그리기 전에 보이면 빈 투명 창 — 두 번 눌러야 열렸다)
         PRELOADED.lock().unwrap().retain(|l| l != w.label()); // 미리 그린 창을 연다 — 거두지 않게
@@ -339,6 +342,9 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
     let one = CREATING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let st = state(app);
     let open = st.note_labels.lock().unwrap().get(id).cloned();
+    if let Some(w) = open.as_deref().and_then(|l| crate::windows::reopen_closing(app, id, l)) {
+        return Ok(w);
+    }
     if let Some(w) = open.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         return Ok(w);
     }
@@ -1079,6 +1085,10 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             if let Some(w) = app.get_webview_window(label) {
                 let _ = w.close();
             }
+            Ok(Value::Null)
+        }
+        "win:close-busy" => {
+            crate::windows::mark_close_busy(label);
             Ok(Value::Null)
         }
         // 예비 창의 화면이 다 불러졌다 → 열 메모가 정해질 때까지 이 일꾼 스레드에서 기다린다 (Electron spareWaiting). 예비 창이 아니면 null

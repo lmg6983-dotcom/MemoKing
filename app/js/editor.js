@@ -1427,15 +1427,20 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       // 주석: 원본은 그대로 두고 주석을 넣은 새 PDF · 새 썸네일로 바꾼다 (되돌리기로 원래대로)
       let shown = pdf;
       const onSave = readOnly ? null : async (bytes) => {
+        // 그사이 글이 바뀌었을 수 있다 — 그 썸네일을 다시 찾는다 (없으면 파일을 쓰기 전에 그만 — 쓰지 않는 파일이 남지 않게)
+        const find = () => {
+          let at = -1;
+          v.state.doc.descendants((n, p) => {
+            if (at < 0 && n.type.name === 'image' && pdfOfTitle(n.attrs.title) === shown) at = p;
+            return at < 0;
+          });
+          if (at < 0) throw new Error('메모에서 이 PDF 를 찾지 못해 주석을 넣지 못했어요');
+          return at;
+        };
+        find();
         const pdfSrc = await saveFile(new File([bytes], `${baseName(name)}.pdf`, { type: 'application/pdf' }));
         const thumbSrc = await saveFile(new File([await pdfThumbnail(bytes, 600)], `${baseName(name)} 미리보기.png`, { type: 'image/png' }));
-        // 그사이 글이 바뀌었을 수 있다 — 그 썸네일을 다시 찾는다
-        let at = -1;
-        v.state.doc.descendants((n, p) => {
-          if (at < 0 && n.type.name === 'image' && pdfOfTitle(n.attrs.title) === shown) at = p;
-          return at < 0;
-        });
-        if (at < 0) throw new Error('메모에서 이 PDF 를 찾지 못해 주석을 넣지 못했어요');
+        const at = find();
         const node = v.state.doc.nodeAt(at);
         v.dispatch(v.state.tr.setNodeMarkup(at, null, { ...node.attrs, src: thumbSrc, title: pdfThumbTitle(pdfSrc) }));
         shown = pdfSrc;
@@ -1686,14 +1691,26 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return pdf?.ask ? null : pdf;
   }
 
+  // 문서를 PDF · 그림으로 바꾸는 중인 일 — 창을 닫아도 숨긴 채 끝까지 하고 닫는다 (note.js finishClose · docWork).
+  //   메모가 사라지면(다른 기기 · 탐색기에서 지움) 그만둔다 (stopDocWork) — 그 뒤로는 파일을 남기지 않는다
+  const docJobs = new Set();
+  let docStopped = false;
+  const trackDoc = (job) => {
+    docJobs.add(job);
+    job.finally(() => docJobs.delete(job)).catch(() => {});
+    return job;
+  };
+
   // 메모 폴더에 넣은 문서 → PDF (PDF 는 그대로) → 첫 쪽 썸네일 그림 (누르면 그 PDF 미리보기). 바꾸지 못하면 null (칩만)
   //   onProgress(done, total): 장을 그릴 때마다 (진행 정도는 그 자리의 임시 칸이 보인다)
-  async function documentPdfItem(it, onProgress = null) {
+  //   wanted(): 다 바꾼 뒤 아직 넣을 자리가 있는가 — 없으면(칩을 지움 · 되돌림 · 메모가 사라짐) 파일을 남기지 않고 null
+  async function documentPdfItem(it, onProgress = null, wanted = () => true) {
     const name = it.name;
     try {
       const srcFile = await documentSource(it);
       const isPdf = extOf(srcFile.name) === 'pdf';
       const { pdf, total, pages, thumb } = await documentPdf(srcFile, (n, all) => onProgress?.(n, all));
+      if (docStopped || !wanted()) return null; // 첨부 폴더에 쓰지 않은 PDF · 썸네일 파일이 남지 않게
       // 원래 PDF 면 넣은 파일 그대로, 바꾼 것이면 PDF 를 새로 남긴다
       const pdfSrc = isPdf && extOf(name) === 'pdf' ? it.src : await saveFile(new File([pdf], `${baseName(name)}.pdf`, { type: 'application/pdf' }));
       const thumbSrc = await saveFile(new File([thumb], `${baseName(name)} 미리보기.png`, { type: 'image/png' }));
@@ -1716,7 +1733,19 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const v = view();
     if (!v.isDestroyed) v.dispatch(v.state.tr.setMeta(pendingDocKey, { id, ...meta }).setMeta('addToHistory', false));
   };
-  async function pairDocument(it, pos) {
+  // 칩이 아직 그 문단에 있는가 (그사이 지웠거나 되돌렸으면 썸네일을 붙일 자리가 없다)
+  const chipAt = (state, id, src) => {
+    const p = pendingDocKey.getState(state)?.get(id);
+    if (!p) return null;
+    const $p = state.doc.resolve(Math.min(p.pos, state.doc.content.size));
+    let chip = false;
+    $p.parent.forEach((c) => {
+      if (c.marks?.some((m) => m.type.name === 'link' && m.attrs.href === src)) chip = true;
+    });
+    return $p.parent.type.name === 'paragraph' && chip ? $p : null;
+  };
+  const pairDocument = (it, pos) => trackDoc(pairDocumentNow(it, pos));
+  async function pairDocumentNow(it, pos) {
     const id = String(++pendingSeq);
     const send = (meta) => sendPending(id, meta);
     send({ set: { pos, name: it.name, pdf: extOf(it.name) === 'pdf', done: 0, total: 0 } });
@@ -1724,20 +1753,13 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     requestAnimationFrame(() => {
       view().dom.querySelector(`.mk-doc-pending[data-id="${id}"]`)?.closest('p')?.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
     });
-    const thumb = await documentPdfItem(it, (done, total) => send({ set: { done, total } }));
+    const thumb = await documentPdfItem(it, (done, total) => send({ set: { done, total } }), () => !view().isDestroyed && Boolean(chipAt(view().state, id, it.src)));
     const v = view();
     if (v.isDestroyed) return;
-    const p = pendingDocKey.getState(v.state)?.get(id);
     // 썸네일 붙이기는 보통 편집으로 (addToHistory: false 면 Milkdown 이 바뀐 것으로 알리지 않아 저장되지 않는다)
+    const $p = thumb ? chipAt(v.state, id, it.src) : null;
     const tr = v.state.tr.setMeta(pendingDocKey, { id, remove: true });
-    if (thumb && p) {
-      const $p = tr.doc.resolve(p.pos);
-      let chip = false;
-      $p.parent.forEach((c) => {
-        if (c.marks?.some((m) => m.type.name === 'link' && m.attrs.href === it.src)) chip = true;
-      });
-      if ($p.parent.type.name === 'paragraph' && chip) tr.insert($p.end(), pdfPairNodes(v.state.schema, thumb));
-    }
+    if ($p) tr.insert($p.end(), pdfPairNodes(v.state.schema, thumb));
     v.dispatch(tr);
   }
 
@@ -1749,6 +1771,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const srcFile = await documentSource(it);
       const { pages, total } = await documentPages(srcFile, (n, all) => onNotice?.(`${name}을 이미지로 바꾸고 있어요 (${n}/${all})`));
       const images = [];
+      if (docStopped) return it; // 그사이 메모가 사라졌다 — 장 그림 파일을 남기지 않는다
       for (let i = 0; i < pages.length; i++) {
         const alt = `${baseName(name)} ${i + 1}쪽`;
         images.push({ src: await saveFile(new File([pages[i]], `${alt}.png`, { type: 'image/png' })), alt, page: true });
@@ -1768,7 +1791,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const { pos, node, href, name } = e.detail ?? {};
     if (!href) return;
     const item = { kind: 'file', src: href, name: name || href.split('/').pop() };
-    const album = await documentAlbum(item);
+    const album = await trackDoc(documentAlbum(item));
     if (album && album !== item && album.images?.length) {
       const v = view();
       const insertAt = pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head;
@@ -1784,7 +1807,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const item = { kind: 'file', src: href, name: name || href.split('/').pop() };
     const at = chipParagraphEnd(view().state.doc, href);
     if (at >= 0) return void pairDocument(item, at); // 칩 문단 끝에 (바꾸는 동안 그 자리에 임시 칸)
-    const thumb = await documentPdfItem(item); // 칩이 문단에 섞여 있지 않은 경우 (표 칸 등) — 칩 아래 새 줄에
+    const thumb = await trackDoc(documentPdfItem(item)); // 칩이 문단에 섞여 있지 않은 경우 (표 칸 등) — 칩 아래 새 줄에
     const v = view();
     if (thumb) insertBlocks(pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head, [thumb]);
   });
@@ -2988,6 +3011,13 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     run(name) {
       commands[name]?.();
       view().focus();
+    },
+    /** 문서를 PDF · 그림으로 바꾸는 중인 일이 있는가 · 다 끝날 때까지 (note.js 가 창을 닫기 전에 기다린다) */
+    docBusy: () => docJobs.size > 0,
+    docWork: () => Promise.allSettled([...docJobs]),
+    /** 메모가 사라졌다: 바꾸는 중인 일을 그만둔다 (그 뒤로는 파일을 남기지 않는다) */
+    stopDocWork() {
+      docStopped = true;
     },
     /** 메모 안 찾기 · 바꾸기 (find-bar.js 가 쓴다) */
     find: findController(view),
