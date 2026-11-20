@@ -16,10 +16,10 @@
   --on-black: #ffffff;
 
   /* 바탕 · 글씨 */
-  --surface-0: #f4f2ef; /* 아주 살짝 따뜻한 회색 (OKLCH L.962 C.0045 H85) — 노랑 브랜드와 어울리게 */
-  --surface-1: #ffffff;
-  --surface-2: #ffffff;
-  --line: #e7e4df;
+  --surface-0: #ffffff; /* 바탕은 흰색 (카카오톡 목록 화면처럼) */
+  --surface-1: #f6f6f6; /* 바탕 위 카드 · 검색칸은 아주 옅은 회색 채움 (카톡 검색창처럼) — 흰 바탕 위 흰 카드는 보이지 않아서 */
+  --surface-2: #ffffff; /* 떠 있는 판(메뉴 · 시트 · 대화상자)은 흰색 + 그림자 */
+  --line: #ebebeb;
   --fill-hover: rgba(17, 17, 17, 0.06);
   --fill-tab: rgba(17, 17, 17, 0.05);
   --text-strong: #111111;
@@ -32,7 +32,7 @@
   --on-danger: #ffffff;
   --focus-ring: #111111;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 14px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 0 0 0 transparent; /* 흰 바탕 위 옅은 회색 카드는 채움만으로 갈린다 — 그림자 없이 평평하게 (카톡처럼) */
   /* 떠 있는 판(메뉴·말풍선·대화상자): 1px 테두리와 어울리게 넓게 번지는 그림자 대신 가까운 그림자 두 겹 */
   --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.12);
   /* 안내 말풍선·알림 띠·토스트: 검정 대신 앱 바탕 (다크 모드에선 어두운 앱 바탕) */
