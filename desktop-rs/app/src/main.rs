@@ -23,6 +23,7 @@ mod os;
 mod reminders;
 mod services;
 mod settings;
+mod shell_menu;
 mod shortcuts;
 mod state;
 mod stt;

@@ -417,6 +417,14 @@ fn launch(app: &AppHandle, args: &[String]) -> bool {
         }
         return true;
     }
+    // 탐색기 오른쪽 클릭 › 메모킹에 저장 (--save-file "경로", 파일마다 한 번) — 잠깐 모아 한 메모로 만들어 연다 (shell_menu.rs)
+    let saves: Vec<PathBuf> = args.windows(2).filter(|w| w[0] == "--save-file").map(|w| PathBuf::from(&w[1])).collect();
+    if !saves.is_empty() {
+        for f in saves {
+            crate::shell_menu::save_file(app, f);
+        }
+        return true;
+    }
     // 매직키 "일정 추가": 글을 목록 창에 넘겨 일정 탭 빠른 추가와 같게 만든다 (목록 창이 아직 켜지는 중이면 켜진 뒤 꺼내 간다)
     if let Some(file) = val("--new-schedule-file=").filter(|f| magickey_name(f)) {
         let Some((real, text)) = magickey_file(&file, &std::env::temp_dir()) else { return false };
@@ -443,6 +451,9 @@ pub fn second_launch(app: &AppHandle, argv: Vec<String>, _cwd: String) {
 pub fn start(app: &AppHandle, list: &WebviewWindow) {
     if let Err(err) = tray(app) {
         elog!("알림 영역 아이콘을 만들지 못했어요: {err}");
+    }
+    if !crate::ipc::smoke() {
+        crate::shell_menu::register(); // 탐색기 오른쪽 클릭 › 메모킹에 저장 (이 exe 를 부르게 — 업데이트로 자리가 바뀌어도)
     }
     let app2 = app.clone();
     list.on_window_event(move |e| match e {

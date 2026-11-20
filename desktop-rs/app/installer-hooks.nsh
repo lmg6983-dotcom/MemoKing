@@ -41,3 +41,8 @@ Var mkAutoStart
   IfErrors +2 0
     Exec '"$INSTDIR\MemoKing.exe"'
 !macroend
+
+; 지울 때: 메모킹이 켤 때마다 적던 탐색기 오른쪽 클릭 › "메모킹에 저장" 메뉴도 (desktop-rs/app/src/shell_menu.rs)
+!macro NSIS_HOOK_PREUNINSTALL
+  DeleteRegKey HKCU "Software\Classes\*\shell\MemoKing.Save"
+!macroend
