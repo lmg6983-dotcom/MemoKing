@@ -519,62 +519,41 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     });
   }
 
+  /**
+   * 일정 글 → 일정 만들기 (빠른 추가 · 매직키 "일정 추가" 가 함께 — 같은 해석 · 같은 알림 기본값)
+   *   day: 날짜를 안 적었을 때의 날 (달력에서 고른 날, 매직키는 없음) → { title, schedules, memoIds } · 만들 수 없으면 Error
+   */
+  async function saveScheduleText(raw, day) {
+    const parsed = parseScheduleText(raw, day);
+    if (parsed.needsDateChoice) throw Object.assign(new Error('날짜를 입력하거나 달력에서 날짜를 선택해 주세요.'), { input: true });
+    if (parsed.emptyTitle) throw Object.assign(new Error('일정 제목을 입력해 주세요.'), { input: true });
+    if (!api.reminders.add) throw new Error('일정을 만들지 못했어요');
+    const { title, schedules } = parsed;
+    const memoIds = [];
+    for (const s of schedules) {
+      const allDay = s.allDay;
+      const chosen = pendingAlerts(remembered(allDay ? 'allDay' : 'timed'), s.start, { fallback: fallbackAlert(allDay), allDay });
+      const reminder = { kind: 'at', action: 'notify', enabled: true, created: toLocalIso(new Date()), at: toLocalIso(s.start), alerts: chosen, title };
+      if (allDay) reminder.allDay = true;
+      if (s.type === 'range' && s.end) reminder.end = toLocalIso(s.end);
+      memoIds.push(await api.reminders.add(null, reminder, title));
+    }
+    return { title, schedules, memoIds };
+  }
+  const savedText = ({ title, schedules }) => {
+    if (schedules.length > 1) return `${schedules.length}개의 "${title}" 일정이 저장되었어요`;
+    const d = schedules[0].start;
+    return `${d.getMonth() + 1}월 ${d.getDate()}일 "${title}" 일정이 저장되었어요`;
+  };
+
   async function submitQuickSchedule() {
     const raw = qInput.value.replace(/\s+/g, ' ').trim();
-    if (!raw) return;
-
-    const parsed = parseScheduleText(raw, selected);
-
-    if (parsed.needsDateChoice) {
-      notify('날짜를 입력하거나 달력에서 날짜를 선택해 주세요.', true);
-      qInput.focus();
-      return;
-    }
-
-    if (parsed.emptyTitle) {
-      notify('일정 제목을 입력해 주세요.', true);
-      qInput.focus();
-      return;
-    }
-
-    if (adding || !api.reminders.add) return;
+    if (!raw || adding) return;
     adding = true;
     qSave.disabled = true;
-
     try {
-      const title = parsed.title;
-      const schedules = parsed.schedules;
-      const createdReminders = [];
-
-      for (const s of schedules) {
-        const isRange = s.type === 'range';
-        const allDay = s.allDay;
-        const k = allDay ? 'allDay' : 'timed';
-        const chosen = pendingAlerts(remembered(k), s.start, {
-          fallback: fallbackAlert(allDay),
-          allDay,
-        });
-
-        const reminder = {
-          kind: 'at',
-          action: 'notify',
-          enabled: true,
-          created: toLocalIso(new Date()),
-          at: toLocalIso(s.start),
-          alerts: chosen,
-          title,
-        };
-        if (allDay) reminder.allDay = true;
-        if (isRange && s.end) {
-          reminder.end = toLocalIso(s.end);
-        }
-        createdReminders.push(reminder);
-      }
-
-      for (const rem of createdReminders) {
-        await api.reminders.add(null, rem, title);
-      }
-
+      const done = await saveScheduleText(raw, selected);
+      const { schedules } = done;
       qInput.value = '';
       pickedHour = null;
       for (const c of qChips.querySelectorAll('button')) c.setAttribute('aria-pressed', 'false');
@@ -594,18 +573,11 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
 
       await refresh();
       highlightCreatedDates(schedules.map((s) => s.start));
-
-      if (createdReminders.length > 1) {
-        notify(`${createdReminders.length}개의 "${title}" 일정이 저장되었어요`);
-      } else {
-        const d = schedules[0].start;
-        const m = d.getMonth() + 1;
-        const dt = d.getDate();
-        notify(`${m}월 ${dt}일 "${title}" 일정이 저장되었어요`);
-      }
+      notify(savedText(done));
     } catch (err) {
-      console.error(err);
+      if (!err.input) console.error(err);
       notify(err.message || '일정을 만들지 못했어요', true);
+      if (err.input) qInput.focus();
     } finally {
       adding = false;
       qSave.disabled = false;
@@ -1401,6 +1373,12 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       else render();
       markView();
       updateCount(new Date()); // 탭 숫자도 그 모드의 것으로 (회상 보기로 가면 render 를 거치지 않는다)
+    },
+    /** 매직키가 넘긴 일정 글로 일정 만들기 (빠른 추가와 같게) → { title, schedules, memoIds, text } · 못 만들면 Error */
+    async addFromText(raw) {
+      const done = await saveScheduleText(String(raw ?? '').replace(/\s+/g, ' ').trim(), null);
+      await refresh({ quiet: true });
+      return { ...done, text: savedText(done) };
     },
     /** @param {{ quiet?: boolean }} [o] quiet: 그리지 않고 검색어만 (곧 refresh 가 그릴 때 — 달력을 두 번 그리지 않게) */
     setQuery(q, { quiet = false } = {}) {

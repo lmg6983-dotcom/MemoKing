@@ -1488,6 +1488,33 @@ for (const b of document.querySelectorAll('.tabs [data-tab]')) b.addEventListene
 tabKeys(document.querySelector('.tabs'));
 api.on('list:tab', showTab);
 api.on('reminders:changed', () => remindersTab.refresh({ quiet: activeTab !== 'reminders' })); // 안 보이는 달력은 탭으로 갈 때 그린다
+// 매직키 "일정 추가" (--new-schedule-file): 기다리는 글을 꺼내 일정 탭 빠른 추가와 같게 만들고 Windows 알림으로 알린다
+//   목록 창이 켜지는 중에 온 글도 — 켤 때 한 번 꺼내 간다 (아래 준비 끝)
+let takingMagic = null;
+let magicAgain = false; // 꺼내는 중에 또 알려 왔다 — 끝나면 한 번 더
+async function takeMagicSchedules() {
+  if (!api.reminders.takeMagic) return;
+  if (takingMagic) magicAgain = true;
+  takingMagic ??= (async () => {
+    try {
+      // 꺼내는 동안 또 온 글도 (빌 때까지)
+      for (let list = await api.reminders.takeMagic(); list.length; list = await api.reminders.takeMagic()) {
+        for (const text of list) {
+          const done = await remindersTab.addFromText(text).catch((err) => ({ error: err.message || '일정을 만들지 못했어요' }));
+          await api.reminders.magicDone(done.memoIds?.[0] ?? null, done.error ? text.slice(0, 40) : done.title, done.error ?? `${done.text} · 눌러서 열기`).catch(() => {});
+        }
+      }
+    } finally {
+      takingMagic = null;
+      if (magicAgain) {
+        magicAgain = false;
+        void takeMagicSchedules();
+      }
+    }
+  })();
+  return takingMagic;
+}
+api.on('schedule:magic', () => void takeMagicSchedules());
 api.on('history:changed', () => activeTab === 'history' && historyTab.refresh());
 $('reveal-vault').addEventListener('click', () => api.vault.reveal());
 $('change-vault').addEventListener('click', async () => {
@@ -2422,6 +2449,7 @@ api.recovered?.count().then((n) => {
 }, () => {});
 await remindersTab.refresh().catch(reportError);
 showTab(new URLSearchParams(location.search).get('tab') ?? 'memos');
+void takeMagicSchedules(); // 켜지는 동안 매직키가 넘긴 일정
 document.documentElement.dataset.ready = 'true';
 liftBoot();
 

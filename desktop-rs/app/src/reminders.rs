@@ -40,6 +40,13 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         "reminders:set" => set_reminders(app, arg(0).as_str().unwrap_or_default(), arg(1)),
         "reminders:all" => Ok(vault(app, |v| json!(v.all_reminders())).unwrap_or_else(|| json!([]))),
         "reminders:add" => add_reminder(app, arg(0), arg(1), arg(2), arg(3)),
+        // 매직키 일정 추가: 기다리는 글을 꺼내 가고(목록 창), 만든 뒤 Windows 알림 (memoId | null, 제목, 안내)
+        "reminders:take-magic" => Ok(json!(std::mem::take(&mut *state(app).magic_schedules.lock().unwrap()))),
+        "reminders:magic-done" => {
+            let (id, title, label) = (arg(0).as_str().unwrap_or_default(), js::string(arg(1)), js::string(arg(2)));
+            toast(app, id, if id.is_empty() { "일정을 만들지 못했어요" } else { "일정을 만들었어요" }, &title, &label, None);
+            Ok(Value::Null)
+        }
         "calendars:feeds" => Ok(json!(feed_list(app))),
         "calendars:set-feeds" => Ok(json!(save_feeds(app, arg(0)))),
         "calendars:fetch" => Ok(fetch_feed(app, &if arg(0).is_null() { String::new() } else { js::string(arg(0)) }, arg(1) == true)),

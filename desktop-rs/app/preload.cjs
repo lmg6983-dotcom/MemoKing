@@ -3,7 +3,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const EVENTS = [
-  'app:ready',
+  'app:ready', 'schedule:magic',
   'memos:changed', 'shortcuts:changed', 'memo:external', 'memo:removed', 'memo:trashed', 'memo:meta', 'memo:links-changed', 'vault:opened',
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
@@ -70,6 +70,9 @@ contextBridge.exposeInMainWorld('memoking', {
     set: invoke('reminders:set'),
     all: invoke('reminders:all'),
     add: invoke('reminders:add'),
+    // 매직키 일정 추가 (--new-schedule-file): 기다리는 글 꺼내기 · 만든 뒤 Windows 알림 (memoId | null, 제목, 안내)
+    takeMagic: invoke('reminders:take-magic'),
+    magicDone: invoke('reminders:magic-done'),
   },
   // 일정 탭이 함께 보는 다른 캘린더 (.ics 구독 — Google 캘린더 비공개 주소 등): feeds() · setFeeds(목록) · fetch(id, 새로) → { text, at, error? }
   calendars: {
