@@ -2732,7 +2732,7 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-doc p:has(> img.mk-pdf-thumb) { position: relative; width: fit-content; max-width: 100%; }
 /* 문서 칩 + 썸네일 한 문단: 그림이 블록이라 줄바꿈 · 편집기 보조 그림이 빈 줄만 더한다 (묶음 사진과 같게) */
 .mk-doc p:has(> img.mk-pdf-thumb) > :is(img.ProseMirror-separator, br) { display: none !important; }
-.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF 보기"; position: absolute; right: 8px; bottom: 10px; padding: 3px 10px; border-radius: 999px; background: rgba(17, 17, 17, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; } /* 빨강 대신 차분한 어두운 알약 — 빨강은 지우기 · 녹음 같은 경고에만 */
+.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF 보기"; position: absolute; right: 8px; bottom: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(17, 17, 17, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; } /* 빨강 대신 차분한 어두운 알약 — 빨강은 지우기 · 녹음 같은 경고에만 */
 /* 문서 캡슐: 두 칸이 무엇을 여는지 — 위 이름 줄은 원본을 그 앱으로(↗ 다른 앱), 아래 첫 쪽은 메모킹 안 PDF 보기. 확장자 자리에 할 일을 적는다 */
 .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]::after { content: "원본 열기 ↗"; margin-left: auto; padding: 0 6px; font-weight: 600; }
 .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:is([data-ext="DOCX"], [data-ext="DOC"])::after { content: "Word로 열기 ↗"; }

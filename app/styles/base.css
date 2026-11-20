@@ -1312,7 +1312,7 @@ dialog.quick-event[open] {
 
 /* 날짜 숫자 칸: 22px 정사각 → 오늘의 노란 동그라미가 납작한 타원(22.7×20)이 아닌 원으로, 칸 가운데에 (달력이 붙이던 왼쪽 여백 1px 없이) */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { padding-inline: 0 !important; }
-.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: 24px; min-width: 24px; height: 24px; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; line-height: 1; }
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: auto; min-width: 19px; height: 19px; margin: 0 !important; padding: 0 3px !important; display: flex; align-items: center; justify-content: center; border-radius: 999px !important; line-height: 1; } /* 오늘 원은 숫자에 꼭 맞게 (24px 는 숫자보다 테두리가 커 보였다), 두 자리면 살짝 긴 알약 */
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: #c4282e; } /* 일요일 빨강은 그대로 */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sat, [role="gridcell"].mk-sat > :first-child) { color: var(--sat); } /* 토요일 파랑도 */
@@ -1709,7 +1709,7 @@ dialog.quick-event[open] {
 }
 @keyframes mf-run { 0%, 12% { transform: none; } 88%, 100% { transform: translateX(calc(var(--mf-w, 0px) - 100%)); } }
 /* 메모 수: 이름과 떨어진 작은 알약 (Apple 메일처럼) */
-.mf-count { flex: none; min-width: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--muted); font-size: 11.5px; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.mf-count { flex: none; min-width: 16px; padding: 0 4px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--muted); font-size: 11.5px; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }
 .mf-item[aria-current="true"] .mf-count { background: color-mix(in srgb, var(--text-strong) 10%, transparent); }
 /* 두 묶음 사이: 가는 선과 "폴더" 머리글 */
 .mf-sep { margin: 6px 4px 0; padding: 9px 6px 3px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; list-style: none; user-select: none; }

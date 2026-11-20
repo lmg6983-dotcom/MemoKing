@@ -182,7 +182,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   .tabs { left: 50%; right: auto; width: min(calc(100% - 32px), 520px); transform: translateX(-50%); }
   .note-screen #format-bar, .note-screen .tag-suggest-bar { align-self: center; width: min(calc(100% - 32px), 720px); margin-inline: auto; }
 }
-.tab-count { position: absolute; top: 4px; left: calc(50% + 9px); min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--text-strong); color: var(--surface-1); font-size: 11px; font-weight: 800; line-height: 18px; } /* 숫자 배지는 무채색 */
+.tab-count { position: absolute; top: 5px; left: calc(50% + 9px); min-width: 15px; padding: 0 4px; border-radius: 999px; background: var(--text-strong); color: var(--surface-1); font-size: 10.5px; font-weight: 800; line-height: 15px; text-align: center; } /* 숫자 배지는 무채색 */
 .tab-count:empty { display: none; }
 
 /* One UI 큰 머리: 맨 위에서는 화면 위쪽을 비워 제목을 가운데 크게 (보는 자리),

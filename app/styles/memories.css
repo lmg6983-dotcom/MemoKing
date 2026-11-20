@@ -61,7 +61,7 @@ button.mem-day:active { transform: scale(0.96); }
 .mem-day.mem-sat .mem-num { color: var(--sat); }
 .mem-day.mem-out { opacity: 0.32; }
 /* 오늘: 캘린더 보기와 같은 꽉 찬 노란 원 (바꿀 때 오늘 표시 모양이 바뀌지 않게) */
-.mem-day.mem-today .mem-num { display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 3px; top: 2px; left: 3px; border-radius: 999px; background: var(--brand-yellow); font-weight: 800; color: var(--on-brand) !important; }
+.mem-day.mem-today .mem-num { display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 2px; top: 3px; left: 3px; border-radius: 999px; background: var(--brand-yellow); font-weight: 800; color: var(--on-brand) !important; }
 .mem-day:not(.has-photo):not(.has-note) { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); }
 
 /* 사진 있는 날: 하얀 테두리 사진 한 장 (여러 장이면 뒤에 기운 사진 한 장 더) */
