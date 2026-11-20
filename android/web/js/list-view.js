@@ -470,6 +470,7 @@ export function render() {
   $('other-mode').textContent = elsewhere ? `${MODE_LABEL[otherMode(state.mode)]}에서 ${elsewhere}개 더 찾았어요` : '';
   // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)
   glideCards(() => layoutCards(memos));
+  $('large-sub').textContent = `메모 ${memos.length}개`;
   el.empty.hidden = memos.length > 0;
   el.empty.parentElement.classList.toggle('is-empty', !memos.length); // 안내 · 단추를 목록 칸 가운데에 (PC 와 같이)
   if (!memos.length) renderEmpty(narrowed, elsewhere);
@@ -843,6 +844,9 @@ function setTab(tab) {
   $('view-memos').hidden = tab !== 'memos';
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
+  $('large-title').textContent = { memos: '메모', reminders: '일정', history: '알림 보관함' }[tab];
+  $('large-sub').hidden = tab !== 'memos';
+  document.querySelector('.list-screen').classList.remove('scrolled');
   el.filterBtn.hidden = tab !== 'memos';
   el.folderBtn.hidden = tab !== 'memos'; // 폴더는 메모에만 (일정 · 보관함에는 쓸 데가 없다)
   el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: UI.searchHistory }[tab];
@@ -860,6 +864,14 @@ function setTab(tab) {
   }, 0));
 }
 let tabSeq = 0;
+// One UI 큰 제목: 목록을 내리면 접고, 맨 위로 오면 다시 편다
+document.querySelector('.list-screen').addEventListener('scroll', (e) => {
+  if (!e.target.classList?.contains('view')) return;
+  const v = e.target, y = v.scrollTop, list = e.currentTarget.classList; // 접고 펴는 문턱을 벌려 둔다 (제목 높이만큼 목록이 움직여도 오락가락하지 않게)
+  // 접으면 목록 칸이 머리 높이만큼 길어진다 — 그래도 내릴 거리가 남는 긴 목록만 접는다 (짧으면 접자마자 맨 위로 돌아와 다시 펴졌다)
+  if (y > 48 && v.scrollHeight - v.clientHeight - $('large-title').parentElement.offsetHeight > 8) list.add('scrolled');
+  else if (y < 4) list.remove('scrolled');
+}, { capture: true, passive: true });
 tabKeys(document.querySelector('.tabs'));
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');

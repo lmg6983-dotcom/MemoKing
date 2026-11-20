@@ -1,4 +1,6 @@
-/* 모든 창이 함께 쓰는 기본 스타일 — 값은 메모킹 디자인 시스템(노랑·검정) 토큰 */
+/* 모든 창이 함께 쓰는 기본 스타일 — 값은 메모킹 디자인 시스템 토큰
+   모양은 One UI 9.5 를 따른다: 무채색 바탕 위 흰 카드, 크게 둥근 모서리, 떠 있는 판은 평평한 반투명(블러는 약하게), 강조는 메모킹 노랑
+   매직키(MagicKey ui/magic.css) · MagicSystem(ui/styles/base.css) 도 같은 값을 쓴다 — 바꾸면 함께 바꾼다 */
 /* 브랜드 글꼴 Pretendard Variable: 글자 묶음별로 나눈 판 — 창마다 화면에 나온 글자의 묶음만 읽는다 (scripts/build-vendor.mjs) */
 @import url("../vendor/fonts/pretendard/pretendard.css");
 
@@ -12,15 +14,15 @@
   --on-black: #ffffff;
 
   /* 바탕 · 글씨 */
-  --surface-0: #f6f5f1;
+  --surface-0: #f2f2f2;
   --surface-1: #ffffff;
   --surface-2: #ffffff;
-  --line: #e8e6df;
+  --line: #e6e6e6;
   --fill-hover: rgba(17, 17, 17, 0.06);
   --fill-tab: rgba(17, 17, 17, 0.05);
   --text-strong: #111111;
-  --text-muted: #6b6860;
-  --text-faint: #8f8c83;
+  --text-muted: #686868;
+  --text-faint: #8a8a8a;
   --danger: #d93036;
   --sat: #2260c4; /* 달력 토요일 (흰 바탕 5.9:1) */
   --ok-text: #1e7a45; /* 복사했어요 · 저장 같은 성공 글 */
@@ -28,9 +30,9 @@
   --on-danger: #ffffff;
   --focus-ring: #111111;
 
-  --shadow-card: 0 1px 2px rgba(17, 17, 17, 0.06), 0 2px 8px rgba(17, 17, 17, 0.04);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 14px rgba(0, 0, 0, 0.04);
   /* 떠 있는 판(메뉴·말풍선·대화상자): 1px 테두리와 어울리게 넓게 번지는 그림자 대신 가까운 그림자 두 겹 */
-  --shadow-pop: 0 2px 6px rgba(17, 17, 17, 0.1), 0 10px 20px rgba(17, 17, 17, 0.1);
+  --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.12);
   /* 안내 말풍선·알림 띠·토스트: 검정 대신 앱 바탕 (다크 모드에선 어두운 앱 바탕) */
   --bubble-bg: var(--surface-2);
   --bubble-fg: var(--text-strong);
@@ -38,10 +40,15 @@
   --bubble-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
 
   --font-sans: "Pretendard Variable", Pretendard, "Malgun Gothic", system-ui, sans-serif;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+
+  /* One UI 9.5 의 떠 있는 판(아래 탭바 · 메뉴 · 시트): 평평한 반투명 — 9.0 의 짙은 젖빛 유리보다 블러를 줄였다 */
+  --glass-bg: rgba(255, 255, 255, 0.78);
+  --glass-line: rgba(0, 0, 0, 0.06);
+  --glass-blur: blur(14px) saturate(1.6);
 
   /* 예전 이름 — 각 화면 CSS 가 쓰는 짧은 이름을 토큰에 잇는다 */
   --bg: var(--surface-0);
@@ -84,15 +91,17 @@
   :root:where(:not([data-theme="light"])) {
     --brand-yellow-hover: #ffd633;
     --brand-yellow-soft: #3a3100;
-    --surface-0: #0e0e0d;
-    --surface-1: #1a1a18;
-    --surface-2: #252522;
-    --line: #2e2d29;
+    --surface-0: #000000;
+    --surface-1: #171717;
+    --surface-2: #232323;
+    --line: #2a2a2a;
+    --glass-bg: rgba(30, 30, 30, 0.74);
+    --glass-line: rgba(255, 255, 255, 0.08);
     --fill-hover: rgba(255, 255, 255, 0.08);
     --fill-tab: rgba(255, 255, 255, 0.06);
     --text-strong: #f5f4ef;
-    --text-muted: #a3a098;
-    --text-faint: #77746c;
+    --text-muted: #a0a0a0;
+    --text-faint: #767676;
     --danger: #ff6b70;
     --sat: #74b0f7;
     --ok-text: #6fd39a;
@@ -1640,7 +1649,7 @@ dialog.quick-event[open] {
 .mf-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin: 0; padding: 0; list-style: none; } /* minmax(0): 긴 폴더 이름이 줄을 밀어 넓히지 않고 … 로 줄어든다 */
 .mf-item {
   display: flex; align-items: center; gap: 8px; width: 100%; min-height: 34px; padding: 6px 10px;
-  border: 0; border-radius: var(--radius-sm); background: none; color: var(--text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer;
+  border: 0; border-radius: 999px; background: none; color: var(--text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer;
 }
 .mf-item svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
 .mf-item:hover:not(:disabled) { background: var(--hover); }
@@ -1648,7 +1657,6 @@ dialog.quick-event[open] {
 /* 고른 폴더: 옅은 바탕 + 왼쪽 노란 막대 (Notion · Linear 처럼 — 줄마다 상자가 겹쳐 보이지 않게) */
 .mf-item { position: relative; }
 .mf-item[aria-current="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 700; }
-.mf-item[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 3px; background: var(--brand-yellow); }
 .mf-item[aria-current="true"] svg, .mf-item[aria-current="true"] .mf-count { color: inherit; }
 .mf-item:disabled { cursor: default; opacity: 0.6; }
 .mf-item.drop-on { box-shadow: inset 0 0 0 2px var(--brand-yellow); background: var(--hover); }
