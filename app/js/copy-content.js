@@ -9,6 +9,8 @@ import { mediaKindOf, isAlbumTitle, plainAlt, pdfOfTitle } from './core/memo-fil
 import { textBase64 } from './core/base64.js';
 import { voiceAudioOf } from './core/voice-card.js';
 import { fullUrl } from './media.js';
+import { rememberDragOut } from './core/drag-out.js';
+export { isOwnDragOut } from './core/drag-out.js';
 
 let host = {
   /** @param {string} pngBase64 */
@@ -27,10 +29,8 @@ let host = {
   /** 공유: { name, mime, rel? | base64?, text? } — 휴대폰 공유 창 · PC 공유 방법 고르기(share-menu.js) (없으면 공유 단추를 보이지 않음)
    *  → 휴대폰 'shared' · PC 'link' | 'localsend' | 'localsend-missing' | 'mail' · 둘 다 'cancelled' (문구는 share-menu.js SHARE_DONE) */
   share: null,
-  /** PC 끌어내기: 메모 안 내용을 탐색기 · 바탕화면 · 카카오톡 같은 다른 프로그램으로 — ({ name, rel? | base64? }) 끌기를 시작 */
+  /** PC 끌어내기: 메모 안 내용을 탐색기 · 바탕화면 · 카카오톡 같은 다른 프로그램으로 — ({ name, rel? | base64? }) 끌기를 시작 → 끄는 파일 이름 */
   dragOut: null,
-  /** PC: 끌어다 놓은 File 의 원래 경로 ('' = 알 수 없음) — 메모킹이 끌어낸 임시 파일이 도로 떨어졌는지 알아보는 데 */
-  pathOf: null,
   /** PC: 내용을 오른쪽 클릭하면 아이콘 줄이 있는 메뉴(ctx-menu.js)를 쓴다 — 휴대폰은 단추 줄 (delete-button.js) */
   contentMenu: false,
 };
@@ -348,12 +348,8 @@ export async function dragOutBlock(view, pos, node, target, name = '') {
   if (!host.dragOut) return false;
   const { text: _text, mime: _mime, ...f } = await blockPayload(view, pos, node, target);
   if (!f.rel && /\.txt$/i.test(f.name ?? '')) return false;
-  host.dragOut({ ...f, name: name || f.name });
+  const shown = await host.dragOut({ ...f, name: name || f.name });
+  if (shown) rememberDragOut(shown); // 메모 창 · 목록 창에 도로 놓으면 취소로 (core/drag-out.js)
   return true;
 }
 
-/** 방금 끌어낸 임시 파일이 메모에 도로 떨어졌는가 (그러면 파일이 하나 더 생기지 않게 무시) */
-export function isOwnDragOut(dataTransfer) {
-  if (!host.pathOf || !dataTransfer?.files?.length) return false;
-  return [...dataTransfer.files].some((file) => /[\\/]memoking-drag[\\/]/.test(host.pathOf(file)));
-}

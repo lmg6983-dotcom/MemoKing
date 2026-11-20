@@ -98,6 +98,8 @@ struct Wm {
     closing: HashSet<String>,
     /// 닫는 중(숨기고 남은 글을 저장하는 중)인 메모 창. 없어질 때 뺀다
     closing_notes: HashSet<String>,
+    /// 닫는 중인데 문서를 PDF 로 바꾸느라 숨은 채 기다리는 메모 창 — 그사이 같은 메모를 열면 닫기를 그만두고 다시 보인다 (reopen_closing)
+    closing_busy: HashSet<String>,
     /// 숨은 메모 창이 처음 숨은 것으로 보인 때 — 오래 숨은 스택 탭은 거둔다 (discard_tick)
     hidden_at: HashMap<String, Instant>,
     /// 예비 창으로 되돌려 다시 쓴 횟수 (창마다 RECYCLE_MAX 까지)
@@ -152,6 +154,30 @@ fn note_win(app: &AppHandle, id: &str) -> Option<WebviewWindow> {
 /// 닫는 중인 메모 창은 곧 없어지니 없는 셈 친다 (다시 열면 새 창으로)
 pub fn is_closing(label: &str) -> bool {
     wm().closing_notes.contains(label)
+}
+
+/// 닫는 메모 창이 문서 바꾸기를 숨은 채 기다린다 (win:close-busy)
+pub fn mark_close_busy(label: &str) {
+    if is_closing(label) {
+        wm().closing_busy.insert(label.to_string());
+    }
+}
+
+/// 숨은 채 기다리던 창의 메모를 다시 열었다: 닫기를 그만두고 그 창을 다시 보인다 (새 창을 띄우면 두 창이 같은 메모를 저장해 덮어쓴다) → 그 창
+pub fn reopen_closing(app: &AppHandle, id: &str, label: &str) -> Option<WebviewWindow> {
+    {
+        let mut g = wm();
+        if !g.closing_busy.remove(label) {
+            return None;
+        }
+        g.closing_notes.remove(label);
+    }
+    let w = app.get_webview_window(label)?;
+    emit(app, label, "close:cancel", Value::Null);
+    show_note_win(&w);
+    let _ = w.set_focus();
+    shown(app, id, &w);
+    Some(w)
 }
 
 fn note_id(app: &AppHandle, label: &str) -> Option<String> {
@@ -580,6 +606,7 @@ fn destroyed(app: &AppHandle, id: &str, label: &str) {
     let (sticker, pin) = {
         let mut g = wm();
         g.closing_notes.remove(label);
+        g.closing_busy.remove(label);
         g.inking.remove(label);
         g.reveal.remove(label);
         g.settle.remove(label);

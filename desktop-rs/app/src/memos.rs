@@ -208,6 +208,9 @@ pub fn open_note(app: &AppHandle, id: &str) -> Result<bool, String> {
         return Ok(crate::windows::show_tab(app, id, None, true));
     }
     let label = st.note_labels.lock().unwrap().get(id).cloned();
+    if label.as_deref().and_then(|l| crate::windows::reopen_closing(app, id, l)).is_some() {
+        return Ok(true); // 문서를 PDF 로 바꾸느라 숨은 채 닫는 중이던 창 — 그 창을 다시
+    }
     if let Some(w) = label.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         // 마우스를 올려 미리 그리는 중인 창: 다 그리면 보인다 (그리기 전에 보이면 빈 투명 창 — 두 번 눌러야 열렸다)
         PRELOADED.lock().unwrap().retain(|l| l != w.label()); // 미리 그린 창을 연다 — 거두지 않게
@@ -339,6 +342,9 @@ pub fn create_note_window(app: &AppHandle, id: &str, bounds: Option<[f64; 4]>, s
     let one = CREATING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let st = state(app);
     let open = st.note_labels.lock().unwrap().get(id).cloned();
+    if let Some(w) = open.as_deref().and_then(|l| crate::windows::reopen_closing(app, id, l)) {
+        return Ok(w);
+    }
     if let Some(w) = open.filter(|l| !crate::windows::is_closing(l)).and_then(|l| app.get_webview_window(&l)) {
         return Ok(w);
     }
@@ -609,7 +615,7 @@ fn save_attachment_as(app: &AppHandle, f: &Value) -> Result<Value, String> {
 }
 
 /// 첨부를 메모 밖(탐색기 · 바탕화면 · 카카오톡)으로 끌어내기: { name, rel? | base64? } — 임시 폴더에 그 이름으로 복사해 파일 끌기 (Electron startDrag)
-fn drag_out(app: &AppHandle, label: &str, f: &Value) -> Option<()> {
+fn drag_out(app: &AppHandle, label: &str, f: &Value) -> Option<String> {
     use base64::Engine;
     let source = match (f["rel"].as_str(), f["base64"].as_str()) {
         (Some(rel), _) if !rel.is_empty() => Ok(attachment_file(app, rel).ok()?),
@@ -639,10 +645,11 @@ fn drag_out(app: &AppHandle, label: &str, f: &Value) -> Option<()> {
         Err(bytes) => std::fs::write(&file, bytes),
     }
     .ok()?;
+    let shown = file.file_name()?.to_string_lossy().into_owned(); // 끄는 파일 이름 — 화면이 메모킹에 도로 떨어졌는지 알아보는 데 (isOwnDragOut)
     if !crate::ipc::smoke() {
         start_file_drag(app, label, file);
     }
-    Some(())
+    Some(shown)
 }
 
 /// 셸 파일 끌기(SHDoDragDrop) — 창 스레드(메인)에서, 놓거나 Esc 를 누를 때까지 그 안에서 메시지를 돈다.
@@ -932,10 +939,11 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "attachment:open" => open_attachment(app, &arg_str(args, 0)),
         "attachment:save-as" => save_attachment_as(app, args.first().unwrap_or(&Value::Null)),
         "attachment:drag-out" => {
-            if drag_out(app, label, args.first().unwrap_or(&Value::Null)).is_none() {
+            let shown = drag_out(app, label, args.first().unwrap_or(&Value::Null));
+            if shown.is_none() {
                 elog!("[drag-out] 끌어낼 파일을 만들지 못했어요");
             }
-            Ok(Value::Null)
+            Ok(json!(shown))
         }
         "memo:handoff" => {
             let last = st.handoff.lock().unwrap().1.clone();
@@ -1077,6 +1085,10 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             if let Some(w) = app.get_webview_window(label) {
                 let _ = w.close();
             }
+            Ok(Value::Null)
+        }
+        "win:close-busy" => {
+            crate::windows::mark_close_busy(label);
             Ok(Value::Null)
         }
         // 예비 창의 화면이 다 불러졌다 → 열 메모가 정해질 때까지 이 일꾼 스레드에서 기다린다 (Electron spareWaiting). 예비 창이 아니면 null

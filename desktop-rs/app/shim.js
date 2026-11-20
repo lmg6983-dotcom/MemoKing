@@ -18,8 +18,6 @@
 
   const electron = {
     contextBridge: { exposeInMainWorld: (name, api) => { window[name] = api; } },
-    // shortcut: 끌어다 놓은 파일의 원래 경로는 아직 '' (화면은 '' 를 "모름" 으로 다룬다) — 첨부 끌어내기를 옮길 때 Tauri 드롭 이벤트로
-    webUtils: { getPathForFile: () => '' },
     ipcRenderer: {
       invoke: (channel, ...args) => call(channel, args),
       send: (channel, ...args) => { call(channel, args).catch((e) => console.warn(`[ipc] ${channel}`, e)); },

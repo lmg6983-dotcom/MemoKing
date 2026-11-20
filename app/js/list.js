@@ -11,6 +11,7 @@ import { vaultUrl, mediaKind, fileExtension } from './media.js';
 import { videoThumb } from './video-poster.js';
 import { memoBodyFromFile } from './core/file-memo.js';
 import { isDocumentFile } from './core/file-kinds.js';
+import { isOwnDragOut } from './core/drag-out.js';
 import { isTextDocument } from './core/markdown-import.js';
 import { setupRemindersTab } from './list-reminders.js';
 import { setupHistoryTab } from './list-history.js';
@@ -935,6 +936,7 @@ window.addEventListener('drop', async (e) => {
   const all = [...e.dataTransfer.files].filter((_f, i) => !entries[i]?.isDirectory);
   const files = all.slice(0, MAX_DROP_FILES);
   const over = all.length - files.length; // 한 번에 넣는 수를 넘은 파일 (예전: 말없이 빠졌다)
+  if (isOwnDragOut(e.dataTransfer)) return; // 메모에서 끌어낸 것을 목록에 도로 놓음 = 취소 (새 메모를 만들지 않는다)
   if (!files.length) return entries.some((x) => x?.isDirectory) && flashStatus(UI.folderDrop);
   const made = [];
   let failed = 0;
