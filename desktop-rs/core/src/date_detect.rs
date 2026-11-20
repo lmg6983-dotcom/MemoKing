@@ -1,6 +1,7 @@
 //! 글 속의 날짜·시각 찾기 — app/js/core/date-detect.js 의 findDates · guessTitle ("내일 오후 3시", "다음 주 화요일", "이틀 뒤" …)
 //!   앞으로의 시각만 — 지난 날("어제 오후 3시")은 그 자리를 통째로 비워 둔다. 자리(from · to)는 UTF-8 바이트 (JS 는 UTF-16)
-//!   shortcut: 영어 날짜(chrono) · allowPast 는 옮기지 않았다 — 쓰는 곳(에이전트 · 일정 자동 등록)이 한국어만 본다, 편집기 밑줄을 옮길 때
+//!   find_dates_with(allow_past) 는 지난 날도 (일정 탭 빠른 추가 · 매직키 일정 — schedule_parse.rs)
+//!   shortcut: 영어 날짜(chrono)는 옮기지 않았다 — 쓰는 곳(에이전트 · 일정 자동 등록 · 일정 추가)이 한국어만 본다, 편집기 밑줄을 옮길 때
 use crate::js::re;
 use crate::time::js_local;
 use chrono::{DateTime, Datelike, Duration, Local, Timelike};
@@ -82,10 +83,10 @@ fn period_hour(p: &str) -> i64 {
     }
 }
 
-fn ymd(t: T) -> Day {
+pub(crate) fn ymd(t: T) -> Day {
     (t.year().into(), t.month0().into(), t.day().into())
 }
-fn at_time(d: Day, h: i64, min: i64) -> T {
+pub(crate) fn at_time(d: Day, h: i64, min: i64) -> T {
     js_local(d.0, d.1, d.2, h, min)
 }
 fn start_of_day(t: T) -> T {
@@ -583,8 +584,13 @@ fn before(s: &str, from: usize, n: usize) -> &str {
     start.last().map_or(&s[from..from], |(i, _)| &s[i..from])
 }
 
-/// 글 속 날짜·시각들 (앞에서부터, 겹치지 않게)
+/// 글 속 날짜·시각들 (앞에서부터, 겹치지 않게) — 앞으로의 것만
 pub fn find_dates(s: &str, now: T) -> Vec<Found> {
+    find_dates_with(s, now, false)
+}
+
+/// allow_past: 지난 날 · 지난 시각도 그대로 (JS findDates 의 { allowPast })
+pub fn find_dates_with(s: &str, now: T, allow_past: bool) -> Vec<Found> {
     let mut found: Vec<Found> = vec![];
     let mut taken: Vec<(usize, usize)> = vec![]; // 날짜 말이 차지한 자리 (지난 날 포함)
     let overlaps = |taken: &[(usize, usize)], from: usize, to: usize| taken.iter().any(|r| from < r.1 && to > r.0);
@@ -593,13 +599,13 @@ pub fn find_dates(s: &str, now: T) -> Vec<Found> {
             return;
         }
         taken.push((from, to));
-        if past {
+        if past && !allow_past {
             return;
         }
         // 되풀이는 이미 지났으면 다음 차례로
         let at = repeat.map_or(at, |r| next_repeat(at, r, now));
         // 날짜만 적은 말(종일)은 그날이 다 가기 전까지는 앞으로의 날 (date-detect.js dayLeft)
-        if if has_time { at <= now + Duration::seconds(30) } else { add_days(at, 1) <= now } {
+        if !allow_past && if has_time { at <= now + Duration::seconds(30) } else { add_days(at, 1) <= now } {
             return;
         }
         found.push(Found { from, to, text: crate::js::trim(&s[from..to]).to_string(), at, has_time, end, repeat: repeat.map(|r| repeat_at(r, at)) });
@@ -634,7 +640,7 @@ pub fn find_dates(s: &str, now: T) -> Vec<Found> {
             }
             if let Some((t, end)) = t {
                 let mut at = at_time(date, t.h, t.min);
-                if r.today {
+                if r.today && !allow_past {
                     at = evening_if_past(at, &t, now);
                 }
                 if r.roll_week && at <= now {
@@ -669,9 +675,9 @@ pub fn find_dates(s: &str, now: T) -> Vec<Found> {
         }
         let end = range_end(s, all.end());
         let mut at = at_time(ymd(now), t.h, t.min);
-        if at <= now && (t.period == Some("새벽") || t.midnight) {
+        if !allow_past && at <= now && (t.period == Some("새벽") || t.midnight) {
             at = plus_days(at, 1);
-        } else {
+        } else if !allow_past {
             at = evening_if_past(at, &t, now);
         }
         add(&mut taken, all.start(), end, at, true, false, None, None);

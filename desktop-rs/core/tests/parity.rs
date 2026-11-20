@@ -959,6 +959,34 @@ fn date_detect() {
 }
 
 #[test]
+fn schedule_parse() {
+    use memoking_core::schedule_parse::*;
+    let nows = ["2026-10-10T10:00:00+09:00", "2026-11-17T08:30:00+09:00", "2026-11-22T21:00:00+09:00", "2026-12-31T23:50:00+09:00", "2027-01-31T12:00:00+09:00"];
+    let days = [None, Some("2026-11-25T00:00:00+09:00")];
+    let at = |iso: &str| memoking_core::time::parse_js_date(iso).unwrap().with_timezone(&chrono::Local);
+    let cases = fixtures("schedule_parse");
+    let mut fails = vec![];
+    for c in &cases {
+        let text = c["text"].as_str().unwrap();
+        let mut k = 0;
+        for iso in nows {
+            for day in days {
+                let r = parse_schedule_text(text, day.map(at), at(iso));
+                let got = json!({
+                    "title": r.title, "emptyTitle": r.empty_title, "needsDateChoice": r.needs_date_choice,
+                    "schedules": r.schedules.iter().map(|s| json!({ "type": if s.range { "range" } else { "single" }, "start": s.start.timestamp_millis(), "end": s.end.map(|e| e.timestamp_millis()), "allDay": s.all_day })).collect::<Vec<_>>(),
+                });
+                if got != c["out"][k] {
+                    fails.push(format!("{text:?} @ {iso} day {day:?}\n  JS  : {}\n  Rust: {got}", c["out"][k]));
+                }
+                k += 1;
+            }
+        }
+    }
+    report("schedule_parse", fails, cases.len() * nows.len() * days.len());
+}
+
+#[test]
 fn agent() {
     use memoking_core::agent::*;
     use memoking_core::reminders::{event_from_date, occurrences_between};
