@@ -50,6 +50,7 @@ jobs:
           Start-Sleep 3
           Get-Process MemoKing -ErrorAction SilentlyContinue | Stop-Process -Force
           $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          if (-not (Test-Path $run)) { New-Item -Path $run -Force | Out-Null } # 어떤 러너에는 Run 키가 아예 없다 (없으면 아래 Set-ItemProperty 가 멈췄다)
           Set-ItemProperty $run 'com.memoking.desktop' "`"$env:LOCALAPPDATA\Programs\MemoKing\MemoKing.exe`" --hidden"
           Set-ItemProperty $run 'MemoKing Beta' "`"$env:LOCALAPPDATA\MemoKing Beta\MemoKing.exe`" --hidden"
           New-Item -ItemType Directory -Force "$env:APPDATA\MemoKing" | Out-Null
