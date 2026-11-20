@@ -609,7 +609,7 @@ fn save_attachment_as(app: &AppHandle, f: &Value) -> Result<Value, String> {
 }
 
 /// 첨부를 메모 밖(탐색기 · 바탕화면 · 카카오톡)으로 끌어내기: { name, rel? | base64? } — 임시 폴더에 그 이름으로 복사해 파일 끌기 (Electron startDrag)
-fn drag_out(app: &AppHandle, label: &str, f: &Value) -> Option<()> {
+fn drag_out(app: &AppHandle, label: &str, f: &Value) -> Option<String> {
     use base64::Engine;
     let source = match (f["rel"].as_str(), f["base64"].as_str()) {
         (Some(rel), _) if !rel.is_empty() => Ok(attachment_file(app, rel).ok()?),
@@ -639,10 +639,11 @@ fn drag_out(app: &AppHandle, label: &str, f: &Value) -> Option<()> {
         Err(bytes) => std::fs::write(&file, bytes),
     }
     .ok()?;
+    let shown = file.file_name()?.to_string_lossy().into_owned(); // 끄는 파일 이름 — 화면이 메모킹에 도로 떨어졌는지 알아보는 데 (isOwnDragOut)
     if !crate::ipc::smoke() {
         start_file_drag(app, label, file);
     }
-    Some(())
+    Some(shown)
 }
 
 /// 셸 파일 끌기(SHDoDragDrop) — 창 스레드(메인)에서, 놓거나 Esc 를 누를 때까지 그 안에서 메시지를 돈다.
@@ -932,10 +933,11 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "attachment:open" => open_attachment(app, &arg_str(args, 0)),
         "attachment:save-as" => save_attachment_as(app, args.first().unwrap_or(&Value::Null)),
         "attachment:drag-out" => {
-            if drag_out(app, label, args.first().unwrap_or(&Value::Null)).is_none() {
+            let shown = drag_out(app, label, args.first().unwrap_or(&Value::Null));
+            if shown.is_none() {
                 elog!("[drag-out] 끌어낼 파일을 만들지 못했어요");
             }
-            Ok(Value::Null)
+            Ok(json!(shown))
         }
         "memo:handoff" => {
             let last = st.handoff.lock().unwrap().1.clone();

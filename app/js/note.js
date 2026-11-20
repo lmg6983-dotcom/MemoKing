@@ -73,7 +73,6 @@ setCopyHost({
     return { drive: 'link', localsend: 'localsend', mail: 'mail' }[via];
   },
   dragOut: (payload) => api.attachments.dragOut(payload), // 메모 안 내용을 탐색기 · 카카오톡으로 끌어내기 (block-move.js)
-  pathOf: (file) => api.attachments.pathOf(file),
   contentMenu: true, // 내용을 오른쪽 클릭하면 아이콘 줄이 있는 메뉴 (block-move.js · ctx-menu.js) — 마우스를 올려도 단추가 뜨지 않는다
 });
 // 저장 단추의 결과 (delete-button.js)

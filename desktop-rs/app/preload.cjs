@@ -1,6 +1,6 @@
 // 화면(app/)이 쓸 수 있는 데스크탑 기능만 골라서 노출한다.
 // 안드로이드 버전은 같은 모양의 window.memoking 을 Capacitor 로 구현하면 된다.
-const { contextBridge, ipcRenderer, webUtils } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 const EVENTS = [
   'app:ready', 'schedule:magic',
@@ -198,16 +198,8 @@ contextBridge.exposeInMainWorld('memoking', {
     // 공유: { name, mime, rel? | base64?, via: 'drive' | 'localsend' | 'mail' } → { ok, link? } | { missing } | { error }
     share: invoke('attachment:share'),
     shareTargets: invoke('share:targets'),
-    // 메모 안 내용을 탐색기 · 바탕화면 · 카카오톡 같은 다른 프로그램으로 끌어내기: { name, rel? | base64? } (끌기를 시작할 때 한 번)
-    dragOut: (payload) => ipcRenderer.send('attachment:drag-out', payload),
-    // 끌어다 놓은 파일의 원래 자리 — 메모킹이 끌어낸 임시 파일이 도로 떨어졌는지 알아보려고 (없으면 '')
-    pathOf: (file) => {
-      try {
-        return webUtils.getPathForFile(file) || '';
-      } catch {
-        return '';
-      }
-    },
+    // 메모 안 내용을 탐색기 · 바탕화면 · 카카오톡 같은 다른 프로그램으로 끌어내기: { name, rel? | base64? } (끌기를 시작할 때 한 번) → 끄는 파일 이름 | null
+    dragOut: invoke('attachment:drag-out'),
   },
   // 링크 미리보기 카드
   links: {
