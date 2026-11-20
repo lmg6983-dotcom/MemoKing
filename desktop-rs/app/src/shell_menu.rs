@@ -27,19 +27,10 @@ const SAVE_GATHER: Duration = Duration::from_millis(700);
 /// 켤 때: 이 메모킹(exe)을 부르는 메뉴를 적는다
 #[cfg(windows)]
 pub fn register() {
-    use windows_sys::Win32::System::Registry::{RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ};
     let Ok(exe) = std::env::current_exe() else { return };
     let exe = exe.display().to_string();
     let applies = EXTS.iter().map(|e| format!("System.FileExtension:=.{e}")).collect::<Vec<_>>().join(" OR ");
-    let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
-    let set = |sub: &str, name: Option<&str>, value: &str| {
-        let (sub, value) = (wide(sub), wide(value));
-        let name = name.map(wide);
-        // SAFETY: 끝이 0 인 UTF-16 글자들 — 함수가 읽는 동안 살아 있다
-        unsafe {
-            RegSetKeyValueW(HKEY_CURRENT_USER, sub.as_ptr(), name.as_ref().map_or(std::ptr::null(), |n| n.as_ptr()), REG_SZ, value.as_ptr().cast(), (value.len() * 2) as u32);
-        }
-    };
+    let set = set_reg;
     set(KEY, Some("MUIVerb"), "메모킹에 저장");
     set(KEY, Some("Icon"), &format!("\"{exe}\",0"));
     set(KEY, Some("AppliesTo"), &applies);
@@ -49,6 +40,19 @@ pub fn register() {
 
 #[cfg(not(windows))]
 pub fn register() {}
+
+/// 이 사용자 레지스트리(HKCU)에 글자 값 하나 (name 이 None 이면 기본값) — 알림 이름 · memoking: 주소도 (reminders::register)
+#[cfg(windows)]
+pub(crate) fn set_reg(sub: &str, name: Option<&str>, value: &str) {
+    use windows_sys::Win32::System::Registry::{RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ};
+    let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+    let (sub, value) = (wide(sub), wide(value));
+    let name = name.map(wide);
+    // SAFETY: 끝이 0 인 UTF-16 글자들 — 함수가 읽는 동안 살아 있다
+    unsafe {
+        RegSetKeyValueW(HKEY_CURRENT_USER, sub.as_ptr(), name.as_ref().map_or(std::ptr::null(), |n| n.as_ptr()), REG_SZ, value.as_ptr().cast(), (value.len() * 2) as u32);
+    }
+}
 
 static GATHERED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 static GEN: AtomicU64 = AtomicU64::new(0);
@@ -86,7 +90,7 @@ fn save_files(app: &AppHandle, mut files: Vec<PathBuf>) {
     }
     let missed = files.len() - items.len();
     if items.is_empty() {
-        crate::reminders::toast(app, "", "메모킹에 넣지 못했어요", "파일을 읽지 못했거나 너무 커요 (1GB 넘음)", "", None);
+        crate::reminders::toast(app, "", "메모킹에 넣지 못했어요", "파일을 읽지 못했거나 너무 커요 (1GB 넘음)", "");
         return;
     }
     let title = if names.len() == 1 { names[0].clone() } else { format!("{} 외 {}개", names[0], names.len() - 1) };
