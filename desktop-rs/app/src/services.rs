@@ -495,7 +495,7 @@ fn download_update(app: &AppHandle) {
             |chunk, total| {
                 got += chunk as u64;
                 let total = total.unwrap_or(0);
-                let percent = if total > 0 { got * 100 / total } else { 0 };
+                let percent = (got * 100).checked_div(total).unwrap_or(0);
                 // 받은 조각(수천 개)마다가 아니라 1% 오를 때만 (크기를 모르면 1MB 마다) — 화면이 조각마다 다시 그려 막대가 날뛰었다
                 let step = if total > 0 { percent } else { got >> 20 };
                 if step == shown {
