@@ -204,7 +204,7 @@ $('open-after').addEventListener('change', (e) => {
   opt.open = e.target.checked;
   remember();
 });
-$('cancel').addEventListener('click', () => window.close());
+$('cancel').addEventListener('click', () => api.win.close());
 // 창이 작아 고르기가 단추 줄 밑에 숨으면 알려 준다
 const form = $('form');
 function showMore() {
@@ -215,7 +215,7 @@ function showMore() {
 form.addEventListener('scroll', showMore, { passive: true });
 new ResizeObserver(() => requestAnimationFrame(showMore)).observe(form); // 다음 화면에서 (안내를 켜고 끄며 생기는 고리 경고 없이)
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') window.close();
+  if (e.key === 'Escape') api.win.close();
 });
 let stageSize = '';
 let stageFrame = 0;
@@ -242,7 +242,7 @@ $('form').addEventListener('submit', async (e) => {
   $('save').disabled = false;
   if (r?.file) {
     $('status').textContent = `${r.pages}쪽 PDF로 저장했어요`;
-    setTimeout(() => window.close(), 900);
+    setTimeout(() => api.win.close(), 900);
   } else if (r?.cancelled) {
     $('status').textContent = '';
   } else {
