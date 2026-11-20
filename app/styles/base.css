@@ -34,10 +34,10 @@
   /* 떠 있는 판(메뉴·말풍선·대화상자): 1px 테두리와 어울리게 넓게 번지는 그림자 대신 가까운 그림자 두 겹 */
   --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.12);
   /* 안내 말풍선·알림 띠·토스트: 검정 대신 앱 바탕 (다크 모드에선 어두운 앱 바탕) */
-  --bubble-bg: var(--surface-2);
+  --bubble-bg: var(--glass-bg); /* One UI 9.5: 떠 있는 판은 평평한 반투명 (블러는 아래 :is 규칙) */
   --bubble-fg: var(--text-strong);
-  --bubble-line: var(--line);
-  --bubble-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
+  --bubble-line: var(--glass-line);
+  --bubble-shadow: var(--shadow-pop), inset 0 0 0 1px var(--glass-line);
 
   --font-sans: "Pretendard Variable", Pretendard, "Malgun Gothic", system-ui, sans-serif;
   --radius-sm: 10px;
@@ -267,14 +267,16 @@ svg { width: 20px; height: 20px; flex: none; }
   position: fixed;
   z-index: 901;
   width: min(300px, calc(100vw - 24px));
-  padding: 16px 16px 12px;
-  border-radius: var(--radius-xl);
-  background: var(--surface-2);
+  padding: 18px 18px 14px;
+  border-radius: 28px;
+  background: var(--bubble-bg);
   color: var(--text-strong);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--bubble-shadow);
   font-family: var(--font-sans);
   animation: coach-in 0.15s ease-out;
 }
+/* 떠 있는 판(말풍선 · 알림 띠 · 메뉴)은 한 벌의 반투명 — 뒤가 살짝 비치고 흐려진다 */
+:is(.toast, .hint-bubble, .coach-bubble, .mk-ctx, .mk-share-menu) { -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 @keyframes coach-in { from { opacity: 0; transform: scale(0.96); } }
 .coach-bubble.wide { width: min(440px, calc(100vw - 24px)); }
 .coach-bubble.enter { animation: coach-pop 0.32s var(--ease-pop); }
@@ -502,13 +504,13 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   align-items: center;
   gap: 10px;
   max-width: min(320px, calc(100vw - 16px));
-  padding: 10px 10px 10px 14px;
-  border-radius: var(--radius-sm, 8px);
-  /* 앱 화면과 같은 카드 (밝은 화면에서 검정 말풍선이 튀던 것 — 밝으면 흰 바탕, 어두우면 어두운 카드) */
-  border: 1px solid var(--line);
-  background: var(--surface-2);
+  padding: 12px 12px 12px 18px;
+  border-radius: 22px;
+  /* 앱 화면과 같은 판 (밝은 화면에서 검정 말풍선이 튀던 것 — 밝으면 흰 반투명, 어두우면 어두운 반투명) */
+  border: 0;
+  background: var(--bubble-bg);
   color: var(--text-strong);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--bubble-shadow);
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.45;
@@ -519,11 +521,11 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
 .hint-bubble p { margin: 0; }
 .hint-ok {
   flex: none;
-  padding: 6px 10px;
+  padding: 8px 14px;
   border: 0;
-  border-radius: 6px;
-  background: transparent; /* 안내를 닫는 것뿐이라 채우지 않는다 (노랑 채움은 주요 동작에만) */
-  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: 999px;
+  background: var(--fill-tab); /* 안내를 닫는 것뿐이라 옅은 바탕만 (노랑 채움은 주요 동작에만) */
+  box-shadow: none;
   color: var(--text-strong);
   font: inherit;
   font-weight: 600;

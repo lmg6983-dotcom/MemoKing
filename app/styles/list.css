@@ -895,7 +895,7 @@ div.setting-row { cursor: default; }
   width: 44px;
   height: 44px;
   border: 0;
-  border-radius: 15px;
+  border-radius: 999px; /* 휴대폰 ＋ 와 같은 원 */
   background: var(--brand-yellow);
   color: var(--on-brand);
   box-shadow: 0 4px 12px rgba(17, 17, 17, 0.2), 0 1px 3px rgba(17, 17, 17, 0.12);

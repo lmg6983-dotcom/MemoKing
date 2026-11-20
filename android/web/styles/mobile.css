@@ -355,7 +355,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   width: 60px;
   height: 60px;
   border: 0;
-  border-radius: 20px;
+  border-radius: 999px; /* One UI 떠 있는 둥근 단추 */
   background: var(--brand-yellow);
   color: var(--on-brand);
   box-shadow: 0 6px 18px rgba(17, 17, 17, 0.22), 0 2px 4px rgba(17, 17, 17, 0.12);
@@ -419,6 +419,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 @keyframes note-out { to { opacity: 0; transform: translateY(24px); } }
 
 .note-screen .bar {
+  background: var(--note-bg); /* One UI: 위 막대도 메모지와 한 바탕 (막대 색 띠 없이) */
   height: var(--top-h);
   padding: 0 4px;
   gap: 0;
@@ -741,8 +742,8 @@ h2.sheet-title { font-size: 20px; }
   z-index: 950; /* 튜토리얼 말풍선(901) 위 — 알림의 단추를 말풍선이 가리지 않게 */
   width: max-content; /* left: 50% 이면 폭이 화면 반으로 줄어 글이 여러 줄로 접힌다 */
   max-width: calc(100vw - 32px);
-  padding: 12px 18px;
-  border-radius: 14px;
+  padding: 14px 20px;
+  border-radius: 22px;
   background: var(--bubble-bg);
   color: var(--bubble-fg);
   font-size: 14px;
@@ -943,8 +944,8 @@ body.sheet-open .mk-date-chip { visibility: hidden; } /* 시트가 열리면 메
 .fab-sat { display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: none; color: var(--text-strong); animation: sat-out 0.26s var(--ease-out) both; }
 .fab-sat:nth-child(1) { animation-delay: 0.03s; }
 .fab-menu.closing .fab-sat { animation: sat-in 0.14s var(--ease-out) both; }
-.fab-sat-label { padding: 6px 12px; border-radius: 10px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14.5px; }
-.fab-sat-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-right: 4px; border-radius: 18px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.2); }
+.fab-sat-label { padding: 6px 14px; border-radius: 999px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14.5px; }
+.fab-sat-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-right: 4px; border-radius: 999px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.2); }
 .fab-sat[data-new="voice"] .fab-sat-btn { background: var(--rec); color: var(--on-rec); }
 .fab-sat[data-new="ink"] .fab-sat-btn { background: var(--brand-yellow); color: var(--on-brand); } /* PC · 메모 안 + 메뉴와 같은 색 */
 .fab-sat-btn svg { width: 24px; height: 24px; }
@@ -1076,10 +1077,12 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   height: 52px;
   padding: 0;
   border: 0;
-  border-radius: 18px; /* 목록의 ＋ 와 같은 둥근 사각 */
-  background: var(--surface-2);
+  border-radius: 999px; /* One UI: 떠 있는 둥근 단추 — 목록의 ＋ 와 같은 원 */
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   color: var(--text-strong);
-  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
+  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--glass-line);
   transition: transform 0.12s var(--ease-out), background-color 0.15s ease-out;
 }
 .add-fab::before { content: ""; position: absolute; inset: -4px; } /* 손가락 자리 60px */
@@ -1111,11 +1114,11 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 .add-sat:nth-child(6) { animation-delay: 0.15s; }
 .add-sat:nth-child(7) { animation-delay: 0.18s; }
 .add-menu.closing .add-sat { animation: add-sat-in 0.14s var(--ease-out) both; animation-delay: 0s; }
-.add-sat-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 16px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.18), inset 0 0 0 1px var(--line); }
+.add-sat-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 999px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.18), inset 0 0 0 1px var(--line); }
 .add-sat-btn svg { width: 22px; height: 22px; }
 .add-sat-btn.rec { background: var(--rec); color: var(--on-rec); box-shadow: 0 6px 16px color-mix(in srgb, var(--rec) 35%, transparent); }
 .add-sat.active .add-sat-btn.rec { animation: mk-blink 1.2s ease-in-out infinite; }
-.add-sat-label { padding: 5px 11px; border-radius: 10px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14px; white-space: nowrap; }
+.add-sat-label { padding: 5px 11px; border-radius: 999px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14px; white-space: nowrap; }
 .add-sat:active .add-sat-btn { transform: scale(0.92); }
 @keyframes add-sat-out { from { opacity: 0; transform: translate(-6px, 30px) scale(0.5); } }
 @keyframes add-sat-in { to { opacity: 0; transform: translate(-6px, 30px) scale(0.5); } }
@@ -1129,14 +1132,16 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   padding: 5px;
   min-height: 52px; box-sizing: border-box; /* 옮기기 막대 · 그리기 도구 막대와 같은 높이 — 방식을 바꿔도 다이얼이 제자리 */
   border-top: 0;
-  border-radius: 18px;
-  background: var(--surface-2);
+  border-radius: 28px; /* One UI 9.5: 떠 있는 평평한 반투명 막대 */
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   color: var(--text-strong);
-  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
+  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--glass-line);
 }
-.note-screen #format-bar button { min-width: 40px; height: 40px; border-radius: 12px; color: var(--text-strong); }
+.note-screen #format-bar button { min-width: 40px; height: 40px; border-radius: 999px; color: var(--text-strong); }
 .note-screen #format-bar button:active { background: var(--fill-hover); }
-.note-screen #format-bar button.active { background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); }
+.note-screen #format-bar button.active { background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: none; }
 .note-screen #format-bar .sep { width: 1px; height: 22px; margin: 0 3px; background: var(--line); }
 .note-screen #format-bar .style-btn { background: var(--fill-tab); }
 .note-screen #format-bar .style-btn.active { background: var(--brand-yellow-soft); }
@@ -1216,10 +1221,12 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 18px;
-  background: var(--surface-2);
+  border-radius: 999px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   color: var(--text-strong);
-  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line);
+  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--glass-line);
   touch-action: none; /* 돌리기(끌기)를 다이얼이 받는다 */
   transition: transform 0.12s var(--ease-out);
 }

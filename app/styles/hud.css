@@ -1,4 +1,6 @@
 /* 잠깐 알림 (HUD) — 메모 단축키로 복사하면 마우스 가까이 1.6초. 투명 창 안의 말풍선 하나 */
+/* 바탕 화면 위에 따로 뜨는 창: 창 뒤(바탕 화면)는 흐려지지 않으니 떠 있는 판을 반투명 대신 불투명으로 */
+:root { --bubble-bg: var(--surface-2); --bubble-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 body { display: grid; place-items: center; font-family: var(--font-sans); }
 .hud {

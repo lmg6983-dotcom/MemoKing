@@ -1,4 +1,6 @@
 /* 끌어다 놓기 미리보기 창 — 창 자체는 투명하고, 안쪽 여백(24px)에 그림자가 들어간다 */
+/* 바탕 화면 위에 따로 뜨는 창: 창 뒤(바탕 화면)는 흐려지지 않으니 떠 있는 판을 반투명 대신 불투명으로 */
+:root { --bubble-bg: var(--surface-2); --bubble-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
 html, body {
   height: 100%;
   background: transparent !important;

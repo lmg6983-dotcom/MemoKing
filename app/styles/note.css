@@ -607,7 +607,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   height: 28px;
   padding: 0 4px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 999px;
   background: none;
   color: var(--note-muted);
   font-size: 13px;
@@ -1287,7 +1287,9 @@ body[data-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); border-col
 
 /* ---------- v0.17.16: 아래 서식 도구막대 — 메모 창이 활성이거나 마우스가 아래쪽에 있을 때만 미끄러져 올라온다 ---------- */
 /* 자리(margin)는 바로 비우고, 보이는 막대만 transform 으로 미끄러진다 — 배치 속성은 애니메이션하지 않는다 */
-.format-bar { position: relative; z-index: 2; background: var(--note-bg); transition: transform 0.22s var(--ease-out), opacity 0.18s ease-out; }
+/* One UI 9.5: 서식 막대는 메모 위에 떠 있는 평평한 반투명 알약 (휴대폰 mobile.css #format-bar 와 같은 모양) */
+.format-bar { margin: 0 8px 8px; padding: 4px 8px; border-top: 0; border-radius: 22px; -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--glass-line); }
+.format-bar { position: relative; z-index: 2; background: var(--glass-bg); transition: transform 0.22s var(--ease-out), opacity 0.18s ease-out; }
 body.tab-arriving .format-bar { transition: none; } /* 스택 탭을 바꿀 때는 막대가 미끄러지지 않고 그 자리에 */
 body.bar-hidden .format-bar { margin-bottom: calc(-1 * var(--bar-h, 38px)); transform: translateY(100%); opacity: 0; pointer-events: none; }
 
