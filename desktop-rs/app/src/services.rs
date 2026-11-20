@@ -489,13 +489,19 @@ fn check_update(app: &AppHandle, manual: bool) {
 fn download_update(app: &AppHandle) {
     let Some(up) = updates(|u| if u.state["status"] == "available" { u.update.clone() } else { None }) else { return };
     set_update(app, json!({ "status": "downloading", "percent": 0 }));
-    let (app2, mut got) = (app.clone(), 0u64);
+    let (app2, mut got, mut shown) = (app.clone(), 0u64, u64::MAX);
     let r = wait(async move {
         up.download(
             |chunk, total| {
                 got += chunk as u64;
                 let total = total.unwrap_or(0);
-                let percent = if total > 0 { (got as f64 * 100.0 / total as f64).round() } else { 0.0 };
+                let percent = if total > 0 { got * 100 / total } else { 0 };
+                // 받은 조각(수천 개)마다가 아니라 1% 오를 때만 (크기를 모르면 1MB 마다) — 화면이 조각마다 다시 그려 막대가 날뛰었다
+                let step = if total > 0 { percent } else { got >> 20 };
+                if step == shown {
+                    return;
+                }
+                shown = step;
                 set_update(&app2, json!({ "status": "downloading", "percent": percent, "transferred": got, "total": total }));
             },
             || {},
