@@ -8,7 +8,7 @@ html.print-page {
   --pink-bg: #ffe0ec; --pink-bar: #ffc4da;
   --purple-bg: #ede3ff; --purple-bar: #d9c7ff;
   --blue-bg: #ddeeff; --blue-bar: #c2e0ff;
-  --gray-bg: #f1f0ec; --gray-bar: #e2e0da;
+  --gray-bg: #e6e5e1; --gray-bar: #d8d6d0;
   --charcoal-bg: #1c1c1b; --charcoal-bar: #111111;
   --note-text-default: #1f1f1c;
   background: var(--page-bg, #ffffff) !important;

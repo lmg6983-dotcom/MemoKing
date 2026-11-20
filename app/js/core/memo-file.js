@@ -14,7 +14,7 @@ export const DEFAULT_COLOR = 'yellow';
 export const COLOR_DOTS = { yellow: '#ffe58a', green: '#c8ecb4', pink: '#ffc9d6', purple: '#dccbff', blue: '#bfe0ff', gray: '#e3e3e3', charcoal: '#3b3b3b' };
 // 메모 바탕색 (화면 CSS 와 같은 값) — 창이 뜨는 순간의 배경 · 한 장으로 그림의 메모지
 export const NOTE_BG = {
-  light: { yellow: '#fff4b8', green: '#ddf5df', pink: '#ffe0ec', purple: '#ede3ff', blue: '#ddeeff', gray: '#f1f0ec', charcoal: '#1c1c1b' },
+  light: { yellow: '#fff4b8', green: '#ddf5df', pink: '#ffe0ec', purple: '#ede3ff', blue: '#ddeeff', gray: '#e6e5e1', charcoal: '#1c1c1b' },
   dark: { yellow: '#3a3317', green: '#1e3322', pink: '#3d2230', purple: '#2c2440', blue: '#1c2d42', gray: '#262624', charcoal: '#141413' },
 };
 export const UNTITLED = '제목 없음';

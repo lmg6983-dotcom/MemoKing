@@ -9,6 +9,7 @@
   --brand-yellow: #ffcc00;
   --brand-yellow-hover: #f2c000;
   --brand-yellow-soft: #fff6cc;
+  --on-brand-soft: var(--text-strong); /* 연노랑 위 글자 (어두운 화면은 노랑 글자로 — 탁한 올리브 바탕에 흰 글자가 흐렸다) */
   --brand-black: #111111;
   --on-brand: #111111;
   --on-black: #ffffff;
@@ -68,7 +69,7 @@
   --pink-bg: #ffe0ec; --pink-bar: #ffc4da; --pink-chip: #ec5a93;
   --purple-bg: #ede3ff; --purple-bar: #d9c7ff; --purple-chip: #8f5ce6;
   --blue-bg: #ddeeff; --blue-bar: #c2e0ff; --blue-chip: #3d8ee6;
-  --gray-bg: #f1f0ec; --gray-bar: #e2e0da; --gray-chip: #9a978f;
+  --gray-bg: #e6e5e1; --gray-bar: #d8d6d0; /* 무채색 앱 바탕(#F2F2F2)과 구별되게 한 단 진하게 */ --gray-chip: #9a978f;
   --charcoal-bg: #1c1c1b; --charcoal-bar: #111111; --charcoal-chip: #111111;
   --note-text-default: #1f1f1c;
   --note-black-text: #f5f4ef;
@@ -91,6 +92,7 @@
   :root:where(:not([data-theme="light"])) {
     --brand-yellow-hover: #ffd633;
     --brand-yellow-soft: #3a3100;
+    --on-brand-soft: #ffd84d;
     --surface-0: #000000;
     --surface-1: #171717;
     --surface-2: #232323;
@@ -941,7 +943,7 @@ dialog.quick-event[open] {
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 2px 8px; }
 .cal-views { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(46px, auto); gap: 2px; padding: 3px; border-radius: 999px; background: var(--fill-tab); }
 .cal-views button { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-.cal-views button[aria-checked="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); }
+.cal-views button[aria-checked="true"] { background: var(--brand-yellow-soft); color: var(--on-brand-soft); }
 .cal-views > .seg-thumb { background: var(--brand-yellow-soft) !important; box-shadow: none !important; }
 .cal-views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 13px; white-space: nowrap; }
@@ -1680,7 +1682,7 @@ dialog.quick-event[open] {
 .mf-item:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
 /* 고른 폴더: 옅은 바탕 + 왼쪽 노란 막대 (Notion · Linear 처럼 — 줄마다 상자가 겹쳐 보이지 않게) */
 .mf-item { position: relative; }
-.mf-item[aria-current="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 700; }
+.mf-item[aria-current="true"] { background: var(--brand-yellow-soft); color: var(--on-brand-soft); font-weight: 700; }
 .mf-item[aria-current="true"] svg, .mf-item[aria-current="true"] .mf-count { color: inherit; }
 .mf-item:disabled { cursor: default; opacity: 0.6; }
 .mf-item.drop-on { box-shadow: inset 0 0 0 2px var(--brand-yellow); background: var(--hover); }

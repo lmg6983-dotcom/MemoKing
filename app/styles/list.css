@@ -273,6 +273,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   margin: 0 12px 8px;
   padding: 4px;
   border-radius: 999px;
+  max-width: 560px; /* 넓은 창에서 탭 줄이 창 끝까지 늘어나지 않게 */
   background: var(--fill-tab);
 }
 .tabs button {
@@ -294,7 +295,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   cursor: pointer;
 }
 .tabs button svg { width: 15px; height: 15px; }
-.tabs button[aria-selected="true"] { background: var(--brand-yellow-soft); color: var(--text); } /* 휴대폰 아래 탭바와 같은 연노랑 알약 */
+.tabs button[aria-selected="true"] { background: var(--brand-yellow-soft); color: var(--on-brand-soft); } /* 휴대폰 아래 탭바와 같은 연노랑 알약 */
 .tabs > .tab-indicator { border-radius: 999px; background: var(--brand-yellow-soft) !important; box-shadow: none !important; }
 /* 탭 숫자: 휴대폰처럼 바탕 없이 흐린 숫자만 (고른 탭은 글자색으로) */
 .tab-count { font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }

@@ -174,9 +174,14 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out);
 }
 .tabs button svg { width: 22px; height: 22px; }
-.tabs button[aria-selected="true"] { color: var(--text-strong); font-weight: 700; }
+.tabs button[aria-selected="true"] { color: var(--on-brand-soft); font-weight: 700; }
 .tabs > :is(.tab-indicator, .seg-thumb) { border-radius: 999px; background: var(--brand-yellow-soft) !important; box-shadow: none !important; }
 .tabs button { position: relative; }
+/* 넓은 화면(폴드 · 태블릿): 떠 있는 막대들이 화면 끝까지 늘어나지 않게 가운데 알맞은 폭으로 (One UI 태블릿처럼) */
+@media (min-width: 640px) {
+  .tabs { left: 50%; right: auto; width: min(calc(100% - 32px), 520px); transform: translateX(-50%); }
+  .note-screen #format-bar, .note-screen .tag-suggest-bar { align-self: center; width: min(calc(100% - 32px), 720px); margin-inline: auto; }
+}
 .tab-count { position: absolute; top: 4px; left: calc(50% + 9px); min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--brand-yellow); color: var(--on-brand); font-size: 11px; font-weight: 800; line-height: 18px; }
 .tab-count:empty { display: none; }
 
@@ -1073,7 +1078,6 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   .note-screen .editor { padding: 6px 14px 32px; }
   .note-screen .format-bar button { min-width: 38px; height: 40px; }
   .tabs button { font-size: 12.5px; }
-  .tabs button svg { display: none; }
   .share-choice small { display: none; }
 }
 /* 가로로 눕힌 휴대폰 (높이가 낮음): 막대를 얇게 */
