@@ -1512,6 +1512,28 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-voice.folded .mk-voice-chev { transform: rotate(-90deg); }
 .mk-voice-label { flex: none; font-weight: 600; }
 .mk-voice-peek { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; opacity: 0.75; }
+.mk-voice-copy {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--note-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mk-voice-copy-ico svg { display: block; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.mk-voice-copy:focus-visible, .mk-voice-copy.done { background: color-mix(in srgb, var(--note-text) 7%, transparent); color: var(--note-text); }
+@media (hover: hover) and (pointer: fine) { .mk-voice-copy:hover { background: color-mix(in srgb, var(--note-text) 7%, transparent); color: var(--note-text); } }
+.mk-voice-copy:active { transform: scale(0.97); }
 .mk-voice-peek:not(:empty)::before { content: "“"; }
 .mk-voice-peek:not(:empty)::after { content: "…”"; }
 .mk-voice.folded .mk-voice-body > :not(:first-child) { display: none; }
@@ -2691,7 +2713,19 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-doc p:has(> img.mk-pdf-thumb) { position: relative; width: fit-content; max-width: 100%; }
 /* 문서 칩 + 썸네일 한 문단: 그림이 블록이라 줄바꿈 · 편집기 보조 그림이 빈 줄만 더한다 (묶음 사진과 같게) */
 .mk-doc p:has(> img.mk-pdf-thumb) > :is(img.ProseMirror-separator, br) { display: none !important; }
-.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF"; position: absolute; right: 8px; bottom: 10px; padding: 2px 7px; border-radius: 6px; background: #c4282e; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; }
+.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF 보기"; position: absolute; right: 8px; bottom: 10px; padding: 2px 8px; border-radius: 6px; background: #c4282e; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; }
+/* 문서 캡슐: 두 칸이 무엇을 여는지 — 위 이름 줄은 원본을 그 앱으로(↗ 다른 앱), 아래 첫 쪽은 메모킹 안 PDF 보기. 확장자 자리에 할 일을 적는다 */
+.mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]::after { content: "원본 열기 ↗"; margin-left: auto; padding: 0 6px; font-weight: 600; }
+.mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:is([data-ext="DOCX"], [data-ext="DOC"])::after { content: "Word로 열기 ↗"; }
+.mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:is([data-ext="PPTX"], [data-ext="PPT"])::after { content: "PowerPoint로 열기 ↗"; }
+.mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:is([data-ext="XLSX"], [data-ext="XLS"])::after { content: "Excel로 열기 ↗"; }
+.mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:is([data-ext="HWP"], [data-ext="HWPX"])::after { content: "한글로 열기 ↗"; }
+/* PC: 마우스를 올린 칸만 진해진다 (어느 칸을 누르는지) */
+@media (hover: hover) and (pointer: fine) {
+  .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:hover { background: var(--note-hover); }
+  .mk-doc p:has(> img.mk-pdf-thumb) > img.mk-pdf-thumb { transition: filter 0.12s; }
+  .mk-doc p:has(> img.mk-pdf-thumb) > img.mk-pdf-thumb:hover { filter: brightness(0.95); }
+}
 /* 문서 칩 + PDF 첫 쪽(바꾸는 동안은 임시 칸): 동영상처럼 한 덩어리 카드. 위는 이름 줄(칩), 아래는 첫 쪽, 테두리 · 둥글기 · 그림자는 카드 하나에 */
 .mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { display: flex; flex-direction: column; width: min(100%, 360px); margin: 6px 0; overflow: hidden; border-radius: var(--radius-lg); box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12); }
 .mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) > a[href^="attachments/"] { display: flex; max-width: none; padding: 7px 12px 7px 10px; border-radius: 0; }

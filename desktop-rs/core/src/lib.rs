@@ -18,6 +18,7 @@ pub mod placement;
 pub mod rag;
 pub mod release_notes;
 pub mod reminders;
+pub mod schedule_parse;
 pub mod search;
 pub mod share_text;
 pub mod stacks;

@@ -217,7 +217,7 @@ fn shorten(t: &str) -> String {
 }
 
 /// 목록 창을 그 탭으로 (Electron createListWindow(tab))
-fn show_list_tab(app: &AppHandle, tab: &str) {
+pub(crate) fn show_list_tab(app: &AppHandle, tab: &str) {
     show_list(app);
     let _ = app.emit_to("list", "list:tab", [tab]);
 }
@@ -415,6 +415,14 @@ fn launch(app: &AppHandle, args: &[String]) -> bool {
             let when = saved.map(|r| format!("알림: {}", memoking_core::reminders::describe_reminder(&r, now))).unwrap_or_default();
             crate::reminders::toast(app, &id, "메모를 만들었어요", &first, &if when.is_empty() { "눌러서 열기".to_string() } else { format!("{when} · 눌러서 열기") }, None);
         }
+        return true;
+    }
+    // 매직키 "일정 추가": 글을 목록 창에 넘겨 일정 탭 빠른 추가와 같게 만든다 (목록 창이 아직 켜지는 중이면 켜진 뒤 꺼내 간다)
+    if let Some(file) = val("--new-schedule-file=").filter(|f| magickey_name(f)) {
+        let Some((real, text)) = magickey_file(&file, &std::env::temp_dir()) else { return false };
+        let _ = std::fs::remove_file(real);
+        state(app).magic_schedules.lock().unwrap().push(text);
+        let _ = app.emit_to("list", "schedule:magic", [Value::Null; 0]);
         return true;
     }
     args.iter().any(|a| a == "--new-memo") && new_memo(app)

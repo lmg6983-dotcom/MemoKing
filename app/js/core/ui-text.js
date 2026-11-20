@@ -46,6 +46,7 @@ export const UI = Object.freeze({
   linkSaveFail: '연결을 저장하지 못했어요. 잠시 뒤 다시 해 주세요',
   imageType: '지원하지 않는 이미지 형식이에요. PNG, JPG, GIF, WebP 이미지를 써 주세요',
   fileAddFail: '파일을 추가하지 못했어요. 다시 해 주세요',
+  folderDrop: '폴더는 넣을 수 없어요. 폴더 안의 파일을 골라 끌어 주세요', // 메모 창 · 목록 창에 폴더를 놓았을 때 (탐색기 · 매직키)
   fileNotAdded: '메모를 바꿔서 파일을 넣지 않았어요. 넣을 메모에서 다시 해 주세요',
   rowDelete: '이 행 삭제',
   colDelete: '이 열 삭제',

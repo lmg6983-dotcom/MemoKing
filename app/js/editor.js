@@ -286,7 +286,9 @@ function mediaView(node, view, getPos) {
     // 휴대폰: 파일 칩처럼 두 번 눌러야 크게 보기 — 한 번 누르면 단추 줄(복사 · 저장 · 지우기 · 크기, block-move.js)만.
     //   고치기 · 옮기기 방식, 한 장 사진 · 묶음 사진 · PDF 를 펼친 장 모두 같게 (예전: 옮기기에서는 한 장 사진이 아예 열리지 않고,
     //   글을 고칠 수 없는 때라 묶음 · PDF 장은 한 번만 눌러도 열렸다)
-    if (matchMedia('(pointer: coarse)').matches) {
+    //   문서의 PDF 첫 쪽 썸네일만은 한 번 누르면 바로 PDF 보기 — 가장 자주 하는 일이라 (두 번 누르기를 몰라 열지 못했다). 단추 줄은 꾹 누르기로
+    if (pdfThumb && matchMedia('(pointer: coarse)').matches) hideDeleteButton(true);
+    else if (matchMedia('(pointer: coarse)').matches) {
       const now = Date.now();
       if (now - lastTap > DOUBLE_TAP_MS) {
         lastTap = now;
@@ -1655,14 +1657,33 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     return out;
   }
 
-  // 넣은 문서 파일 → 읽을 File. PC: Word · PowerPoint 는 Office 로 만든 PDF (직접 그리면 그림이 깨지고 장이 어긋남 — Office 가 없으면 직접 그린다)
+  // 넣은 문서 파일 → 읽을 File. PC: Word · PowerPoint · Excel 은 Office 로 만든 PDF (직접 그리면 그림이 깨지고 장이 어긋남 — Office 가 없으면 직접 그린다)
   async function documentSource(it) {
     const name = it.name;
     const fileName = extOf(name) ? name : `${name}.${extOf(it.src) || 'txt'}`;
-    const pdf = extOf(fileName) === 'pdf' ? null : await window.memoking?.attachments?.toPdf?.(it.src).catch(() => null);
+    const pdf = extOf(fileName) === 'pdf' ? null : await officePdf(it.src, name);
     if (pdf) return new File([pdf], `${baseName(name)}.pdf`, { type: 'application/pdf' });
     if (it.file instanceof File) return new File([await it.file.arrayBuffer()], fileName, { type: it.file.type });
     return new File([await (await fetch(vaultUrl(it.src))).blob()], fileName);
+  }
+
+  // Office 로 PDF 만들기 — 검토 메모 · 발표자 노트가 있으면 PDF 에 넣을지 먼저 묻는다 (Office 의 PDF 내보내기는 기본으로 빼 버린다)
+  async function officePdf(src, name) {
+    const toPdf = window.memoking?.attachments?.toPdf;
+    if (!toPdf) return null;
+    const got = await toPdf(src).catch(() => null);
+    if (!got?.ask) return got;
+    const yes = async (what, n) => await promptChoice({
+      title: `${name}에 ${what} ${n}개가 있어요`,
+      message: 'PDF에 함께 넣을까요?',
+      choices: [{ id: 'no', label: '넣지 않기' }, { id: 'yes', label: '함께 넣기', primary: true }],
+    }) === 'yes';
+    const opts = {
+      comments: got.ask.comments > 0 && await yes('검토 메모', got.ask.comments),
+      notes: got.ask.notes > 0 && await yes('발표자 노트가 있는 슬라이드', got.ask.notes),
+    };
+    const pdf = await toPdf(src, opts).catch(() => null);
+    return pdf?.ask ? null : pdf;
   }
 
   // 메모 폴더에 넣은 문서 → PDF (PDF 는 그대로) → 첫 쪽 썸네일 그림 (누르면 그 PDF 미리보기). 바꾸지 못하면 null (칩만)

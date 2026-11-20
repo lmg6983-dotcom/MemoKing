@@ -512,6 +512,26 @@ write('date_detect', [...ddTexts].map((text) => ({
   }))),
 })));
 
+// 일정 글 읽기 (schedule-parse.js parseScheduleText — 일정 탭 빠른 추가 · 매직키 일정 추가). 고른 날이 없을 때 · 있을 때
+const sp = await import('../../app/js/core/schedule-parse.js');
+const spTexts = new Set([...ddTexts]);
+{
+  const src = fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'tests', 'schedule-parse.test.js'), 'utf8');
+  for (const m of src.matchAll(/'(?:[^'\\\n]|\\.)*'/g)) {
+    const s = new Function(`return ${m[0]}`)();
+    if (/[가-힣0-9]/.test(s)) spTexts.add(s);
+  }
+}
+for (const s of ['치과 2시', '10월 31일 치과 오후 3시', '11월 20일부터 22일까지 학회', '내일 그리고 모레 운동', '12월 1일, 12월 3일 회의', '3일 ~ 5일 휴가', '어제 회의 정리', '영양제 먹는 날', '1월 1일 영양제 먹는 날', '오늘 오후 3시 치과', '다음 주 월요일부터 금요일까지 출장', '2026-12-24 크리스마스 이브 파티']) spTexts.add(s);
+const spDays = [null, '2026-11-25T00:00:00+09:00'];
+write('schedule_parse', [...spTexts].map((text) => ({
+  text,
+  out: ddNows.flatMap((iso) => spDays.map((day) => {
+    const r = sp.parseScheduleText(text, day ? new Date(day) : null, new Date(iso));
+    return { title: r.title, emptyTitle: r.emptyTitle, needsDateChoice: r.needsDateChoice, schedules: r.schedules.map((s) => ({ type: s.type, start: s.start.getTime(), end: s.end?.getTime() ?? null, allDay: s.allDay })) };
+  })),
+})));
+
 // 매직 에이전트 (agent.js) — 말 가르기 · 모델 답 읽기 · 덧붙일 메모 · 본문 · 일정 묻기, 그리고 쓰는 reminders.js eventFromDate · occurrencesBetween
 const ag = await import('../../app/js/core/agent.js');
 const { eventFromDate, occurrencesBetween } = await import('../../app/js/core/reminders.js');

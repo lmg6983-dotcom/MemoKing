@@ -92,7 +92,7 @@ if (params.get('spare') === '1') {
   perf.start = performance.now();
   perf.how = '예비 창';
   if (!job?.id) {
-    window.close();
+    api.win.close();
     await new Promise(() => {});
   }
   params.delete('spare');
@@ -375,7 +375,7 @@ api.on('memo:external', async (next) => {
     }
     if (snapshot !== null) saved = snapshot;
     setStatus(`${what}${kept} 다시 열 때 비밀번호를 넣어 주세요`, true);
-    setTimeout(() => window.close(), kept ? 4000 : 2500);
+    setTimeout(() => api.win.close(), kept ? 4000 : 2500);
     return;
   }
   // 다른 기기에서 잠금을 풀었으면(또는 이 창의 열쇠로 풀리는 잠금이면) 메뉴의 잠금 상태를 맞춘다
@@ -1065,7 +1065,7 @@ async function insertFiles(files) {
 setupFileDrop(el.editorRoot, () => editor, (err) => {
   console.error(err);
   setStatus(UI.fileAddFail, true);
-});
+}, () => setStatus(UI.folderDrop, true));
 
 el.fileInput.addEventListener('change', () => {
   insertFiles([...el.fileInput.files]);
@@ -1822,7 +1822,7 @@ const closeWindow = () => finishClose(api.win.hideForClose?.(), true);
 // Ctrl+W: 스택이면 보이는 탭만 닫는다 (탭의 × 와 같음 — 옆 탭이 바로 보인다). 스택이 아니면 창을 닫는다.
 const closeTabOrWindow = () => (tabsEl.hidden ? closeWindow() : finishClose(api.stack.removeHidden(id)));
 
-// 새 탭 (탭 줄 + · 스택이 아닐 때 윗막대 +): 새 메모를 이 창의 새 탭으로 (스택이 아니면 스택이 된다). 따로 새 창은 Ctrl+N
+// 새 탭 (스택의 탭 줄 +): 새 메모를 이 창의 새 탭으로. 윗막대 + · Ctrl+N 은 언제나 새 창
 // 빠르게 두 번 눌러도 새 메모는 하나만 (예전: 빈 메모 탭이 두 개 생겼다)
 let addingTab = false;
 async function newTab() {
@@ -1830,19 +1830,13 @@ async function newTab() {
   addingTab = true;
   try {
     await flush();
-    await busyUntilBlur($('new-btn'), api.stack.newTab(id));
+    await busyUntilBlur(tabsEl.querySelector('.stack-add') ?? $('new-btn'), api.stack.newTab(id));
   } finally {
     setTimeout(() => (addingTab = false), 400);
   }
 }
-// 스택이면 탭 줄에 새 탭(+)이 따로 있으니 윗막대 + 는 새 창 (Ctrl+N 과 같음). 스택이 아니면 새 탭으로 쌓는다
-const isStacked = () => !tabsEl.hidden;
-function paintNewBtn(stacked) {
-  const b = $('new-btn');
-  b.title = stacked ? '새 창: 새 메모를 따로 된 창으로 열어요 (Ctrl+N). 새 탭은 왼쪽 아래 +' : '새 탭: 이 창에 메모를 하나 더 쌓아요 (새 창은 Ctrl+N)';
-  b.setAttribute('aria-label', stacked ? '새 창으로 메모 추가' : '새 탭으로 메모 추가');
-}
-$('new-btn').addEventListener('click', () => (isStacked() ? api.memo.create({ color: memo?.color }) : newTab()));
+// 윗막대 + 는 언제나 새 창 (Ctrl+N 과 같음) — 탭으로 쌓기는 스택의 탭 줄 + · 끌어 합치기 · 메뉴의 "다른 메모 창과 합치기"
+$('new-btn').addEventListener('click', () => api.memo.create({ color: memo?.color }));
 $('close-btn').addEventListener('click', closeWindow);
 el.editorRoot.addEventListener('mousedown', (e) => {
   // 글 아래 빈 곳을 눌러도 편집을 시작할 수 있게
@@ -1876,7 +1870,6 @@ function renderStack(state) {
   const stacked = members.length >= 2;
   tabsEl.hidden = !stacked;
   document.body.classList.toggle('stacked', stacked);
-  paintNewBtn(stacked);
   if (stacked) setTimeout(() => hintOnce('stack-reorder', '탭을 위아래로 끌어 순서를 바꾸고, 옆으로 끌어내면 따로 떼어져요', { anchor: tabsEl }), 800);
   if (!stacked) return tabsEl.replaceChildren();
   const tabs = members.map((m) => {
@@ -2103,7 +2096,7 @@ if (memo?.needsPassword) {
       memo = { ...memo, ...r };
       return null;
     },
-    onCancel: () => window.close(),
+    onCancel: () => api.win.close(),
   });
   markPainted();
   const opened = await unlocking;

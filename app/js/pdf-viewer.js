@@ -48,7 +48,7 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   };
   // 위 막대: [PDF 표 · 제목 / 쪽] …… [다른 앱으로 열기] | [닫기] — 닫기는 늘 오른쪽 끝 (Windows 창 · 상용 PDF 보기처럼)
   const bar = el('div', 'mk-pdf-bar');
-  const close = iconBtn('닫기 (Esc)', 'close', () => shut(), 'mk-pdf-close');
+  const close = iconBtn('닫기 (Esc)', 'close', () => shut({ all: true }), 'mk-pdf-close');
   const badge = el('span', 'mk-pdf-badge', { textContent: 'PDF', ariaHidden: 'true' }); // 메모 속 썸네일의 PDF 표와 같은 빨강
   const heading = el('div', 'mk-pdf-heading');
   const title = el('div', 'mk-pdf-title', { textContent: name, title: name });
@@ -754,11 +754,17 @@ export async function openPdfViewer({ bytes, name = 'PDF', onExternal = null, on
   };
   window.addEventListener('resize', onResize);
 
-  // 닫기 — 주석 중이면 먼저 저장 (뒤로 가기 한 번은 주석만 끝낸다)
+  // 닫기 — 주석 중이면 먼저 저장. 뒤로 가기 · Esc 한 번은 주석만 끝내고, 닫기 단추(all)는 저장하고 바로 닫는다
+  //   (예전: 펜 · 형광펜 · 지우개를 켠 채 닫기를 누르면 주석만 끝나 두 번 눌러야 닫혔다). 저장을 못 했으면 닫지 않는다 (주석을 잃지 않게)
   let closing = false;
-  async function shut() {
+  async function shut({ all = false } = {}) {
     if (shutDown || closing) return;
-    if (inking) return setInk(false);
+    if (inking) {
+      closing = true;
+      await setInk(false);
+      closing = false;
+      if (!all || dirty()) return;
+    }
     closing = true;
     if (saving) await saving;
     shutDown = true;

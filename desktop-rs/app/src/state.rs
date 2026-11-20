@@ -29,6 +29,8 @@ pub struct State {
     pub commands: Mutex<HashMap<String, Value>>,
     /// 닫힌 메모를 여는 알림: 창이 열리면 띠로 (memo:get alarm)
     pub alarms: Mutex<HashMap<String, Value>>,
+    /// 매직키가 넘긴 일정 글 (--new-schedule-file) — 목록 창이 일정 탭 빠른 추가와 같은 코드로 만든다 (알림 기본값이 목록 창에 있어서)
+    pub magic_schedules: Mutex<Vec<String>>,
 }
 
 /// 설정 폴더: Electron 과 같은 %APPDATA%\MemoKing (MagicKey · MagicSystem 이 여기서 읽는다).
@@ -80,6 +82,7 @@ impl State {
             inserts: Default::default(),
             commands: Default::default(),
             alarms: Default::default(),
+            magic_schedules: Default::default(),
         }
     }
 

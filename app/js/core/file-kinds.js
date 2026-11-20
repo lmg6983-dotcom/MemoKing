@@ -27,7 +27,13 @@ export function extOf(name) {
 
 // 메모에 넣으면 PDF 첫 쪽 썸네일과 짝이 되는 문서 (doc-pages.js 가 그린다)
 export const DOC_EXTS = ['pdf', 'docx', 'pptx', 'hwp', 'hwpx', 'txt'];
-export const isDocumentFile = (file) => DOC_EXTS.includes(extOf(file?.name));
+// PC 의 Office 로만 PDF 가 되는 문서 (attachment:to-pdf) — 직접 그리지 못해 Office 가 있는 PC 에서만 짝을 짓는다 (휴대폰은 칩만)
+export const OFFICE_ONLY_EXTS = ['doc', 'ppt', 'xls', 'xlsx'];
+const officePdf = () => Boolean(globalThis.memoking?.attachments?.toPdf);
+export const isDocumentFile = (file) => {
+  const ext = extOf(file?.name);
+  return DOC_EXTS.includes(ext) || (OFFICE_ONLY_EXTS.includes(ext) && officePdf());
+};
 
 export function isProgramFile(name) {
   return PROGRAM_EXT.has(extOf(name));

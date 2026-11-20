@@ -3,7 +3,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const EVENTS = [
-  'app:ready',
+  'app:ready', 'schedule:magic',
   'memos:changed', 'shortcuts:changed', 'memo:external', 'memo:removed', 'memo:trashed', 'memo:meta', 'memo:links-changed', 'vault:opened',
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
@@ -70,6 +70,9 @@ contextBridge.exposeInMainWorld('memoking', {
     set: invoke('reminders:set'),
     all: invoke('reminders:all'),
     add: invoke('reminders:add'),
+    // 매직키 일정 추가 (--new-schedule-file): 기다리는 글 꺼내기 · 만든 뒤 Windows 알림 (memoId | null, 제목, 안내)
+    takeMagic: invoke('reminders:take-magic'),
+    magicDone: invoke('reminders:magic-done'),
   },
   // 일정 탭이 함께 보는 다른 캘린더 (.ics 구독 — Google 캘린더 비공개 주소 등): feeds() · setFeeds(목록) · fetch(id, 새로) → { text, at, error? }
   calendars: {
@@ -189,7 +192,7 @@ contextBridge.exposeInMainWorld('memoking', {
     info: invoke('attachment:info'),
     copy: invoke('attachment:copy'), // 메모 폴더의 첨부를 파일 그대로 클립보드에 → true | false
     copyMany: invoke('attachment:copy-many'), // 여러 첨부를 한 번에 (묶음 사진) → true | false
-    toPdf: invoke('attachment:to-pdf'), // Word · PowerPoint 첨부 → PDF 내용 | null (Office 없음)
+    toPdf: invoke('attachment:to-pdf'), // (첨부, 고르기?) Word · PowerPoint · Excel 첨부 → PDF 내용 | { ask: { comments, notes } } | null (Office 없음)
     // 내용 저장(저장 단추): { name, mime, rel? | base64? } → { name } | { cancelled } | { error }
     saveAs: invoke('attachment:save-as'),
     // 공유: { name, mime, rel? | base64?, via: 'drive' | 'localsend' | 'mail' } → { ok, link? } | { missing } | { error }

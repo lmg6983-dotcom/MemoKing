@@ -7,7 +7,7 @@
 import { plainTextOf, spacedHtml } from './clipboard-text.js';
 import { mediaKindOf, isAlbumTitle, plainAlt, pdfOfTitle } from './core/memo-file.js';
 import { textBase64 } from './core/base64.js';
-import { voiceAudioOf } from './voice-card-view.js';
+import { voiceAudioOf } from './core/voice-card.js';
 import { fullUrl } from './media.js';
 
 let host = {
