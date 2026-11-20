@@ -3,12 +3,12 @@ html.print-page {
   color-scheme: light;
   --surface-0: #ffffff; --surface-1: #ffffff; --surface-2: #ffffff; --line: #e8e6df;
   --text-strong: #111111; --text-muted: #6b6860; --fill-hover: rgba(17, 17, 17, 0.06);
-  --yellow-bg: #fff4b8; --yellow-bar: #ffe680;
-  --green-bg: #ddf5df; --green-bar: #bfebc3;
-  --pink-bg: #ffe0ec; --pink-bar: #ffc4da;
-  --purple-bg: #ede3ff; --purple-bar: #d9c7ff;
-  --blue-bg: #ddeeff; --blue-bar: #c2e0ff;
-  --gray-bg: #f1f0ec; --gray-bar: #e2e0da;
+  --yellow-bg: #ffe99a; --yellow-bar: #f2da7f;
+  --green-bg: #c1facc; --green-bar: #a3f1b3;
+  --pink-bg: #ffe0eb; --pink-bar: #ffcadd;
+  --purple-bg: #ede5fe; --purple-bar: #e1d2ff;
+  --blue-bg: #dbecfe; --blue-bar: #c0defe;
+  --gray-bg: #e1dfdb; --gray-bar: #d3d1cb;
   --charcoal-bg: #1c1c1b; --charcoal-bar: #111111;
   --note-text-default: #1f1f1c;
   background: var(--page-bg, #ffffff) !important;

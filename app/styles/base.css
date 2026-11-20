@@ -8,21 +8,26 @@
   /* 브랜드 */
   --brand-yellow: #ffcc00;
   --brand-yellow-hover: #f2c000;
-  --brand-yellow-soft: #fff6cc;
+  /* 포인트색(노랑)은 꼭 눈이 가야 할 곳에만: 주요 동작 단추 · ＋ · 달력의 오늘 · 튜토리얼 · 진행 막대 · 경고 띠.
+     고른 탭 · 고른 줄 · 밑줄 · 포커스 · 스위치 · 체크 같은 "상태" 는 무채색으로 (노랑이 여기저기 흩어져 난잡하던 것) */
+  --brand-yellow-soft: rgba(25, 25, 25, 0.08); /* 고른 상태 바탕 (이름은 예전 그대로 — 이제 무채색) */
+  --accent-line: rgba(25, 25, 25, 0.32); /* 밑줄 · 입력 포커스 선 */
+  --on-dark-fill: #ffffff;
+  --on-brand-soft: var(--text-strong); /* 고른 상태 위 글자 */
   --brand-black: #111111;
   --on-brand: #111111;
   --on-black: #ffffff;
 
   /* 바탕 · 글씨 */
-  --surface-0: #f2f2f2;
-  --surface-1: #ffffff;
-  --surface-2: #ffffff;
-  --line: #e6e6e6;
+  --surface-0: #f5f5f5; /* 바탕: 카카오톡 더보기 화면과 같은 무채색 옅은 회색 */
+  --surface-1: #ffffff; /* 트레이(카드 · 검색칸)는 흰색, 그림자 없이 — 카톡 트레이처럼 */
+  --surface-2: #ffffff; /* 떠 있는 판(메뉴 · 시트 · 대화상자)은 흰색 + 그림자 */
+  --line: #ebebeb;
   --fill-hover: rgba(17, 17, 17, 0.06);
   --fill-tab: rgba(17, 17, 17, 0.05);
-  --text-strong: #111111;
+  --text-strong: #191919; /* 카톡 본문 글자색 */
   --text-muted: #686868;
-  --text-faint: #8a8a8a;
+  --text-faint: #737373; /* 흐린 글(안내 · 빈칸 글)도 흰 카드에서 4.5:1 넘게 (#8a8a8a 는 3.4:1) */
   --danger: #d93036;
   --sat: #2260c4; /* 달력 토요일 (흰 바탕 5.9:1) */
   --ok-text: #1e7a45; /* 복사했어요 · 저장 같은 성공 글 */
@@ -30,7 +35,7 @@
   --on-danger: #ffffff;
   --focus-ring: #111111;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 14px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 0 0 0 transparent; /* 흰 바탕 위 옅은 회색 카드는 채움만으로 갈린다 — 그림자 없이 평평하게 (카톡처럼) */
   /* 떠 있는 판(메뉴·말풍선·대화상자): 1px 테두리와 어울리게 넓게 번지는 그림자 대신 가까운 그림자 두 겹 */
   --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.12);
   /* 안내 말풍선·알림 띠·토스트: 검정 대신 앱 바탕 (다크 모드에선 어두운 앱 바탕) */
@@ -63,12 +68,12 @@
   --shadow: var(--shadow-pop);
 
   /* 스티커 메모 7색: 바탕 / 윗막대 / 목록에서 보이는 색 칩 */
-  --yellow-bg: #fff4b8; --yellow-bar: #ffe680; --yellow-chip: #ffcc00;
-  --green-bg: #ddf5df; --green-bar: #bfebc3; --green-chip: #4cb35a;
-  --pink-bg: #ffe0ec; --pink-bar: #ffc4da; --pink-chip: #ec5a93;
-  --purple-bg: #ede3ff; --purple-bar: #d9c7ff; --purple-chip: #8f5ce6;
-  --blue-bg: #ddeeff; --blue-bar: #c2e0ff; --blue-chip: #3d8ee6;
-  --gray-bg: #f1f0ec; --gray-bar: #e2e0da; --gray-chip: #9a978f;
+  --yellow-bg: #ffe99a; --yellow-bar: #f2da7f; --yellow-chip: #ffcc00; /* OKLCH L.935 C.085 — 모든 색이 같은 밝기 · 채도 (노랑만 채도 1.6배: 같은 채도면 크림빛으로 탁해 보여서) */
+  --green-bg: #c1facc; --green-bar: #a3f1b3; --green-chip: #5ac576;
+  --pink-bg: #ffe0eb; --pink-bar: #ffcadd; --pink-chip: #f37fb0;
+  --purple-bg: #ede5fe; --purple-bar: #e1d2ff; --purple-chip: #ba93fb;
+  --blue-bg: #dbecfe; --blue-bar: #c0defe; --blue-chip: #61b0fe;
+  --gray-bg: #e1dfdb; --gray-bar: #d3d1cb; --gray-chip: #95928b;
   --charcoal-bg: #1c1c1b; --charcoal-bar: #111111; --charcoal-chip: #111111;
   --note-text-default: #1f1f1c;
   --note-black-text: #f5f4ef;
@@ -90,33 +95,35 @@
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     --brand-yellow-hover: #ffd633;
-    --brand-yellow-soft: #3a3100;
-    --surface-0: #000000;
-    --surface-1: #171717;
-    --surface-2: #232323;
-    --line: #2a2a2a;
+    --brand-yellow-soft: rgba(255, 255, 255, 0.12);
+    --accent-line: rgba(255, 255, 255, 0.4);
+    --on-brand-soft: var(--text-strong);
+    --surface-0: #0f0e0d; /* 완전 검정 대신 아주 어두운 따뜻한 회색 */
+    --surface-1: #1d1c1a;
+    --surface-2: #282725;
+    --line: #302f2c;
     --glass-bg: rgba(30, 30, 30, 0.74);
     --glass-line: rgba(255, 255, 255, 0.08);
     --fill-hover: rgba(255, 255, 255, 0.08);
     --fill-tab: rgba(255, 255, 255, 0.06);
     --text-strong: #f5f4ef;
     --text-muted: #a0a0a0;
-    --text-faint: #767676;
+    --text-faint: #8a8a8a; /* 어두운 카드(#171717) 위 4.5:1 */
     --danger: #ff6b70;
     --sat: #74b0f7;
     --ok-text: #6fd39a;
     --err-text: #ff8a80;
     --on-danger: #1a0506;
-    --focus-ring: #ffcc00;
+    --focus-ring: #f2f2f2;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 14px rgba(0, 0, 0, 0.45);
 
-    --yellow-bg: #3a3317; --yellow-bar: #4a401a;
-    --green-bg: #1e3322; --green-bar: #26402b; --green-chip: #5cc46a;
-    --pink-bg: #3d2230; --pink-bar: #4c2a3b; --pink-chip: #f07aa8;
-    --purple-bg: #2c2440; --purple-bar: #372d50; --purple-chip: #a980f0;
-    --blue-bg: #1c2d42; --blue-bar: #233852; --blue-chip: #62a6f0;
-    --gray-bg: #262624; --gray-bar: #31302d; --gray-chip: #8a877f;
+    --yellow-bg: #503800; --yellow-bar: #614501; --yellow-chip: #e7b551; /* 어두운 화면 OKLCH L.36 C.10 — 회색기 없이 깊은 색, 노랑은 올리브 대신 호박색(H82) */
+    --green-bg: #024a28; --green-bar: #035a31; --green-chip: #72d699;
+    --pink-bg: #632240; --pink-bar: #762c4d; --pink-chip: #ff99c2;
+    --purple-bg: #462e69; --purple-bar: #543a7c; --purple-chip: #c9acff;
+    --blue-bg: #023f6f; --blue-bar: #0a4c83; --blue-chip: #89c3fe;
+    --gray-bg: #393834; --gray-bar: #474540; --gray-chip: #a19e98;
     --charcoal-bg: #141413; --charcoal-bar: #0a0a0a; --charcoal-chip: #f5f4ef;
     --note-text-default: #f5f4ef;
     color-scheme: dark;
@@ -124,7 +131,7 @@
 }
 
 /* 메모 안의 강조(체크 표시·선택 막대·링크 밑줄)는 어느 색이든 브랜드 노랑 */
-[data-color] { --note-accent: var(--brand-yellow); --note-fg: var(--note-text-default); }
+[data-color] { --note-accent: color-mix(in srgb, var(--note-text-default) 55%, transparent); --note-fg: var(--note-text-default); } /* 메모 안 강조(체크 · 선택 테두리 · 링크 밑줄)는 메모 글자색 계열 — 노랑 메모 위 노랑이 묻히고, 다른 색 메모에선 튀던 것 */
 [data-color="yellow"] { --note-bg: var(--yellow-bg); --note-bar: var(--yellow-bar); --note-chip: var(--yellow-chip); }
 [data-color="green"] { --note-bg: var(--green-bg); --note-bar: var(--green-bar); --note-chip: var(--green-chip); }
 [data-color="pink"] { --note-bg: var(--pink-bg); --note-bar: var(--pink-bar); --note-chip: var(--pink-chip); }
@@ -181,7 +188,7 @@ svg { width: 20px; height: 20px; flex: none; }
    누를 수 있는 글자는 그렇게 보이게 (휴대폰과 같은 노란 밑줄 · 지우는 일은 빨강) */
 .link-btn { flex: none; white-space: nowrap; border: 0; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 @media (hover: hover) and (pointer: fine) { .link-btn:hover { background: var(--hover); color: var(--text); } .link-btn.danger:hover { color: var(--danger); } }
-.link-btn { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.link-btn { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--accent-line); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .link-btn.danger { color: var(--danger); text-decoration-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .link-btn:where(:disabled) { opacity: 0.45; cursor: default; background: none; color: var(--muted); } /* :where — 각 창 CSS(휴대폰 mobile.css 등)의 .link-btn 이 그대로 이기게 */
 
@@ -221,6 +228,8 @@ svg { width: 20px; height: 20px; flex: none; }
 }
 .dialog:focus { outline: none; } /* 창 자체(열 때 포커스)에는 테두리 없음 — 안의 단추는 그대로 */
 .dialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+/* 어두운 화면: 검정 판이 검정 앱 위에서 가장자리가 사라지지 않게 옅은 테두리 한 줄 */
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .dialog { box-shadow: var(--shadow-pop), inset 0 0 0 1px rgba(255, 255, 255, 0.1); } :where(:root:not([data-theme="light"])) .dialog::backdrop { background: rgba(0, 0, 0, 0.55); } }
 .dialog h2 { margin: 0 0 12px; font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
 .dialog p { margin: 0 0 16px; line-height: 1.6; white-space: pre-line; }
 /* 긴 창(설정·휴지통 …)의 머리: 제목 + 오른쪽 위 × — 스크롤해도 위에 붙어 있다 */
@@ -248,7 +257,8 @@ svg { width: 20px; height: 20px; flex: none; }
 .setting-row.nav-row > .btn.nav-act::before { display: none !important; }
 .setting-row.nav-row > .btn.nav-act::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 .setting-row.nav-row > .btn.nav-act:disabled { opacity: 0.4; }
-.setting-row.nav-row:has(> .nav-act:disabled) { cursor: default; opacity: 0.6; }
+.setting-row.nav-row:has(> .nav-act:disabled) { cursor: default; }
+.setting-row.nav-row:has(> .nav-act:disabled) > span { opacity: 0.5; } /* 줄 전체를 흐리게 하면 카드 바탕까지 비쳐 띠가 생겼다 — 글만 */
 @media (hover: hover) and (pointer: fine) { .setting-row.nav-row:hover { background-color: color-mix(in srgb, var(--text) 4%, transparent); } }
 .setting-row.nav-row:active:not(:has(> .nav-act:disabled)) { background-color: color-mix(in srgb, var(--text) 7%, transparent); }
 .setting-row.nav-row:has(> .nav-act:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
@@ -472,7 +482,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   transition: transform 0.15s;
 }
-.switch:checked { background: var(--brand-yellow); }
+.switch:checked { background: var(--text-strong); } /* 켜진 스위치는 진한 무채색 — 포인트색은 주요 동작에만 */
 .switch:checked::after { transform: translateX(16px); background: #fff; }
 .switch:disabled { opacity: 0.4; cursor: not-allowed; }
 /* 어두운 화면: 꺼진 스위치의 손잡이는 밝게 (어두운 바탕 · 어두운 손잡이면 스위치가 있는지도 안 보였다) */
@@ -640,7 +650,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
 .quick-event .qe-search { width: 100%; height: 38px; margin-bottom: 6px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); color: var(--text); font: inherit; }
 .quick-event .qe-memos { max-height: min(40vh, 280px); margin: 0 0 8px; padding: 0; overflow-y: auto; list-style: none; }
 .quick-event .qe-memo { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 6px 10px; border: 1.5px solid transparent; border-radius: 10px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-.quick-event .qe-memo[aria-checked="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent)); font-weight: 700; }
+.quick-event .qe-memo[aria-checked="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent)); font-weight: 700; }
 .quick-event .qe-memo[aria-checked="true"]::after { content: '✓'; margin-left: auto; font-weight: 800; }
 .quick-event .qe-plus { display: grid; place-items: center; width: 12px; height: 12px; font-style: normal; font-weight: 800; font-size: 13px; }
 .quick-event .qe-fresh-box {
@@ -797,7 +807,7 @@ dialog.quick-event[open] {
 .quick-event .qe-clock:hover {
   border-color: var(--text-strong);
 }
-.quick-event .qe-clock[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent)); color: var(--text-strong); font-weight: 700; }
+.quick-event .qe-clock[aria-pressed="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent)); color: var(--text-strong); font-weight: 700; }
 .quick-event .qe-pane .event-none:empty { display: none; }
 .quick-event .event-alerts button:not([aria-pressed="true"]) {
   display: none !important; /* 미리 알림 미선택 예시 캡슐 비활성화 */
@@ -895,7 +905,7 @@ dialog.quick-event[open] {
   cursor: pointer;
 }
 .alert-custom-row select:focus-visible, .alert-custom select:focus-visible {
-  border-color: var(--brand-yellow);
+  border-color: var(--text-strong);
   box-shadow: 0 0 0 2px var(--brand-yellow-soft);
   outline: none;
 }
@@ -906,7 +916,7 @@ dialog.quick-event[open] {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .alert-custom-row input[type="number"]:focus-visible, .alert-custom input:focus-visible {
-  border-color: var(--brand-yellow);
+  border-color: var(--text-strong);
   box-shadow: 0 0 0 2px var(--brand-yellow-soft);
   outline: none;
 }
@@ -939,7 +949,7 @@ dialog.quick-event[open] {
 .cal-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 2px 8px; }
 .cal-views { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(46px, auto); gap: 2px; padding: 3px; border-radius: 999px; background: var(--fill-tab); }
 .cal-views button { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-.cal-views button[aria-checked="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); }
+.cal-views button[aria-checked="true"] { background: var(--brand-yellow-soft); color: var(--on-brand-soft); }
 .cal-views > .seg-thumb { background: var(--brand-yellow-soft) !important; box-shadow: none !important; }
 .cal-views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 13px; white-space: nowrap; }
@@ -1302,7 +1312,7 @@ dialog.quick-event[open] {
 
 /* 날짜 숫자 칸: 22px 정사각 → 오늘의 노란 동그라미가 납작한 타원(22.7×20)이 아닌 원으로, 칸 가운데에 (달력이 붙이던 왼쪽 여백 1px 없이) */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { padding-inline: 0 !important; }
-.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: 24px; min-width: 24px; height: 24px; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; line-height: 1; }
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: auto; min-width: 19px; height: 19px; margin: 0 !important; padding: 0 3px !important; display: flex; align-items: center; justify-content: center; border-radius: 999px !important; line-height: 1; } /* 오늘 원은 숫자에 꼭 맞게 (24px 는 숫자보다 테두리가 커 보였다), 두 자리면 살짝 긴 알약 */
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: #c4282e; } /* 일요일 빨강은 그대로 */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sat, [role="gridcell"].mk-sat > :first-child) { color: var(--sat); } /* 토요일 파랑도 */
@@ -1310,7 +1320,7 @@ dialog.quick-event[open] {
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 5px !important; }
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev, .cal[data-view="dayGridMonth"] .cal-body .mk-ev > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
 /* 좁은 창(휴대폰): 달력을 화면 폭 가까이 넓혀 칸마다 글자가 더 들어가게 */
-@media (max-width: 700px) { .cal[data-view="dayGridMonth"] { padding-inline: 4px; } } /* 카드 끝은 다른 카드와 같은 선, 칸은 카드 안에서 넓게 */
+@media (max-width: 700px) { .cal[data-view="dayGridMonth"] .cal-body { margin-inline: -6px; } } /* 칸만 카드 안에서 넓게 — 카드 안쪽 여백은 그대로 두어 머리줄이 회상 보기와 같은 자리 (바꿀 때 옆으로 튀지 않게) */
 /* 칩 제목: 칸 폭에 맞춘 크기(공백 포함 한글 8자쯤 — 휴대폰 약 8~9px, 넓은 창은 11px 까지) · 보통 굵기 · 살짝 좁은 자간 */
 .cal[data-view="dayGridMonth"] .cal-body .mk-mt { font-size: clamp(8px, calc((var(--cal-col, 56px) - 5px) / 6.3), 11px) !important; font-weight: 500; letter-spacing: -0.03em; line-height: 1.3; padding: 1px 1.5px; }
 .cal[data-view="dayGridMonth"] .cal-body .mk-more { min-height: 0 !important; margin: 0 2px; padding: 0 2px; font-size: 11.5px; line-height: 13px; }
@@ -1340,9 +1350,9 @@ dialog.quick-event[open] {
   transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 .task-check svg { width: 13px; height: 13px; }
-.task-check:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+.task-check:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { .task-check:hover { border-color: var(--text-strong); color: var(--text-faint); } }
-.task-check[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow); color: var(--on-brand); }
+.task-check[aria-pressed="true"] { border-color: var(--text-strong); background: var(--text-strong); color: var(--surface-1); }
 .task-item.done .rem-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--text-faint); }
 .task-item.done { opacity: 0.7; }
 .task-row-item.done .row-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--text-faint); }
@@ -1404,7 +1414,7 @@ dialog.quick-event[open] {
 .feed-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 52px; padding: 8px 6px 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); }
 .feed-dot { flex: none; width: 10px; height: 10px; border-radius: 99px; background: var(--ext-color, var(--muted)); }
 .feed-color { width: 28px; height: 28px; margin: -9px; padding: 0; border: 0; border-radius: 99px; background: radial-gradient(circle, var(--ext-color) 0 5px, transparent 5.5px); cursor: pointer; }
-.feed-color:focus-visible, .feed-swatch:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+.feed-color:focus-visible, .feed-swatch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .feed-palette { display: flex; flex-basis: 100%; flex-wrap: wrap; gap: 8px; padding: 6px 0 2px 20px; }
 .feed-palette[hidden] { display: none; }
 /* 손가락 화면: 색 점은 점 둘레까지 눌리게(44px), 색 칸은 40px */
@@ -1434,7 +1444,7 @@ dialog.quick-event[open] {
 .feed-field .feed-url { width: 100%; box-sizing: border-box; font-weight: 400; }
 .feed-naver .btn { justify-self: end; }
 .feed-url { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; }
-.feed-url:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
+.feed-url:focus { outline: 2px solid var(--focus-ring); outline-offset: 0; }
 .feed-add .btn { height: 38px; padding: 0 14px; }
 .dialog p.feed-note { min-height: 1.4em; margin: 6px 2px 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .dialog p.feed-note.err { color: var(--danger); }
@@ -1460,7 +1470,7 @@ dialog.quick-event[open] {
 .ed-dot { flex: none; width: 12px; height: 12px; margin: 4px 3px 0; border-radius: 99px; background: var(--ev-color, var(--note-chip, var(--brand-yellow))); }
 .ed-badge { flex: none; margin-left: auto; font-size: 12px; font-weight: 600; color: var(--muted); } /* 표시일 뿐이라 단추처럼 보이지 않게 테두리 없이 */
 .dialog p.ed-note { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-1); font-size: 13.5px; line-height: 1.6; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
-.ed-link { color: var(--text-strong); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 2px; overflow-wrap: anywhere; cursor: pointer; }
+.ed-link { color: var(--text-strong); font-weight: 600; text-decoration: underline; text-decoration-color: var(--accent-line); text-decoration-thickness: 2px; text-underline-offset: 2px; overflow-wrap: anywhere; cursor: pointer; }
 .ed-lines .ed-url { font-size: 13.5px; }
 .ed-actions { margin-top: 18px; }
 .ed-actions .btn { min-height: 44px; }
@@ -1614,7 +1624,7 @@ dialog.quick-event[open] {
 .work-hours .wh-days { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
 .work-hours .wh-day { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .work-hours .wh-day.sun { color: var(--danger); }
-.work-hours .wh-day[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); }
+.work-hours .wh-day[aria-pressed="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft); color: var(--text-strong); }
 .work-hours .wh-time { display: flex; align-items: center; gap: 8px; }
 .work-hours .wh-time input { height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
 .work-hours .wh-sum { font-weight: 500; color: var(--muted); }
@@ -1675,10 +1685,10 @@ dialog.quick-event[open] {
 }
 .mf-item svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
 .mf-item:hover:not(:disabled) { background: var(--hover); }
-.mf-item:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
+.mf-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 /* 고른 폴더: 옅은 바탕 + 왼쪽 노란 막대 (Notion · Linear 처럼 — 줄마다 상자가 겹쳐 보이지 않게) */
 .mf-item { position: relative; }
-.mf-item[aria-current="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 700; }
+.mf-item[aria-current="true"] { background: var(--brand-yellow-soft); color: var(--on-brand-soft); font-weight: 700; }
 .mf-item[aria-current="true"] svg, .mf-item[aria-current="true"] .mf-count { color: inherit; }
 .mf-item:disabled { cursor: default; opacity: 0.6; }
 .mf-item.drop-on { box-shadow: inset 0 0 0 2px var(--brand-yellow); background: var(--hover); }
@@ -1699,8 +1709,8 @@ dialog.quick-event[open] {
 }
 @keyframes mf-run { 0%, 12% { transform: none; } 88%, 100% { transform: translateX(calc(var(--mf-w, 0px) - 100%)); } }
 /* 메모 수: 이름과 떨어진 작은 알약 (Apple 메일처럼) */
-.mf-count { flex: none; min-width: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--muted); font-size: 11.5px; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
-.mf-item[aria-current="true"] .mf-count { background: color-mix(in srgb, var(--brand-yellow) 40%, transparent); }
+.mf-count { flex: none; min-width: 16px; padding: 0 4px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--muted); font-size: 11.5px; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+.mf-item[aria-current="true"] .mf-count { background: color-mix(in srgb, var(--text-strong) 10%, transparent); }
 /* 두 묶음 사이: 가는 선과 "폴더" 머리글 */
 .mf-sep { margin: 6px 4px 0; padding: 9px 6px 3px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; list-style: none; user-select: none; }
 /* 메모 목록의 상단 고정 묶음 (PC · 휴대폰): 묶음마다 제 열 줄 — 이름 줄은 한 줄을 다 차지 (폴더 목록 .mf-sep 과 같은 모양) */
@@ -1743,7 +1753,7 @@ dialog.folder-pop::backdrop { background: rgba(0, 0, 0, 0.18); }
 .folder-tag.unfiled { opacity: 0.62; font-weight: 600; } /* 미분류: 폴더 이름보다 흐리게 (누르면 폴더에 넣기) */
 .folder-tag svg { flex: none; width: 12px; height: 12px; }
 .folder-tag span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.folder-tag:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
+.folder-tag:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 /* 카드의 폴더 이름 (전체 · 검색에서만 — folder-ui.js) */
 /* 카드의 폴더 이름: 태그(#굵은 글자)와 다르게 "자리" 로 읽히게 — 흐린 글자의 옅은 알약 */
 ::selection { background: color-mix(in srgb, var(--brand-yellow) 42%, transparent); }
@@ -1799,9 +1809,9 @@ body.picking .card.picked::after {
 .fchip-count { font-size: 12px; font-weight: 500; color: var(--muted); }
 @media (prefers-reduced-motion: no-preference) { .fchip:active { transform: scale(0.96); } }
 @media (hover: hover) and (pointer: fine) { .fchip:hover { background: var(--hover); } }
-.fchip:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+.fchip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 /* 고른 것: 옅은 노랑 바탕 + 노랑 테두리 (일정 창의 고른 칸과 같게). 꽉 찬 노랑은 ＋ 같은 주요 동작에만 */
-.fchip[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 800; }
+.fchip[aria-pressed="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 800; }
 .fchip[aria-pressed="true"] svg, .fchip[aria-pressed="true"] .fchip-count { color: inherit; }
 /* ＋ 새 폴더: 점선 — 폴더가 아니라 만드는 단추로 읽히게 */
 .fchip-add { border-style: dashed; color: var(--muted); }
@@ -1820,7 +1830,7 @@ body.picking .card.picked::after {
   background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; outline: none; box-shadow: 0 0 0 1px var(--brand-yellow);
 }
 .fchip-input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
-.fchip-ok { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
+.fchip-ok { border-color: transparent; background: var(--text-strong); color: var(--surface-1); font-weight: 800; }
 @media (pointer: coarse) {
   .fchip, .fchip-input { height: 36px; font-size: 13.5px; } /* 보기 패널의 칩과 같은 크기 (누르는 자리는 mobile.css 가 48px 로 넓힌다) */
   .fchip-all, .fchip-cancel { height: 44px; min-width: 44px; }

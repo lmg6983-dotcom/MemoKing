@@ -118,7 +118,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   background: var(--surface-1);
   box-shadow: var(--shadow-card);
 }
-.search:focus-within { box-shadow: inset 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
+.search:focus-within { box-shadow: inset 0 0 0 2px var(--accent-line), var(--shadow-card); }
 .search-icon { width: 18px; height: 18px; color: var(--text-faint); }
 .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 15px; }
 .search input::-webkit-search-cancel-button { display: none; }
@@ -133,8 +133,8 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--brand-yellow);
-  color: var(--on-brand);
+  background: var(--text-strong);
+  color: var(--surface-1);
   font-size: 12px;
   font-weight: 800;
   line-height: 16px;
@@ -174,10 +174,15 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
   transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out);
 }
 .tabs button svg { width: 22px; height: 22px; }
-.tabs button[aria-selected="true"] { color: var(--text-strong); font-weight: 700; }
+.tabs button[aria-selected="true"] { color: var(--on-brand-soft); font-weight: 700; }
 .tabs > :is(.tab-indicator, .seg-thumb) { border-radius: 999px; background: var(--brand-yellow-soft) !important; box-shadow: none !important; }
 .tabs button { position: relative; }
-.tab-count { position: absolute; top: 4px; left: calc(50% + 9px); min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--brand-yellow); color: var(--on-brand); font-size: 11px; font-weight: 800; line-height: 18px; }
+/* 넓은 화면(폴드 · 태블릿): 떠 있는 막대들이 화면 끝까지 늘어나지 않게 가운데 알맞은 폭으로 (One UI 태블릿처럼) */
+@media (min-width: 640px) {
+  .tabs { left: 50%; right: auto; width: min(calc(100% - 32px), 520px); transform: translateX(-50%); }
+  .note-screen #format-bar, .note-screen .tag-suggest-bar { align-self: center; width: min(calc(100% - 32px), 720px); margin-inline: auto; }
+}
+.tab-count { position: absolute; top: 5px; left: calc(50% + 9px); min-width: 15px; padding: 0 4px; border-radius: 999px; background: var(--text-strong); color: var(--surface-1); font-size: 10.5px; font-weight: 800; line-height: 15px; text-align: center; } /* 숫자 배지는 무채색 */
 .tab-count:empty { display: none; }
 
 /* One UI 큰 머리: 맨 위에서는 화면 위쪽을 비워 제목을 가운데 크게 (보는 자리),
@@ -248,13 +253,13 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
   white-space: nowrap;
 }
 .chip svg { width: 15px; height: 15px; }
-.chip[aria-pressed="true"], .chip[aria-checked="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); } /* PC 목록과 같음 (보기 패널의 정렬 · 카드 모양은 aria-checked) */
+.chip[aria-pressed="true"], .chip[aria-checked="true"], .tag-chip[aria-pressed="true"] { background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1.5px var(--text-strong); } /* PC 목록과 같음 (보기 패널의 정렬 · 카드 모양은 aria-checked) */
 
 .tag-chip small { font-size: 12px; font-weight: 500; opacity: 0.72; }
 .filter-summary { display: flex; align-items: center; gap: 8px; margin: 0 16px 8px; font-size: 13px; color: var(--muted); }
 .filter-summary span { flex: 1; }
 /* 글자 단추는 한 줄로 — 자리가 모자라면 옆(고르기 칸)이 줄어든다 */
-.link-btn { flex: none; white-space: nowrap; min-height: var(--tap); padding: 6px 8px; border: 0; background: none; color: var(--text-strong); font-weight: 700; font-size: 13px; text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.link-btn { flex: none; white-space: nowrap; min-height: var(--tap); padding: 6px 8px; border: 0; background: none; color: var(--text-strong); font-weight: 700; font-size: 13px; text-decoration: underline; text-decoration-color: var(--accent-line); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 
 /* 카드: 바탕이 실제 메모 색. 기본은 두 줄 격자, 목록 모양이면 한 줄씩 */
 .cards {
@@ -709,7 +714,7 @@ h2.sheet-title { font-size: 20px; }
 .btn.wide { width: 100%; margin-top: 6px; }
 .btn svg { width: 20px; height: 20px; }
 .hint.small { font-size: 12.5px; }
-.hint a { color: var(--text-strong); font-weight: 700; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.hint a { color: var(--text-strong); font-weight: 700; text-decoration-color: var(--accent-line); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .field { display: flex; flex-direction: column; gap: 6px; margin: 14px 4px 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .field input { height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); color: var(--text); font-size: 14px; font-weight: 500; }
 .field input:focus { outline: 2px solid var(--text-strong); outline-offset: -1px; }
@@ -920,7 +925,7 @@ body.sheet-open .mk-date-chip { visibility: hidden; } /* 시트가 열리면 메
 .print-panel[hidden] { display: none; }
 .print-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .print-chips button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-1, var(--bg)); color: var(--text); font: inherit; font-size: 13.5px; }
-.print-chips button[aria-checked="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 700; }
+.print-chips button[aria-checked="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 700; }
 .print-size-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
 .print-size-row input { width: 76px; height: 40px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; text-align: right; }
 .print-range { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; color: var(--muted); }
@@ -965,7 +970,7 @@ body.sheet-open .mk-date-chip { visibility: hidden; } /* 시트가 열리면 메
 .fab-sat-label { padding: 6px 14px; border-radius: 999px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14.5px; }
 .fab-sat-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-right: 4px; border-radius: 999px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.2); }
 .fab-sat[data-new="voice"] .fab-sat-btn { background: var(--rec); color: var(--on-rec); }
-.fab-sat[data-new="ink"] .fab-sat-btn { background: var(--brand-yellow); color: var(--on-brand); } /* PC · 메모 안 + 메뉴와 같은 색 */
+.fab-sat[data-new="ink"] .fab-sat-btn { background: var(--surface-2); color: var(--text-strong); } /* ＋ 만 노랑 — 펼친 단추들은 무채색 (녹음만 빨강) */
 .fab-sat-btn svg { width: 24px; height: 24px; }
 .fab-sat:active .fab-sat-btn { transform: scale(0.94); }
 @keyframes sat-out { from { opacity: 0; transform: translate(18px, 34px) scale(0.5); } }
@@ -1073,7 +1078,6 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   .note-screen .editor { padding: 6px 14px 32px; }
   .note-screen .format-bar button { min-width: 38px; height: 40px; }
   .tabs button { font-size: 12.5px; }
-  .tabs button svg { display: none; }
   .share-choice small { display: none; }
 }
 /* 가로로 눕힌 휴대폰 (높이가 낮음): 막대를 얇게 */
@@ -1106,7 +1110,7 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 .add-fab::before { content: ""; position: absolute; inset: -4px; } /* 손가락 자리 60px */
 .add-fab:active { transform: scale(0.95); }
 .add-fab svg { width: 24px; height: 24px; transition: transform 0.22s var(--ease-out); }
-.add-fab.open { background: var(--brand-yellow); color: var(--on-brand); box-shadow: var(--shadow-pop); }
+.add-fab.open { background: var(--surface-2); color: var(--text-strong); box-shadow: var(--shadow-pop); } /* 목록 ＋ 를 펼쳤을 때와 같게 무채색 × */
 .add-fab.open svg { transform: rotate(45deg); } /* + → × */
 /* 녹음 중: + 에 빨간 점 */
 .add-fab.recording::after {

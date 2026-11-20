@@ -237,9 +237,12 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   cursor: pointer;
 }
 .mk-doc li[data-item-type="task"][data-checked="true"]::before {
-  border-color: var(--note-accent);
-  background: var(--note-accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23111111' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
+  /* 끝낸 일: 메모 글자색으로 꽉 채우고 흰 체크 (반투명 칠은 메모 색과 섞여 탁했다) */
+  border-color: var(--note-fg);
+  background: var(--note-fg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
 }
+[data-color="charcoal"] .mk-doc li[data-item-type="task"][data-checked="true"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23111111' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .mk-doc li[data-item-type="task"][data-checked="true"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23111111' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); } } /* 어두운 화면: 밝은 글자색 칸 위 진한 체크 */
 .mk-doc li[data-item-type="task"][data-checked="true"] > p { color: var(--note-muted); text-decoration: line-through; }
 
 /* 밑줄 · 글자 색 · 하이라이트 */
@@ -247,6 +250,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .mk-doc mark { padding: 0.05em 0.1em; border-radius: 4px; color: #1f1f1f; } /* 배경색은 요소의 style 에서 */
 /* 어두운 화면: 형광펜 칠 · 흰 바탕 그림(흰 바탕 손 메모 · 가져온 일정의 달력 그림)은 조금 어둡게 — 검은 바탕에서 혼자 눈부시지 않게 (파일은 그대로) */
 [data-color="charcoal"] .mk-doc mark { filter: brightness(0.8); }
+@media (prefers-color-scheme: light) { :where(body:not([data-color="charcoal"])) .mk-doc mark { mix-blend-mode: multiply; } } /* 노랑 메모 위 노랑 형광펜도 보이게 (곱하면 한 단 진해진다) — 밝은 화면만 */
 [data-color="charcoal"] .mk-doc :is(.mk-ink.bg-white img, img[alt*="월 달력 — "]) { filter: brightness(0.86); }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .mk-doc mark { filter: brightness(0.8); }
@@ -390,7 +394,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 @media (hover: hover) and (pointer: fine) { .lc-main:hover { box-shadow: 0 2px 4px rgba(17, 17, 17, 0.08), 0 8px 20px rgba(17, 17, 17, 0.1); } }
 .lc-main:active { transform: scale(0.99); }
 @media (prefers-reduced-motion: reduce) { .lc-main { transition: none; } .lc-main:active { transform: none; } }
-.mk-link-card.selected .lc-main { box-shadow: inset 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
+.mk-link-card.selected .lc-main { box-shadow: inset 0 0 0 2px var(--text-strong), var(--shadow-card); }
 .lc-text { display: flex; flex-direction: column; justify-content: center; gap: 2px; flex: 1; min-width: 0; }
 .lc-site { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--text-muted); }
 .lc-icon { width: 16px; height: 16px; flex: none; border-radius: 4px; object-fit: contain; }
@@ -862,7 +866,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .task-row[aria-checked="true"] .task-row-label::before {
   content: ''; display: inline-block; width: 7px; height: 7px; margin: 0 8px 1px 0; border-radius: 50%; background: var(--brand-yellow); vertical-align: middle;
 }
-.task-row:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: -2px; }
+.task-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 @media (hover: hover) and (pointer: fine) { .task-row:not([aria-checked="true"]):hover { background: var(--hover); } }
 .task-row-chev { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
 .task-row-custom[aria-checked="true"] .task-row-chev { transform: rotate(90deg); }
@@ -1910,7 +1914,7 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-btn:active { transform: scale(0.9); }
 .ink-btn:disabled { opacity: 0.3; cursor: default; background: none; transform: none; }
 /* 고른 도구: 옅은 노랑 + 노랑 테두리, 위로 살짝 (한 번 더 누르면 색·굵기) */
-.ink-tool[aria-pressed="true"], .ink-tool[aria-pressed="true"]:hover { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); transform: translateY(-2px); }
+.ink-tool[aria-pressed="true"], .ink-tool[aria-pressed="true"]:hover { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--text-strong); transform: translateY(-2px); }
 .ink-tool-color { position: absolute; left: 9px; right: 9px; bottom: 4px; height: 3px; border-radius: 2px; background: var(--c); box-shadow: 0 0 0 1px rgba(128, 128, 128, 0.35); }
 .ink-style-dot { display: block; width: var(--d, 10px); height: var(--d, 10px); border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.5), 0 0 0 2px var(--ink-ui-bg), 0 0 0 3.5px color-mix(in srgb, var(--ink-ui-fg) 30%, transparent); }
 .ink-style[data-tool="eraser"] .ink-style-dot { background: none; box-shadow: none; border: 1.6px dashed color-mix(in srgb, var(--ink-ui-fg) 70%, transparent); }
@@ -1938,10 +1942,10 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-size { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px; background: var(--fill-tab); cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .ink-size:hover { background: var(--fill-hover); } }
 .ink-size span { display: block; border-radius: 50%; background: var(--c, var(--ink-ui-fg)); }
-.ink-size[aria-pressed="true"] { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); }
+.ink-size[aria-pressed="true"] { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--text-strong); }
 .ink-bg { display: grid; justify-items: center; gap: 5px; width: 66px; padding: 7px 4px 6px; border: 0; border-radius: 12px; background: none; color: var(--ink-ui-fg); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .ink-bg:hover { background: var(--fill-hover); } }
-.ink-bg[aria-checked="true"] { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--brand-yellow); }
+.ink-bg[aria-checked="true"] { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--text-strong); }
 .ink-bg-preview { display: block; width: 40px; height: 30px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.5); background-image: repeating-conic-gradient(color-mix(in srgb, var(--ink-ui-fg) 14%, transparent) 0 25%, transparent 0 50%); background-size: 10px 10px; }
 .ink-bg-white .ink-bg-preview { background: #fff; }
 .ink-bg-black .ink-bg-preview { background: #111; }
@@ -2016,7 +2020,7 @@ body.recording .format-bar button.add-btn::after {
 .add-sat-btn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: var(--surface-2, #fff); color: var(--text-strong, #111); box-shadow: 0 4px 12px rgba(17, 17, 17, 0.16), inset 0 0 0 1px var(--line, rgba(0, 0, 0, 0.08)); transition: transform 0.12s ease-out; }
 .add-sat-btn svg { width: 17px; height: 17px; }
 .add-sat-btn.rec { background: var(--rec); color: var(--on-rec); }
-.add-sat-btn.ink { background: var(--brand-yellow); color: var(--on-brand); }
+.add-sat-btn.ink { background: var(--surface-2); color: var(--text-strong); } /* 목록 ＋ 메뉴와 같게: 펼친 단추는 무채색 */
 .add-sat.active .add-sat-btn.rec { animation: mk-blink 1.2s ease-in-out infinite; }
 .add-sat-label { padding: 3px 9px; border-radius: 8px; background: var(--surface-2, #fff); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 12.5px; white-space: nowrap; }
 .add-sat:focus-visible .add-sat-btn { transform: scale(1.07); }
@@ -2728,7 +2732,7 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-doc p:has(> img.mk-pdf-thumb) { position: relative; width: fit-content; max-width: 100%; }
 /* 문서 칩 + 썸네일 한 문단: 그림이 블록이라 줄바꿈 · 편집기 보조 그림이 빈 줄만 더한다 (묶음 사진과 같게) */
 .mk-doc p:has(> img.mk-pdf-thumb) > :is(img.ProseMirror-separator, br) { display: none !important; }
-.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF 보기"; position: absolute; right: 8px; bottom: 10px; padding: 3px 10px; border-radius: 999px; background: #c4282e; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; }
+.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF 보기"; position: absolute; right: 8px; bottom: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(17, 17, 17, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; } /* 빨강 대신 차분한 어두운 알약 — 빨강은 지우기 · 녹음 같은 경고에만 */
 /* 문서 캡슐: 두 칸이 무엇을 여는지 — 위 이름 줄은 원본을 그 앱으로(↗ 다른 앱), 아래 첫 쪽은 메모킹 안 PDF 보기. 확장자 자리에 할 일을 적는다 */
 .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]::after { content: "원본 열기 ↗"; margin-left: auto; padding: 0 6px; font-weight: 600; }
 .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:is([data-ext="DOCX"], [data-ext="DOC"])::after { content: "Word로 열기 ↗"; }
@@ -2737,13 +2741,17 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:is([data-ext="HWP"], [data-ext="HWPX"])::after { content: "한글로 열기 ↗"; }
 /* PC: 마우스를 올린 칸만 진해진다 (어느 칸을 누르는지) */
 @media (hover: hover) and (pointer: fine) {
-  .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:hover { background: var(--note-hover); }
+  .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:hover { background: color-mix(in srgb, var(--doc-head-fg) 5%, var(--doc-head-bg)); }
   .mk-doc p:has(> img.mk-pdf-thumb) > img.mk-pdf-thumb { transition: filter 0.12s; }
   .mk-doc p:has(> img.mk-pdf-thumb) > img.mk-pdf-thumb:hover { filter: brightness(0.95); }
 }
 /* 문서 칩 + PDF 첫 쪽(바꾸는 동안은 임시 칸): 동영상처럼 한 덩어리 카드. 위는 이름 줄(칩), 아래는 첫 쪽, 테두리 · 둥글기 · 그림자는 카드 하나에 */
 .mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { display: flex; flex-direction: column; width: min(100%, 360px); margin: 6px 0; overflow: hidden; border-radius: var(--radius-lg); box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12); }
-.mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) > a[href^="attachments/"] { display: flex; max-width: none; padding: 7px 12px 7px 10px; border-radius: 0; }
+/* 이름 줄도 첫 쪽과 같은 불투명 종이 — 반투명 칩 바탕이 흰 쪽과 따로 놀던 것. 어두운 화면은 불투명한 어두운 판 */
+.mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { --doc-head-bg: #fff; --doc-head-fg: #1f1f1c; --doc-head-line: rgba(0, 0, 0, 0.08); background: #fff; }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { --doc-head-bg: #232323; --doc-head-fg: #f5f5f5; --doc-head-line: rgba(255, 255, 255, 0.08); } }
+.mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) > a[href^="attachments/"] { display: flex; align-items: center; max-width: none; min-height: 44px; padding: 8px 10px 8px 14px; border-radius: 0; background: var(--doc-head-bg); color: var(--doc-head-fg); box-shadow: inset 0 -1px 0 var(--doc-head-line); }
+.mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]::after { padding: 2px 10px !important; border-radius: 999px !important; background: color-mix(in srgb, var(--doc-head-fg) 8%, transparent) !important; color: var(--doc-head-fg) !important; opacity: 0.8; font-size: 12px; line-height: 18px; }
 .mk-doc p:has(> img.mk-pdf-thumb) > img.mk-pdf-thumb { width: 100%; margin: 0; border-radius: 0; outline: 0; box-shadow: none; }
 .mk-doc p:has(> .mk-doc-pending) > .mk-doc-pending { width: 100%; margin: 0; }
 .mk-doc p:has(> .mk-doc-pending) .mk-doc-pending-page { border-radius: 0; box-shadow: none; }

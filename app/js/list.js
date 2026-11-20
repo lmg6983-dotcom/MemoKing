@@ -1,4 +1,5 @@
 // 메모 목록 창 — 폴더 지정, 메모 카드 목록, 검색, 새 메모.
+import { listContext } from './core/list-context.js';
 import { hotkeyLabel } from './core/memo-hotkeys.js';
 import { setupAiAsk } from './ai-ask.js';
 import { DEFAULT_MODEL } from './core/model-catalog.js';
@@ -193,8 +194,8 @@ function render() {
   el.empty.hidden = memos.length > 0;
   el.cards.classList.toggle('is-empty', !memos.length); // 빈 카드 칸이 자리를 반 나눠 가져 안내가 아래로 치우치지 않게
   if (!memos.length) renderEmpty(narrowed, elsewhere);
-  // 검색·필터로 좁혔을 때만 "N개 중 M개" (평소 개수는 메모 탭에)
-  el.count.replaceChildren(`메모 ${(state.query ? modeMemos() : inFolder(modeMemos())).length}개 중 ${memos.length}개`);
+  // 검색·필터로 좁혔을 때: 무엇으로 몇 개를 찾았는지 (휴대폰 큰 제목 아래와 같은 글 — core/list-context.js)
+  el.count.replaceChildren(listContext({ folder: state.folder, mode: state.mode, workLife: state.workLife, query: state.query, filters: filterCount(), shown: memos.length }));
   if (elsewhere) el.count.append(', ', otherModeLink(elsewhere));
   el.count.hidden = !narrowed || !memos.length; // 하나도 없으면 빈 화면 안내가 "다른 모드에서 보기" 를 맡는다
   renderFilters();

@@ -542,7 +542,7 @@ fn invalid_client_help(err: io::Error, source: &str) -> io::Error {
 fn page(ok: bool) -> String {
     let (title, sub) = if ok { ("메모킹에 Google Drive를 연결했어요", "이 창을 닫고 메모킹으로 돌아가세요.") } else { ("연결하지 못했어요", "메모킹으로 돌아가 다시 해 주세요.") };
     format!(
-        "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\"><title>메모킹</title>\n<style>body{{font-family:system-ui,\"Malgun Gothic\",sans-serif;background:#f2f2f2;color:#111;display:grid;place-items:center;min-height:90vh;margin:0;text-align:center}}\nh1{{font-size:22px}}p{{color:#686868}}</style></head><body><div><h1>{title}</h1><p>{sub}</p></div></body></html>"
+        "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\"><title>메모킹</title>\n<style>body{{font-family:system-ui,\"Malgun Gothic\",sans-serif;background:#f5f5f5;color:#111;display:grid;place-items:center;min-height:90vh;margin:0;text-align:center}}\nh1{{font-size:22px}}p{{color:#686868}}</style></head><body><div><h1>{title}</h1><p>{sub}</p></div></body></html>"
     )
 }
 

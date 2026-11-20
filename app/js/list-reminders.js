@@ -935,6 +935,11 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     if (id === viewId) return;
     const was = viewId;
     viewId = id;
+    // 보던 자리 그대로: 바꾸는 사이 잠깐 짧아진 칸 때문에 목록이 맨 위로 튀지 않게 (캘린더 ↔ 회상)
+    let scroller = container; // 위로 올라가며 처음 스크롤되는 칸 (휴대폰 #view-reminders · PC 목록 칸)
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight && scroller.parentElement) scroller = scroller.parentElement;
+    const keepTop = scroller.scrollTop;
+    requestAnimationFrame(() => { if (scroller.scrollTop !== keepTop) scroller.scrollTop = keepTop; });
     try {
       if (remember) localStorage.setItem(VIEW_KEY, id);
     } catch {

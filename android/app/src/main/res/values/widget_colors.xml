@@ -2,12 +2,12 @@
 <!-- 홈 화면 위젯 색 (Widgets.kt): 메모 7색 종이 · 글자. 다크 모드는 values-night 에서 — 런처가 직접 고른다
      (앱이 칠하는 방식(setColorFilter)에 기대면 런처에 따라 흰 바탕만 남아 글자가 안 보일 수 있어서) -->
 <resources>
-    <color name="widget_yellow">#FFFFF4B8</color>
-    <color name="widget_green">#FFDDF5DF</color>
-    <color name="widget_pink">#FFFFE0EC</color>
-    <color name="widget_purple">#FFEDE3FF</color>
-    <color name="widget_blue">#FFDDEEFF</color>
-    <color name="widget_gray">#FFF1F0EC</color>
+    <color name="widget_yellow">#FFFFE99A</color>
+    <color name="widget_green">#FFC1FACC</color>
+    <color name="widget_pink">#FFFFE0EB</color>
+    <color name="widget_purple">#FFEDE5FE</color>
+    <color name="widget_blue">#FFDBECFE</color>
+    <color name="widget_gray">#FFE1DFDB</color>
     <color name="widget_charcoal">#FF1C1C1B</color>
     <color name="widget_text">#FF1F1F1C</color>
     <color name="widget_muted">#8A1F1F1C</color>
