@@ -8,9 +8,12 @@
   /* 브랜드 */
   --brand-yellow: #ffcc00;
   --brand-yellow-hover: #f2c000;
-  --brand-yellow-soft: #ffeeaa; /* 고른 탭 · 칸 바탕: #fff6cc 는 흰 · 회색 바탕과 밝기가 같아(1.03:1) 색만으로 겨우 보였다 — 한 단 진하게 */
-  --accent-line: #d9a100; /* 노랑 선(밑줄 · 입력 포커스): 순노랑은 흰 바탕과 1.5:1 이라 선이 사라졌다 — 같은 색 계열의 진한 금색 */
-  --on-brand-soft: var(--text-strong); /* 연노랑 위 글자 (어두운 화면은 노랑 글자로 — 탁한 올리브 바탕에 흰 글자가 흐렸다) */
+  /* 포인트색(노랑)은 꼭 눈이 가야 할 곳에만: 주요 동작 단추 · ＋ · 달력의 오늘 · 튜토리얼 · 진행 막대 · 경고 띠.
+     고른 탭 · 고른 줄 · 밑줄 · 포커스 · 스위치 · 체크 같은 "상태" 는 무채색으로 (노랑이 여기저기 흩어져 난잡하던 것) */
+  --brand-yellow-soft: rgba(25, 25, 25, 0.08); /* 고른 상태 바탕 (이름은 예전 그대로 — 이제 무채색) */
+  --accent-line: rgba(25, 25, 25, 0.32); /* 밑줄 · 입력 포커스 선 */
+  --on-dark-fill: #ffffff;
+  --on-brand-soft: var(--text-strong); /* 고른 상태 위 글자 */
   --brand-black: #111111;
   --on-brand: #111111;
   --on-black: #ffffff;
@@ -92,9 +95,9 @@
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     --brand-yellow-hover: #ffd633;
-    --brand-yellow-soft: #3d3112; /* 올리브빛(#3a3100) 대신 따뜻한 금빛 */
-    --accent-line: #ffcc00;
-    --on-brand-soft: #ffd84d;
+    --brand-yellow-soft: rgba(255, 255, 255, 0.12);
+    --accent-line: rgba(255, 255, 255, 0.4);
+    --on-brand-soft: var(--text-strong);
     --surface-0: #0f0e0d; /* 완전 검정 대신 아주 어두운 따뜻한 회색 */
     --surface-1: #1d1c1a;
     --surface-2: #282725;
@@ -111,7 +114,7 @@
     --ok-text: #6fd39a;
     --err-text: #ff8a80;
     --on-danger: #1a0506;
-    --focus-ring: #ffcc00;
+    --focus-ring: #f2f2f2;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 14px rgba(0, 0, 0, 0.45);
 
@@ -128,7 +131,7 @@
 }
 
 /* 메모 안의 강조(체크 표시·선택 막대·링크 밑줄)는 어느 색이든 브랜드 노랑 */
-[data-color] { --note-accent: var(--brand-yellow); --note-fg: var(--note-text-default); }
+[data-color] { --note-accent: color-mix(in srgb, var(--note-text-default) 55%, transparent); --note-fg: var(--note-text-default); } /* 메모 안 강조(체크 · 선택 테두리 · 링크 밑줄)는 메모 글자색 계열 — 노랑 메모 위 노랑이 묻히고, 다른 색 메모에선 튀던 것 */
 [data-color="yellow"] { --note-bg: var(--yellow-bg); --note-bar: var(--yellow-bar); --note-chip: var(--yellow-chip); }
 [data-color="green"] { --note-bg: var(--green-bg); --note-bar: var(--green-bar); --note-chip: var(--green-chip); }
 [data-color="pink"] { --note-bg: var(--pink-bg); --note-bar: var(--pink-bar); --note-chip: var(--pink-chip); }
@@ -479,7 +482,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   transition: transform 0.15s;
 }
-.switch:checked { background: var(--brand-yellow); }
+.switch:checked { background: var(--text-strong); } /* 켜진 스위치는 진한 무채색 — 포인트색은 주요 동작에만 */
 .switch:checked::after { transform: translateX(16px); background: #fff; }
 .switch:disabled { opacity: 0.4; cursor: not-allowed; }
 /* 어두운 화면: 꺼진 스위치의 손잡이는 밝게 (어두운 바탕 · 어두운 손잡이면 스위치가 있는지도 안 보였다) */
@@ -647,7 +650,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
 .quick-event .qe-search { width: 100%; height: 38px; margin-bottom: 6px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); color: var(--text); font: inherit; }
 .quick-event .qe-memos { max-height: min(40vh, 280px); margin: 0 0 8px; padding: 0; overflow-y: auto; list-style: none; }
 .quick-event .qe-memo { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 6px 10px; border: 1.5px solid transparent; border-radius: 10px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-.quick-event .qe-memo[aria-checked="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent)); font-weight: 700; }
+.quick-event .qe-memo[aria-checked="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent)); font-weight: 700; }
 .quick-event .qe-memo[aria-checked="true"]::after { content: '✓'; margin-left: auto; font-weight: 800; }
 .quick-event .qe-plus { display: grid; place-items: center; width: 12px; height: 12px; font-style: normal; font-weight: 800; font-size: 13px; }
 .quick-event .qe-fresh-box {
@@ -804,7 +807,7 @@ dialog.quick-event[open] {
 .quick-event .qe-clock:hover {
   border-color: var(--text-strong);
 }
-.quick-event .qe-clock[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent)); color: var(--text-strong); font-weight: 700; }
+.quick-event .qe-clock[aria-pressed="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft, color-mix(in srgb, var(--brand-yellow) 16%, transparent)); color: var(--text-strong); font-weight: 700; }
 .quick-event .qe-pane .event-none:empty { display: none; }
 .quick-event .event-alerts button:not([aria-pressed="true"]) {
   display: none !important; /* 미리 알림 미선택 예시 캡슐 비활성화 */
@@ -902,7 +905,7 @@ dialog.quick-event[open] {
   cursor: pointer;
 }
 .alert-custom-row select:focus-visible, .alert-custom select:focus-visible {
-  border-color: var(--brand-yellow);
+  border-color: var(--text-strong);
   box-shadow: 0 0 0 2px var(--brand-yellow-soft);
   outline: none;
 }
@@ -913,7 +916,7 @@ dialog.quick-event[open] {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .alert-custom-row input[type="number"]:focus-visible, .alert-custom input:focus-visible {
-  border-color: var(--brand-yellow);
+  border-color: var(--text-strong);
   box-shadow: 0 0 0 2px var(--brand-yellow-soft);
   outline: none;
 }
@@ -1347,9 +1350,9 @@ dialog.quick-event[open] {
   transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 .task-check svg { width: 13px; height: 13px; }
-.task-check:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+.task-check:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { .task-check:hover { border-color: var(--text-strong); color: var(--text-faint); } }
-.task-check[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow); color: var(--on-brand); }
+.task-check[aria-pressed="true"] { border-color: var(--text-strong); background: var(--text-strong); color: var(--surface-1); }
 .task-item.done .rem-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--text-faint); }
 .task-item.done { opacity: 0.7; }
 .task-row-item.done .row-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--text-faint); }
@@ -1411,7 +1414,7 @@ dialog.quick-event[open] {
 .feed-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 52px; padding: 8px 6px 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); }
 .feed-dot { flex: none; width: 10px; height: 10px; border-radius: 99px; background: var(--ext-color, var(--muted)); }
 .feed-color { width: 28px; height: 28px; margin: -9px; padding: 0; border: 0; border-radius: 99px; background: radial-gradient(circle, var(--ext-color) 0 5px, transparent 5.5px); cursor: pointer; }
-.feed-color:focus-visible, .feed-swatch:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+.feed-color:focus-visible, .feed-swatch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .feed-palette { display: flex; flex-basis: 100%; flex-wrap: wrap; gap: 8px; padding: 6px 0 2px 20px; }
 .feed-palette[hidden] { display: none; }
 /* 손가락 화면: 색 점은 점 둘레까지 눌리게(44px), 색 칸은 40px */
@@ -1441,7 +1444,7 @@ dialog.quick-event[open] {
 .feed-field .feed-url { width: 100%; box-sizing: border-box; font-weight: 400; }
 .feed-naver .btn { justify-self: end; }
 .feed-url { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; }
-.feed-url:focus { outline: 2px solid var(--brand-yellow); outline-offset: 0; }
+.feed-url:focus { outline: 2px solid var(--focus-ring); outline-offset: 0; }
 .feed-add .btn { height: 38px; padding: 0 14px; }
 .dialog p.feed-note { min-height: 1.4em; margin: 6px 2px 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .dialog p.feed-note.err { color: var(--danger); }
@@ -1621,7 +1624,7 @@ dialog.quick-event[open] {
 .work-hours .wh-days { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
 .work-hours .wh-day { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .work-hours .wh-day.sun { color: var(--danger); }
-.work-hours .wh-day[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); }
+.work-hours .wh-day[aria-pressed="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft); color: var(--text-strong); }
 .work-hours .wh-time { display: flex; align-items: center; gap: 8px; }
 .work-hours .wh-time input { height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text); font: inherit; }
 .work-hours .wh-sum { font-weight: 500; color: var(--muted); }
@@ -1682,7 +1685,7 @@ dialog.quick-event[open] {
 }
 .mf-item svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
 .mf-item:hover:not(:disabled) { background: var(--hover); }
-.mf-item:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
+.mf-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 /* 고른 폴더: 옅은 바탕 + 왼쪽 노란 막대 (Notion · Linear 처럼 — 줄마다 상자가 겹쳐 보이지 않게) */
 .mf-item { position: relative; }
 .mf-item[aria-current="true"] { background: var(--brand-yellow-soft); color: var(--on-brand-soft); font-weight: 700; }
@@ -1707,7 +1710,7 @@ dialog.quick-event[open] {
 @keyframes mf-run { 0%, 12% { transform: none; } 88%, 100% { transform: translateX(calc(var(--mf-w, 0px) - 100%)); } }
 /* 메모 수: 이름과 떨어진 작은 알약 (Apple 메일처럼) */
 .mf-count { flex: none; min-width: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--muted); font-size: 11.5px; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
-.mf-item[aria-current="true"] .mf-count { background: color-mix(in srgb, var(--brand-yellow) 40%, transparent); }
+.mf-item[aria-current="true"] .mf-count { background: color-mix(in srgb, var(--text-strong) 10%, transparent); }
 /* 두 묶음 사이: 가는 선과 "폴더" 머리글 */
 .mf-sep { margin: 6px 4px 0; padding: 9px 6px 3px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; list-style: none; user-select: none; }
 /* 메모 목록의 상단 고정 묶음 (PC · 휴대폰): 묶음마다 제 열 줄 — 이름 줄은 한 줄을 다 차지 (폴더 목록 .mf-sep 과 같은 모양) */
@@ -1750,7 +1753,7 @@ dialog.folder-pop::backdrop { background: rgba(0, 0, 0, 0.18); }
 .folder-tag.unfiled { opacity: 0.62; font-weight: 600; } /* 미분류: 폴더 이름보다 흐리게 (누르면 폴더에 넣기) */
 .folder-tag svg { flex: none; width: 12px; height: 12px; }
 .folder-tag span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.folder-tag:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 1px; }
+.folder-tag:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 /* 카드의 폴더 이름 (전체 · 검색에서만 — folder-ui.js) */
 /* 카드의 폴더 이름: 태그(#굵은 글자)와 다르게 "자리" 로 읽히게 — 흐린 글자의 옅은 알약 */
 ::selection { background: color-mix(in srgb, var(--brand-yellow) 42%, transparent); }
@@ -1806,9 +1809,9 @@ body.picking .card.picked::after {
 .fchip-count { font-size: 12px; font-weight: 500; color: var(--muted); }
 @media (prefers-reduced-motion: no-preference) { .fchip:active { transform: scale(0.96); } }
 @media (hover: hover) and (pointer: fine) { .fchip:hover { background: var(--hover); } }
-.fchip:focus-visible { outline: 2px solid var(--brand-yellow); outline-offset: 2px; }
+.fchip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 /* 고른 것: 옅은 노랑 바탕 + 노랑 테두리 (일정 창의 고른 칸과 같게). 꽉 찬 노랑은 ＋ 같은 주요 동작에만 */
-.fchip[aria-pressed="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 800; }
+.fchip[aria-pressed="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 800; }
 .fchip[aria-pressed="true"] svg, .fchip[aria-pressed="true"] .fchip-count { color: inherit; }
 /* ＋ 새 폴더: 점선 — 폴더가 아니라 만드는 단추로 읽히게 */
 .fchip-add { border-style: dashed; color: var(--muted); }
@@ -1827,7 +1830,7 @@ body.picking .card.picked::after {
   background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; outline: none; box-shadow: 0 0 0 1px var(--brand-yellow);
 }
 .fchip-input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
-.fchip-ok { border-color: transparent; background: var(--brand-yellow); color: var(--on-brand); font-weight: 800; }
+.fchip-ok { border-color: transparent; background: var(--text-strong); color: var(--surface-1); font-weight: 800; }
 @media (pointer: coarse) {
   .fchip, .fchip-input { height: 36px; font-size: 13.5px; } /* 보기 패널의 칩과 같은 크기 (누르는 자리는 mobile.css 가 48px 로 넓힌다) */
   .fchip-all, .fchip-cancel { height: 44px; min-width: 44px; }
