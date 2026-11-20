@@ -66,7 +66,7 @@ Var mkAutoStart
 ; 지울 때: 메모킹이 켤 때마다 적던 레지스트리도 — 탐색기 오른쪽 클릭 › "메모킹에 저장" 메뉴 (desktop-rs/app/src/shell_menu.rs) · 알림
 !macro NSIS_HOOK_PREUNINSTALL
   DeleteRegKey HKCU "Software\Classes\*\shell\MemoKing.Save"
-  ; 알림 누르기(memoking: 주소) · 알림 이름 · 아이콘 (desktop-rs/app/src/reminders.rs register)
+  ; 알림 누르기(memoking: 주소) · 1.5.1 이 적던 알림 이름 · 아이콘 (desktop-rs/app/src/reminders.rs register)
   DeleteRegKey HKCU "Software\Classes\memoking"
   DeleteRegKey HKCU "Software\Classes\AppUserModelId\com.memoking.desktop"
 !macroend

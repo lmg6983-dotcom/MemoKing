@@ -191,18 +191,18 @@ fn toast_app_id(app: &AppHandle) -> String {
     if cfg!(debug_assertions) { "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe".to_string() } else { app.config().identifier.clone() }
 }
 
-/// 켤 때: 알림의 이름 · 아이콘(바로가기가 없거나 옛 판의 것이면 아이콘이 깨진다)과 memoking: 주소(알림 누르기)를 이 메모킹으로 적는다
-///   지우기는 설치 파일의 지우개가 (installer-hooks.nsh NSIS_HOOK_PREUNINSTALL)
+/// 켤 때: memoking: 주소(알림 누르기)를 이 메모킹으로 적는다. 지우기는 설치 파일의 지우개가 (installer-hooks.nsh NSIS_HOOK_PREUNINSTALL)
+///   알림 이름 · 아이콘은 시작 메뉴 바로가기(설치 때 고친다)의 것을 쓴다 — 1.5.1 이 적던 큰 PNG 아이콘(AppUserModelId)은
+///   Windows 가 16px 로 줄이며 모자이크처럼 깨져, 손으로 다듬은 작은 아이콘이 든 바로가기 쪽이 쓰이게 지운다
 #[cfg(windows)]
 pub fn register(app: &AppHandle) {
     use crate::shell_menu::set_reg;
     let Ok(exe) = std::env::current_exe() else { return };
-    let icon = state(app).settings_dir.join("toast-icon.png");
-    // 개발 중에는 PowerShell 이름을 빌려 쓰니 그 이름 · 아이콘은 건드리지 않는다
-    if !cfg!(debug_assertions) && std::fs::write(&icon, include_bytes!("../../../assets/icons/icon-256.png")).is_ok() {
-        let key = format!(r"Software\Classes\AppUserModelId\{}", toast_app_id(app));
-        set_reg(&key, Some("DisplayName"), "메모킹");
-        set_reg(&key, Some("IconUri"), &icon.display().to_string());
+    if !cfg!(debug_assertions) {
+        let key: Vec<u16> = format!(r"Software\Classes\AppUserModelId\{}", toast_app_id(app)).encode_utf16().chain(std::iter::once(0)).collect();
+        // SAFETY: 끝이 0 인 UTF-16 글자 — 함수가 읽는 동안 살아 있다
+        unsafe { windows_sys::Win32::System::Registry::RegDeleteTreeW(windows_sys::Win32::System::Registry::HKEY_CURRENT_USER, key.as_ptr()) };
+        let _ = std::fs::remove_file(state(app).settings_dir.join("toast-icon.png"));
     }
     set_reg(r"Software\Classes\memoking", None, "URL:MemoKing");
     set_reg(r"Software\Classes\memoking", Some("URL Protocol"), "");
