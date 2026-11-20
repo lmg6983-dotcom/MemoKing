@@ -4,40 +4,62 @@
 /* 브랜드 글꼴 Pretendard Variable: 글자 묶음별로 나눈 판 — 창마다 화면에 나온 글자의 묶음만 읽는다 (scripts/build-vendor.mjs) */
 @import url("../vendor/fonts/pretendard/pretendard.css");
 
+/* OKLab 팔레트 — 화면의 모든 색은 여기서 고른다 (메모킹 · MagicKey · MagicSystem 같은 값)
+   OKLCH 좌표(밝기 L · 채도 C · 색상 h)에서 뽑아 sRGB 로 적었다. 반투명은 color-mix(in oklab, 토큰 N%, transparent)
+   무채색 gray-0(흰)~1000(검정) · 색 50(밝음)~950(어두움) · 노랑 300 = 브랜드 #ffcc00 · paper-* = 메모 종이 */
+:root {
+  --ok-gray-0: #ffffff; --ok-gray-25: #fafafa; --ok-gray-50: #f5f5f5; --ok-gray-100: #ebebeb; --ok-gray-150: #e1e1e1; --ok-gray-200: #d4d4d4; --ok-gray-300: #bebebe; --ok-gray-400: #9e9e9e; --ok-gray-500: #808080; --ok-gray-550: #737373; --ok-gray-600: #696969; --ok-gray-700: #4d4d4d; --ok-gray-800: #333333; --ok-gray-850: #242424; --ok-gray-900: #191919; --ok-gray-950: #0e0e0e; --ok-gray-975: #060606; --ok-gray-1000: #000000;
+  --ok-red-50: #fff2f0; --ok-red-100: #ffdfdc; --ok-red-200: #ffc3bd; --ok-red-300: #ffa098; --ok-red-400: #ff716b; --ok-red-500: #f14445; --ok-red-600: #d12830; --ok-red-700: #ae1320; --ok-red-800: #880a16; --ok-red-900: #64040c; --ok-red-950: #420205;
+  --ok-orange-50: #fff2eb; --ok-orange-100: #ffe1d1; --ok-orange-200: #ffc6a7; --ok-orange-300: #ffa571; --ok-orange-400: #fa7c1f; --ok-orange-500: #da6600; --ok-orange-600: #b65400; --ok-orange-700: #944300; --ok-orange-800: #733200; --ok-orange-900: #542300; --ok-orange-950: #361400;
+  --ok-green-50: #e8fbec; --ok-green-100: #cef3d6; --ok-green-200: #a6e6b6; --ok-green-300: #74d792; --ok-green-400: #41c170; --ok-green-500: #00a855; --ok-green-600: #008c46; --ok-green-700: #007137; --ok-green-800: #005729; --ok-green-900: #003e1c; --ok-green-950: #00270f;
+  --ok-teal-50: #e7f9fa; --ok-teal-100: #cbf0f2; --ok-teal-200: #a0e2e5; --ok-teal-300: #6ad1d6; --ok-teal-400: #2bbac1; --ok-teal-500: #00a0a6; --ok-teal-600: #00858a; --ok-teal-700: #006b70; --ok-teal-800: #005256; --ok-teal-900: #003b3e; --ok-teal-950: #002527;
+  --ok-blue-50: #eff6ff; --ok-blue-100: #d9eaff; --ok-blue-200: #b8d7ff; --ok-blue-300: #91c1ff; --ok-blue-400: #60a7ff; --ok-blue-500: #1f8aff; --ok-blue-600: #0072dd; --ok-blue-700: #005bb4; --ok-blue-800: #00468c; --ok-blue-900: #003167; --ok-blue-950: #001e44;
+  --ok-violet-50: #f4f4ff; --ok-violet-100: #e6e5ff; --ok-violet-200: #d1ceff; --ok-violet-300: #bab3ff; --ok-violet-400: #a192ff; --ok-violet-500: #8a6fff; --ok-violet-600: #764cf1; --ok-violet-700: #5f38ca; --ok-violet-800: #49299f; --ok-violet-900: #341b76; --ok-violet-950: #200e4e;
+  --ok-purple-50: #f7f3ff; --ok-purple-100: #ebe3ff; --ok-purple-200: #dbcaff; --ok-purple-300: #c9acff; --ok-purple-400: #b58afa; --ok-purple-500: #9d6fe3; --ok-purple-600: #8558c5; --ok-purple-700: #6c44a4; --ok-purple-800: #533380; --ok-purple-900: #3c235e; --ok-purple-950: #25143d;
+  --ok-pink-50: #fff1f6; --ok-pink-100: #ffdde9; --ok-pink-200: #ffbfd7; --ok-pink-300: #ff99c2; --ok-pink-400: #f075aa; --ok-pink-500: #d85891; --ok-pink-600: #ba4179; --ok-pink-700: #9a2f62; --ok-pink-800: #78224b; --ok-pink-900: #581635; --ok-pink-950: #390b21;
+  --ok-yellow-50: #fff5d6; --ok-yellow-100: #ffeaab; --ok-yellow-200: #ffdf7b; --ok-yellow-300: #ffcc00; --ok-yellow-400: #e3b916; --ok-yellow-500: #c6a000; --ok-yellow-600: #a28300; --ok-yellow-700: #866c02; --ok-yellow-800: #645000; --ok-yellow-900: #453600; --ok-yellow-950: #281e00;
+  --ok-paper-yellow: #f4edd7; --ok-paper-yellow-bar: #ede3c2; --ok-paper-yellow-chip: #c4a953; --ok-paper-yellow-dark: #342d19; --ok-paper-yellow-dark-bar: #463c20; --ok-paper-yellow-dark-chip: #a89044;
+  --ok-paper-green: #dff3e2; --ok-paper-green-bar: #cfecd3; --ok-paper-green-chip: #76be86; --ok-paper-green-dark: #213324; --ok-paper-green-dark-bar: #2c4431; --ok-paper-green-dark-chip: #63a471;
+  --ok-paper-pink: #fee5ee; --ok-paper-pink-bar: #fdd7e4; --ok-paper-pink-chip: #e28dae; --ok-paper-pink-dark: #3c262f; --ok-paper-pink-dark-bar: #50333e; --ok-paper-pink-dark-chip: #c27895;
+  --ok-paper-purple: #f0e9ff; --ok-paper-purple-bar: #e7ddfd; --ok-paper-purple-chip: #b59be6; --ok-paper-purple-dark: #302a3d; --ok-paper-purple-dark-bar: #413851; --ok-paper-purple-dark-chip: #9c84c7;
+  --ok-paper-blue: #deefff; --ok-paper-blue-bar: #cbe7ff; --ok-paper-blue-chip: #6cb2ec; --ok-paper-blue-dark: #1f303e; --ok-paper-blue-dark-bar: #284053; --ok-paper-blue-dark-chip: #5a98cb;
+  --ok-paper-gray: #f0ece7; --ok-paper-gray-bar: #e7e2db; --ok-paper-gray-chip: #b2aa9d; --ok-paper-gray-dark: #2f2d2a; --ok-paper-gray-dark-bar: #3f3d38; --ok-paper-gray-dark-chip: #999185;
+}
+
 :root {
   /* 브랜드 */
-  --brand-yellow: #ffcc00;
-  --brand-yellow-hover: #f2c000;
+  --brand-yellow: var(--ok-yellow-300);
+  --brand-yellow-hover: var(--ok-yellow-400);
   /* 포인트색(노랑)은 꼭 눈이 가야 할 곳에만: 주요 동작 단추 · ＋ · 달력의 오늘 · 튜토리얼 · 진행 막대 · 경고 띠.
      고른 탭 · 고른 줄 · 밑줄 · 포커스 · 스위치 · 체크 같은 "상태" 는 무채색으로 (노랑이 여기저기 흩어져 난잡하던 것) */
-  --brand-yellow-soft: rgba(25, 25, 25, 0.08); /* 고른 상태 바탕 (이름은 예전 그대로 — 이제 무채색) */
-  --accent-line: rgba(25, 25, 25, 0.32); /* 밑줄 · 입력 포커스 선 */
-  --on-dark-fill: #ffffff;
+  --brand-yellow-soft: color-mix(in oklab, var(--ok-gray-900) 8%, transparent); /* 고른 상태 바탕 (이름은 예전 그대로 — 이제 무채색) */
+  --accent-line: color-mix(in oklab, var(--ok-gray-900) 32%, transparent); /* 밑줄 · 입력 포커스 선 */
+  --on-dark-fill: var(--ok-gray-0);
   --on-brand-soft: var(--text-strong); /* 고른 상태 위 글자 */
-  --brand-black: #111111;
-  --on-brand: #111111;
-  --on-black: #ffffff;
+  --brand-black: var(--ok-gray-950);
+  --on-brand: var(--ok-gray-950);
+  --on-black: var(--ok-gray-0);
 
   /* 바탕 · 글씨 */
-  --surface-0: #f5f5f5; /* 바탕: 카카오톡 더보기 화면과 같은 무채색 옅은 회색 */
-  --surface-1: #ffffff; /* 트레이(카드 · 검색칸)는 흰색, 그림자 없이 — 카톡 트레이처럼 */
-  --surface-2: #ffffff; /* 떠 있는 판(메뉴 · 시트 · 대화상자)은 흰색 + 그림자 */
-  --line: #ebebeb;
-  --fill-hover: rgba(17, 17, 17, 0.06);
-  --fill-tab: rgba(17, 17, 17, 0.05);
-  --text-strong: #191919; /* 카톡 본문 글자색 */
-  --text-muted: #686868;
-  --text-faint: #737373; /* 흐린 글(안내 · 빈칸 글)도 흰 카드에서 4.5:1 넘게 (#8a8a8a 는 3.4:1) */
-  --danger: #d93036;
-  --sat: #2260c4; /* 달력 토요일 (흰 바탕 5.9:1) */
-  --ok-text: #1e7a45; /* 복사했어요 · 저장 같은 성공 글 */
-  --err-text: #b42318; /* 실패 글 (빨강 바탕이 아닌 글자) */
-  --on-danger: #ffffff;
-  --focus-ring: #111111;
+  --surface-0: var(--ok-gray-50); /* 바탕: 카카오톡 더보기 화면과 같은 무채색 옅은 회색 */
+  --surface-1: var(--ok-gray-0); /* 트레이(카드 · 검색칸)는 흰색, 그림자 없이 — 카톡 트레이처럼 */
+  --surface-2: var(--ok-gray-0); /* 떠 있는 판(메뉴 · 시트 · 대화상자)은 흰색 + 그림자 */
+  --line: var(--ok-gray-100);
+  --fill-hover: color-mix(in oklab, var(--ok-gray-950) 6%, transparent);
+  --fill-tab: color-mix(in oklab, var(--ok-gray-950) 5%, transparent);
+  --text-strong: var(--ok-gray-900); /* 카톡 본문 글자색 */
+  --text-muted: var(--ok-gray-600);
+  --text-faint: var(--ok-gray-550); /* 흐린 글(안내 · 빈칸 글)도 흰 카드에서 4.5:1 넘게 (#8a8a8a 는 3.4:1) */
+  --danger: var(--ok-red-600);
+  --sat: var(--ok-blue-700); /* 달력 토요일 (흰 바탕 5.9:1) */
+  --ok-text: var(--ok-green-700); /* 복사했어요 · 저장 같은 성공 글 */
+  --err-text: var(--ok-red-700); /* 실패 글 (빨강 바탕이 아닌 글자) */
+  --on-danger: var(--ok-gray-0);
+  --focus-ring: var(--ok-gray-950);
 
   --shadow-card: 0 0 0 0 transparent; /* 흰 바탕 위 옅은 회색 카드는 채움만으로 갈린다 — 그림자 없이 평평하게 (카톡처럼) */
   /* 떠 있는 판(메뉴·말풍선·대화상자): 1px 테두리와 어울리게 넓게 번지는 그림자 대신 가까운 그림자 두 겹 */
-  --shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.12);
+  --shadow-pop: 0 2px 8px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent), 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent);
   /* 안내 말풍선·알림 띠·토스트: 검정 대신 앱 바탕 (다크 모드에선 어두운 앱 바탕) */
   --bubble-bg: var(--glass-bg); /* One UI 9.5: 떠 있는 판은 평평한 반투명 (블러는 아래 :is 규칙) */
   --bubble-fg: var(--text-strong);
@@ -51,8 +73,8 @@
   --radius-xl: 26px;
 
   /* One UI 9.5 의 떠 있는 판(아래 탭바 · 메뉴 · 시트): 평평한 반투명 — 9.0 의 짙은 젖빛 유리보다 블러를 줄였다 */
-  --glass-bg: rgba(255, 255, 255, 0.78);
-  --glass-line: rgba(0, 0, 0, 0.06);
+  --glass-bg: color-mix(in oklab, var(--ok-gray-0) 78%, transparent);
+  --glass-line: color-mix(in oklab, var(--ok-gray-1000) 6%, transparent);
   --glass-blur: blur(14px) saturate(1.6);
 
   /* 예전 이름 — 각 화면 CSS 가 쓰는 짧은 이름을 토큰에 잇는다 */
@@ -68,21 +90,21 @@
   --shadow: var(--shadow-pop);
 
   /* 스티커 메모 7색: 바탕 / 윗막대 / 목록에서 보이는 색 칩 */
-  --yellow-bg: #ffe99a; --yellow-bar: #f2da7f; --yellow-chip: #ffcc00; /* OKLCH L.935 C.085 — 모든 색이 같은 밝기 · 채도 (노랑만 채도 1.6배: 같은 채도면 크림빛으로 탁해 보여서) */
-  --green-bg: #c1facc; --green-bar: #a3f1b3; --green-chip: #5ac576;
-  --pink-bg: #ffe0eb; --pink-bar: #ffcadd; --pink-chip: #f37fb0;
-  --purple-bg: #ede5fe; --purple-bar: #e1d2ff; --purple-chip: #ba93fb;
-  --blue-bg: #dbecfe; --blue-bar: #c0defe; --blue-chip: #61b0fe;
-  --gray-bg: #e1dfdb; --gray-bar: #d3d1cb; --gray-chip: #95928b;
-  --charcoal-bg: #1c1c1b; --charcoal-bar: #111111; --charcoal-chip: #111111;
-  --note-text-default: #1f1f1c;
-  --note-black-text: #f5f4ef;
+  --yellow-bg: var(--ok-paper-yellow); --yellow-bar: var(--ok-paper-yellow-bar); --yellow-chip: var(--ok-paper-yellow-chip); /* 차분한 종이: OKLCH L.945 C.03 — 모든 색이 같은 밝기 · 채도 (회색 C.008) */
+  --green-bg: var(--ok-paper-green); --green-bar: var(--ok-paper-green-bar); --green-chip: var(--ok-paper-green-chip);
+  --pink-bg: var(--ok-paper-pink); --pink-bar: var(--ok-paper-pink-bar); --pink-chip: var(--ok-paper-pink-chip);
+  --purple-bg: var(--ok-paper-purple); --purple-bar: var(--ok-paper-purple-bar); --purple-chip: var(--ok-paper-purple-chip);
+  --blue-bg: var(--ok-paper-blue); --blue-bar: var(--ok-paper-blue-bar); --blue-chip: var(--ok-paper-blue-chip);
+  --gray-bg: var(--ok-paper-gray); --gray-bar: var(--ok-paper-gray-bar); --gray-chip: var(--ok-paper-gray-chip);
+  --charcoal-bg: var(--ok-gray-900); --charcoal-bar: var(--ok-gray-950); --charcoal-chip: var(--ok-gray-950);
+  --note-text-default: var(--ok-gray-850);
+  --note-black-text: var(--ok-gray-50);
 
   /* 녹음·지우기 빨강 — 녹음 점·막대·단추, 밀어 지우기, CLEAR 도장이 함께 쓴다 */
-  --rec: #e5484d;
-  --rec-hover: #d63c41;
-  --on-rec: #ffffff;
-  --rec-on-dark: #ff8b8f; /* 검정 메모 위의 CLEAR 도장 */
+  --rec: var(--ok-red-500);
+  --rec-hover: var(--ok-red-600);
+  --on-rec: var(--ok-gray-0);
+  --rec-on-dark: var(--ok-red-300); /* 검정 메모 위의 CLEAR 도장 */
 
   /* 움직임 — 곡선은 여기서만 정한다 (Emil Kowalski 기준: 나타나고 사라지는 건 ease-out, 화면 안에서 옮겨 가는 건 ease-in-out) */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);     /* 강한 ease-out: 처음이 빨라 바로 반응하는 느낌 */
@@ -94,38 +116,38 @@
 
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
-    --brand-yellow-hover: #ffd633;
-    --brand-yellow-soft: rgba(255, 255, 255, 0.12);
-    --accent-line: rgba(255, 255, 255, 0.4);
+    --brand-yellow-hover: var(--ok-yellow-300);
+    --brand-yellow-soft: color-mix(in oklab, var(--ok-gray-0) 12%, transparent);
+    --accent-line: color-mix(in oklab, var(--ok-gray-0) 40%, transparent);
     --on-brand-soft: var(--text-strong);
-    --surface-0: #0f0e0d; /* 완전 검정 대신 아주 어두운 따뜻한 회색 */
-    --surface-1: #1d1c1a;
-    --surface-2: #282725;
-    --line: #302f2c;
-    --glass-bg: rgba(30, 30, 30, 0.74);
-    --glass-line: rgba(255, 255, 255, 0.08);
-    --fill-hover: rgba(255, 255, 255, 0.08);
-    --fill-tab: rgba(255, 255, 255, 0.06);
-    --text-strong: #f5f4ef;
-    --text-muted: #a0a0a0;
-    --text-faint: #8a8a8a; /* 어두운 카드(#171717) 위 4.5:1 */
-    --danger: #ff6b70;
-    --sat: #74b0f7;
-    --ok-text: #6fd39a;
-    --err-text: #ff8a80;
-    --on-danger: #1a0506;
-    --focus-ring: #f2f2f2;
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 14px rgba(0, 0, 0, 0.45);
+    --surface-0: var(--ok-gray-950); /* 완전 검정 대신 아주 어두운 따뜻한 회색 */
+    --surface-1: var(--ok-gray-900);
+    --surface-2: var(--ok-gray-850);
+    --line: var(--ok-gray-800);
+    --glass-bg: color-mix(in oklab, var(--ok-gray-900) 74%, transparent);
+    --glass-line: color-mix(in oklab, var(--ok-gray-0) 8%, transparent);
+    --fill-hover: color-mix(in oklab, var(--ok-gray-0) 8%, transparent);
+    --fill-tab: color-mix(in oklab, var(--ok-gray-0) 6%, transparent);
+    --text-strong: var(--ok-gray-50);
+    --text-muted: var(--ok-gray-400);
+    --text-faint: var(--ok-gray-500); /* 어두운 카드(#171717) 위 4.5:1 */
+    --danger: var(--ok-red-400);
+    --sat: var(--ok-blue-400);
+    --ok-text: var(--ok-green-300);
+    --err-text: var(--ok-red-300);
+    --on-danger: var(--ok-gray-950);
+    --focus-ring: var(--ok-gray-50);
+    --shadow-card: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 50%, transparent);
+    --shadow-pop: 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 40%, transparent), 0 8px 14px color-mix(in oklab, var(--ok-gray-1000) 45%, transparent);
 
-    --yellow-bg: #503800; --yellow-bar: #614501; --yellow-chip: #e7b551; /* 어두운 화면 OKLCH L.36 C.10 — 회색기 없이 깊은 색, 노랑은 올리브 대신 호박색(H82) */
-    --green-bg: #024a28; --green-bar: #035a31; --green-chip: #72d699;
-    --pink-bg: #632240; --pink-bar: #762c4d; --pink-chip: #ff99c2;
-    --purple-bg: #462e69; --purple-bar: #543a7c; --purple-chip: #c9acff;
-    --blue-bg: #023f6f; --blue-bar: #0a4c83; --blue-chip: #89c3fe;
-    --gray-bg: #393834; --gray-bar: #474540; --gray-chip: #a19e98;
-    --charcoal-bg: #141413; --charcoal-bar: #0a0a0a; --charcoal-chip: #f5f4ef;
-    --note-text-default: #f5f4ef;
+    --yellow-bg: var(--ok-paper-yellow-dark); --yellow-bar: var(--ok-paper-yellow-dark-bar); --yellow-chip: var(--ok-paper-yellow-dark-chip); /* 어두운 종이: OKLCH L.30 C.035 */
+    --green-bg: var(--ok-paper-green-dark); --green-bar: var(--ok-paper-green-dark-bar); --green-chip: var(--ok-paper-green-dark-chip);
+    --pink-bg: var(--ok-paper-pink-dark); --pink-bar: var(--ok-paper-pink-dark-bar); --pink-chip: var(--ok-paper-pink-dark-chip);
+    --purple-bg: var(--ok-paper-purple-dark); --purple-bar: var(--ok-paper-purple-dark-bar); --purple-chip: var(--ok-paper-purple-dark-chip);
+    --blue-bg: var(--ok-paper-blue-dark); --blue-bar: var(--ok-paper-blue-dark-bar); --blue-chip: var(--ok-paper-blue-dark-chip);
+    --gray-bg: var(--ok-paper-gray-dark); --gray-bar: var(--ok-paper-gray-dark-bar); --gray-chip: var(--ok-paper-gray-dark-chip);
+    --charcoal-bg: var(--ok-gray-900); --charcoal-bar: var(--ok-gray-950); --charcoal-chip: var(--ok-gray-50);
+    --note-text-default: var(--ok-gray-50);
     color-scheme: dark;
   }
 }
@@ -227,9 +249,9 @@ svg { width: 20px; height: 20px; flex: none; }
   box-shadow: var(--shadow-pop);
 }
 .dialog:focus { outline: none; } /* 창 자체(열 때 포커스)에는 테두리 없음 — 안의 단추는 그대로 */
-.dialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+.dialog::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 32%, transparent); }
 /* 어두운 화면: 검정 판이 검정 앱 위에서 가장자리가 사라지지 않게 옅은 테두리 한 줄 */
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .dialog { box-shadow: var(--shadow-pop), inset 0 0 0 1px rgba(255, 255, 255, 0.1); } :where(:root:not([data-theme="light"])) .dialog::backdrop { background: rgba(0, 0, 0, 0.55); } }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .dialog { box-shadow: var(--shadow-pop), inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-0) 10%, transparent); } :where(:root:not([data-theme="light"])) .dialog::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 55%, transparent); } }
 .dialog h2 { margin: 0 0 12px; font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
 .dialog p { margin: 0 0 16px; line-height: 1.6; white-space: pre-line; }
 /* 긴 창(설정·휴지통 …)의 머리: 제목 + 오른쪽 위 × — 스크롤해도 위에 붙어 있다 */
@@ -286,10 +308,10 @@ svg { width: 20px; height: 20px; flex: none; }
   position: fixed;
   z-index: 900;
   border-radius: 12px;
-  box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px color-mix(in oklab, var(--ok-gray-1000) 45%, transparent);
   pointer-events: none; /* 비춘 버튼을 실제로 눌러 볼 수 있게 */
 }
-.coach-spot.center { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); }
+.coach-spot.center { box-shadow: 0 0 0 9999px color-mix(in oklab, var(--ok-gray-1000) 45%, transparent); }
 .coach-bubble {
   position: fixed;
   z-index: 901;
@@ -313,10 +335,10 @@ svg { width: 20px; height: 20px; flex: none; }
 .coach-sandbox {
   flex: none; padding: 2px 8px; border-radius: 999px;
   font-size: 11px; font-weight: 600; line-height: 16px; white-space: nowrap;
-  color: var(--mk-sandbox-ink, #8a5a00); background: var(--mk-sandbox-bg, rgba(255, 176, 32, 0.18));
+  color: var(--mk-sandbox-ink, var(--ok-yellow-700)); background: var(--mk-sandbox-bg, color-mix(in oklab, var(--ok-yellow-400) 18%, transparent));
 }
 .coach-bubble.mini .coach-sandbox { display: none; }
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .coach-sandbox { --mk-sandbox-ink: #ffc96b; --mk-sandbox-bg: rgba(255, 176, 32, 0.16); } }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .coach-sandbox { --mk-sandbox-ink: var(--ok-yellow-200); --mk-sandbox-bg: color-mix(in oklab, var(--ok-yellow-400) 16%, transparent); } }
 
 .coach-emoji {
   display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px;
@@ -373,8 +395,8 @@ svg { width: 20px; height: 20px; flex: none; }
 /* 직접 해 보는 단계: 비춘 곳이 두근두근 · 둘레는 아주 옅게만 (글자를 고르고 메뉴를 보며 해 볼 수 있게) */
 .coach-spot.pulse { animation: coach-pulse 1.4s ease-in-out infinite; }
 @keyframes coach-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px rgba(0, 0, 0, 0.12); }
-  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--brand-yellow) 55%, transparent), 0 0 0 9999px rgba(0, 0, 0, 0.12); }
+  0%, 100% { box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent); }
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--brand-yellow) 55%, transparent), 0 0 0 9999px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent); }
 }
 /* 접기 단추 · 접힌 알약 (직접 해 보는 동안 가리지 않게) */
 .coach-fold {
@@ -427,7 +449,7 @@ dialog.dialog:not([open]) { opacity: 0; }
 dialog.dialog[open] { opacity: 1; transform: none; }
 @starting-style { dialog.dialog[open] { opacity: 0; transform: scale(0.96) translateY(4px); } }
 dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0.18s allow-discrete, display 0.18s allow-discrete; }
-@starting-style { dialog.dialog[open]::backdrop { background-color: rgba(0, 0, 0, 0); } }
+@starting-style { dialog.dialog[open]::backdrop { background-color: transparent; } }
 
 @keyframes mk-pop-in { from { opacity: 0; transform: scale(0.95); } }
 /* 여러 화면이 같이 쓰는 움직임: 나타나기 · 깜빡이기(녹음 중 등) · 돌기(불러오는 중) */
@@ -479,14 +501,14 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   height: 16px;
   border-radius: 50%;
   background: var(--surface-1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 30%, transparent);
   transition: transform 0.15s;
 }
 .switch:checked { background: var(--text-strong); } /* 켜진 스위치는 진한 무채색 — 포인트색은 주요 동작에만 */
-.switch:checked::after { transform: translateX(16px); background: #fff; }
+.switch:checked::after { transform: translateX(16px); background: var(--ok-gray-0); }
 .switch:disabled { opacity: 0.4; cursor: not-allowed; }
 /* 어두운 화면: 꺼진 스위치의 손잡이는 밝게 (어두운 바탕 · 어두운 손잡이면 스위치가 있는지도 안 보였다) */
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .switch:not(:checked)::after { background: #d9d6ce; } }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .switch:not(:checked)::after { background: var(--ok-gray-200); } }
 
 /* Ctrl+휠 확대 배지 (메모 창 · 목록 창) */
 .zoom-badge {
@@ -624,13 +646,13 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   width: 100%; min-height: 40px; margin-bottom: 6px; padding: 8px 14px;
   border: 1px solid var(--border); border-radius: 12px;
   background: var(--surface-1); color: var(--text-strong); font: inherit; font-size: 15px; font-weight: 600;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: inset 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 3%, transparent);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   box-sizing: border-box;
 }
 .quick-event .qe-name:focus {
   border-color: var(--brand-yellow);
-  box-shadow: 0 0 0 2px var(--brand-yellow-soft), inset 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 0 0 2px var(--brand-yellow-soft), inset 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 3%, transparent);
   outline: none;
 }
 .dp-quick, :is(.quick-event .qe-time, .event-dialog .event-time) .dp-quick {
@@ -729,13 +751,13 @@ dialog.quick-event[open] {
   overflow-x: hidden;
   padding: 2px 2px 4px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.16) transparent;
+  scrollbar-color: color-mix(in oklab, var(--ok-gray-1000) 16%, transparent) transparent;
 }
 .quick-event .qe-body::-webkit-scrollbar {
   width: 4px;
 }
 .quick-event .qe-body::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.16);
+  background: color-mix(in oklab, var(--ok-gray-1000) 16%, transparent);
   border-radius: 4px;
 }
 .quick-event .qe-allday { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-top: 6px; padding: 0 8px; border-top: 1px solid var(--line); cursor: pointer; }
@@ -760,7 +782,7 @@ dialog.quick-event[open] {
   color: var(--text-strong);
   font-size: 14px;
   font-weight: 700;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
 }
@@ -800,7 +822,7 @@ dialog.quick-event[open] {
   border: 1px solid var(--border); border-radius: 8px;
   background: var(--surface-1);
   color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600; text-align: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   transition: border-color 0.15s ease, background-color 0.15s ease;
   cursor: pointer;
 }
@@ -867,10 +889,10 @@ dialog.quick-event[open] {
 }
 .quick-event .flow-footer .btn:active { transform: scale(0.98); }
 .quick-event .flow-footer .btn.primary {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
 }
 .quick-event .flow-footer .btn.primary:hover {
-  box-shadow: 0 2px 8px rgba(255, 199, 0, 0.35);
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--ok-yellow-300) 35%, transparent);
   filter: brightness(0.98);
 }
 @media (pointer: coarse) {
@@ -900,7 +922,7 @@ dialog.quick-event[open] {
   background-size: 10px 10px !important;
   -webkit-appearance: none; appearance: none;
   color: var(--text-strong) !important; font: inherit; font-size: 13.5px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
 }
@@ -912,7 +934,7 @@ dialog.quick-event[open] {
 .alert-custom-row input[type="number"], .alert-custom input {
   width: 72px; height: 36px; text-align: center; border: 1px solid var(--border); border-radius: 8px;
   background-color: var(--surface-1) !important; color: var(--text-strong) !important; font: inherit; font-size: 13.5px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .alert-custom-row input[type="number"]:focus-visible, .alert-custom input:focus-visible {
@@ -961,7 +983,7 @@ dialog.quick-event[open] {
   position: fixed;
   inset: 0;
   z-index: 45;
-  background: rgba(0, 0, 0, 0.22);
+  background: color-mix(in oklab, var(--ok-gray-1000) 22%, transparent);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: cal-quick-fade 0.18s ease-out;
@@ -984,7 +1006,7 @@ dialog.quick-event[open] {
   border-radius: 999px;
   background: var(--surface); /* 검색창과 동일한 흰색 배경 */
   border: 1px solid var(--border); /* 검색창과 동일한 회색 테두리 */
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 12px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent), 0 1px 3px color-mix(in oklab, var(--ok-gray-1000) 5%, transparent);
   transition: width 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease, border-color 0.2s ease;
   box-sizing: border-box;
 }
@@ -1000,7 +1022,7 @@ dialog.quick-event[open] {
 .cal-quick.is-expanded {
   width: min(540px, calc(100vw - 32px));
   border-color: var(--border);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 20px color-mix(in oklab, var(--ok-gray-1000) 14%, transparent), 0 1px 4px color-mix(in oklab, var(--ok-gray-1000) 6%, transparent);
 }
 .cal-quick.is-expanded:focus-within {
   border-color: var(--text-strong);
@@ -1206,7 +1228,7 @@ dialog.quick-event[open] {
   --fc-forma-primary-down: var(--brand-yellow-hover, var(--brand-yellow));
   --fc-forma-primary-foreground: var(--on-brand);
   --fc-forma-event: var(--blue-chip);
-  --fc-forma-event-contrast: #fff;
+  --fc-forma-event-contrast: var(--ok-gray-0);
   --fc-forma-highlight: color-mix(in srgb, var(--accent) 35%, transparent);
   --fc-forma-background: var(--surface-1);
   --fc-forma-faint: color-mix(in srgb, var(--text) 3%, transparent);
@@ -1227,7 +1249,7 @@ dialog.quick-event[open] {
 }
 .cal-body [role="grid"] { border-radius: 10px; overflow: hidden; }
 /* 일요일 빨강: 다른 달 날의 옅은 회색 칸 위 작은 숫자에서도 4.5:1 이 되게 밝은 화면은 조금 진하게 (#d93036 은 4.46 이었다) */
-.cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: #c4282e; }
+.cal-body [role="columnheader"].mk-sun, .cal-body [role="gridcell"].mk-sun > :first-child { color: var(--ok-red-600); }
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal-body [role="columnheader"].mk-sun, :where(:root:not([data-theme="light"])) .cal-body [role="gridcell"].mk-sun > :first-child { color: var(--danger); } }
 
 /* 토요일 파랑 (네이버 · 삼성 캘린더처럼 한국 달력의 관례): 일요일 빨강과 같은 세기로 */
@@ -1245,17 +1267,17 @@ dialog.quick-event[open] {
 /* 생성된 일정 날짜 셀 펄스 하이라이트 애니메이션 */
 @keyframes mk-created-pulse {
   0% {
-    box-shadow: inset 0 0 0 2px var(--brand-yellow), 0 0 12px rgba(255, 199, 0, 0.75);
+    box-shadow: inset 0 0 0 2px var(--brand-yellow), 0 0 12px color-mix(in oklab, var(--ok-yellow-300) 75%, transparent);
     background-color: color-mix(in srgb, var(--brand-yellow) 35%, transparent);
     transform: scale(1.02);
   }
   35% {
-    box-shadow: inset 0 0 0 3px var(--brand-yellow), 0 0 20px rgba(255, 199, 0, 0.95);
+    box-shadow: inset 0 0 0 3px var(--brand-yellow), 0 0 20px color-mix(in oklab, var(--ok-yellow-300) 95%, transparent);
     background-color: color-mix(in srgb, var(--brand-yellow) 50%, transparent);
     transform: scale(1.035);
   }
   70% {
-    box-shadow: inset 0 0 0 2px var(--brand-yellow), 0 0 10px rgba(255, 199, 0, 0.5);
+    box-shadow: inset 0 0 0 2px var(--brand-yellow), 0 0 10px color-mix(in oklab, var(--ok-yellow-300) 50%, transparent);
     background-color: color-mix(in srgb, var(--brand-yellow) 25%, transparent);
     transform: scale(1.01);
   }
@@ -1295,25 +1317,18 @@ dialog.quick-event[open] {
 .cal[data-view="dayGridMonth"] .cal-body [role="grid"] { border-radius: 0; }
 .cal[data-view="dayGridMonth"] .cal-body [role="columnheader"] { font-size: 13px; font-weight: 800; color: var(--text-strong); }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { display: flex; justify-content: center; padding-top: 2px; font-size: 12px; line-height: 17px; font-weight: 500; color: var(--muted); }
-.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child { font-weight: 800; }
-:root { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23d93a30' stroke-linecap='round' stroke-linejoin='round' opacity='0.8'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } /* 오늘 표시 (달력 · 회상 달력 같이) */
-@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff6f61' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } }
-
-/* 오늘: 날짜를 빨간 색연필로 쓱 두른 동그라미 (숫자는 진한 글자 그대로 비쳐 보이게 — 읽기 쉽고 메모지 느낌) */
-.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div { position: relative; background: var(--brand-yellow) !important; color: var(--on-brand) !important; } /* One UI: 오늘은 꽉 찬 노란 원 */
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child { font-weight: 800; color: var(--text-strong); }
+/* 오늘: 숫자 밑 짧은 노란 밑줄 하나 (회상 달력과 같은 모양) */
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div { position: relative; background: none !important; color: inherit !important; border-radius: 0 !important; } /* 달력이 칠하는 오늘 원은 끈다 */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after {
-  content: ""; position: absolute; left: -6px; top: -4px; width: 34px; height: 30px; pointer-events: none; /* 동그라미 가운데가 숫자 칸(22px) 가운데에 */
-  background: var(--mk-today-ring) center / contain no-repeat; mix-blend-mode: multiply;
-  display: none; /* 색연필 동그라미는 회상 달력만 — 일정 달력은 노란 원 */
-}
-@media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after { background-image: var(--mk-today-ring); mix-blend-mode: screen; }
+  content: ""; position: absolute; left: 50%; bottom: -3px; width: 12px; height: 2px; border-radius: 2px; transform: translateX(-50%);
+  background: var(--brand-yellow); pointer-events: none;
 }
 
-/* 날짜 숫자 칸: 22px 정사각 → 오늘의 노란 동그라미가 납작한 타원(22.7×20)이 아닌 원으로, 칸 가운데에 (달력이 붙이던 왼쪽 여백 1px 없이) */
+/* 날짜 숫자 칸: 칸 가운데에 (달력이 붙이던 왼쪽 여백 1px 없이) */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { padding-inline: 0 !important; }
-.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: auto; min-width: 19px; height: 19px; margin: 0 !important; padding: 0 3px !important; display: flex; align-items: center; justify-content: center; border-radius: 999px !important; line-height: 1; } /* 오늘 원은 숫자에 꼭 맞게 (24px 는 숫자보다 테두리가 커 보였다), 두 자리면 살짝 긴 알약 */
-.cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: #c4282e; } /* 일요일 빨강은 그대로 */
+.cal[data-view="dayGridMonth"]:not(.compact) .cal-body [role="gridcell"] > :first-child > div { box-sizing: border-box; width: auto; min-width: 19px; height: 19px; margin: 0 !important; padding: 0 3px !important; display: flex; align-items: center; justify-content: center; line-height: 1; } /* 오늘 원은 숫자에 꼭 맞게 (24px 는 숫자보다 테두리가 커 보였다), 두 자리면 살짝 긴 알약 */
+.cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--ok-red-600); } /* 일요일 빨강은 그대로 */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sat, [role="gridcell"].mk-sat > :first-child) { color: var(--sat); } /* 토요일 파랑도 */
 
@@ -1338,11 +1353,11 @@ dialog.quick-event[open] {
 .cal-body .mk-ev:not(.mk-ext) {
   background: var(--note-bg, var(--yellow-bg)) !important;
   box-shadow: inset 0 0 0 1px var(--note-bar, var(--yellow-bar));
-  color: color-mix(in srgb, var(--note-chip, var(--yellow-chip)) 38%, #1b1b1f);
+  color: color-mix(in srgb, var(--note-chip, var(--yellow-chip)) 38%, var(--ok-gray-900));
   font-weight: 600;
 }
-.cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: #5a4600; } /* 노랑은 섞으면 탁해져 따로 (갈색 글자) */
-.cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: #f5f4ef; box-shadow: none; }
+.cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: var(--ok-yellow-800); } /* 노랑은 섞으면 탁해져 따로 (갈색 글자) */
+.cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: var(--ok-gray-50); box-shadow: none; }
 /* 알림(구글 리마인더처럼): 동그라미를 누르면 완료 — 메모 창 목록 · 일정 탭 목록 */
 .task-check {
   display: grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0;
@@ -1367,9 +1382,9 @@ dialog.quick-event[open] {
 .cal-body .mk-task.mk-done .mk-mt, .cal-body .mk-task.mk-done .fc-event-title { text-decoration: line-through; }
 .cal-body .mk-task.mk-done .mk-mt::before, .cal-body .mk-task.mk-done .fc-event-title::before { background: var(--note-chip, var(--yellow-chip)); }
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .cal-body .mk-ev:not(.mk-ext) { color: color-mix(in srgb, var(--note-chip, var(--yellow-chip)) 55%, #fff); }
-  :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: #ffe680; }
-  :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: #f5f4ef; box-shadow: inset 0 0 0 1px var(--line); }
+  :where(:root:not([data-theme="light"])) .cal-body .mk-ev:not(.mk-ext) { color: color-mix(in srgb, var(--note-chip, var(--yellow-chip)) 55%, var(--ok-gray-0)); }
+  :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: var(--ok-yellow-200); }
+  :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: var(--ok-gray-50); box-shadow: inset 0 0 0 1px var(--line); }
 }
 
   
@@ -1381,17 +1396,17 @@ dialog.quick-event[open] {
 /* 다른 캘린더 일정: 내 메모 일정과 같은 한 벌 — 그 캘린더 색을 메모지 색처럼 옅은 바탕 + 한 단계 진한 얇은 테두리 + 같은 색 계열의 진한 글자.
    oklch 로 섞어 색이 탁해지지 않게 (검정을 섞은 아래 그림자는 갈색으로 죽어 보였다) */
 .cal-body .mk-ext {
-  background: color-mix(in oklch, var(--fc-event-color) 20%, #fff) !important;
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 42%, #fff);
-  color: color-mix(in oklch, var(--fc-event-color) 40%, #1b1b1f);
+  background: color-mix(in oklch, var(--fc-event-color) 20%, var(--ok-gray-0)) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 42%, var(--ok-gray-0));
+  color: color-mix(in oklch, var(--fc-event-color) 40%, var(--ok-gray-900));
   font-weight: 600;
 }
 .cal-body .mk-ext * { color: inherit !important; }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .cal-body .mk-ext {
-    background: color-mix(in oklch, var(--fc-event-color) 26%, #1c1c1e) !important;
-    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 40%, #1c1c1e);
-    color: color-mix(in oklch, var(--fc-event-color) 55%, #fff);
+    background: color-mix(in oklch, var(--fc-event-color) 26%, var(--ok-gray-900)) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 40%, var(--ok-gray-900));
+    color: color-mix(in oklch, var(--fc-event-color) 55%, var(--ok-gray-0));
   }
 }
 .cal-body .mk-ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -1429,7 +1444,7 @@ dialog.quick-event[open] {
 .feed-swatch { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 99px; background: var(--sw); cursor: pointer; }
 .feed-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--sw); }
 @media (pointer: coarse) { .feed-swatch { width: 40px; height: 40px; } }
-.feed-device > .feed-dot { background: conic-gradient(#1a73e8 0 25%, #34a853 0 50%, #fbbc04 0 75%, #ea4335 0); }
+.feed-device > .feed-dot { background: conic-gradient(var(--ok-blue-600) 0 25%, var(--ok-green-500) 0 50%, var(--ok-yellow-400) 0 75%, var(--ok-red-500) 0); }
 .feed-text { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; text-align: left; }
 .feed-text b { overflow: hidden; font-size: 13.5px; white-space: nowrap; text-overflow: ellipsis; }
 .feed-text small { overflow: hidden; font-size: 11.5px; color: var(--muted); text-overflow: ellipsis; }
@@ -1488,7 +1503,6 @@ dialog.quick-event[open] {
 .rows-title.ev-upcoming-title { margin-top: 18px; color: var(--text); font-size: 13px; }
 .rows-title.ev-sub-title { margin-top: 8px; font-weight: 600; }
 /* 어두운 화면: 노랑을 섞은 칠은 칙칙한 올리브가 돼 — 한 단 밝은 바탕 + 노란 테두리로 */
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cal-body [role="gridcell"].mk-selected { background: color-mix(in srgb, var(--accent) 13%, var(--surface-2)); } } /* 밝은 화면처럼 테두리 없이 옅은 채움만 */
 .event-dialog { max-height: calc(100vh - 16px); }
 @media (max-height: 520px) {
   .event-dialog { padding-top: 14px; padding-bottom: 12px; }
@@ -1532,36 +1546,36 @@ dialog.quick-event[open] {
   --ms-pad: 2px; --ms-h: 22px; --orb: calc(var(--ms-h) - 6px);
   --ms-swing: cubic-bezier(0.5, -0.32, 0.3, 1.36); /* 살짝 뒤로 물러섰다 넘어가 통 하고 멈춤 */
   position: relative; display: inline-grid; grid-template-columns: auto auto; flex: none; padding: var(--ms-pad); border-radius: 999px; overflow: hidden; isolation: isolate;
-  background: linear-gradient(180deg, #a9dcff 0%, #e2f4ff 100%); box-shadow: inset 0 1px 2px rgba(20, 60, 110, 0.18);
+  background: linear-gradient(180deg, var(--ok-blue-200) 0%, var(--ok-blue-50) 100%); box-shadow: inset 0 1px 2px color-mix(in oklab, var(--ok-blue-900) 18%, transparent);
   -webkit-app-region: no-drag; view-transition-name: mk-mode-switch;
 }
 /* 밤하늘: 위에 겹쳐 두고 Work 에서 서서히 짙어짐 */
-.ms-scene { position: absolute; inset: 0; z-index: 0; border-radius: inherit; background: linear-gradient(180deg, #111a33 0%, #2a3d6b 100%); opacity: 0; transition: opacity 0.5s ease-out; pointer-events: none; }
+.ms-scene { position: absolute; inset: 0; z-index: 0; border-radius: inherit; background: linear-gradient(180deg, var(--ok-blue-950) 0%, var(--ok-blue-900) 100%); opacity: 0; transition: opacity 0.5s ease-out; pointer-events: none; }
 /* 별: 왼쪽(Life 글자 뒤) 빈 하늘에 작은 점 다섯 */
 .ms-scene::after {
   content: ""; position: absolute; top: 0; bottom: 0; left: 6%; width: 44%;
   background:
-    radial-gradient(circle at 12% 30%, #fff 0 1px, transparent 1.6px),
-    radial-gradient(circle at 38% 68%, #fff 0 0.8px, transparent 1.4px),
-    radial-gradient(circle at 60% 24%, #fff 0 1.1px, transparent 1.7px),
-    radial-gradient(circle at 82% 62%, #fff 0 0.8px, transparent 1.4px),
-    radial-gradient(circle at 96% 34%, #fff 0 0.7px, transparent 1.2px);
+    radial-gradient(circle at 12% 30%, var(--ok-gray-0) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 38% 68%, var(--ok-gray-0) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 60% 24%, var(--ok-gray-0) 0 1.1px, transparent 1.7px),
+    radial-gradient(circle at 82% 62%, var(--ok-gray-0) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 96% 34%, var(--ok-gray-0) 0 0.7px, transparent 1.2px);
   opacity: 0; transform: translateY(-5px) scale(0.6); transition: opacity 0.3s ease-out, transform 0.5s var(--ease-out);
 }
 /* 구름: 오른쪽(Work 글자 뒤) 빈 하늘에 뭉게구름 둘 */
 .mode-switch::after {
   content: ""; position: absolute; z-index: 1; right: 4px; bottom: -3px; width: calc(var(--orb) * 1.9); height: calc(var(--orb) * 0.9); pointer-events: none;
   background:
-    radial-gradient(circle at 30% 70%, #fff 0 28%, transparent 30%),
-    radial-gradient(circle at 52% 52%, #fff 0 30%, transparent 32%),
-    radial-gradient(circle at 74% 72%, #fff 0 24%, transparent 26%);
+    radial-gradient(circle at 30% 70%, var(--ok-gray-0) 0 28%, transparent 30%),
+    radial-gradient(circle at 52% 52%, var(--ok-gray-0) 0 30%, transparent 32%),
+    radial-gradient(circle at 74% 72%, var(--ok-gray-0) 0 24%, transparent 26%);
   opacity: 0.95; transition: transform 0.55s var(--ease-out), opacity 0.35s ease-out;
 }
 /* 해 / 달: 안쪽 그림자가 밀려 들어오면서 둥근 해가 초승달로 이지러짐 (그림자 값끼리 부드럽게 이어짐) */
 .mode-switch::before {
   content: ""; position: absolute; z-index: 2; top: 3px; left: 3px; width: var(--orb); height: var(--orb); border-radius: 50%;
-  background-color: #ffcc00;
-  box-shadow: inset 0 0 0 0 #fff3c4, 0 0 0 3px rgba(255, 204, 0, 0.28), 0 0 10px 2px rgba(255, 170, 0, 0.5);
+  background-color: var(--ok-yellow-300);
+  box-shadow: inset 0 0 0 0 var(--ok-yellow-50), 0 0 0 3px color-mix(in oklab, var(--ok-yellow-300) 28%, transparent), 0 0 10px 2px color-mix(in oklab, var(--ok-yellow-400) 50%, transparent);
   /* 옮기기는 translate (화면 그리기와 따로 돌아 목록을 새로 그리는 동안에도 끊기지 않게) — 거리 --ms-travel 은 JS 가 잰다 (dom.js setModeSwitch) */
   transition: translate 0.6s var(--ms-swing), background-color 0.45s ease-out, box-shadow 0.5s ease-out;
   animation: ms-day 0.6s var(--ease-out);
@@ -1569,8 +1583,8 @@ dialog.quick-event[open] {
 .mode-switch.ms-still::before, .mode-switch.ms-still::after, .mode-switch.ms-still .ms-scene, .mode-switch.ms-still .ms-scene::after { transition: none !important; animation: none !important; } /* 처음 그릴 때는 움직이지 않고 그 자리에 */
 .mode-switch[data-on="work"]::before {
   translate: var(--ms-travel, 0px) 0;
-  background-color: rgba(42, 61, 107, 0);
-  box-shadow: inset calc(var(--orb) * -0.32) calc(var(--orb) * -0.08) 0 0 #f4f0e2, 0 0 0 3px rgba(244, 240, 226, 0.1), 0 0 10px 2px rgba(190, 210, 255, 0.35);
+  background-color: transparent;
+  box-shadow: inset calc(var(--orb) * -0.32) calc(var(--orb) * -0.08) 0 0 var(--ok-orange-50), 0 0 0 3px color-mix(in oklab, var(--ok-orange-50) 10%, transparent), 0 0 10px 2px color-mix(in oklab, var(--ok-blue-200) 35%, transparent);
   animation: ms-night 0.6s var(--ease-out);
 }
 .mode-switch[data-on="work"] .ms-scene { opacity: 1; }
@@ -1581,16 +1595,16 @@ dialog.quick-event[open] {
 @keyframes ms-day { 0% { transform: none; } 35% { transform: scale(1.18, 0.86); } 70% { transform: scale(0.94, 1.06) rotate(12deg); } 100% { transform: none; } }
 .mode-switch button {
   position: relative; z-index: 3; height: calc(var(--ms-h) - 2 * var(--ms-pad)); padding: 0 3px; border: 0; border-radius: 999px; background: none;
-  color: rgba(20, 45, 80, 0.5); font: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
+  color: color-mix(in oklab, var(--ok-blue-900) 50%, transparent); font: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
   transition: color 0.3s var(--ease-out);
 }
 .mode-switch button[data-mode="life"] { padding-left: calc(var(--orb) + 4px); } /* 해 자리 */
 .mode-switch button[data-mode="work"] { padding-right: calc(var(--orb) + 4px); } /* 달 자리 */
-.mode-switch button[aria-checked="true"] { color: #10294d; }
-.mode-switch[data-on="work"] button { color: rgba(255, 255, 255, 0.5); }
-.mode-switch[data-on="work"] button[aria-checked="true"] { color: #fff; }
-.mode-switch button:hover:not([aria-checked="true"]) { color: #10294d; }
-.mode-switch[data-on="work"] button:hover:not([aria-checked="true"]) { color: #fff; }
+.mode-switch button[aria-checked="true"] { color: var(--ok-blue-950); }
+.mode-switch[data-on="work"] button { color: color-mix(in oklab, var(--ok-gray-0) 50%, transparent); }
+.mode-switch[data-on="work"] button[aria-checked="true"] { color: var(--ok-gray-0); }
+.mode-switch button:hover:not([aria-checked="true"]) { color: var(--ok-blue-950); }
+.mode-switch[data-on="work"] button:hover:not([aria-checked="true"]) { color: var(--ok-gray-0); }
 .mode-switch button:active { transform: scale(0.96); }
 @media (prefers-reduced-motion: reduce) {
   .mode-switch::before, .mode-switch[data-on="work"]::before { animation: none; transition: translate 0.2s ease-out, background-color 0.2s ease-out, box-shadow 0.2s ease-out; }
@@ -1671,10 +1685,10 @@ dialog.quick-event[open] {
 
 /* 복사 아이콘 버튼 완료 피드백: 앱 전체 초록색 체크 표시 통일 */
 :is(.icon-btn, .act-btn, .mk-ctx-ic, .op-copy, .op-copy-biblio).done {
-  color: var(--ok-text, #2f9e44) !important;
+  color: var(--ok-text, var(--ok-green-500)) !important;
 }
 :is(.icon-btn, .act-btn, .mk-ctx-ic).done svg {
-  color: var(--ok-text, #2f9e44) !important;
+  color: var(--ok-text, var(--ok-green-500)) !important;
 }
 
 /* 메모킹 폴더 (folder-ui.js — PC 목록의 왼쪽 막대 · 휴대폰 시트 · 폴더 고르기 창) */
@@ -1726,10 +1740,10 @@ dialog.quick-event[open] {
 /* 폴더 목록: 누른 단추 바로 아래에 펼쳐지는 판 (folder-ui.js openFolderSheet) */
 dialog.folder-pop {
   position: fixed; inset: auto; margin: 0; padding: 0; overflow: hidden auto; box-sizing: border-box;
-  border: 1px solid var(--line); border-radius: 16px; background: var(--surface-1, #fff); color: var(--text);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line); border-radius: 16px; background: var(--surface-1, var(--ok-gray-0)); color: var(--text);
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 22%, transparent), 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
 }
-dialog.folder-pop::backdrop { background: rgba(0, 0, 0, 0.18); }
+dialog.folder-pop::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 18%, transparent); }
 .folder-pop-body { padding: 8px; }
 .folder-pop .mf-new { margin: 6px 0 2px 8px; }
 /* 새 폴더: 목록 맨 아래 그 자리에서 이름 칸 + 만들기 */
@@ -1769,9 +1783,9 @@ dialog.folder-pop::backdrop { background: rgba(0, 0, 0, 0.18); }
 body.picking .card { position: relative; }
 body.picking .card::after {
   content: ""; position: absolute; top: 8px; right: 8px; z-index: 2; width: 22px; height: 22px; box-sizing: border-box;
-  border: 2px solid color-mix(in srgb, var(--text-strong) 55%, transparent); border-radius: 50%; background: var(--surface-1, #fff); pointer-events: none;
+  border: 2px solid color-mix(in srgb, var(--text-strong) 55%, transparent); border-radius: 50%; background: var(--surface-1, var(--ok-gray-0)); pointer-events: none;
 }
-.card.picked { box-shadow: 0 0 0 3px var(--text-strong), 0 4px 12px rgba(0, 0, 0, 0.12); }
+.card.picked { box-shadow: 0 0 0 3px var(--text-strong), 0 4px 12px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent); }
 body.picking .card.picked::after {
   border-color: var(--text-strong);
   background: var(--text-strong) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 14px no-repeat;
@@ -1781,7 +1795,7 @@ body.picking .card.picked::after {
 }
 .pick-bar {
   position: fixed; left: 50%; bottom: 16px; z-index: 60; display: flex; align-items: center; gap: 8px; transform: translateX(-50%);
-  padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--surface-1, #fff); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); font-size: 13.5px; font-weight: 700; white-space: nowrap;
+  padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--surface-1, var(--ok-gray-0)); box-shadow: 0 6px 24px color-mix(in oklab, var(--ok-gray-1000) 18%, transparent); font-size: 13.5px; font-weight: 700; white-space: nowrap;
 }
 .pick-bar[hidden] { display: none; }
 
@@ -1793,13 +1807,13 @@ body.picking .card.picked::after {
   scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding-inline: 12px;
 }
 /* 넘치는 쪽 끝은 살짝 흐리게 — 옆으로 더 있다는 표시 (넘겨 본 뒤에는 왼쪽도) */
-.fchip-row.fade-end { mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
-.fchip-row.fade-start { mask-image: linear-gradient(to right, transparent, #000 24px); }
-.fchip-row.fade-start.fade-end { mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
+.fchip-row.fade-end { mask-image: linear-gradient(to right, var(--ok-gray-1000) calc(100% - 24px), transparent); }
+.fchip-row.fade-start { mask-image: linear-gradient(to right, transparent, var(--ok-gray-1000) 24px); }
+.fchip-row.fade-start.fade-end { mask-image: linear-gradient(to right, transparent, var(--ok-gray-1000) 24px, var(--ok-gray-1000) calc(100% - 24px), transparent); }
 .fchip-row::-webkit-scrollbar { display: none; }
 .fchip {
   display: inline-flex; align-items: center; gap: 5px; flex: none; height: 30px; padding: 0 12px;
-  border: 1px solid var(--line); border-radius: 999px; background: var(--surface-1, #fff); color: var(--text);
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface-1, var(--ok-gray-0)); color: var(--text);
   font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
   transition: background-color 0.15s ease-out, border-color 0.15s ease-out, transform 0.1s ease-out;

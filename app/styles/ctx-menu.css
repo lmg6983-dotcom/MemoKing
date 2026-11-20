@@ -1,16 +1,16 @@
 /* ---------- 오른쪽 클릭 메뉴 (PC, 내용 · 목록 카드 — ctx-menu.js): Windows 11 메뉴처럼 맨 위 한 줄에 아이콘, 아래에 글 항목 ---------- */
 .mk-ctx {
-  --ctx-bg: rgba(255, 255, 255, 0.88); --ctx-text: #1b1b1b; --ctx-muted: #6b6b6b; --ctx-line: rgba(0, 0, 0, 0.09); --ctx-hover: rgba(0, 0, 0, 0.06); --ctx-danger: #c4282e;
+  --ctx-bg: color-mix(in oklab, var(--ok-gray-0) 88%, transparent); --ctx-text: var(--ok-gray-900); --ctx-muted: var(--ok-gray-600); --ctx-line: color-mix(in oklab, var(--ok-gray-1000) 9%, transparent); --ctx-hover: color-mix(in oklab, var(--ok-gray-1000) 6%, transparent); --ctx-danger: var(--ok-red-600);
   position: fixed; z-index: 100000;
   min-width: 232px; max-width: 340px; max-height: calc(100vh - 12px); overflow-y: auto; padding: 4px;
   border-radius: 20px; background: var(--ctx-bg); color: var(--ctx-text); /* One UI 9.5 메뉴: 크게 둥근 반투명 판 */
-  box-shadow: 0 0 0 1px var(--ctx-line), 0 12px 32px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0 0 1px var(--ctx-line), 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 18%, transparent);
   font: 13.5px/1.35 var(--font-sans, system-ui, sans-serif); user-select: none;
   outline: none;
   animation: mk-ctx-in 0.12s var(--ease-out, ease-out) both; transform-origin: top left;
 }
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .mk-ctx { --ctx-bg: rgba(38, 38, 38, 0.88); --ctx-text: #f1f1f1; --ctx-muted: #a6a6a6; --ctx-line: rgba(255, 255, 255, 0.12); --ctx-hover: rgba(255, 255, 255, 0.1); --ctx-danger: #ff6b70; }
+  :where(:root:not([data-theme="light"])) .mk-ctx { --ctx-bg: color-mix(in oklab, var(--ok-gray-850) 88%, transparent); --ctx-text: var(--ok-gray-50); --ctx-muted: var(--ok-gray-400); --ctx-line: color-mix(in oklab, var(--ok-gray-0) 12%, transparent); --ctx-hover: color-mix(in oklab, var(--ok-gray-0) 10%, transparent); --ctx-danger: var(--ok-red-400); }
 }
 
 .mk-ctx.closing { opacity: 0; transition: opacity 0.09s; pointer-events: none; animation: none; }
@@ -44,11 +44,11 @@
 .mk-ctx-colors .mk-ctx-text { color: var(--ctx-text); }
 .mk-ctx-swatches { display: flex; gap: 4px; }
 .mk-ctx-sw {
-  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--note-chip, #ddd); cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.4);
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--note-chip, var(--ok-gray-150)); cursor: pointer;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 40%, transparent);
 }
 .mk-ctx-sw[aria-checked="true"] { box-shadow: 0 0 0 2px var(--ctx-bg), 0 0 0 4px var(--ctx-text); }
-.mk-ctx .mk-ctx-sw:not(:disabled):hover, .mk-ctx .mk-ctx-sw:not(:disabled):focus-visible { background: var(--note-chip, #ddd); transform: scale(1.12); }
+.mk-ctx .mk-ctx-sw:not(:disabled):hover, .mk-ctx .mk-ctx-sw:not(:disabled):focus-visible { background: var(--note-chip, var(--ok-gray-150)); transform: scale(1.12); }
 .mk-ctx-item[aria-checked="true"] .mk-ctx-text::before { content: "✓"; display: inline-block; width: 18px; margin-left: -4px; color: var(--ctx-text); }
 .mk-ctx-item.danger { color: var(--ctx-danger); }
 
@@ -60,7 +60,7 @@
   border: 1px solid var(--line, var(--border));
   border-radius: 20px;
   background: var(--surface-1, var(--surface));
-  box-shadow: var(--shadow-pop, 0 12px 32px rgba(0, 0, 0, 0.18));
+  box-shadow: var(--shadow-pop, 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 18%, transparent));
   animation: mk-pop-in 0.14s ease-out both;
 }
 .mk-share-head { margin: 4px 8px 6px; font-size: 12px; font-weight: 800; color: var(--muted); }
@@ -87,13 +87,13 @@
   border: 1px solid var(--line, var(--border));
   border-radius: 16px;
   background: var(--surface-1, var(--surface));
-  box-shadow: var(--shadow-pop, 0 12px 32px rgba(0, 0, 0, 0.18));
+  box-shadow: var(--shadow-pop, 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 18%, transparent));
   text-align: center; cursor: default;
   transform: translate(-50%, -50%);
   animation: mk-share-pop-in 0.22s cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 .mk-share-pop.leaving { pointer-events: none; opacity: 0; transform: translate(-50%, -50%) scale(0.97); transition: opacity 0.18s ease-out, transform 0.18s ease-out; }
-.mk-share-pop-icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 6px; border-radius: 50%; background: var(--brand-yellow, #ffcc00); color: #111; }
+.mk-share-pop-icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 6px; border-radius: 50%; background: var(--brand-yellow, var(--ok-yellow-300)); color: var(--ok-gray-950); }
 .mk-share-pop-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .mk-share-pop b { font-size: 15px; font-weight: 800; color: var(--text-strong); }
 .mk-share-pop p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
@@ -104,19 +104,19 @@
 .mk-confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; } /* 공유 완료 카드(95) 위로도 날린다 */
 
 /* 이름 입력 창 (rename-content.js) */
-.mk-prompt-back { position: fixed; inset: 0; z-index: 100001; display: grid; place-items: center; background: rgba(0, 0, 0, 0.25); }
+.mk-prompt-back { position: fixed; inset: 0; z-index: 100001; display: grid; place-items: center; background: color-mix(in oklab, var(--ok-gray-1000) 25%, transparent); }
 .mk-prompt {
   display: flex; flex-direction: column; gap: 10px; width: min(340px, calc(100vw - 32px)); padding: 16px;
-  border-radius: 12px; background: var(--surface, #fff); color: var(--text, #1b1b1b); box-shadow: var(--shadow-pop, 0 12px 32px rgba(0, 0, 0, 0.25));
+  border-radius: 12px; background: var(--surface, var(--ok-gray-0)); color: var(--text, var(--ok-gray-900)); box-shadow: var(--shadow-pop, 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 25%, transparent));
   font: 13.5px/1.4 var(--font-sans, system-ui, sans-serif);
 }
 .mk-prompt b { font-size: 14.5px; color: var(--text-strong, inherit); }
-.mk-prompt-msg { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted, #666); }
-.mk-prompt input { height: 36px; padding: 0 10px; border: 1px solid var(--border, #ccc); border-radius: 8px; background: var(--surface, #fff); color: inherit; font: inherit; outline: none; }
-.mk-prompt input:focus { border-color: var(--text-strong, #111); }
+.mk-prompt-msg { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted, var(--ok-gray-600)); }
+.mk-prompt input { height: 36px; padding: 0 10px; border: 1px solid var(--border, var(--ok-gray-200)); border-radius: 8px; background: var(--surface, var(--ok-gray-0)); color: inherit; font: inherit; outline: none; }
+.mk-prompt input:focus { border-color: var(--text-strong, var(--ok-gray-950)); }
 .mk-prompt-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.mk-prompt-actions button { height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--hover, rgba(0, 0, 0, 0.07)); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
-.mk-prompt-actions .primary { background: var(--brand-yellow, #ffcc00); color: var(--on-brand, #111); }
+.mk-prompt-actions button { height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--hover, color-mix(in oklab, var(--ok-gray-1000) 7%, transparent)); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.mk-prompt-actions .primary { background: var(--brand-yellow, var(--ok-yellow-300)); color: var(--on-brand, var(--ok-gray-950)); }
 .mk-share-menu button.unready:not(:disabled) { opacity: 0.7; }
 /* 손가락 화면(휴대폰 정렬 메뉴 등): 누르는 칸을 넉넉히 */
 @media (pointer: coarse) { .mk-ctx-item { height: 44px; padding: 0 14px; } }

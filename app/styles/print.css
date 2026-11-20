@@ -1,17 +1,17 @@
 /* 메모를 PDF 쪽으로 — 늘 밝은 색으로 (다크 모드여도 종이는 흰색) */
 html.print-page {
   color-scheme: light;
-  --surface-0: #ffffff; --surface-1: #ffffff; --surface-2: #ffffff; --line: #e8e6df;
-  --text-strong: #111111; --text-muted: #6b6860; --fill-hover: rgba(17, 17, 17, 0.06);
-  --yellow-bg: #ffe99a; --yellow-bar: #f2da7f;
-  --green-bg: #c1facc; --green-bar: #a3f1b3;
-  --pink-bg: #ffe0eb; --pink-bar: #ffcadd;
-  --purple-bg: #ede5fe; --purple-bar: #e1d2ff;
-  --blue-bg: #dbecfe; --blue-bar: #c0defe;
-  --gray-bg: #e1dfdb; --gray-bar: #d3d1cb;
-  --charcoal-bg: #1c1c1b; --charcoal-bar: #111111;
-  --note-text-default: #1f1f1c;
-  background: var(--page-bg, #ffffff) !important;
+  --surface-0: var(--ok-gray-0); --surface-1: var(--ok-gray-0); --surface-2: var(--ok-gray-0); --line: var(--ok-gray-150);
+  --text-strong: var(--ok-gray-950); --text-muted: var(--ok-gray-600); --fill-hover: color-mix(in oklab, var(--ok-gray-950) 6%, transparent);
+  --yellow-bg: var(--ok-yellow-100); --yellow-bar: var(--ok-yellow-200);
+  --green-bg: var(--ok-green-100); --green-bar: var(--ok-green-200);
+  --pink-bg: var(--ok-pink-100); --pink-bar: var(--ok-pink-200);
+  --purple-bg: var(--ok-purple-100); --purple-bar: var(--ok-purple-200);
+  --blue-bg: var(--ok-blue-100); --blue-bar: var(--ok-blue-200);
+  --gray-bg: var(--ok-gray-150); --gray-bar: var(--ok-gray-200);
+  --charcoal-bg: var(--ok-gray-900); --charcoal-bar: var(--ok-gray-950);
+  --note-text-default: var(--ok-gray-850);
+  background: var(--page-bg, var(--ok-gray-0)) !important;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -20,13 +20,13 @@ html.print-page body {
   display: block;
   margin: 0;
   background: transparent !important;
-  --note-text: #1f1f1c;
-  --note-muted: rgba(17, 17, 17, 0.64);
-  --note-hover: rgba(17, 17, 17, 0.07);
+  --note-text: var(--ok-gray-850);
+  --note-muted: color-mix(in oklab, var(--ok-gray-950) 64%, transparent);
+  --note-hover: color-mix(in oklab, var(--ok-gray-950) 7%, transparent);
   color: var(--note-text);
 }
 /* 메모 색 바탕: 쪽 전체 (여백 포함) */
-html.print-page.with-bg body[data-color="charcoal"] { --note-text: #f5f4ef; --note-muted: rgba(255, 255, 255, 0.64); --note-hover: rgba(255, 255, 255, 0.1); }
+html.print-page.with-bg body[data-color="charcoal"] { --note-text: var(--ok-gray-50); --note-muted: color-mix(in oklab, var(--ok-gray-0) 64%, transparent); --note-hover: color-mix(in oklab, var(--ok-gray-0) 10%, transparent); }
 
 .print-doc { overflow: visible; padding: 0; cursor: default; }
 .print-doc .mk-doc { min-height: 0; font-size: 11pt; line-height: 1.65; }
@@ -55,13 +55,13 @@ html.preview body {
   height: var(--page-h);
   padding: var(--page-m);
   overflow: hidden;
-  background: var(--page-bg, #ffffff) !important;
+  background: var(--page-bg, var(--ok-gray-0)) !important;
 }
 
 /* 여러 쪽 미리보기 (print.js paginate): 쪽마다 쪽 모양, 사이를 띄워 위아래로 */
 html.preview.multi body { width: var(--page-w); height: auto; padding: 0; overflow: visible; background: transparent !important; }
 .pv-pages { display: flex; flex-direction: column; gap: 28px; }
-.pv-page { box-sizing: border-box; width: var(--page-w); height: var(--page-h); padding: var(--page-m); overflow: hidden; background: var(--page-bg, #ffffff); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.14); }
+.pv-page { box-sizing: border-box; width: var(--page-w); height: var(--page-h); padding: var(--page-m); overflow: hidden; background: var(--page-bg, var(--ok-gray-0)); box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent), 0 8px 24px color-mix(in oklab, var(--ok-gray-1000) 14%, transparent); }
 .pv-view { height: calc(var(--page-h) - 2 * var(--page-m)); overflow: hidden; }
 
 /* PDF 여백: 쪽마다 위아래 빈 칸 + 좌우 안쪽 여백 */

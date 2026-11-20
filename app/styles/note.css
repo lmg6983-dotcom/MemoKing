@@ -10,14 +10,14 @@ body {
 /* 메모 바탕 위 글자색 — PC 메모 창(body) · 휴대폰 메모 화면 · 휴대폰 공유 그림 종이 */
 body, .note-screen, .share-paper {
   --note-text: var(--note-fg);
-  --note-muted: rgba(17, 17, 17, 0.64); /* 노랑·초록 메모 위 대비 4.5:1 이상 */
-  --note-hover: rgba(17, 17, 17, 0.07);
+  --note-muted: color-mix(in oklab, var(--ok-gray-950) 64%, transparent); /* 노랑·초록 메모 위 대비 4.5:1 이상 */
+  --note-hover: color-mix(in oklab, var(--ok-gray-950) 7%, transparent);
 }
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) body, :where(:root:not([data-theme="light"])) .note-screen, :where(:root:not([data-theme="light"])) .share-paper { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.09); }
+  :where(:root:not([data-theme="light"])) body, :where(:root:not([data-theme="light"])) .note-screen, :where(:root:not([data-theme="light"])) .share-paper { --note-muted: color-mix(in oklab, var(--ok-gray-0) 58%, transparent); --note-hover: color-mix(in oklab, var(--ok-gray-0) 9%, transparent); }
 }
 
-:is(body, .note-screen, .share-paper)[data-color="charcoal"] { --note-muted: rgba(255, 255, 255, 0.58); --note-hover: rgba(255, 255, 255, 0.1); }
+:is(body, .note-screen, .share-paper)[data-color="charcoal"] { --note-muted: color-mix(in oklab, var(--ok-gray-0) 58%, transparent); --note-hover: color-mix(in oklab, var(--ok-gray-0) 10%, transparent); }
 
 .icon-btn { width: 30px; height: 30px; color: var(--note-muted); }
 @media (hover: hover) and (pointer: fine) { .icon-btn:hover { background: var(--note-hover); color: var(--note-text); } }
@@ -106,7 +106,7 @@ body, .note-screen, .share-paper {
   border: 2px solid transparent;
   border-radius: 50%;
   background: var(--note-bg);
-  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.35);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 35%, transparent);
   cursor: pointer;
 }
 .swatch[aria-checked="true"] { border-color: var(--text-strong); }
@@ -247,7 +247,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 
 /* 밑줄 · 글자 색 · 하이라이트 */
 .mk-doc u { text-decoration-thickness: 1px; text-underline-offset: 2px; } /* 1.5px 는 100% 화면에서 2px 로 그려져 두꺼웠다 */
-.mk-doc mark { padding: 0.05em 0.1em; border-radius: 4px; color: #1f1f1f; } /* 배경색은 요소의 style 에서 */
+.mk-doc mark { padding: 0.05em 0.1em; border-radius: 4px; color: var(--ok-gray-850); } /* 배경색은 요소의 style 에서 */
 /* 어두운 화면: 형광펜 칠 · 흰 바탕 그림(흰 바탕 손 메모 · 가져온 일정의 달력 그림)은 조금 어둡게 — 검은 바탕에서 혼자 눈부시지 않게 (파일은 그대로) */
 [data-color="charcoal"] .mk-doc mark { filter: brightness(0.8); }
 @media (prefers-color-scheme: light) { :where(body:not([data-color="charcoal"])) .mk-doc mark { mix-blend-mode: multiply; } } /* 노랑 메모 위 노랑 형광펜도 보이게 (곱하면 한 단 진해진다) — 밝은 화면만 */
@@ -278,9 +278,9 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   --plyr-control-spacing: 8px;
 }
 /* 재생 단추: 배경 없이 옆 아이콘들과 같게 — 동영상은 흰색, 소리는 글자색. 영상 가운데 큰 단추도 원 없이 그림자만 (밝은 장면에서도 보이게) */
-.mk-video .plyr__control--overlaid { padding: 12px; background: transparent; color: #fff; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55)); }
+.mk-video .plyr__control--overlaid { padding: 12px; background: transparent; color: var(--ok-gray-0); filter: drop-shadow(0 1px 4px color-mix(in oklab, var(--ok-gray-1000) 55%, transparent)); }
 .mk-video .plyr__control--overlaid svg { width: 34px; height: 34px; }
-@media (hover: hover) and (pointer: fine) { .mk-video .plyr__control--overlaid:hover { background: transparent; color: #fff; opacity: 0.85; } }
+@media (hover: hover) and (pointer: fine) { .mk-video .plyr__control--overlaid:hover { background: transparent; color: var(--ok-gray-0); opacity: 0.85; } }
 .mk-media .plyr__time { white-space: nowrap; }
 .mk-media-label { padding: 0 4px; font-size: 12px; color: var(--note-muted); user-select: none; }
 
@@ -308,7 +308,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .mk-audio .mk-loop { grid-area: loop; justify-self: end; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border-radius: 50%; }
 /* 반복 재생이 켜지면 강조색 (동영상은 흰 단추들 사이에서 노랑) */
 .mk-media .mk-loop[aria-pressed="true"] { color: var(--note-accent); }
-.mk-video .mk-loop[aria-pressed="true"] { color: var(--brand-yellow, #ffcc00); }
+.mk-video .mk-loop[aria-pressed="true"] { color: var(--brand-yellow, var(--ok-yellow-300)); }
 .mk-audio .plyr__control[data-plyr="play"] { grid-area: play; width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 50%; }
 .mk-audio .plyr__control[data-plyr="play"] svg { width: 22px; height: 22px; }
 .mk-audio .plyr__progress__container { grid-area: bar; margin: 0; padding: 0; }
@@ -318,7 +318,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .mk-audio .plyr__time--duration { grid-area: dur; }
 
 /* 동영상: 이름 줄 없이 화면 그대로, 이름은 영상 위 왼쪽 위에 — 재생 중 단추가 숨으면 같이 숨는다 */
-.mk-video { position: relative; display: block; background: #000; }
+.mk-video { position: relative; display: block; background: var(--ok-gray-1000); }
 .mk-video .plyr { border-radius: inherit; }
 
 /* 그 밖의 파일: 파일 칩 (끌어서 순서 바꾸기 · 한 번 눌러 열기) */
@@ -353,10 +353,10 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 
 /* 파일 종류: 아이콘 색 + 확장자 표시 */
 .mk-doc a[data-file="pdf"] { --chip-ico: var(--rec); }
-.mk-doc a[data-file="doc"] { --chip-ico: #3b82f6; }
-.mk-doc a[data-file="sheet"] { --chip-ico: #22a355; }
-.mk-doc a[data-file="slide"] { --chip-ico: #f07c1b; }
-.mk-doc a[data-file="archive"] { --chip-ico: #8b5cf6; }
+.mk-doc a[data-file="doc"] { --chip-ico: var(--ok-blue-500); }
+.mk-doc a[data-file="sheet"] { --chip-ico: var(--ok-green-500); }
+.mk-doc a[data-file="slide"] { --chip-ico: var(--ok-orange-400); }
+.mk-doc a[data-file="archive"] { --chip-ico: var(--ok-violet-500); }
 .mk-doc a[data-file="program"] { --chip-ico: var(--danger); }
 .mk-doc a[data-file]:not([data-ext=""])::after {
   content: attr(data-ext);
@@ -391,7 +391,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   overflow: hidden;
   transition: box-shadow 0.15s ease-out, transform 0.1s ease-out;
 }
-@media (hover: hover) and (pointer: fine) { .lc-main:hover { box-shadow: 0 2px 4px rgba(17, 17, 17, 0.08), 0 8px 20px rgba(17, 17, 17, 0.1); } }
+@media (hover: hover) and (pointer: fine) { .lc-main:hover { box-shadow: 0 2px 4px color-mix(in oklab, var(--ok-gray-950) 8%, transparent), 0 8px 20px color-mix(in oklab, var(--ok-gray-950) 10%, transparent); } }
 .lc-main:active { transform: scale(0.99); }
 @media (prefers-reduced-motion: reduce) { .lc-main { transition: none; } .lc-main:active { transform: none; } }
 .mk-link-card.selected .lc-main { box-shadow: inset 0 0 0 2px var(--text-strong), var(--shadow-card); }
@@ -417,10 +417,10 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   height: 20px;
   margin-top: -10px;
   border-radius: 6px;
-  background: rgba(17, 17, 17, 0.72);
+  background: color-mix(in oklab, var(--ok-gray-950) 72%, transparent);
   pointer-events: none;
 }
-.lc-play::after { content: ''; position: absolute; left: 11px; top: 5px; border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent #fff; }
+.lc-play::after { content: ''; position: absolute; left: 11px; top: 5px; border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent var(--ok-gray-0); }
 @media (max-width: 260px) { .lc-thumb, .lc-play { display: none; } }
 
 /* 파일 칩 위에 뜨는 안내 (이름·크기) */
@@ -531,7 +531,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   cursor: pointer;
 }
 .link-open span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.link-dot { width: 10px; height: 10px; flex: none; border-radius: 3px; background: var(--note-chip); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.25); }
+.link-dot { width: 10px; height: 10px; flex: none; border-radius: 3px; background: var(--note-chip); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 25%, transparent); }
 .link-item .icon-btn { width: 26px; height: 26px; }
 .link-item .icon-btn svg { width: 15px; height: 15px; }
 .link-score { font-size: 12px; color: var(--muted); }
@@ -572,9 +572,9 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   overflow: hidden;
   background:
     linear-gradient(color-mix(in srgb, currentColor 10%, transparent) 0 0) left 0 top 63px / 58% 11px no-repeat,
-    repeating-linear-gradient(#0000 0 5px, color-mix(in srgb, currentColor 10%, transparent) 5px 16px, #0000 16px 21px) left 0 top 0 / 100% 63px no-repeat;
+    repeating-linear-gradient(transparent 0 5px, color-mix(in srgb, currentColor 10%, transparent) 5px 16px, transparent 16px 21px) left 0 top 0 / 100% 63px no-repeat;
 }
-.ai-pending-lines::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, #0000 30%, color-mix(in srgb, var(--surface-2, #fff) 75%, transparent) 50%, #0000 70%); transform: translateX(-100%); animation: mk-doc-shine 1.4s ease-in-out infinite; }
+.ai-pending-lines::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--surface-2, var(--ok-gray-0)) 75%, transparent) 50%, transparent 70%); transform: translateX(-100%); animation: mk-doc-shine 1.4s ease-in-out infinite; }
 .ai-pending .mk-doc-pending-bar { margin-top: 8px; }
 .ai-pending .mk-doc-pending-bar > span { background: color-mix(in srgb, currentColor 55%, transparent); }
 .ai-pending .mk-doc-pending-bar { background: color-mix(in srgb, currentColor 12%, transparent); }
@@ -595,7 +595,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   gap: 2px;
   flex: none;
   padding: 4px 6px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid color-mix(in oklab, var(--ok-gray-1000) 6%, transparent);
 }
 .format-items {
   display: flex;
@@ -639,7 +639,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   bottom: 4px;
   height: 3px;
   border-radius: 2px;
-  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 0.5px color-mix(in oklab, var(--ok-gray-1000) 25%, transparent);
 }
 
 /* ---------- 도구막대 팝업 (더보기·색판) ---------- */
@@ -678,7 +678,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   color: var(--text-strong);
   font-weight: 800;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-1000) 15%, transparent);
 }
 @media (hover: hover) and (pointer: fine) { .palette-swatch:hover { transform: scale(1.1); } }
 .palette-swatch.text-sample { background: var(--surface-1) !important; font-size: 15px; box-shadow: inset 0 0 0 1px var(--line); }
@@ -713,7 +713,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   position: fixed;
   inset: 0;
   z-index: 45;
-  background: rgba(0, 0, 0, 0.35);
+  background: color-mix(in oklab, var(--ok-gray-1000) 35%, transparent);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: cal-quick-fade 0.18s ease-out;
@@ -739,7 +739,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   border-radius: var(--radius-xl, 18px);
   background: var(--surface-2);
   color: var(--text);
-  box-shadow: var(--shadow-pop, 0 16px 36px rgba(0, 0, 0, 0.22));
+  box-shadow: var(--shadow-pop, 0 16px 36px color-mix(in oklab, var(--ok-gray-1000) 22%, transparent));
   box-sizing: border-box;
   animation: mk-pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
   display: flex;
@@ -781,7 +781,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   padding: 0 24px 0 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background-color: var(--surface-0, #ffffff);
+  background-color: var(--surface-0, var(--ok-gray-0));
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%23888888' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 8px center;
@@ -790,16 +790,16 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 3%, transparent);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .reminder-panel select:hover {
-  border-color: var(--brand-black, #1a1a1a);
+  border-color: var(--brand-black, var(--ok-gray-900));
 }
 .reminder-panel select:focus {
   outline: none;
   border-color: var(--brand-yellow);
-  box-shadow: 0 0 0 2px var(--brand-yellow-subtle, rgba(255, 212, 0, 0.2));
+  box-shadow: 0 0 0 2px var(--brand-yellow-subtle, color-mix(in oklab, var(--ok-yellow-300) 20%, transparent));
 }
 
 .reminder-panel input:not(.switch):not([type="radio"]) {
@@ -807,17 +807,17 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
   padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background-color: var(--surface-0, #ffffff);
+  background-color: var(--surface-0, var(--ok-gray-0));
   color: var(--text);
   font: inherit;
   font-size: 12.5px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 3%, transparent);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .reminder-panel input:not(.switch):not([type="radio"]):focus {
   outline: none;
   border-color: var(--brand-yellow);
-  box-shadow: 0 0 0 2px var(--brand-yellow-subtle, rgba(255, 212, 0, 0.2));
+  box-shadow: 0 0 0 2px var(--brand-yellow-subtle, color-mix(in oklab, var(--ok-yellow-300) 20%, transparent));
 }
 
 .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 2px; padding: 2.5px; border-radius: var(--radius-md); background: var(--fill-tab); margin-bottom: 8px; }
@@ -861,7 +861,7 @@ body.win-inactive .mk-doc .ProseMirror-selectednode, body.win-inactive .mk-doc .
 .task-row:first-child { border-top: 0; }
 .task-row-label { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; }
 .task-row-when { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.task-row[aria-checked="true"] { background: rgba(255, 204, 0, 0.16); }
+.task-row[aria-checked="true"] { background: color-mix(in oklab, var(--ok-yellow-300) 16%, transparent); }
 .task-row[aria-checked="true"] .task-row-label { color: var(--text-strong); font-weight: 800; }
 .task-row[aria-checked="true"] .task-row-label::before {
   content: ''; display: inline-block; width: 7px; height: 7px; margin: 0 8px 1px 0; border-radius: 50%; background: var(--brand-yellow); vertical-align: middle;
@@ -945,7 +945,7 @@ body.stacked { --tabs-h: 0px; --tabs-w: 30px; padding-left: var(--tabs-w); }
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
-  background: color-mix(in srgb, var(--note-bar) 78%, #000 12%);
+  background: color-mix(in srgb, var(--note-bar) 78%, var(--ok-gray-1000) 12%);
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -1094,7 +1094,7 @@ body[data-color="yellow"] .stack-tab[aria-selected="true"]::after { background: 
   flex: none;
   padding: 4px 6px;
   overflow-x: auto;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid color-mix(in oklab, var(--ok-gray-1000) 6%, transparent);
   background: color-mix(in srgb, var(--note-bar) 55%, transparent);
   scrollbar-width: none;
 }
@@ -1219,7 +1219,7 @@ body.mk-row-resizing { user-select: none; }
 .table-bar button { flex: none; }
 /* 낮은 창(작은 메모 창): 여러 줄이면 창의 1/3 을 차지해 표가 안 보였다 — 한 줄로 두고 옆으로 밀어 보기 (끝은 옅게) */
 @media (max-height: 460px) {
-  .table-bar, .table-bar.grouped { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+  .table-bar, .table-bar.grouped { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; -webkit-mask-image: linear-gradient(to right, var(--ok-gray-1000) calc(100% - 24px), transparent); mask-image: linear-gradient(to right, var(--ok-gray-1000) calc(100% - 24px), transparent); }
 }
 
 /* ---------- v0.17.14: 목록·체크리스트 항목 — 글자를 잠깐 누르고 끌어서 순서 바꾸기 ---------- */
@@ -1259,7 +1259,7 @@ body.mk-row-resizing { user-select: none; }
   z-index: 5;
   border-radius: 6px;
   background: var(--note-bg);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 26px color-mix(in oklab, var(--ok-gray-1000) 22%, transparent), 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent);
   cursor: grabbing;
   pointer-events: none; /* 커서를 따라오는 동안 아래 항목이 잡히게 */
   transition: none !important; /* 커서를 지연 없이 따라온다 (나머지 항목만 미끄러짐) */
@@ -1315,11 +1315,11 @@ body.bar-hidden .format-bar { margin-bottom: calc(-1 * var(--bar-h, 38px)); tran
   box-shadow: var(--bubble-shadow);
   animation: mk-badge-in 0.12s ease-out;
 }
-.mk-drag-badge[data-kind="swap"] { background: #7a4dff; color: #fff; }
+.mk-drag-badge[data-kind="swap"] { background: var(--ok-violet-600); color: var(--ok-gray-0); }
 @keyframes mk-badge-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 .mk-doc li.mk-dropped { border-radius: 6px; animation: mk-dropped 0.7s ease-out; }
 @keyframes mk-dropped { 0% { background: color-mix(in srgb, var(--note-text) 16%, transparent); } 100% { background: transparent; } }
-.mk-doc li.mk-swap-target::after { border-color: #7a4dff !important; }
+.mk-doc li.mk-swap-target::after { border-color: var(--ok-violet-600) !important; }
 
 /* ---------- 그림·소리·동영상·파일·링크 카드 줄 옮기기 (block-move.js) — 내용 자체를 잡아 끈다 ---------- */
 /* 마우스를 올린 덩어리 하나에 흐린 점선 — "이 한 덩어리를 잡아 옮길 수 있다" (꾹 눌러 끌기). 목록 항목(li::after)과 같은 모양을
@@ -1356,7 +1356,7 @@ body.mk-block-dragging, body.mk-block-dragging * { cursor: grabbing !important; 
   position: relative; z-index: 3;
   border-radius: 8px;
   background: var(--note-bg);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24), 0 0 0 4px var(--note-bg), 0 0 0 6px var(--note-text);
+  box-shadow: 0 14px 30px color-mix(in oklab, var(--ok-gray-1000) 24%, transparent), 0 0 0 4px var(--note-bg), 0 0 0 6px var(--note-text);
   opacity: 0.96;
 }
 .mk-doc .mk-block-lift:not(:has(> img.mk-album-img)) { width: fit-content; max-width: 100%; } /* 들어 올린 틀은 내용 크기에 맞게 (높이는 그대로라 다른 줄 자리 계산은 같다) */
@@ -1365,7 +1365,7 @@ body.mk-block-dragging .mk-doc .ProseMirror-selectednode { outline: none; }
 .mk-doc .mk-block-lift > * { animation: mk-lift-in 0.18s ease-out both; }
 /* 묶음 사진은 들어 올려도 격자 폭 · 장마다 기운 모양 그대로 (fit-content 면 두 칸 격자가 줄어 배치가 깨지고, 들기 움직임이 장의 기울기를 덮었다) */
 .mk-doc p.mk-block-lift:has(> img.mk-album-img) > * { animation: none; }
-.mk-doc .mk-block-swap-target { border-radius: 8px; outline: 2px dashed #7a4dff; outline-offset: 2px; background: color-mix(in srgb, #7a4dff 8%, transparent); }
+.mk-doc .mk-block-swap-target { border-radius: 8px; outline: 2px dashed var(--ok-violet-600); outline-offset: 2px; background: color-mix(in srgb, var(--ok-violet-600) 8%, transparent); }
 .mk-doc .mk-block-dropped { border-radius: 8px; animation: mk-dropped 0.7s ease-out; }
 /* 처음 한 번 옮기는 방법 안내 */
 .mk-move-hint {
@@ -1383,10 +1383,10 @@ body.mk-block-dragging .mk-doc .ProseMirror-selectednode { outline: none; }
 .mk-doc li.mk-lift::after {
   z-index: -1; /* li 가 z-index 로 쌓임 맥락을 만들어 글자 바로 뒤에 깔린다 */
   background: var(--note-bg);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 26px color-mix(in oklab, var(--ok-gray-1000) 22%, transparent), 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent);
 }
 .mk-doc li.mk-swap-target { z-index: 1; }
-.mk-doc li.mk-swap-target::after { z-index: -1; background: color-mix(in srgb, #7a4dff 9%, transparent); } /* 옮기기 틀의 맞바꿀 상대와 같은 보라 */
+.mk-doc li.mk-swap-target::after { z-index: -1; background: color-mix(in srgb, var(--ok-violet-600) 9%, transparent); } /* 옮기기 틀의 맞바꿀 상대와 같은 보라 */
 .mk-doc li.mk-dropped { z-index: 1; animation: none; }
 .mk-doc li.mk-dropped::after { z-index: -1; animation: mk-dropped 0.7s ease-out; }
 /* 커서가 있는 항목에 흐린 점선 — Enter 로 새 항목을 만들면 테두리도 새 항목으로 따라간다.
@@ -1405,10 +1405,10 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
   border-style: solid; border-color: color-mix(in srgb, var(--note-text) 35%, transparent) !important;
   left: calc(-1.35em - 7px + var(--swipe-cut-l, 0px)); right: calc(-6px + var(--swipe-cut-r, 0px)); /* 본문 칸 끝에서 멈춤 (list-drag.js) */
 }
-.mk-doc li.mk-swipe-ready::after { border-width: 2px; border-color: #7a4dff !important; }
+.mk-doc li.mk-swipe-ready::after { border-width: 2px; border-color: var(--ok-violet-600) !important; }
 .mk-doc li.mk-swipe-back { transition: transform 0.18s var(--ease-out) !important; }
-.mk-drag-badge[data-kind="indent"], .mk-drag-badge[data-kind="outdent"] { background: #7a4dff; color: #fff; }
-.mk-drag-badge[data-kind="blocked"] { background: #666; color: #fff; }
+.mk-drag-badge[data-kind="indent"], .mk-drag-badge[data-kind="outdent"] { background: var(--ok-violet-600); color: var(--ok-gray-0); }
+.mk-drag-badge[data-kind="blocked"] { background: var(--ok-gray-600); color: var(--ok-gray-0); }
 
 /* ---------- v0.18.0: 수식 (KaTeX) — 누르면 아래에 고치기 창 ---------- */
 .mk-doc .mk-math { padding: 0 2px; border-radius: 4px; cursor: pointer; }
@@ -1424,23 +1424,23 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
   display: flex; flex-direction: column; gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  background: var(--surface-2, #fff); color: var(--text, #111);
-  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line, rgba(0, 0, 0, 0.1));
+  background: var(--surface-2, var(--ok-gray-0)); color: var(--text, var(--ok-gray-950));
+  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line, color-mix(in oklab, var(--ok-gray-1000) 10%, transparent));
   animation: mk-drop-in 0.14s ease-out;
 }
 .mk-math-editor textarea {
   width: 100%; resize: vertical; min-height: 36px;
-  padding: 8px 10px; border: 1px solid var(--line, #ddd); border-radius: 8px;
-  background: var(--surface-1, #fff); color: inherit;
+  padding: 8px 10px; border: 1px solid var(--line, var(--ok-gray-150)); border-radius: 8px;
+  background: var(--surface-1, var(--ok-gray-0)); color: inherit;
   font: 14px/1.5 ui-monospace, Consolas, monospace;
 }
-.mk-math-editor textarea:focus { outline: 2px solid var(--text-strong, #111); outline-offset: -1px; }
+.mk-math-editor textarea:focus { outline: 2px solid var(--text-strong, var(--ok-gray-950)); outline-offset: -1px; }
 .mk-math-preview { min-height: 28px; max-height: 40vh; overflow: auto; padding: 4px 2px; text-align: center; }
-.mk-math-preview.empty { color: var(--muted, #777); font-size: 13px; }
-.mk-math-actions { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted, #777); }
+.mk-math-preview.empty { color: var(--muted, var(--ok-gray-550)); font-size: 13px; }
+.mk-math-actions { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted, var(--ok-gray-550)); }
 .mk-math-actions span { flex: 1; }
-.mk-math-actions button { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--fill-hover, #eee); color: inherit; font-weight: 700; }
-.mk-math-actions button.primary { background: var(--brand-yellow, #ffcd00); color: var(--on-brand, #111); }
+.mk-math-actions button { height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--fill-hover, var(--ok-gray-100)); color: inherit; font-weight: 700; }
+.mk-math-actions button.primary { background: var(--brand-yellow, var(--ok-yellow-300)); color: var(--on-brand, var(--ok-gray-950)); }
 .s-math { font: italic 15px "Times New Roman", serif; }
 @media print { .mk-math-editor { display: none !important; } .mk-doc .mk-math-block { background: none; } }
 
@@ -1450,8 +1450,8 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 .mk-video .mk-media-label {
   position: absolute; top: 0; left: 0; right: 0; z-index: 3;
   padding: 10px 14px 28px;
-  background: linear-gradient(rgba(0, 0, 0, 0.5), transparent);
-  color: #fff; font-size: 13px; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(color-mix(in oklab, var(--ok-gray-1000) 50%, transparent), transparent);
+  color: var(--ok-gray-0); font-size: 13px; font-weight: 600; text-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 40%, transparent);
   transition: opacity 0.25s ease-out;
 }
 .mk-video:has(.plyr--playing.plyr--hide-controls) .mk-media-label { opacity: 0; pointer-events: none; }
@@ -1493,16 +1493,16 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
   font-weight: 700;
   line-height: 1.6;
   vertical-align: 1px;
-  color: #fff;
+  color: var(--ok-gray-0);
   background: var(--spk);
 }
 .mk-voice-body > p.mk-voice-line[class*="mk-spk-"] { border-left-color: color-mix(in srgb, var(--spk) 55%, transparent); }
-.mk-spk-0 { --spk: #2f6fdf; }
-.mk-spk-1 { --spk: #d9534f; }
-.mk-spk-2 { --spk: #2e9d5b; }
-.mk-spk-3 { --spk: #9a5bd6; }
-.mk-spk-4 { --spk: #d98a1c; }
-.mk-spk-5 { --spk: #1d9aa8; }
+.mk-spk-0 { --spk: var(--ok-blue-600); }
+.mk-spk-1 { --spk: var(--ok-red-500); }
+.mk-spk-2 { --spk: var(--ok-green-500); }
+.mk-spk-3 { --spk: var(--ok-purple-600); }
+.mk-spk-4 { --spk: var(--ok-orange-400); }
+.mk-spk-5 { --spk: var(--ok-teal-500); }
 .mk-voice-bar { display: flex; padding: 4px 0; user-select: none; -webkit-user-select: none; }
 .mk-voice-toggle {
   display: flex;
@@ -1576,11 +1576,11 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
   border-radius: 50%;
-  background: #fff;
+  background: var(--ok-gray-0);
   color: var(--rec);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--ok-gray-1000) 18%, transparent);
   cursor: pointer;
   animation: mk-del-in 0.22s var(--ease-out) both;
   -webkit-tap-highlight-color: transparent;
@@ -1623,8 +1623,8 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 /* 복사 · 저장 단추: 지우기 단추 왼쪽에 차례로, 같은 크기 · 동그라미에 글자색 아이콘 (누르면 ✓ 초록, 실패하면 !) — 메모 색 · 어두운 화면을 따라감 */
 :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) {
   position: fixed; z-index: 70; display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
-  border: 1px solid color-mix(in srgb, var(--text-strong, #111) 10%, transparent); border-radius: 50%; background: var(--surface-2); color: var(--text-strong, #222);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); cursor: pointer; animation: mk-del-in 0.22s var(--ease-out) both;
+  border: 1px solid color-mix(in srgb, var(--text-strong, var(--ok-gray-950)) 10%, transparent); border-radius: 50%; background: var(--surface-2); color: var(--text-strong, var(--ok-gray-850));
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--ok-gray-1000) 18%, transparent); cursor: pointer; animation: mk-del-in 0.22s var(--ease-out) both;
   -webkit-tap-highlight-color: transparent;
 }
 /* 손가락 닿는 범위: 바깥쪽은 넉넉히, × 쪽(오른쪽)은 좁게 — 복사하려다 지우지 않게 */
@@ -1636,17 +1636,17 @@ body.mk-typing .mk-doc.ProseMirror-focused li.mk-caret-item::after { border-colo
 :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).failed { color: var(--danger); }
 :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).failed svg { stroke-width: 2.4; }
 :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: mk-del-fade 0.26s ease-out forwards; pointer-events: none; }
-:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 2px; }
-.mk-delete-btn { background: var(--surface-2); color: #c4282e; } /* 흰 바탕 위 빨간 × 를 4.5:1 넘게 (--rec #e5484d 는 3.9) */
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .mk-delete-btn { color: #ff6b70; } }
+:is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn):focus-visible, .mk-delete-btn:focus-visible { outline: 2px solid var(--focus-ring, var(--ok-blue-600)); outline-offset: 2px; }
+.mk-delete-btn { background: var(--surface-2); color: var(--ok-red-600); } /* 흰 바탕 위 빨간 × 를 4.5:1 넘게 (--rec #e5484d 는 3.9) */
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .mk-delete-btn { color: var(--ok-red-400); } }
 
-body[data-color="charcoal"] .mk-delete-btn { color: #ff6b70; }
+body[data-color="charcoal"] .mk-delete-btn { color: var(--ok-red-400); }
 /* 어두운 숯색 메모 위에서도 또렷하게 */
-body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), body[data-color="charcoal"] .mk-delete-btn { background: #2b2b29; border-color: rgba(255, 255, 255, 0.14); }
-body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) { color: #f1f1ef; }
+body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), body[data-color="charcoal"] .mk-delete-btn { background: var(--ok-gray-850); border-color: color-mix(in oklab, var(--ok-gray-0) 14%, transparent); }
+body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn) { color: var(--ok-gray-50); }
 /* 열기: 이 단추들 중 하는 일이 가장 큰 것 — 노란 바탕으로 */
-.mk-open-btn, body[data-color="charcoal"] .mk-open-btn { background: var(--brand-yellow, #ffd43b); color: var(--on-brand, #111); border-color: transparent; }
-body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).done { color: #69db7c; }
+.mk-open-btn, body[data-color="charcoal"] .mk-open-btn { background: var(--brand-yellow, var(--ok-yellow-300)); color: var(--on-brand, var(--ok-gray-950)); border-color: transparent; }
+body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).done { color: var(--ok-green-300); }
 .mk-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn), :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { animation: none; } :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).fading { opacity: 0; } }
 
@@ -1674,7 +1674,7 @@ body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-sha
 .mk-drag-frame {
   position: absolute;
   box-sizing: border-box;
-  border: 2px solid var(--note-text, #111);
+  border: 2px solid var(--note-text, var(--ok-gray-950));
   border-radius: 12px;
   pointer-events: none;
   transition: left 0.18s var(--ease-out), top 0.18s var(--ease-out),
@@ -1683,26 +1683,26 @@ body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-sha
 /* 들어 올린 것: 손을 바로 따라온다 (미끄러지지 않음). 틈(4px)은 메모 바탕으로 덮어 아래 줄이 비치지 않게, 들어 올릴 때 "톡" */
 .mk-drag-frame.lift {
   transition: none;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22), 0 3px 8px rgba(0, 0, 0, 0.12), inset 0 0 0 4.5px var(--note-bg, #fff);
+  box-shadow: 0 14px 30px color-mix(in oklab, var(--ok-gray-1000) 22%, transparent), 0 3px 8px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent), inset 0 0 0 4.5px var(--note-bg, var(--ok-gray-0));
   animation: mk-frame-pop 0.22s var(--ease-out);
 }
 @keyframes mk-frame-pop { from { transform: scale(0.94); opacity: 0.3; } }
-.mk-drag-frame.target { border-style: dashed; border-color: #7a4dff; background: color-mix(in srgb, #7a4dff 9%, transparent); }
+.mk-drag-frame.target { border-style: dashed; border-color: var(--ok-violet-600); background: color-mix(in srgb, var(--ok-violet-600) 9%, transparent); }
 /* 넣을 자리: 손을 놓으면 옮겨질 자리 (다른 줄들이 비켜 연 틈) — 숨 쉬듯 */
 .mk-drop-slot {
   border-style: dashed;
-  border-color: color-mix(in srgb, var(--note-text, #111) 55%, transparent);
-  background: color-mix(in srgb, var(--brand-yellow, #ffcc00) 18%, transparent);
+  border-color: color-mix(in srgb, var(--note-text, var(--ok-gray-950)) 55%, transparent);
+  background: color-mix(in srgb, var(--brand-yellow, var(--ok-yellow-300)) 18%, transparent);
   animation: mk-slot-in 0.18s ease-out, mk-slot-breathe 1.4s ease-in-out 0.18s infinite;
 }
-.mk-drop-slot.line { border-radius: 4px; border-style: solid; border-color: var(--note-text, #111); background: var(--brand-yellow, #ffcc00); }
+.mk-drop-slot.line { border-radius: 4px; border-style: solid; border-color: var(--note-text, var(--ok-gray-950)); background: var(--brand-yellow, var(--ok-yellow-300)); }
 @keyframes mk-slot-in { from { opacity: 0; transform: scale(0.96); } }
-@keyframes mk-slot-breathe { 50% { border-color: color-mix(in srgb, var(--note-text, #111) 30%, transparent); } }
+@keyframes mk-slot-breathe { 50% { border-color: color-mix(in srgb, var(--note-text, var(--ok-gray-950)) 30%, transparent); } }
 /* 파일 끌어 넣기 (file-drop.js): 편집기 둘레에 흐르는 점선 틀(놓을 수 있는 곳) + 들어갈 자리 (위 넣을 자리와 같은 모양) */
 .mk-file-drop {
   position: fixed; z-index: 60; pointer-events: none;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--brand-yellow, #ffcc00) 7%, transparent);
+  background: color-mix(in srgb, var(--brand-yellow, var(--ok-yellow-300)) 7%, transparent);
   animation: mk-file-drop-in 0.15s ease-out;
 }
 .mk-file-drop[hidden] { display: none; }
@@ -1710,18 +1710,18 @@ body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-sha
 .mk-file-drop svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .mk-file-drop rect {
   x: 3px; y: 3px; width: calc(100% - 6px); height: calc(100% - 6px); rx: 10px;
-  fill: none; stroke: color-mix(in srgb, var(--note-text, #111) 45%, transparent); stroke-width: 2; stroke-dasharray: 8 6;
+  fill: none; stroke: color-mix(in srgb, var(--note-text, var(--ok-gray-950)) 45%, transparent); stroke-width: 2; stroke-dasharray: 8 6;
   animation: mk-ants 0.6s linear infinite;
 }
 @keyframes mk-ants { to { stroke-dashoffset: -14; } }
 .mk-file-drop-slot {
   position: absolute; box-sizing: border-box;
-  border: 2px dashed color-mix(in srgb, var(--note-text, #111) 55%, transparent); border-radius: 10px;
-  background: color-mix(in srgb, var(--brand-yellow, #ffcc00) 18%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--note-text, var(--ok-gray-950)) 55%, transparent); border-radius: 10px;
+  background: color-mix(in srgb, var(--brand-yellow, var(--ok-yellow-300)) 18%, transparent);
   transition: left 0.12s var(--ease-out), top 0.12s var(--ease-out), width 0.12s var(--ease-out), height 0.12s var(--ease-out);
   animation: mk-slot-in 0.18s ease-out, mk-slot-breathe 1.4s ease-in-out 0.18s infinite;
 }
-.mk-file-drop-slot.line { border-radius: 4px; border-style: solid; border-color: var(--note-text, #111); background: var(--brand-yellow, #ffcc00); }
+.mk-file-drop-slot.line { border-radius: 4px; border-style: solid; border-color: var(--note-text, var(--ok-gray-950)); background: var(--brand-yellow, var(--ok-yellow-300)); }
 .mk-file-drop .mk-drag-badge { position: absolute; right: 14px; margin-top: -11px; transition: top 0.12s var(--ease-out); }
 @media (prefers-reduced-motion: reduce) {
   .mk-file-drop, .mk-file-drop rect, .mk-file-drop-slot, .mk-file-drop .mk-drag-badge { animation: none; transition: none; }
@@ -1747,7 +1747,7 @@ body.mk-block-dragging .mk-doc .mk-block-swap-target { outline: none; background
 /* 옮기는 동안 접기 (block-move.js 의 COMPACT_H = 96px): 줄마다 짧게 — 사진은 88px 썸네일, 긴 글·표·음성 카드는
    첫 부분만 (아래가 흐려짐). 글 줄은 글 폭만큼만 차지해 틀이 글을 감싼다. 한 칸 옮기는 데 손가락을 조금만. 놓으면 원래대로 */
 body.mk-block-compact .mk-doc .mk-block-compact-item { max-height: 96px; overflow: hidden; box-sizing: border-box; }
-body.mk-block-compact .mk-doc .mk-block-compact-item.mk-block-clipped { -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
+body.mk-block-compact .mk-doc .mk-block-compact-item.mk-block-clipped { -webkit-mask-image: linear-gradient(var(--ok-gray-1000) 62%, transparent); mask-image: linear-gradient(var(--ok-gray-1000) 62%, transparent); }
 body.mk-block-compact .mk-doc :is(p, h1, h2, h3, h4, h5, h6).mk-block-compact-item { width: fit-content; max-width: 100%; }
 /* 사진 폭 제한은 % 가 아닌 px 로 (% 는 사진을 감싼 줄 기준이라 사진만 줄고 틀은 넓게 남았다) */
 body.mk-block-compact .mk-doc .mk-block-compact-item img.mk-image { width: auto !important; height: auto; max-height: 88px; max-width: 220px; border-radius: 8px; } /* !important: 크기를 맞춘 그림의 width % (줄 안 style) 보다 앞서게 — 아니면 높이만 줄어 찌그러진다 */
@@ -1830,16 +1830,16 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-title { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 15px; }
 .ink-title svg { width: 18px; height: 18px; }
 .ink-hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--note-muted); transition: color 0.15s; }
-.ink-hint.warn { color: #d9480f; font-weight: 600; }
+.ink-hint.warn { color: var(--ok-orange-500); font-weight: 600; }
 /* 완료: 하나뿐인 주 버튼 = 브랜드 노랑 (취소 없음 — 닫으면 저장). 다크 모드에서도 노랑 그대로 (휴대폰 다크 도구막대의 + 와 같음) */
 .ink-done {
   display: inline-flex; align-items: center; gap: 5px; flex: none; height: 34px; padding: 0 14px 0 11px;
   border: 0; border-radius: 999px; background: var(--brand-yellow); color: var(--on-brand);
   font: inherit; font-weight: 800; font-size: 13.5px; cursor: pointer;
-  box-shadow: 0 2px 6px rgba(17, 17, 17, 0.14), inset 0 0 0 1px rgba(17, 17, 17, 0.06); transition: background-color 0.15s ease-out, transform 0.12s ease-out, box-shadow 0.12s;
+  box-shadow: 0 2px 6px color-mix(in oklab, var(--ok-gray-950) 14%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-950) 6%, transparent); transition: background-color 0.15s ease-out, transform 0.12s ease-out, box-shadow 0.12s;
 }
 .ink-done svg { width: 17px; height: 17px; }
-@media (hover: hover) and (pointer: fine) { .ink-done:hover { background: var(--brand-yellow-hover); box-shadow: 0 4px 12px rgba(17, 17, 17, 0.2), inset 0 0 0 1px rgba(17, 17, 17, 0.06); } }
+@media (hover: hover) and (pointer: fine) { .ink-done:hover { background: var(--brand-yellow-hover); box-shadow: 0 4px 12px color-mix(in oklab, var(--ok-gray-950) 20%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-950) 6%, transparent); } }
 .ink-done:active { transform: scale(0.94); }
 .ink-done:disabled { opacity: 0.6; }
 .ink-dock .ink-done { box-shadow: none; }
@@ -1859,16 +1859,16 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-page { position: relative; }
 .ink-canvas { display: block; touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }
 .ink-canvas.has-cursor, .mk-annot.drawing.has-cursor { cursor: none; }
-.ink-sheet[data-bg="white"] .ink-page { background: #ffffff; }
-.ink-sheet[data-bg="black"] .ink-page { background: #111111; }
+.ink-sheet[data-bg="white"] .ink-page { background: var(--ok-gray-0); }
+.ink-sheet[data-bg="black"] .ink-page { background: var(--ok-gray-950); }
 /* 투명 바탕: 메모 바탕 위에 옅은 모눈 (그린 그림에는 들어가지 않음) */
 .ink-sheet[data-bg="none"] .ink-page { background-image: radial-gradient(color-mix(in srgb, var(--note-text) 16%, transparent) 1px, transparent 1.2px); background-size: 24px 24px; }
-.ink-sheet[data-bg="black"] { --ink-cursor-ring: rgba(255, 255, 255, 0.85); }
+.ink-sheet[data-bg="black"] { --ink-cursor-ring: color-mix(in oklab, var(--ok-gray-0) 85%, transparent); }
 .ink-live { pointer-events: none; }
 /* 붓 미리 보기 (마우스·펜): 지금 색·굵기의 점, 지우개는 점선 고리 */
-.ink-cursor { fill: var(--c, #1f1f1c); fill-opacity: 0.55; stroke: var(--ink-cursor-ring, rgba(255, 255, 255, 0.9)); stroke-width: 1; pointer-events: none; }
+.ink-cursor { fill: var(--c, var(--ok-gray-850)); fill-opacity: 0.55; stroke: var(--ink-cursor-ring, color-mix(in oklab, var(--ok-gray-0) 90%, transparent)); stroke-width: 1; pointer-events: none; }
 .ink-cursor.erase { fill: color-mix(in srgb, var(--note-text) 6%, transparent); fill-opacity: 1; stroke: color-mix(in srgb, var(--note-text) 60%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; }
-.ink-sheet[data-bg="black"] .ink-cursor.erase { stroke: rgba(255, 255, 255, 0.7); }
+.ink-sheet[data-bg="black"] .ink-cursor.erase { stroke: color-mix(in oklab, var(--ok-gray-0) 70%, transparent); }
 /* 처음 안내 */
 .ink-empty {
   position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px;
@@ -1878,21 +1878,21 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-empty b { display: block; font-size: 15px; color: var(--note-text); opacity: 0.7; }
 .ink-empty span { display: block; margin-top: 3px; font-size: 12.5px; }
 .ink-empty.gone { opacity: 0; transform: scale(0.96); }
-.ink-sheet[data-bg="black"] .ink-empty { color: rgba(255, 255, 255, 0.55); }
-.ink-sheet[data-bg="black"] .ink-empty b { color: #fff; }
-.ink-sheet[data-bg="white"] .ink-empty { color: #6b6b66; }
-.ink-sheet[data-bg="white"] .ink-empty b { color: #1f1f1c; }
+.ink-sheet[data-bg="black"] .ink-empty { color: color-mix(in oklab, var(--ok-gray-0) 55%, transparent); }
+.ink-sheet[data-bg="black"] .ink-empty b { color: var(--ok-gray-0); }
+.ink-sheet[data-bg="white"] .ink-empty { color: var(--ok-gray-600); }
+.ink-sheet[data-bg="white"] .ink-empty b { color: var(--ok-gray-850); }
 @keyframes ink-wiggle { 50% { transform: translateX(4px) rotate(-4deg); } }
 
 /* ---------- 떠 있는 도구 막대 (dock) ----------
    메모 색과 상관없이 + 메뉴 위성 단추와 같은 앱 바탕(surface-2)에 앱 글자색 — 어느 메모 색·다크 모드에서도 같은 모양.
    버튼에 검정 바탕은 쓰지 않는다: 하나뿐인 주 버튼(완료)은 브랜드 노랑, 고른 것은 옅은 노랑 + 노랑 테두리 (목록 거르기·메뉴 선택과 같음) */
 .ink-dock, .mk-annot-caption, .mk-doc .mk-ink-edit {
-  --ink-ui-bg: var(--surface-2, #fff);
-  --ink-ui-fg: var(--text-strong, #111);
-  --ink-ui-muted: var(--text-muted, #6b6860);
-  --ink-ui-line: var(--line, #e8e6df);
-  --ink-ui-sel: var(--brand-yellow-soft, #fff6cc);
+  --ink-ui-bg: var(--surface-2, var(--ok-gray-0));
+  --ink-ui-fg: var(--text-strong, var(--ok-gray-950));
+  --ink-ui-muted: var(--text-muted, var(--ok-gray-600));
+  --ink-ui-line: var(--line, var(--ok-gray-150));
+  --ink-ui-sel: var(--brand-yellow-soft, var(--ok-yellow-50));
 }
 .ink-dock {
   position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 3; transform: translateX(-50%);
@@ -1915,13 +1915,13 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-btn:disabled { opacity: 0.3; cursor: default; background: none; transform: none; }
 /* 고른 도구: 옅은 노랑 + 노랑 테두리, 위로 살짝 (한 번 더 누르면 색·굵기) */
 .ink-tool[aria-pressed="true"], .ink-tool[aria-pressed="true"]:hover { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--text-strong); transform: translateY(-2px); }
-.ink-tool-color { position: absolute; left: 9px; right: 9px; bottom: 4px; height: 3px; border-radius: 2px; background: var(--c); box-shadow: 0 0 0 1px rgba(128, 128, 128, 0.35); }
-.ink-style-dot { display: block; width: var(--d, 10px); height: var(--d, 10px); border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.5), 0 0 0 2px var(--ink-ui-bg), 0 0 0 3.5px color-mix(in srgb, var(--ink-ui-fg) 30%, transparent); }
+.ink-tool-color { position: absolute; left: 9px; right: 9px; bottom: 4px; height: 3px; border-radius: 2px; background: var(--c); box-shadow: 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 35%, transparent); }
+.ink-style-dot { display: block; width: var(--d, 10px); height: var(--d, 10px); border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 50%, transparent), 0 0 0 2px var(--ink-ui-bg), 0 0 0 3.5px color-mix(in srgb, var(--ink-ui-fg) 30%, transparent); }
 .ink-style[data-tool="eraser"] .ink-style-dot { background: none; box-shadow: none; border: 1.6px dashed color-mix(in srgb, var(--ink-ui-fg) 70%, transparent); }
 .ink-style[aria-expanded="true"], .ink-bg-btn[aria-expanded="true"] { background: var(--fill-hover); box-shadow: inset 0 0 0 1px var(--ink-ui-line); }
 .ink-bg-swatch { display: block; width: 20px; height: 20px; border-radius: 6px; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink-ui-fg) 45%, transparent); background-image: repeating-conic-gradient(color-mix(in srgb, var(--ink-ui-fg) 14%, transparent) 0 25%, transparent 0 50%); background-size: 8px 8px; }
-.ink-bg-btn[data-bg="white"] .ink-bg-swatch { background: #fff; }
-.ink-bg-btn[data-bg="black"] .ink-bg-swatch { background: #111; }
+.ink-bg-btn[data-bg="white"] .ink-bg-swatch { background: var(--ok-gray-0); }
+.ink-bg-btn[data-bg="black"] .ink-bg-swatch { background: var(--ok-gray-950); }
 .ink-dock .ink-done { margin-left: 4px; height: 36px; }
 
 /* 위로 여는 작은 판 */
@@ -1936,7 +1936,7 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-pop-title { margin-bottom: 6px; font-size: 12px; font-weight: 700; color: var(--ink-ui-muted); }
 .ink-pop-items { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ink-pop-hint { font-size: 12px; color: var(--ink-ui-muted); max-width: 260px; }
-.ink-color { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.45); cursor: pointer; flex: none; transition: transform 0.12s ease-out; }
+.ink-color { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 45%, transparent); cursor: pointer; flex: none; transition: transform 0.12s ease-out; }
 @media (hover: hover) and (pointer: fine) { .ink-color:hover { transform: scale(1.1); } }
 .ink-color[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink-ui-bg), 0 0 0 4px var(--ink-ui-fg); transform: scale(1.05); }
 .ink-size { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 12px; background: var(--fill-tab); cursor: pointer; }
@@ -1946,9 +1946,9 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .ink-bg { display: grid; justify-items: center; gap: 5px; width: 66px; padding: 7px 4px 6px; border: 0; border-radius: 12px; background: none; color: var(--ink-ui-fg); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .ink-bg:hover { background: var(--fill-hover); } }
 .ink-bg[aria-checked="true"] { background: var(--ink-ui-sel); box-shadow: inset 0 0 0 1.5px var(--text-strong); }
-.ink-bg-preview { display: block; width: 40px; height: 30px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.5); background-image: repeating-conic-gradient(color-mix(in srgb, var(--ink-ui-fg) 14%, transparent) 0 25%, transparent 0 50%); background-size: 10px 10px; }
-.ink-bg-white .ink-bg-preview { background: #fff; }
-.ink-bg-black .ink-bg-preview { background: #111; }
+.ink-bg-preview { display: block; width: 40px; height: 30px; border-radius: 8px; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 50%, transparent); background-image: repeating-conic-gradient(color-mix(in srgb, var(--ink-ui-fg) 14%, transparent) 0 25%, transparent 0 50%); background-size: 10px 10px; }
+.ink-bg-white .ink-bg-preview { background: var(--ok-gray-0); }
+.ink-bg-black .ink-bg-preview { background: var(--ok-gray-950); }
 .ink-clear { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .ink-clear svg { width: 16px; height: 16px; }
 .ink-clear:disabled { opacity: 0.4; cursor: default; }
@@ -1981,13 +1981,13 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 .mk-doc .mk-ink .ink-dark-src { display: none; }
 [data-color="charcoal"] .mk-doc .mk-ink.bg-none:has(.ink-dark-src) .ink-light-src { display: none; }
 [data-color="charcoal"] .mk-doc .mk-ink.bg-none .ink-dark-src { display: block; }
-:is([data-color="charcoal"] .mk-annot, .mk-annot-bar[data-color="charcoal"], .ink-sheet[data-color="charcoal"][data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
-:is([data-color="charcoal"] .mk-annot, .mk-annot-bar[data-color="charcoal"], .ink-sheet[data-color="charcoal"][data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
+:is([data-color="charcoal"] .mk-annot, .mk-annot-bar[data-color="charcoal"], .ink-sheet[data-color="charcoal"][data-bg="none"]) .ink-k { fill: var(--ok-gray-50); background: var(--ok-gray-50); }
+:is([data-color="charcoal"] .mk-annot, .mk-annot-bar[data-color="charcoal"], .ink-sheet[data-color="charcoal"][data-bg="none"]) .ink-w { fill: var(--ok-gray-850); background: var(--ok-gray-850); }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .mk-doc .mk-ink.bg-none:has(.ink-dark-src) .ink-light-src { display: none; }
   :where(:root:not([data-theme="light"])) .mk-doc .mk-ink.bg-none .ink-dark-src { display: block; }
-  :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: #f5f4ef; background: #f5f4ef; }
-  :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: #1f1f1c; background: #1f1f1c; }
+  :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-k { fill: var(--ok-gray-50); background: var(--ok-gray-50); }
+  :where(:root:not([data-theme="light"])) :is(.mk-annot, .mk-annot-bar, .ink-sheet[data-bg="none"]) .ink-w { fill: var(--ok-gray-850); background: var(--ok-gray-850); }
 }
 
   
@@ -1995,8 +1995,8 @@ body.mk-block-compact .mk-doc .mk-block-compact-item .mk-link-card { max-height:
 @media print {
   .mk-doc .mk-ink .ink-light-src { display: block !important; }
   .mk-doc .mk-ink .ink-dark-src { display: none !important; }
-  .mk-annot .ink-k { fill: #1f1f1c !important; }
-  .mk-annot .ink-w { fill: #ffffff !important; }
+  .mk-annot .ink-k { fill: var(--ok-gray-850) !important; }
+  .mk-annot .ink-w { fill: var(--ok-gray-0) !important; }
 }
 
 /* ---------- v0.21.0: 콘텐츠 추가 (+) — 위로 위성 단추 (휴대폰 mobile.css 가 손가락 크기로 덮어씀) ---------- */
@@ -2017,12 +2017,12 @@ body.recording .format-bar button.add-btn::after {
 .add-sat:nth-child(6) { animation-delay: 0.1s; }
 .add-sat:nth-child(7) { animation-delay: 0.12s; }
 .add-menu.closing .add-sat { animation: add-sat-in 0.13s var(--ease-out) both; animation-delay: 0s; }
-.add-sat-btn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: var(--surface-2, #fff); color: var(--text-strong, #111); box-shadow: 0 4px 12px rgba(17, 17, 17, 0.16), inset 0 0 0 1px var(--line, rgba(0, 0, 0, 0.08)); transition: transform 0.12s ease-out; }
+.add-sat-btn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: var(--surface-2, var(--ok-gray-0)); color: var(--text-strong, var(--ok-gray-950)); box-shadow: 0 4px 12px color-mix(in oklab, var(--ok-gray-950) 16%, transparent), inset 0 0 0 1px var(--line, color-mix(in oklab, var(--ok-gray-1000) 8%, transparent)); transition: transform 0.12s ease-out; }
 .add-sat-btn svg { width: 17px; height: 17px; }
 .add-sat-btn.rec { background: var(--rec); color: var(--on-rec); }
 .add-sat-btn.ink { background: var(--surface-2); color: var(--text-strong); } /* 목록 ＋ 메뉴와 같게: 펼친 단추는 무채색 */
 .add-sat.active .add-sat-btn.rec { animation: mk-blink 1.2s ease-in-out infinite; }
-.add-sat-label { padding: 3px 9px; border-radius: 8px; background: var(--surface-2, #fff); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+.add-sat-label { padding: 3px 9px; border-radius: 8px; background: var(--surface-2, var(--ok-gray-0)); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 12.5px; white-space: nowrap; }
 .add-sat:focus-visible .add-sat-btn { transform: scale(1.07); }
 @media (hover: hover) and (pointer: fine) { .add-sat:hover .add-sat-btn { transform: scale(1.07); } }
 .add-sat:active .add-sat-btn { transform: scale(0.92); }
@@ -2126,7 +2126,7 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .lock-screen .dialog-actions .btn { width: 100%; min-height: 40px; }
 @media (pointer: coarse) { .lock-field input { min-height: 48px; font-size: 16px; } }
 /* 비밀번호를 넣기 전: 서식 막대·+ 는 숨김 */
-.memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
+.memo-locked #format-bar, .memo-locked var(--ok-teal-200)-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
 .memo-locked #bell-btn, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
 .lock-dialog h2 { margin-bottom: 8px; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
@@ -2156,7 +2156,7 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 body.in-table.bar-hidden .format-bar { margin-bottom: 0; }
 /* 지우기 단추는 늘 살짝 붉게 (마우스를 올리기 전에도 "추가" 와 구별) */
 .table-bar.grouped button.danger:not(:disabled) { color: color-mix(in srgb, var(--danger) 72%, var(--note-text)); }
-.table-bar.grouped button:focus-visible { outline: 2px solid var(--focus-ring, #1c7ed6); outline-offset: 1px; }
+.table-bar.grouped button:focus-visible { outline: 2px solid var(--focus-ring, var(--ok-blue-600)); outline-offset: 1px; }
 /* 덜 쓰는 표 도구(표 · 바꾸기): 넓은 창에선 막대에 그대로, ⋯ 단추는 좁은 창에서만 */
 body > .table-bar .tb-more { display: contents; }
 body > .table-bar .tb-more-btn { display: none; }
@@ -2258,8 +2258,8 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 
 /* ---------- 메모 안 찾기 · 바꾸기 (find-bar.js · find-replace.js) ---------- */
 /* 찾은 곳: 옅은 주황, 지금 자리: 진한 주황 테두리 — 형광펜(노랑)과 헷갈리지 않게 */
-.mk-doc .mk-find-hit { background: rgba(255, 150, 0, 0.28); border-radius: 2px; box-shadow: 0 0 0 1px rgba(255, 150, 0, 0.35); }
-.mk-doc .mk-find-current { background: rgba(255, 120, 0, 0.55); outline: 2px solid #ff7a00; outline-offset: 0; }
+.mk-doc .mk-find-hit { background: color-mix(in oklab, var(--ok-orange-400) 28%, transparent); border-radius: 2px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ok-orange-400) 35%, transparent); }
+.mk-doc .mk-find-current { background: color-mix(in oklab, var(--ok-orange-400) 55%, transparent); outline: 2px solid var(--ok-orange-400); outline-offset: 0; }
 .mk-find-bar {
   /* 위 막대 바로 아래에 끼워 들어가 글을 아래로 민다 (글 위에 떠서 찾은 곳을 가리지 않게)
      넓은 화면(태블릿 · 넓힌 PC 창)에서는 오른쪽에 560px 까지만 — 단추가 멀어지지 않게 */
@@ -2274,7 +2274,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-find-bar[hidden] { display: none; }
 @keyframes mk-find-in { from { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .mk-find-bar { animation: none; } }
-.mk-find-bar { --mk-find-any-hl: repeating-linear-gradient(135deg, #ffec99 0 4px, #b2f2bb 4px 8px, #a5d8ff 8px 12px); }
+.mk-find-bar { --mk-find-any-hl: repeating-linear-gradient(135deg, var(--ok-yellow-100) 0 4px, var(--ok-green-200) 4px 8px, var(--ok-blue-200) 8px 12px); }
 /* 칸 격자: 찾을 말 · 바꿀 말이 같은 열이라 폭이 늘 같다 (엑셀처럼)
    찾기만: 찾을 말 | 서식 | 펼치기 | 닫기
    바꾸기: 찾을 말 | 서식 | 닫기
@@ -2348,17 +2348,17 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
   display: flex; align-items: baseline; gap: 8px; width: 100%; min-height: 30px; padding: 5px 8px;
   border: 0; border-radius: 8px; background: none; color: var(--text-strong); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
-.mk-find-item[aria-current="true"] { background: color-mix(in srgb, #ff7a00 14%, transparent); }
+.mk-find-item[aria-current="true"] { background: color-mix(in srgb, var(--ok-orange-400) 14%, transparent); }
 @media (hover: hover) and (pointer: fine) { .mk-find-item:hover { background: var(--fill-hover); } }
 .mk-find-num { flex: none; min-width: 1.6em; font-size: 11px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
 .mk-find-line { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .mk-find-ctx { color: var(--text-muted); }
-.mk-find-mark { padding: 0 1px; border-radius: 3px; background: rgba(255, 150, 0, 0.32); color: var(--text-strong); font-weight: 700; }
+.mk-find-mark { padding: 0 1px; border-radius: 3px; background: color-mix(in oklab, var(--ok-orange-400) 32%, transparent); color: var(--text-strong); font-weight: 700; }
 /* 서식 고르기: 누른 서식 단추 아래에 */
 .mk-find-pop {
   position: absolute; z-index: 2; width: min(300px, calc(100% - 16px)); box-sizing: border-box;
   display: flex; flex-direction: column; gap: 10px; padding: 12px;
-  border-radius: 14px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), 0 10px 28px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08);
+  border-radius: 14px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line), 0 10px 28px color-mix(in oklab, var(--ok-gray-1000) 16%, transparent), 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
   animation: mk-find-in 0.14s var(--ease-out);
 }
 .mk-find-pop[hidden] { display: none; }
@@ -2378,13 +2378,13 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-find-choice[hidden] { display: none; }
 .mk-find-swatch {
   width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
-  background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  background: var(--sw); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent);
   transition: transform 0.16s var(--ease-out), box-shadow 0.15s ease-out;
 }
 /* 글자 색은 동그라미 대신 그 색의 "가" 로 (형광펜 바탕색과 헷갈리지 않게) */
 .mk-find-swatch.ink { display: inline-grid; place-items: center; background: var(--fill-tab); color: var(--sw); font-size: 14px; font-weight: 800; }
 .mk-find-swatch.ink::before { content: '가'; }
-.mk-find-swatch[aria-checked="true"] { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 0 0 2px var(--surface), 0 0 0 4px var(--text-strong); }
+.mk-find-swatch[aria-checked="true"] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent), 0 0 0 2px var(--surface), 0 0 0 4px var(--text-strong); }
 .mk-find-swatch:active { transform: scale(0.94); }
 .mk-find-clear { align-self: flex-start; }
 .mk-find-clear[hidden] { display: none; }
@@ -2400,7 +2400,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
   position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; line-height: 0;
   width: min(100%, 380px); border-radius: var(--radius-lg); overflow: hidden; counter-reset: mk-album;
 }
-.mk-doc img.mk-album-img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; margin: 0; border-radius: 0; outline: none; cursor: zoom-in; counter-increment: mk-album; background: #fff; }
+.mk-doc img.mk-album-img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; margin: 0; border-radius: 0; outline: none; cursor: zoom-in; counter-increment: mk-album; background: var(--ok-gray-0); }
 .mk-doc[contenteditable="true"] img.mk-album-img { cursor: zoom-in; }
 /* 숨은 img · 줄 끝 br 이 격자 칸을 차지하지 않게 (그림만 든 줄 표시가 늦게 붙어도) */
 .mk-doc p:has(> img.mk-album-img) > :is(img.ProseMirror-separator, br) { display: none !important; } /* prosemirror.css 가 숨은 img 를 display: inline !important 로 둔다 */
@@ -2417,7 +2417,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 }
 .mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img {
   position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; box-sizing: border-box;
-  border: 5px solid #fff; border-radius: 4px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16), 0 8px 18px -6px rgba(0, 0, 0, 0.28);
+  border: 5px solid var(--ok-gray-0); border-radius: 4px; box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 16%, transparent), 0 8px 18px -6px color-mix(in oklab, var(--ok-gray-1000) 28%, transparent);
   opacity: 0; pointer-events: none; z-index: 0; transform-origin: 50% 60%; transition: transform 0.24s var(--ease-out, ease-out);
 }
 .mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img))) > img.mk-album-img:nth-child(1 of .mk-album-img) { position: relative; inset: auto; height: auto; aspect-ratio: 1; opacity: 1; pointer-events: auto; z-index: 3; }
@@ -2426,13 +2426,13 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 /* 장 수 (counter 는 줄 끝에서 모든 장을 센 값) */
 .mk-doc p:is(:has(> img.mk-album-img:nth-child(5 of .mk-album-img)), :has(> img.mk-album-page:nth-child(2 of .mk-album-img)))::after {
   content: counter(mk-album) '장'; position: absolute; right: -10px; bottom: -12px; z-index: 4;
-  padding: 5px 9px; border-radius: 999px; background: rgba(24, 24, 22, 0.8); color: #fff;
+  padding: 5px 9px; border-radius: 999px; background: color-mix(in oklab, var(--ok-gray-900) 80%, transparent); color: var(--ok-gray-0);
   font-size: 12.5px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; pointer-events: none;
 }
 /* 문서: 2쪽부터 종이 묶음 — 첫 쪽 전체(종이 비율), 뒤 장은 기울이지 않고 오른쪽 아래로 가지런히 */
 .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)) { width: min(66%, 210px); }
 .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)) > img.mk-album-img {
-  border: 0; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1), 0 3px 10px -4px rgba(0, 0, 0, 0.3); object-fit: cover; object-position: top;
+  border: 0; border-radius: 2px; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ok-gray-1000) 10%, transparent), 0 3px 10px -4px color-mix(in oklab, var(--ok-gray-1000) 30%, transparent); object-fit: cover; object-position: top;
 }
 .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)) > img.mk-album-img:nth-child(1 of .mk-album-img) { aspect-ratio: 1 / 1.414; }
 .mk-doc p:has(> img.mk-album-page:nth-child(2 of .mk-album-img)) > img.mk-album-img:nth-child(2 of .mk-album-img) { transform: translate(7px, 7px); }
@@ -2447,60 +2447,60 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 }
 
 /* 묶음 사진 크게 보기 (album-viewer.js) — 테두리 없이 전체 화면, 헤더·테일은 이미지 위에 활성 상태에서만 표시(2초 뒤 숨김) */
-.mk-album-view { position: fixed; inset: 0; z-index: 100000; background: #000; color: #fff; animation: mk-fade-in 0.15s ease-out; -webkit-app-region: no-drag; } /* PC: 메모 창 위 막대의 창 끌기 영역이 덮은 사진 보기 위에서도 살아 있어 위 단추가 눌리지 않았다 */
+.mk-album-view { position: fixed; inset: 0; z-index: 100000; background: var(--ok-gray-1000); color: var(--ok-gray-0); animation: mk-fade-in 0.15s ease-out; -webkit-app-region: no-drag; } /* PC: 메모 창 위 막대의 창 끌기 영역이 덮은 사진 보기 위에서도 살아 있어 위 단추가 눌리지 않았다 */
 /* 머리줄: PDF 보기와 같은 유리 막대 [장 수 · 그린 장] …… [돌리기 · 풀기 · 저장 · 공유 · 삭제 · 그리기] | [닫기]
    PC 는 늘 보인다 — 창을 옮길 곳이자 (보기가 메모 창 위 막대를 덮는다) 상용 사진 보기처럼 도구가 제자리에. 휴대폰은 누를 때만 (몰입) */
 .mk-album-head {
   position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 2px;
   min-height: calc(52px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 6px 0 14px; box-sizing: border-box;
-  background: rgba(28, 28, 30, 0.82); backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06); transition: opacity 0.2s ease-out;
+  background: color-mix(in oklab, var(--ok-gray-900) 82%, transparent); backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px);
+  border-bottom: 1px solid color-mix(in oklab, var(--ok-gray-0) 6%, transparent); transition: opacity 0.2s ease-out;
   -webkit-app-region: drag;
 }
 .mk-album-head button { -webkit-app-region: no-drag; } /* 머리줄의 빈 곳으로 창을 옮기고, 단추는 그대로 */
-.mk-album-sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: rgba(255, 255, 255, 0.14); }
+.mk-album-sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: color-mix(in oklab, var(--ok-gray-0) 14%, transparent); }
 .mk-album-view.inking .mk-album-sep { display: none; }
-.mk-album-count { font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.9; white-space: nowrap; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
+.mk-album-count { font-size: 14px; font-variant-numeric: tabular-nums; opacity: 0.9; white-space: nowrap; text-shadow: 0 1px 3px color-mix(in oklab, var(--ok-gray-1000) 60%, transparent); }
 .mk-album-gap { flex: 1; }
-.mk-album-inked { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(255, 204, 0, 0.22); color: #ffd84d; font-size: 12px; }
+.mk-album-inked { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: color-mix(in oklab, var(--ok-yellow-300) 22%, transparent); color: var(--ok-yellow-300); font-size: 12px; }
 .mk-album-inked svg { width: 13px; height: 13px; }
 .mk-album-inked[hidden] { display: none; }
 .mk-album-icon { width: 36px; padding: 0; justify-content: center; }
 .mk-album-btn:disabled { opacity: 0.45; cursor: progress; } /* 돌리는 중 */
 .mk-album-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 /* 아래 장 목록 (이미지 위 오버레이) */
-.mk-album-strip { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3; display: flex; gap: 6px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent); overflow-x: auto; scrollbar-width: thin; justify-content: safe center; transition: opacity 0.2s ease-out; }
+.mk-album-strip { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3; display: flex; gap: 6px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, color-mix(in oklab, var(--ok-gray-1000) 62%, transparent), transparent); overflow-x: auto; scrollbar-width: thin; justify-content: safe center; transition: opacity 0.2s ease-out; }
 .mk-album-strip[hidden] { display: none; }
 .mk-album-view:not(.ui-active):not(.inking) :is(.mk-album-strip, .mk-album-nav) { opacity: 0; pointer-events: none; }
 @media (pointer: coarse) { .mk-album-view:not(.ui-active):not(.inking) .mk-album-head { opacity: 0; pointer-events: none; } }
 /* PC: 머리줄이 늘 있으니 사진은 그 아래부터 (머리줄에 가리지 않게) */
 @media (hover: hover) and (pointer: fine) { .mk-album-stage { top: 44px; } }
-.mk-album-thumb { position: relative; flex: none; width: 46px; height: 46px; padding: 0; border: 2px solid transparent; border-radius: 6px; background: #222; opacity: 0.6; cursor: pointer; overflow: hidden; }
+.mk-album-thumb { position: relative; flex: none; width: 46px; height: 46px; padding: 0; border: 2px solid transparent; border-radius: 6px; background: var(--ok-gray-850); opacity: 0.6; cursor: pointer; overflow: hidden; }
 .mk-album-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
 .mk-album-thumb:hover { opacity: 0.85; }
-.mk-album-thumb.on { opacity: 1; border-color: var(--brand-yellow, #ffcc00); }
-.mk-album-thumb.inked::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--brand-yellow, #ffcc00); box-shadow: 0 0 0 1.5px #111; }
+.mk-album-thumb.on { opacity: 1; border-color: var(--brand-yellow, var(--ok-yellow-300)); }
+.mk-album-thumb.inked::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--brand-yellow, var(--ok-yellow-300)); box-shadow: 0 0 0 1.5px var(--ok-gray-950); }
 /* 알림 한 줄 (저장했어요 · 삭제 되돌리기 · 처음 한 번 안내) */
-.mk-album-note { position: absolute; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 10px 18px; border-radius: 999px; background: rgba(255, 255, 255, 0.95); color: #1f1f1c; font-size: 13px; line-height: 1.45; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+.mk-album-note { position: absolute; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 10px 18px; border-radius: 999px; background: color-mix(in oklab, var(--ok-gray-0) 95%, transparent); color: var(--ok-gray-850); font-size: 13px; line-height: 1.45; box-shadow: 0 6px 20px color-mix(in oklab, var(--ok-gray-1000) 35%, transparent); }
 .mk-album-note[hidden] { display: none; }
-.mk-album-note-btn { flex: none; border: 0; background: none; color: #8a6a00; font: inherit; font-weight: 700; cursor: pointer; padding: 2px 0; }
+.mk-album-note-btn { flex: none; border: 0; background: none; color: var(--ok-yellow-700); font: inherit; font-weight: 700; cursor: pointer; padding: 2px 0; }
 /* 단추: 막대 안에서 하나의 도구 줄로 (단추마다 따로 뜬 검은 동그라미 대신) — 올리면 옅게 */
-.mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 38px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: #f5f5f7; font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: background 0.12s, color 0.12s, transform 0.12s ease-out; }
+.mk-album-btn { display: inline-flex; align-items: center; gap: 5px; height: 38px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--ok-gray-50); font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: background 0.12s, color 0.12s, transform 0.12s ease-out; }
 .mk-album-btn:active { transform: scale(0.94); }
-@media (hover: hover) { .mk-album-btn:hover { background: rgba(255, 255, 255, 0.14); } }
-.mk-album-btn:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 2px; }
+@media (hover: hover) { .mk-album-btn:hover { background: color-mix(in oklab, var(--ok-gray-0) 14%, transparent); } }
+.mk-album-btn:focus-visible { outline: 2px solid var(--brand-yellow, var(--ok-yellow-300)); outline-offset: 2px; }
 .mk-album-btn svg { width: 18px; height: 18px; }
 /* 그리기: 메모킹 노랑 (보기에서 할 수 있는 주된 일) */
-.mk-album-draw { margin-left: 4px; background: rgba(255, 204, 0, 0.16); color: #ffd84d; font-weight: 650; }
-@media (hover: hover) { .mk-album-draw:hover { background: rgba(255, 204, 0, 0.26); } }
+.mk-album-draw { margin-left: 4px; background: color-mix(in oklab, var(--ok-yellow-300) 16%, transparent); color: var(--ok-yellow-300); font-weight: 650; }
+@media (hover: hover) { .mk-album-draw:hover { background: color-mix(in oklab, var(--ok-yellow-300) 26%, transparent); } }
 /* 닫기: 올리면 Windows 창 닫기처럼 빨강 (목록 창 창 단추 · PDF 보기와 같은 색) */
-@media (hover: hover) { .mk-album-close:hover { background: #c42b1c; color: #fff; } }
+@media (hover: hover) { .mk-album-close:hover { background: var(--ok-red-600); color: var(--ok-gray-0); } }
 .mk-album-stage { position: absolute; inset: 0; margin: 0; overflow: hidden; touch-action: none; } /* 테두리 여백 없이 화면 전체 */
 /* 장 전체가 화면 안에 (세로로 긴 장도) — 그림 상자 = 보이는 그림이어야 그리기판이 그 위에 꼭 맞는다 */
 .mk-album-big { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; background: transparent; user-select: none; -webkit-user-drag: none; transform-origin: 0 0; }
 .mk-album-view.zoomed .mk-album-stage { cursor: grab; }
 .mk-album-view.zoomed .mk-album-stage:active { cursor: grabbing; }
-.mk-album-zoom { position: absolute; left: 50%; top: calc(64px + env(safe-area-inset-top)); z-index: 3; transform: translateX(-50%); padding: 4px 12px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.mk-album-zoom { position: absolute; left: 50%; top: calc(64px + env(safe-area-inset-top)); z-index: 3; transform: translateX(-50%); padding: 4px 12px; border: 0; border-radius: 999px; background: color-mix(in oklab, var(--ok-gray-1000) 60%, transparent); color: var(--ok-gray-0); font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
 .mk-album-zoom[hidden] { display: none; }
 /* 좁은 휴대폰: 위 단추 줄이 화면 밖으로 밀려 오른쪽 끝(닫기)을 누를 수 없던 것 — 간격을 줄이고 "그리기" 는 그림만 */
 @media (max-width: 440px) {
@@ -2512,12 +2512,12 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 .mk-album-count { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .mk-album-nav {
   position: absolute; top: 50%; z-index: 3; width: 44px; height: 44px; margin-top: -22px; border: 0; border-radius: 50%;
-  background: rgba(28, 28, 30, 0.72); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-  color: #fff; cursor: pointer; display: grid; place-items: center; transition: opacity 0.2s ease-out, background 0.12s;
+  background: color-mix(in oklab, var(--ok-gray-900) 72%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px color-mix(in oklab, var(--ok-gray-1000) 35%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-0) 10%, transparent);
+  color: var(--ok-gray-0); cursor: pointer; display: grid; place-items: center; transition: opacity 0.2s ease-out, background 0.12s;
 }
-.mk-album-nav:hover { background: rgba(58, 58, 60, 0.9); }
-.mk-album-nav:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 2px; }
+.mk-album-nav:hover { background: color-mix(in oklab, var(--ok-gray-800) 90%, transparent); }
+.mk-album-nav:focus-visible { outline: 2px solid var(--brand-yellow, var(--ok-yellow-300)); outline-offset: 2px; }
 .mk-album-nav svg { width: 20px; height: 20px; }
 .mk-album-nav.prev { left: 8px; }
 .mk-album-nav.prev svg { transform: rotate(180deg); }
@@ -2528,7 +2528,7 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 /* 손가락 화면(휴대폰)은 밀어서 넘기므로 앞 · 다음 단추 없이 장을 넓게 — PC 의 좁은 메모 창은 단추를 둔다 */
 @media (pointer: coarse) { .mk-album-nav { display: none; } }
 @media (pointer: fine) and (max-width: 420px) { .mk-album-nav { width: 34px; height: 34px; margin-top: -17px; } .mk-album-nav.prev { left: 5px; } .mk-album-nav.next { right: 5px; } }
-.mk-uploading { margin-right: 6px; font-size: 12px; color: var(--muted, #888); }
+.mk-uploading { margin-right: 6px; font-size: 12px; color: var(--muted, var(--ok-gray-500)); }
 @media print { .mk-album-view { display: none !important; } }
 
 /* ---------- 사진 · 동영상 크기 조절 (media-resize.js) ----------
@@ -2545,16 +2545,16 @@ body.content-fixed .format-items :is([data-cmd], [data-action="color"], [data-ac
 }
 /* 오른쪽 아래 모서리에 흰 동그라미 하나 — 잡으면 조금 커지고 그림자가 짙어진다 */
 .mk-resize-handle::before {
-  content: ""; width: 16px; height: 16px; border-radius: 50%; background: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.3);
+  content: ""; width: 16px; height: 16px; border-radius: 50%; background: var(--ok-gray-0);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ok-gray-1000) 16%, transparent), 0 2px 8px color-mix(in oklab, var(--ok-gray-1000) 30%, transparent);
   transition: transform 0.15s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.15s;
 }
 .mk-resize.clipped .mk-resize-handle { visibility: hidden; }
 .mk-resize.video .mk-resize-handle { right: -26px; bottom: -26px; } /* 동영상 재생기의 전체 화면 단추가 오른쪽 아래에 있다 */
-.mk-resize-handle:hover::before, .mk-resize.dragging .mk-resize-handle::before { transform: scale(1.18); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.22), 0 3px 12px rgba(0, 0, 0, 0.36); }
+.mk-resize-handle:hover::before, .mk-resize.dragging .mk-resize-handle::before { transform: scale(1.18); box-shadow: 0 0 0 1px color-mix(in oklab, var(--ok-gray-1000) 22%, transparent), 0 3px 12px color-mix(in oklab, var(--ok-gray-1000) 36%, transparent); }
 .mk-resize-badge {
   position: absolute; left: 50%; top: 10px; transform: translate(-50%, -4px); padding: 4px 10px; border-radius: 999px;
-  background: rgba(17, 17, 17, 0.78); backdrop-filter: blur(8px); color: #fff; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: color-mix(in oklab, var(--ok-gray-950) 78%, transparent); backdrop-filter: blur(8px); color: var(--ok-gray-0); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
   opacity: 0; transition: opacity 0.15s, transform 0.15s cubic-bezier(0.23, 1, 0.32, 1); white-space: nowrap;
 }
 .mk-resize.dragging .mk-resize-badge { opacity: 1; transform: translate(-50%, 0); }
@@ -2564,9 +2564,9 @@ body.mk-resizing, body.mk-resizing * { cursor: nwse-resize !important; user-sele
 @media (prefers-reduced-motion: reduce) { .mk-resize, .mk-resize-handle::before, .mk-resize-badge { transition: none; } }
 /* 크기를 줄인 그림의 줄은 칸 폭 그대로라(위) 들기 · 맞바꿀 자리 · 놓은 자리 · 지우기 표시가 줄 전체(원래 크기)로 떴다 → 그림에만 */
 .mk-doc p:has(> .mk-image.mk-sized):is(.mk-block-lift, .mk-block-swap-target, .mk-block-dropped, .mk-delete-target, .mk-block-pressing) { background: none; box-shadow: none; outline: none; animation: none; }
-.mk-doc p.mk-block-lift > .mk-image.mk-sized { border-radius: 8px; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24), 0 0 0 4px var(--note-bg), 0 0 0 6px var(--note-text); }
+.mk-doc p.mk-block-lift > .mk-image.mk-sized { border-radius: 8px; box-shadow: 0 14px 30px color-mix(in oklab, var(--ok-gray-1000) 24%, transparent), 0 0 0 4px var(--note-bg), 0 0 0 6px var(--note-text); }
 body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow: none; }
-.mk-doc p.mk-block-swap-target > .mk-image.mk-sized { border-radius: 8px; outline: 2px dashed #7a4dff; outline-offset: 2px; }
+.mk-doc p.mk-block-swap-target > .mk-image.mk-sized { border-radius: 8px; outline: 2px dashed var(--ok-violet-600); outline-offset: 2px; }
 .mk-doc p.mk-block-dropped > .mk-image.mk-sized { border-radius: 8px; animation: mk-dropped-img 0.7s ease-out; }
 @keyframes mk-dropped-img { 0% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--note-text) 16%, transparent); } 100% { box-shadow: 0 0 0 6px transparent; } }
 .mk-doc p.mk-delete-target > .mk-image.mk-sized { outline: 1.5px solid color-mix(in srgb, var(--rec) 55%, transparent); outline-offset: 3px; border-radius: var(--radius-lg); }
@@ -2574,12 +2574,12 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 /* 막 뜬 내용 단추 줄: 누름을 받지 않는 0.35초 동안 흐리게 (delete-button.js mk-arming) */
 :is(.mk-delete-btn, .mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-share-btn, .mk-open-btn).mk-arming { opacity: 0.45; transition: opacity 0.2s ease-out; }
 /* 장 순서 바꾸기: 들린 장 (album-viewer.js) */
-.mk-album-thumb.lifting { transform: scale(1.15); z-index: 1; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5); transition: transform 0.12s ease-out; }
+.mk-album-thumb.lifting { transform: scale(1.15); z-index: 1; box-shadow: 0 6px 16px color-mix(in oklab, var(--ok-gray-1000) 50%, transparent); transition: transform 0.12s ease-out; }
 /* 잠긴 메모: 지문 · 얼굴로 열기 (휴대폰, lock-ui.js) */
 .lock-screen .lock-bio { margin-top: 10px; width: 100%; }
 /* ---------- 앱 안 PDF 미리보기 (pdf-viewer.js) ---------- */
 .mk-pdf-view {
-  --pdf-bg: #1c1c1e; --pdf-bar: rgba(28, 28, 30, 0.82); --pdf-fg: #f5f5f7; --pdf-muted: rgba(245, 245, 247, 0.62); --pdf-btn: rgba(255, 255, 255, 0.08); --pdf-btn-hover: rgba(255, 255, 255, 0.16);
+  --pdf-bg: var(--ok-gray-900); --pdf-bar: color-mix(in oklab, var(--ok-gray-900) 82%, transparent); --pdf-fg: var(--ok-gray-50); --pdf-muted: color-mix(in oklab, var(--ok-gray-50) 62%, transparent); --pdf-btn: color-mix(in oklab, var(--ok-gray-0) 8%, transparent); --pdf-btn-hover: color-mix(in oklab, var(--ok-gray-0) 16%, transparent);
   position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: var(--pdf-bg); color: var(--pdf-fg);
   animation: mk-pdf-in 0.18s ease-out; -webkit-app-region: no-drag; font-family: inherit;
 }
@@ -2590,16 +2590,16 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-pdf-bar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 2px;
   height: calc(52px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 6px 0 14px; box-sizing: border-box; background: var(--pdf-bar);
-  backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px); border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: saturate(160%) blur(18px); -webkit-backdrop-filter: saturate(160%) blur(18px); border-bottom: 1px solid color-mix(in oklab, var(--ok-gray-0) 6%, transparent);
   -webkit-app-region: drag; /* PC: 보기가 메모 창 위 막대(창 끌기)를 덮으므로 이 막대로 창을 옮긴다 — 단추는 아래에서 no-drag */
 }
 .mk-pdf-bar button { -webkit-app-region: no-drag; }
 /* 메모 속 PDF 썸네일의 "PDF" 표와 같은 빨강 — 어떤 파일을 보는지 한눈에 */
-.mk-pdf-badge { flex: none; padding: 2px 8px; border-radius: 999px; background: #c4282e; color: #fff; font-size: 10.5px; font-weight: 800; line-height: 1.5; letter-spacing: 0.02em; }
+.mk-pdf-badge { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--ok-red-600); color: var(--ok-gray-0); font-size: 10.5px; font-weight: 800; line-height: 1.5; letter-spacing: 0.02em; }
 .mk-pdf-heading { flex: 1; min-width: 0; padding: 0 10px; line-height: 1.25; }
 .mk-pdf-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 650; font-size: 14.5px; letter-spacing: -0.01em; }
 .mk-pdf-sub { margin-top: 1px; font-size: 11.5px; color: var(--pdf-muted); font-variant-numeric: tabular-nums; }
-.mk-pdf-sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: rgba(255, 255, 255, 0.14); }
+.mk-pdf-sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: color-mix(in oklab, var(--ok-gray-0) 14%, transparent); }
 .mk-pdf-ibtn {
   flex: none; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 999px; /* One UI: 둥근 그림 단추 */
   background: transparent; color: var(--pdf-fg); cursor: pointer; transition: background 0.12s, color 0.12s, transform 0.12s ease-out;
@@ -2608,27 +2608,27 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-pdf-ibtn:active { transform: scale(0.92); }
 @media (hover: hover) { .mk-pdf-ibtn:hover { background: var(--pdf-btn-hover); } }
 /* 닫기: 오른쪽 끝, 올리면 Windows 창 닫기처럼 빨강 (목록 창 창 단추와 같은 색) */
-@media (hover: hover) { .mk-pdf-close:hover { background: #c42b1c; color: #fff; } }
-.mk-pdf-ibtn:focus-visible, .mk-pdf-pill:focus-visible, .mk-pdf-zoomval:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 2px; }
+@media (hover: hover) { .mk-pdf-close:hover { background: var(--ok-red-600); color: var(--ok-gray-0); } }
+.mk-pdf-ibtn:focus-visible, .mk-pdf-pill:focus-visible, .mk-pdf-zoomval:focus-visible { outline: 2px solid var(--brand-yellow, var(--ok-yellow-300)); outline-offset: 2px; }
 /* 왼쪽 도구 줄: 고르기 · 펜 · 형광펜 · 지우개 — 늘 같은 자리, 고른 도구는 메모킹 노랑 */
 .mk-pdf-rail {
   position: absolute; left: 10px; top: 50%; z-index: 3; transform: translateY(-50%);
   display: flex; flex-direction: column; gap: 2px; padding: 5px; border-radius: 999px;
   background: var(--pdf-bar); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 24px color-mix(in oklab, var(--ok-gray-1000) 35%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-0) 8%, transparent);
   animation: mk-pdf-rail-in 0.22s ease-out;
 }
 @keyframes mk-pdf-rail-in { from { opacity: 0; transform: translate(-6px, -50%); } }
 .mk-pdf-rail .mk-pdf-tool { width: 38px; height: 38px; }
 .mk-pdf-rail .mk-pdf-tool:first-child { margin-bottom: 7px; position: relative; } /* 고르기 | 그리기 도구 사이 가는 줄 */
-.mk-pdf-rail .mk-pdf-tool:first-child::after { content: ""; position: absolute; left: 9px; right: 9px; bottom: -5px; height: 1px; background: rgba(255, 255, 255, 0.14); }
-.mk-pdf-tool[aria-pressed="true"] { background: var(--brand-yellow, #ffcc00); color: #1a1a1a; }
-@media (hover: hover) { .mk-pdf-tool[aria-pressed="true"]:hover { background: var(--brand-yellow, #ffcc00); } }
+.mk-pdf-rail .mk-pdf-tool:first-child::after { content: ""; position: absolute; left: 9px; right: 9px; bottom: -5px; height: 1px; background: color-mix(in oklab, var(--ok-gray-0) 14%, transparent); }
+.mk-pdf-tool[aria-pressed="true"] { background: var(--brand-yellow, var(--ok-yellow-300)); color: var(--ok-gray-900); }
+@media (hover: hover) { .mk-pdf-tool[aria-pressed="true"]:hover { background: var(--brand-yellow, var(--ok-yellow-300)); } }
 /* 그리는 동안 색 · 굵기 · 되돌리기 · 완료는 아래 공용 막대 — 도구 고르기는 왼쪽 줄이 맡는다 */
 .mk-pdf-view .ink-dock .ink-tools { display: none; }
 .mk-pdf-view[data-mode="ink"] .mk-pdf-zoombar, .mk-pdf-view[data-mode="ink"] .mk-pdf-pill { display: none; }
 /* 쪽들 — 양옆 여백은 쪽 폭 계산(pdf-viewer.js sidePad)이 그대로 읽는다. 도구 줄이 있으면 그 자리만큼 */
-.mk-pdf-scroll { flex: 1; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
+.mk-pdf-scroll { flex: 1; overflow: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--ok-gray-0) 25%, transparent) transparent; }
 .mk-pdf-pages { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: calc(68px + env(safe-area-inset-top)) 8px calc(96px + env(safe-area-inset-bottom)); min-width: min-content; }
 .mk-pdf-view.has-rail .mk-pdf-pages { padding-left: 60px; }
 /* 좁은 화면(휴대폰): 쪽은 가운데 꽉 차게, 도구 줄은 그 위에 떠 있게 (도구 자리만큼 쪽이 오른쪽으로 밀려 비뚤어 보이던 것) */
@@ -2639,28 +2639,28 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 }
 @media (prefers-reduced-motion: reduce) { .mk-pdf-rail { animation: none; } }
 .mk-pdf-page {
-  position: relative; flex: none; border-radius: 4px; overflow: hidden; background: #fff; /* 문서 쪽은 거의 각지게 — 둥글리면 쪽 모서리 내용이 잘린다 */
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 28px rgba(0, 0, 0, 0.35);
+  position: relative; flex: none; border-radius: 4px; overflow: hidden; background: var(--ok-gray-0); /* 문서 쪽은 거의 각지게 — 둥글리면 쪽 모서리 내용이 잘린다 */
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 35%, transparent), 0 8px 28px color-mix(in oklab, var(--ok-gray-1000) 35%, transparent);
 }
 /* 그리기 전: 반짝이는 빈 쪽 */
-.mk-pdf-page:not(.drawn) { background: linear-gradient(100deg, #f1f1f1 30%, #fafafa 50%, #f1f1f1 70%) 0 0 / 300% 100%; animation: mk-pdf-shimmer 1.4s linear infinite; }
+.mk-pdf-page:not(.drawn) { background: linear-gradient(100deg, var(--ok-gray-50) 30%, var(--ok-gray-25) 50%, var(--ok-gray-50) 70%) 0 0 / 300% 100%; animation: mk-pdf-shimmer 1.4s linear infinite; }
 @keyframes mk-pdf-shimmer { to { background-position: -150% 0; } }
 @media (prefers-reduced-motion: reduce) { .mk-pdf-page:not(.drawn) { animation: none; } .mk-pdf-view, .mk-pdf-view.closing { animation: none; } }
-.mk-pdf-page.failed::after { content: attr(data-msg); position: absolute; inset: 0; display: grid; place-items: center; color: #777; font-size: 13px; }
+.mk-pdf-page.failed::after { content: attr(data-msg); position: absolute; inset: 0; display: grid; place-items: center; color: var(--ok-gray-550); font-size: 13px; }
 .mk-pdf-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .mk-pdf-ink { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .mk-pdf-view[data-mode="ink"] .mk-pdf-ink { pointer-events: auto; touch-action: none; cursor: crosshair; }
-.mk-pdf-view[data-mode="ink"] .mk-pdf-page { box-shadow: 0 0 0 2px rgba(255, 204, 0, 0.55), 0 8px 28px rgba(0, 0, 0, 0.35); }
-.mk-pdf-ink .ink-cursor { vector-effect: non-scaling-stroke; --note-text: #1f1f1c; }
+.mk-pdf-view[data-mode="ink"] .mk-pdf-page { box-shadow: 0 0 0 2px color-mix(in oklab, var(--ok-yellow-300) 55%, transparent), 0 8px 28px color-mix(in oklab, var(--ok-gray-1000) 35%, transparent); }
+.mk-pdf-ink .ink-cursor { vector-effect: non-scaling-stroke; --note-text: var(--ok-gray-850); }
 .mk-pdf-view[data-mode="ink"] .mk-pdf-ink.has-cursor { cursor: none; }
 .mk-pdf-note { display: flex; align-items: center; justify-content: center; gap: 10px; padding: calc(120px + env(safe-area-inset-top)) 16px 40px; color: var(--pdf-muted); font-size: 14px; }
-.mk-pdf-note.error { color: #ffb4b4; }
-.mk-pdf-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2); border-top-color: var(--pdf-fg); animation: mk-pdf-spin 0.8s linear infinite; }
+.mk-pdf-note.error { color: var(--ok-red-200); }
+.mk-pdf-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid color-mix(in oklab, var(--ok-gray-0) 20%, transparent); border-top-color: var(--pdf-fg); animation: mk-pdf-spin 0.8s linear infinite; }
 @keyframes mk-pdf-spin { to { transform: rotate(360deg); } }
 /* 아래: 쪽 번호 알약 · 확대 막대 · 알림 */
 .mk-pdf-pill, .mk-pdf-zoombar, .mk-pdf-toast {
   position: absolute; z-index: 3; bottom: calc(18px + env(safe-area-inset-bottom)); background: var(--pdf-bar); color: var(--pdf-fg);
-  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 6px 24px color-mix(in oklab, var(--ok-gray-1000) 35%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-0) 8%, transparent);
 }
 .mk-pdf-pill {
   left: 50%; transform: translate(-50%, 8px); padding: 7px 14px; border: 0; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600;
@@ -2668,7 +2668,7 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 }
 .mk-pdf-view.ready .mk-pdf-pill.show, .mk-pdf-pill.editing { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 @media (hover: hover) { .mk-pdf-view.ready:hover .mk-pdf-pill { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; } }
-.mk-pdf-goto { width: 3.2em; padding: 0 2px; border: 0; border-bottom: 1.5px solid var(--brand-yellow, #ffcc00); background: transparent; color: inherit; font: inherit; text-align: right; outline: none; -moz-appearance: textfield; }
+.mk-pdf-goto { width: 3.2em; padding: 0 2px; border: 0; border-bottom: 1.5px solid var(--brand-yellow, var(--ok-yellow-300)); background: transparent; color: inherit; font: inherit; text-align: right; outline: none; -moz-appearance: textfield; }
 .mk-pdf-goto::-webkit-inner-spin-button { display: none; }
 .mk-pdf-zoombar { right: 16px; display: none; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; }
 @media (hover: hover) and (pointer: fine) { .mk-pdf-view.ready .mk-pdf-zoombar { display: flex; } }
@@ -2686,28 +2686,28 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-pdf-view { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .mk-pdf-view[data-mode="view"] .mk-pdf-page.drawn { cursor: text; }
 .mk-pdf-sel { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; }
-.mk-pdf-sel > div { position: absolute; background: rgba(56, 132, 255, 0.32); border-radius: 1px; }
-.mk-pdf-sel > div.area { background: rgba(56, 132, 255, 0.12); outline: 1.5px dashed rgba(36, 112, 235, 0.9); outline-offset: -1px; border-radius: 2px; }
+.mk-pdf-sel > div { position: absolute; background: color-mix(in oklab, var(--ok-blue-500) 32%, transparent); border-radius: 1px; }
+.mk-pdf-sel > div.area { background: color-mix(in oklab, var(--ok-blue-500) 12%, transparent); outline: 1.5px dashed color-mix(in oklab, var(--ok-blue-600) 90%, transparent); outline-offset: -1px; border-radius: 2px; }
 .mk-pdf-selframe { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
-.mk-pdf-selframe::before { content: ""; width: 18px; height: 14px; border: 2px solid #ff6b6f; border-radius: 2px; }
-@media (hover: hover) { .mk-pdf-selframe:hover { background: rgba(255, 255, 255, 0.14); } }
-.mk-pdf-selframe:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 1px; }
+.mk-pdf-selframe::before { content: ""; width: 18px; height: 14px; border: 2px solid var(--ok-red-400); border-radius: 2px; }
+@media (hover: hover) { .mk-pdf-selframe:hover { background: color-mix(in oklab, var(--ok-gray-0) 14%, transparent); } }
+.mk-pdf-selframe:focus-visible { outline: 2px solid var(--brand-yellow, var(--ok-yellow-300)); outline-offset: 1px; }
 .mk-pdf-selmenu {
   position: absolute; left: 0; top: 0; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 4px;
-  border-radius: 14px; background: #2c2c2e; color: #fff; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border-radius: 14px; background: var(--ok-gray-800); color: var(--ok-gray-0); box-shadow: 0 8px 28px color-mix(in oklab, var(--ok-gray-1000) 45%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-0) 8%, transparent);
   animation: mk-pdf-pop 0.14s ease-out;
 }
 .mk-pdf-selmenu[hidden] { display: none; }
 @keyframes mk-pdf-pop { from { opacity: 0; scale: 0.94; } }
 .mk-pdf-selbtn { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-@media (hover: hover) { .mk-pdf-selbtn:hover, .mk-pdf-seldot:hover { background: rgba(255, 255, 255, 0.14); } }
-.mk-pdf-selsep { width: 1px; height: 20px; margin: 0 4px; background: rgba(255, 255, 255, 0.16); }
+@media (hover: hover) { .mk-pdf-selbtn:hover, .mk-pdf-seldot:hover { background: color-mix(in oklab, var(--ok-gray-0) 14%, transparent); } }
+.mk-pdf-selsep { width: 1px; height: 20px; margin: 0 4px; background: color-mix(in oklab, var(--ok-gray-0) 16%, transparent); }
 .mk-pdf-seldot { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
-.mk-pdf-seldot::before { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
-.mk-pdf-selbtn:focus-visible, .mk-pdf-seldot:focus-visible { outline: 2px solid var(--brand-yellow, #ffcc00); outline-offset: 1px; }
+.mk-pdf-seldot::before { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-1000) 15%, transparent); }
+.mk-pdf-selbtn:focus-visible, .mk-pdf-seldot:focus-visible { outline: 2px solid var(--brand-yellow, var(--ok-yellow-300)); outline-offset: 1px; }
 @media print { .mk-pdf-view { display: none !important; } }
 /* 메모 속 PDF 썸네일: 누르면 미리보기 — 오른쪽 아래 "PDF" 표시 */
-.mk-doc img.mk-pdf-thumb { box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12); background: #fff; cursor: zoom-in; }
+.mk-doc img.mk-pdf-thumb { box-shadow: 0 0 0 1px var(--line, color-mix(in oklab, var(--ok-gray-1000) 12%, transparent)), 0 2px 8px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent); background: var(--ok-gray-0); cursor: zoom-in; }
 /* 문서를 PDF 로 바꾸는 동안 칩 아래 임시 칸 (editor.js pendingDocs — 파일에 저장되지 않음): 썸네일 자리에 종이 + 지나가는 빛 + 진행 막대 */
 .mk-doc .mk-doc-pending { display: block; width: min(100%, 360px); margin: 6px 0; user-select: none; cursor: progress; animation: mk-fade-in 0.2s ease-out; }
 .mk-doc-pending-page {
@@ -2717,12 +2717,12 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
   overflow: hidden;
   border-radius: var(--radius-lg);
   background:
-    repeating-linear-gradient(#0000 0 14px, rgba(0, 0, 0, 0.06) 14px 22px) left 24px top 64px / calc(100% - 48px) 50% no-repeat,
-    linear-gradient(rgba(0, 0, 0, 0.09) 0 0) left 24px top 30px / 42% 12px no-repeat,
-    #fff;
-  box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12);
+    repeating-linear-gradient(transparent 0 14px, color-mix(in oklab, var(--ok-gray-1000) 6%, transparent) 14px 22px) left 24px top 64px / calc(100% - 48px) 50% no-repeat,
+    linear-gradient(color-mix(in oklab, var(--ok-gray-1000) 9%, transparent) 0 0) left 24px top 30px / 42% 12px no-repeat,
+    var(--ok-gray-0);
+  box-shadow: 0 0 0 1px var(--line, color-mix(in oklab, var(--ok-gray-1000) 12%, transparent)), 0 2px 8px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent);
 }
-.mk-doc-pending-page::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, #fff0 30%, rgba(255, 255, 255, 0.85) 50%, #fff0 70%); transform: translateX(-100%); animation: mk-doc-shine 1.4s ease-in-out infinite; }
+.mk-doc-pending-page::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in oklab, var(--ok-gray-0) 85%, transparent) 50%, transparent 70%); transform: translateX(-100%); animation: mk-doc-shine 1.4s ease-in-out infinite; }
 .mk-doc-pending-bar { display: block; height: 4px; margin-top: 10px; overflow: hidden; border-radius: 2px; background: color-mix(in srgb, var(--note-text) 12%, transparent); }
 .mk-doc-pending-bar > span { display: block; height: 100%; border-radius: inherit; background: color-mix(in srgb, var(--note-text) 60%, transparent); transition: width 0.3s ease-out; }
 .mk-doc-pending-bar.indeterminate > span { width: 35%; animation: mk-doc-indeterminate 1.2s ease-in-out infinite; }
@@ -2732,7 +2732,7 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .mk-doc p:has(> img.mk-pdf-thumb) { position: relative; width: fit-content; max-width: 100%; }
 /* 문서 칩 + 썸네일 한 문단: 그림이 블록이라 줄바꿈 · 편집기 보조 그림이 빈 줄만 더한다 (묶음 사진과 같게) */
 .mk-doc p:has(> img.mk-pdf-thumb) > :is(img.ProseMirror-separator, br) { display: none !important; }
-.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF 보기"; position: absolute; right: 8px; bottom: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(17, 17, 17, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; } /* 빨강 대신 차분한 어두운 알약 — 빨강은 지우기 · 녹음 같은 경고에만 */
+.mk-doc p:has(> img.mk-pdf-thumb)::after { content: "PDF 보기"; position: absolute; right: 8px; bottom: 10px; padding: 2px 8px; border-radius: 999px; background: color-mix(in oklab, var(--ok-gray-950) 72%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: var(--ok-gray-0); font-size: 11px; font-weight: 700; line-height: 1.5; pointer-events: none; } /* 빨강 대신 차분한 어두운 알약 — 빨강은 지우기 · 녹음 같은 경고에만 */
 /* 문서 캡슐: 두 칸이 무엇을 여는지 — 위 이름 줄은 원본을 그 앱으로(↗ 다른 앱), 아래 첫 쪽은 메모킹 안 PDF 보기. 확장자 자리에 할 일을 적는다 */
 .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]::after { content: "원본 열기 ↗"; margin-left: auto; padding: 0 6px; font-weight: 600; }
 .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]:is([data-ext="DOCX"], [data-ext="DOC"])::after { content: "Word로 열기 ↗"; }
@@ -2746,10 +2746,10 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
   .mk-doc p:has(> img.mk-pdf-thumb) > img.mk-pdf-thumb:hover { filter: brightness(0.95); }
 }
 /* 문서 칩 + PDF 첫 쪽(바꾸는 동안은 임시 칸): 동영상처럼 한 덩어리 카드. 위는 이름 줄(칩), 아래는 첫 쪽, 테두리 · 둥글기 · 그림자는 카드 하나에 */
-.mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { display: flex; flex-direction: column; width: min(100%, 360px); margin: 6px 0; overflow: hidden; border-radius: var(--radius-lg); box-shadow: 0 0 0 1px var(--line, rgba(0, 0, 0, 0.12)), 0 2px 8px rgba(0, 0, 0, 0.12); }
+.mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { display: flex; flex-direction: column; width: min(100%, 360px); margin: 6px 0; overflow: hidden; border-radius: var(--radius-lg); box-shadow: 0 0 0 1px var(--line, color-mix(in oklab, var(--ok-gray-1000) 12%, transparent)), 0 2px 8px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent); }
 /* 이름 줄도 첫 쪽과 같은 불투명 종이 — 반투명 칩 바탕이 흰 쪽과 따로 놀던 것. 어두운 화면은 불투명한 어두운 판 */
-.mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { --doc-head-bg: #fff; --doc-head-fg: #1f1f1c; --doc-head-line: rgba(0, 0, 0, 0.08); background: #fff; }
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { --doc-head-bg: #232323; --doc-head-fg: #f5f5f5; --doc-head-line: rgba(255, 255, 255, 0.08); } }
+.mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { --doc-head-bg: var(--ok-gray-0); --doc-head-fg: var(--ok-gray-850); --doc-head-line: color-mix(in oklab, var(--ok-gray-1000) 8%, transparent); background: var(--ok-gray-0); }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) { --doc-head-bg: var(--ok-gray-850); --doc-head-fg: var(--ok-gray-50); --doc-head-line: color-mix(in oklab, var(--ok-gray-0) 8%, transparent); } }
 .mk-doc p:is(:has(> img.mk-pdf-thumb), :has(> .mk-doc-pending)) > a[href^="attachments/"] { display: flex; align-items: center; max-width: none; min-height: 44px; padding: 8px 10px 8px 14px; border-radius: 0; background: var(--doc-head-bg); color: var(--doc-head-fg); box-shadow: inset 0 -1px 0 var(--doc-head-line); }
 .mk-doc p:has(> img.mk-pdf-thumb) > a[data-file]::after { padding: 2px 10px !important; border-radius: 999px !important; background: color-mix(in srgb, var(--doc-head-fg) 8%, transparent) !important; color: var(--doc-head-fg) !important; opacity: 0.8; font-size: 12px; line-height: 18px; }
 .mk-doc p:has(> img.mk-pdf-thumb) > img.mk-pdf-thumb { width: 100%; margin: 0; border-radius: 0; outline: 0; box-shadow: none; }

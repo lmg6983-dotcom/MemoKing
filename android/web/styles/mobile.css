@@ -319,7 +319,7 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
 }
 .cards[data-layout="rows"] .card-preview { -webkit-line-clamp: 2; }
 /* 사진 높이를 미리 정해 두어야 카드를 엇갈려 쌓을 때 자리가 맞는다 */
-.card-thumb { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: rgba(128, 128, 128, 0.12); }
+.card-thumb { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: color-mix(in oklab, var(--ok-gray-500) 12%, transparent); }
 .cards[data-layout="rows"] .card-thumb { aspect-ratio: 16 / 7; }
 
 /* 동영상 첫 장면 (video-poster.js): 사진 썸네일과 같은 칸 · 가운데 ▶ (그리는 동안은 빈 칸 — 자리는 미리 잡아 카드가 흔들리지 않게) */
@@ -328,7 +328,7 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
 .card-video img:not([src]) { visibility: hidden; }
 .card-video::after {
   content: ''; position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.5 3.5v9l7-4.5z' fill='%23fff'/%3E%3C/svg%3E") 55% 50% / 16px no-repeat;
+  background: color-mix(in oklab, var(--ok-gray-1000) 50%, transparent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.5 3.5v9l7-4.5z' fill='%23fff'/%3E%3C/svg%3E") 55% 50% / 16px no-repeat;
 }
 /* 어두운 화면: 사진 · 흰 바탕 손 메모 미리 보기는 조금 어둡게 (검은 카드 사이에서 흰 칸이 튀지 않게) */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .card-thumb { filter: brightness(0.86); } }
@@ -368,7 +368,7 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
   border-radius: 999px; /* One UI 떠 있는 둥근 단추 */
   background: var(--brand-yellow);
   color: var(--on-brand);
-  box-shadow: 0 6px 18px rgba(17, 17, 17, 0.22), 0 2px 4px rgba(17, 17, 17, 0.12);
+  box-shadow: 0 6px 18px color-mix(in oklab, var(--ok-gray-950) 22%, transparent), 0 2px 4px color-mix(in oklab, var(--ok-gray-950) 12%, transparent);
   transition: transform 0.12s ease-out;
 }
 .fab svg { width: 28px; height: 28px; }
@@ -389,7 +389,7 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
 }
 .row.off { opacity: 0.6; }
 .row-main { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 10px 0 10px 12px; border: 0; background: none; text-align: left; }
-.row-dot { width: 12px; height: 12px; flex: none; border-radius: 4px; background: var(--note-chip); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.25); }
+.row-dot { width: 12px; height: 12px; flex: none; border-radius: 4px; background: var(--note-chip); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 25%, transparent); }
 .row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .row-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 700; }
 .row-sub { display: flex; align-items: flex-start; gap: 4px; line-height: 1.45; font-size: 12.5px; color: var(--muted); }
@@ -400,11 +400,11 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
 .switch { width: 46px; height: 26px; margin: 0 2px; /* 보이는 크기는 그대로, 누르는 자리는 아래 ::before 로 44px */ background: var(--line); transition: background-color 0.15s ease-out; }
 .switch::after {
   top: 3px; left: 3px; width: 20px; height: 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 25%, transparent);
   transform-origin: left center;
   transition: transform 0.2s var(--ease-out), background-color 0.15s;
 }
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .switch:not(:checked) { background: #4d4b45; } }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .switch:not(:checked) { background: var(--ok-gray-700); } }
   /* 꺼진 칸도 시트 바탕과 구별되게 */
 /* 누르는 동안 손잡이가 살짝 늘어난다 (움직일 쪽으로) — 폭 대신 scaleX 로 */
 .switch:active::after { transform: scaleX(1.22); }
@@ -494,7 +494,7 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
 .note-screen .table-bar.grouped .tb-more { display: none; }
 .note-screen .table-bar.grouped.more-open .tb-more {
   display: flex; flex-direction: column; gap: 4px; position: absolute; left: 10px; right: 10px; max-width: 440px; bottom: calc(100% + 6px); z-index: 80;
-  padding: 6px; border-radius: 12px; background: var(--note-bg, var(--bg)); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
+  padding: 6px; border-radius: 12px; background: var(--note-bg, var(--bg)); box-shadow: 0 6px 18px color-mix(in oklab, var(--ok-gray-1000) 18%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--note-text) 12%, transparent);
 }
 .note-screen .table-bar.grouped.more-open .tb-more .tb-group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .note-screen .table-bar.grouped.more-open .tb-more .tb-name { display: inline; }
@@ -512,7 +512,7 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(0, 0, 0, 0.36);
+  background: color-mix(in oklab, var(--ok-gray-1000) 36%, transparent);
   animation: mk-fade-in 0.18s ease-out;
 }
 .sheet, .sheet.links-panel {
@@ -531,7 +531,7 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
   border-radius: 28px 28px 0 0;
   background: var(--surface-2);
   color: var(--text);
-  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 -8px 32px color-mix(in oklab, var(--ok-gray-1000) 18%, transparent);
   animation: sheet-up 0.24s var(--ease-drawer);
 }
 @keyframes sheet-up { from { transform: translateY(40%); opacity: 0; } }
@@ -637,7 +637,7 @@ h2.sheet-title { font-size: 20px; }
 .noti { align-items: flex-start; gap: 10px; padding: 12px; }
 .noti.self { background: color-mix(in srgb, var(--brand-yellow) 7%, var(--surface-1)); } /* 왼쪽 색 줄 대신 노란 아바타 + 옅은 바탕 */
 .avatar { width: 36px; height: 36px; flex: none; border-radius: 50%; object-fit: cover; }
-.avatar.letter { display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 15px; }
+.avatar.letter { display: grid; place-items: center; color: var(--ok-gray-0); font-weight: 800; font-size: 15px; }
 .avatar.self { background: var(--brand-yellow); color: var(--on-brand); }
 .avatar.self svg { width: 20px; height: 20px; }
 .noti-text { flex: 1; min-width: 0; }
@@ -680,12 +680,12 @@ h2.sheet-title { font-size: 20px; }
 .app-box .drive-box-text b { font-variant-numeric: tabular-nums; }
 .app-box .drive-box-text small.warn { color: var(--danger); }
 .app-box > .btn { flex: none; min-width: 112px; }
-.update-btn[data-state="latest"] { border-color: transparent; background: #157a3f; color: #fff; }
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .update-btn[data-state="latest"] { background: #2fb36b; color: #06210f; } }
+.update-btn[data-state="latest"] { border-color: transparent; background: var(--ok-green-700); color: var(--ok-gray-0); }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .update-btn[data-state="latest"] { background: var(--ok-green-500); color: var(--ok-green-950); } }
 
 /* 새 버전 시트 (android/web/js/updates.js) — PC 의 새 버전 대화 상자(app/styles/list.css .update-*)와 같은 모양, 손가락 크기로 */
 .update-head { display: flex; align-items: center; gap: 14px; margin: 4px 4px 16px; }
-.update-badge { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--brand-yellow); color: var(--on-brand, #1b1b1b); }
+.update-badge { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--brand-yellow); color: var(--on-brand, var(--ok-gray-900)); }
 .update-badge svg { width: 24px; height: 24px; }
 .update-head-text { min-width: 0; }
 .update-sheet h2 { margin: 0; font-size: 20px; line-height: 1.3; font-weight: 800; letter-spacing: -0.015em; }
@@ -703,7 +703,7 @@ h2.sheet-title { font-size: 20px; }
 .update-notes strong { font-weight: 800; color: var(--text-strong); }
 .update-notes .notes-empty { margin: 0; color: var(--muted); }
 .update-progress { margin: 14px 4px 0; }
-.update-bar { height: 8px; border-radius: 999px; background: var(--hover, rgba(0, 0, 0, 0.08)); overflow: hidden; }
+.update-bar { height: 8px; border-radius: 999px; background: var(--hover, color-mix(in oklab, var(--ok-gray-1000) 8%, transparent)); overflow: hidden; }
 .update-bar span { display: block; height: 100%; border-radius: inherit; background: var(--brand-yellow); transform: scaleX(0); transform-origin: left; transition: transform 0.2s ease-out; }
 .update-progress small { display: block; margin-top: 6px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .update-hint { margin: 12px 4px 0; font-size: 13.5px; color: var(--text); }
@@ -794,9 +794,9 @@ h2.sheet-title { font-size: 20px; }
 
 /* 인쇄(PDF로 저장): 메모 내용만 */
 @media print {
-  body, html { height: auto; overflow: visible; background: #fff; }
+  body, html { height: auto; overflow: visible; background: var(--ok-gray-0); }
   .screen:not(.note-screen), .note-screen .bar, .note-screen .format-bar, .note-screen .table-bar, .banner, .sheet, .scrim, .toast, .palette { display: none !important; }
-  .note-screen { position: static; display: block; background: #fff; color: #111; }
+  .note-screen { position: static; display: block; background: var(--ok-gray-0); color: var(--ok-gray-950); }
   .note-screen .editor { overflow: visible; padding: 0; }
 }
 
@@ -879,7 +879,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
   font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums;
   box-shadow: 0 6px 18px color-mix(in srgb, var(--rec) 35%, transparent);
 }
-.rec-pill .rec-dot { background: #fff; box-shadow: none; }
+.rec-pill .rec-dot { background: var(--ok-gray-0); box-shadow: none; }
 .fab-menu:not([hidden]) ~ .rec-pill { visibility: hidden; } /* + 메뉴를 펼친 동안은 메뉴와 겹치지 않게 */
 
 /* ---------- 추천 태그 (태그 없는 메모) — 모양은 note.css, 여기는 손가락 크기만 ---------- */
@@ -910,11 +910,11 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 
 /* ---------- 보내기 (글 · 그림 · PDF) ---------- */
 /* PDF · 인쇄 내용 크기 (app.js openPrint) — A4 첫 쪽을 시트 폭에 맞춰 줄여 보인다 */
-.print-preview { position: relative; width: min(100%, 280px); aspect-ratio: var(--page-ratio, 794 / 1123); margin: 0 auto 12px; overflow: hidden; border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
+.print-preview { position: relative; width: min(100%, 280px); aspect-ratio: var(--page-ratio, 794 / 1123); margin: 0 auto 12px; overflow: hidden; border-radius: 6px; background: var(--ok-gray-0); box-shadow: 0 0 0 1px var(--line), var(--shadow-card); }
 .print-preview iframe { position: absolute; top: 0; left: 0; width: var(--page-pw, 794px); height: var(--page-ph, 1123px); border: 0; transform: scale(var(--fit, 0.35)); transform-origin: 0 0; pointer-events: none; }
 /* 여러 쪽: 칸은 한 쪽 크기 그대로, 안에서 위아래로 넘긴다 (줄여 보인 높이만큼 자리를 잡는 빈 칸) — 쪽 사이는 시트 바탕색 */
 .print-preview .pv-spacer { display: none; }
-.print-preview.multi { overflow-y: auto; overscroll-behavior: contain; background: var(--surface-2, #ececea); }
+.print-preview.multi { overflow-y: auto; overscroll-behavior: contain; background: var(--surface-2, var(--ok-gray-100)); }
 .print-preview.multi .pv-spacer { display: block; }
 .print-size .seg { margin-bottom: 8px; }
 .print-label { margin: 6px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
@@ -968,7 +968,7 @@ body.sheet-open .mk-date-chip { visibility: hidden; } /* 시트가 열리면 메
 .fab-sat:nth-child(1) { animation-delay: 0.03s; }
 .fab-menu.closing .fab-sat { animation: sat-in 0.14s var(--ease-out) both; }
 .fab-sat-label { padding: 6px 14px; border-radius: 999px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 14.5px; }
-.fab-sat-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-right: 4px; border-radius: 999px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.2); }
+.fab-sat-btn { display: grid; place-items: center; width: 52px; height: 52px; margin-right: 4px; border-radius: 999px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px color-mix(in oklab, var(--ok-gray-950) 20%, transparent); }
 .fab-sat[data-new="voice"] .fab-sat-btn { background: var(--rec); color: var(--on-rec); }
 .fab-sat[data-new="ink"] .fab-sat-btn { background: var(--surface-2); color: var(--text-strong); } /* ＋ 만 노랑 — 펼친 단추들은 무채색 (녹음만 빨강) */
 .fab-sat-btn svg { width: 24px; height: 24px; }
@@ -1136,7 +1136,7 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 .add-sat:nth-child(6) { animation-delay: 0.15s; }
 .add-sat:nth-child(7) { animation-delay: 0.18s; }
 .add-menu.closing .add-sat { animation: add-sat-in 0.14s var(--ease-out) both; animation-delay: 0s; }
-.add-sat-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 999px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px rgba(17, 17, 17, 0.18), inset 0 0 0 1px var(--line); }
+.add-sat-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 999px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px color-mix(in oklab, var(--ok-gray-950) 18%, transparent), inset 0 0 0 1px var(--line); }
 .add-sat-btn svg { width: 22px; height: 22px; }
 .add-sat-btn.rec { background: var(--rec); color: var(--on-rec); box-shadow: 0 6px 16px color-mix(in srgb, var(--rec) 35%, transparent); }
 .add-sat.active .add-sat-btn.rec { animation: mk-blink 1.2s ease-in-out infinite; }
@@ -1370,7 +1370,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 여러 장 고르기 막대: 아래 탭 막대 위에 */
 .pick-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .pick-bar .btn { min-height: 44px; }
-body.picking #fab { display: none; }
+body.picking var(--ok-pink-300) { display: none; }
 
 /* ========== 메모 탭: 왼쪽 폴더 목록 + 카드 (PC 처럼 탐색기 모양 — folder-ui.js renderFolderList) ==========
    메모 칸은 그대로 하나의 스크롤. 폴더 목록은 왼쪽 칸에 붙어(sticky) 카드를 내려도 그 자리에 있고, 넘치면 따로 스크롤한다.
