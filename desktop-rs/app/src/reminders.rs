@@ -178,6 +178,11 @@ pub(crate) fn toast(app: &AppHandle, id: &str, title: &str, label: &str, preview
         .text1(label)
         .text2(preview)
         .on_activated(move |_| {
+            // 메모가 없는 알림(매직키 일정을 못 만듦)은 일정 탭으로
+            if id.is_empty() {
+                crate::os::show_list_tab(&app, "reminders");
+                return Ok(());
+            }
             let _ = crate::memos::open_note(&app, &id);
             if let Some(n) = &notice {
                 send_to_note(&app, &id, "ai:notice", n.clone());

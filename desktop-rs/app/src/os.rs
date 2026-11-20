@@ -217,7 +217,7 @@ fn shorten(t: &str) -> String {
 }
 
 /// 목록 창을 그 탭으로 (Electron createListWindow(tab))
-fn show_list_tab(app: &AppHandle, tab: &str) {
+pub(crate) fn show_list_tab(app: &AppHandle, tab: &str) {
     show_list(app);
     let _ = app.emit_to("list", "list:tab", [tab]);
 }
