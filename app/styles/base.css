@@ -16,13 +16,13 @@
   --on-black: #ffffff;
 
   /* 바탕 · 글씨 */
-  --surface-0: #ffffff; /* 바탕은 흰색 (카카오톡 목록 화면처럼) */
-  --surface-1: #f6f6f6; /* 바탕 위 카드 · 검색칸은 아주 옅은 회색 채움 (카톡 검색창처럼) — 흰 바탕 위 흰 카드는 보이지 않아서 */
+  --surface-0: #f5f5f5; /* 바탕: 카카오톡 더보기 화면과 같은 무채색 옅은 회색 */
+  --surface-1: #ffffff; /* 트레이(카드 · 검색칸)는 흰색, 그림자 없이 — 카톡 트레이처럼 */
   --surface-2: #ffffff; /* 떠 있는 판(메뉴 · 시트 · 대화상자)은 흰색 + 그림자 */
   --line: #ebebeb;
   --fill-hover: rgba(17, 17, 17, 0.06);
   --fill-tab: rgba(17, 17, 17, 0.05);
-  --text-strong: #111111;
+  --text-strong: #191919; /* 카톡 본문 글자색 */
   --text-muted: #686868;
   --text-faint: #737373; /* 흐린 글(안내 · 빈칸 글)도 흰 카드에서 4.5:1 넘게 (#8a8a8a 는 3.4:1) */
   --danger: #d93036;
@@ -254,7 +254,8 @@ svg { width: 20px; height: 20px; flex: none; }
 .setting-row.nav-row > .btn.nav-act::before { display: none !important; }
 .setting-row.nav-row > .btn.nav-act::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 .setting-row.nav-row > .btn.nav-act:disabled { opacity: 0.4; }
-.setting-row.nav-row:has(> .nav-act:disabled) { cursor: default; opacity: 0.6; }
+.setting-row.nav-row:has(> .nav-act:disabled) { cursor: default; }
+.setting-row.nav-row:has(> .nav-act:disabled) > span { opacity: 0.5; } /* 줄 전체를 흐리게 하면 카드 바탕까지 비쳐 띠가 생겼다 — 글만 */
 @media (hover: hover) and (pointer: fine) { .setting-row.nav-row:hover { background-color: color-mix(in srgb, var(--text) 4%, transparent); } }
 .setting-row.nav-row:active:not(:has(> .nav-act:disabled)) { background-color: color-mix(in srgb, var(--text) 7%, transparent); }
 .setting-row.nav-row:has(> .nav-act:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: -2px; }

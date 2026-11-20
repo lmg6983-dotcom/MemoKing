@@ -9,6 +9,6 @@
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:colorAccent">@color/brand_yellow</item>
     </style>
-    <color name="surface_0">#FFFFFF</color>
+    <color name="surface_0">#F5F5F5</color>
     <color name="brand_yellow">#FFCC00</color>
 </resources>
