@@ -1,4 +1,6 @@
 /* 상태 말풍선 — 투명 창 안에. 자리(place)마다 말풍선이 창의 어느 쪽에 붙고 꼬리가 어디를 가리키는지 (bubble.js) */
+/* 바탕 화면 위에 따로 뜨는 창: 창 뒤(바탕 화면)는 흐려지지 않으니 떠 있는 판을 반투명 대신 불투명으로 */
+:root { --bubble-bg: var(--surface-2); --bubble-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent !important; }
 .bubble {
   position: absolute; top: 8px; left: 8px;

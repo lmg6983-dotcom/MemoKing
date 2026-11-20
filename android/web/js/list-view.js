@@ -470,6 +470,7 @@ export function render() {
   $('other-mode').textContent = elsewhere ? `${MODE_LABEL[otherMode(state.mode)]}에서 ${elsewhere}개 더 찾았어요` : '';
   // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)
   glideCards(() => layoutCards(memos));
+  $('large-sub').textContent = `메모 ${memos.length}개`;
   el.empty.hidden = memos.length > 0;
   el.empty.parentElement.classList.toggle('is-empty', !memos.length); // 안내 · 단추를 목록 칸 가운데에 (PC 와 같이)
   if (!memos.length) renderEmpty(narrowed, elsewhere);
@@ -843,6 +844,9 @@ function setTab(tab) {
   $('view-memos').hidden = tab !== 'memos';
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
+  $('large-title').textContent = { memos: '메모', reminders: '일정', history: '알림 보관함' }[tab];
+  $('large-sub').hidden = tab !== 'memos';
+  placeBar(tab);
   el.filterBtn.hidden = tab !== 'memos';
   el.folderBtn.hidden = tab !== 'memos'; // 폴더는 메모에만 (일정 · 보관함에는 쓸 데가 없다)
   el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: UI.searchHistory }[tab];
@@ -860,6 +864,24 @@ function setTab(tab) {
   }, 0));
 }
 let tabSeq = 0;
+// One UI 큰 제목: 맨 위 줄 · 큰 제목 · 검색 줄을 지금 탭의 목록 칸 맨 앞에 두고 함께 스크롤한다.
+//   검색 줄은 칸 위에 붙어 남는다 (sticky, 위 두 줄 높이만큼 위로 올라간 자리) — 제목을 접고 펴며 목록을 밀지 않으니
+//   맨 위로 올라와도 카드가 손가락 밑에서 갑자기 내려가지 않는다
+const searchbar = document.querySelector('.searchbar');
+function placeBar(tab) {
+  const view = $(`view-${tab}`);
+  if (searchbar.parentElement !== view) view.prepend(searchbar);
+  stickBar();
+}
+function stickBar() {
+  const row = el.search.closest('.search');
+  if (!row?.getClientRects().length) return;
+  const above = row.getBoundingClientRect().top - searchbar.getBoundingClientRect().top - 8; // 검색 줄 위 8px 여백은 남긴다
+  searchbar.style.setProperty('--bar-stick', `${-Math.max(0, Math.round(above))}px`);
+  searchbar.parentElement.style.setProperty('--bar-full', `${searchbar.offsetHeight}px`); // 빈 화면 안내를 머리 아래 남은 칸 가운데에
+}
+new ResizeObserver(stickBar).observe(searchbar);
+placeBar(state.tab ?? 'memos');
 tabKeys(document.querySelector('.tabs'));
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');

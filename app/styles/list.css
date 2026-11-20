@@ -15,7 +15,7 @@ body {
   flex: none;
   /* 오른쪽은 창 버튼(최소화 · 최대화 · 닫기) 자리만큼만 비운다 — 창 버튼이 실제로 차지하는 폭(titlebar-area)을 쓰고, 모르면 142px.
      오른쪽 위 단추 묶음(왕관 · 동기화 · 설정)이 창 버튼 바로 옆, 오른쪽 끝에 붙게 */
-  padding: 0 calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 142px)) + 4px) 0 16px;
+  padding: 0 calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 142px)) + 4px) 0 12px; /* 로고도 탭 · 카드와 같은 12px 선 */
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -54,7 +54,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 2px 12px 10px;
+  padding: 2px 4px 10px; /* 아이콘 그림(36px 안 20px)이 탭 · 카드와 같은 12px 선에 */
 }
 .search { position: relative; flex: 1; }
 .search-icon {
@@ -69,14 +69,15 @@ body {
 }
 .search input {
   width: 100%;
-  height: 36px;
-  padding: 0 14px 0 36px;
-  border: 1px solid var(--border);
-  border-radius: 999px; /* 휴대폰과 같은 알약 모양 */
+  height: 40px;
+  padding: 0 14px 0 38px;
+  border: 0;
+  border-radius: 999px; /* 휴대폰과 같은 알약 모양 (테두리 없이 그림자) */
   background: var(--surface);
+  box-shadow: var(--shadow-card);
   outline: none;
 }
-.search input:focus { border-color: var(--text-strong); }
+.search input:focus { box-shadow: inset 0 0 0 2px var(--brand-yellow), var(--shadow-card); }
 .search.has-ai input { padding-right: 38px; }
 /* 검색창 안 오른쪽 ✦ — AI에게 묻기 (ai-ask.js, 글 모델을 넣은 PC 에서 검색어가 있을 때만) */
 .search-ai {
@@ -124,18 +125,18 @@ body {
   width: 100%;
   min-width: 0;
   min-height: 92px;
-  padding: 12px 12px 10px;
+  padding: 14px 16px 12px;
   border: 0;
   border-radius: var(--radius-lg);
   background: var(--note-bg);
   color: var(--note-fg);
-  box-shadow: var(--shadow-card), inset 0 0 0 1px rgba(17, 17, 17, 0.04);
+  box-shadow: none; /* One UI: 색 카드는 그림자 없이 평평하게 — 떠 있는 판만 그림자 */
   text-align: left;
   cursor: pointer;
   --muted: color-mix(in srgb, var(--note-fg) 68%, transparent);
 }
 .cards[data-layout="rows"] .card { min-height: 0; }
-.card:hover { box-shadow: 0 2px 4px rgba(17, 17, 17, 0.08), 0 6px 16px rgba(17, 17, 17, 0.08); }
+.card:hover { box-shadow: var(--shadow-card); }
 /* 열린 메모: 바탕이 노랑이어도 보이게 메모 글씨 색 테두리 — 키보드 포커스(2px 진한 선)와 헷갈리지 않게 가늘고 옅게 */
 .card.open { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--note-fg) 38%, transparent), var(--shadow-card); }
 .card-head { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
@@ -270,8 +271,8 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   display: flex;
   gap: 2px;
   margin: 0 12px 8px;
-  padding: 3px;
-  border-radius: var(--radius-md);
+  padding: 4px;
+  border-radius: 999px;
   background: var(--fill-tab);
 }
 .tabs button {
@@ -284,7 +285,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   height: 32px;
   padding: 0 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 999px;
   background: none;
   color: var(--muted);
   font-size: 13px;
@@ -293,7 +294,8 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   cursor: pointer;
 }
 .tabs button svg { width: 15px; height: 15px; }
-.tabs button[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
+.tabs button[aria-selected="true"] { background: var(--brand-yellow-soft); color: var(--text); } /* 휴대폰 아래 탭바와 같은 연노랑 알약 */
+.tabs > .tab-indicator { border-radius: 999px; background: var(--brand-yellow-soft) !important; box-shadow: none !important; }
 /* 탭 숫자: 휴대폰처럼 바탕 없이 흐린 숫자만 (고른 탭은 글자색으로) */
 .tab-count { font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tabs button[aria-selected="true"] .tab-count { color: var(--text); }
@@ -410,6 +412,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   margin: 0 -24px; padding: 2px 24px 10px;
   background: var(--surface-2);
 }
+/* 설정 창: One UI 설정처럼 회색 바탕 위에 묶음마다 흰 카드 */
+.panel-dialog#settings-dialog { --surface-2: var(--surface-0); }
+#settings-dialog .set-jump a { background: var(--surface-1); }
 .set-jump::-webkit-scrollbar { display: none; }
 .set-jump a {
   flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 10px;
@@ -421,7 +426,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .panel-dialog .set-sec { scroll-margin-top: 80px; }
 #vault-path b { display: block; font-size: 13.5px; }
 #vault-path small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.set-sec { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.set-sec { margin-top: 14px; padding: 18px 20px; border-radius: 24px; background: var(--surface-1); }
 .set-title { margin: 0 0 12px; font-size: 14px; line-height: 20px; font-weight: 700; color: var(--text-strong); }
 .set-title small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .set-sec > .setting-row:last-child, .set-sec > .dialog-actions:last-child { margin-bottom: 0; }
@@ -520,9 +525,9 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
 /* 메모 탭: 왼쪽 폴더 막대 + 오른쪽 카드 (folder-ui.js) — 막대는 위 폴더 단추로 숨긴다 */
 #view-memos { position: relative; flex-direction: row; }
 .memos-col { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
-.folder-side { flex: none; width: 156px; padding: 0 6px 12px 10px; overflow-y: auto; border-right: 1px solid var(--line); }
+.folder-side { flex: none; width: 156px; padding: 0 6px 12px 12px; overflow-y: auto; border-right: 1px solid var(--line); }
 /* 좁은 창(기본 크기)에서는 조금 좁게 — 카드 자리를 덜 빼앗게 */
-@media (max-width: 560px) { .folder-side { width: 132px; padding-left: 8px; } }
+@media (max-width: 560px) { .folder-side { width: 132px; padding-left: 12px; } }
 /* 메모를 끄는 동안: 폴더가 놓을 자리임을 보이고, 목록을 접어 두었어도 카드 위로 떠오른다 */
 body.is-dragging .folder-side { background: var(--bg); }
 body.is-dragging .folder-side[hidden] { display: block !important; position: absolute; z-index: 5; left: 0; top: 0; bottom: 0; box-shadow: var(--shadow-pop); animation: mk-slide-in-left 0.16s var(--ease-out); }
@@ -737,12 +742,24 @@ body.is-dragging .card:hover { transform: none; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px 16px;
   margin-bottom: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
+  border: 0;
+  border-radius: 18px;
+  background: var(--fill-tab);
 }
+.drive-box { flex-wrap: wrap; }
+.drive-box .drive-box-text { flex: 1 1 160px; min-width: 0; }
+.drive-actions { display: flex; flex: none; gap: 6px; margin-left: auto; }
+/* 한 화면의 단추는 한 크기: 설정 창의 단추는 모두 34px 높이 · 같은 최소 폭 (글자 길이에 따라 들쭉날쭉하지 않게) */
+#settings-dialog .btn { height: 34px; min-width: 120px; padding: 0 16px; font-size: 13px; }
+#settings-dialog .setting-row select { height: 34px; min-width: 120px; padding: 0 12px; border-radius: 999px; }
+#settings-dialog .dialog-x { border-radius: 999px; }
+.path-row .path-box { flex: 1 1 160px; min-width: 0; margin: 0; padding: 0; border: 0; background: none; }
+.drive-actions .btn:not(.primary) { background: var(--surface-1); }
+.drive-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: -4px 4px 8px; }
+.drive-links:not(:has(> :not([hidden]))) { display: none; } /* 연결 전에는 줄 자체가 없게 */
+#settings-dialog > .app-box { padding: 16px 16px 16px 20px; border-radius: 24px; background: var(--surface-1); }
 .drive-box-icon { flex: none; width: 22px; height: 22px; color: var(--muted); }
 .drive-box.on .drive-box-icon { color: var(--text-strong); }
 .drive-box.error .drive-box-icon, .drive-box.error small { color: var(--danger); }
@@ -881,15 +898,15 @@ div.setting-row { cursor: default; }
 /* ---------- v0.19.0: 새 메모 + 단추 (오른쪽 아래) · 위성 버튼 — 휴대폰과 같은 모양 ---------- */
 .fab {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  right: 12px; /* 카드 · 탭과 같은 오른쪽 선 */
+  bottom: 16px;
   z-index: 31;
   display: grid;
   place-items: center;
   width: 44px;
   height: 44px;
   border: 0;
-  border-radius: 15px;
+  border-radius: 999px; /* 휴대폰 ＋ 와 같은 원 */
   background: var(--brand-yellow);
   color: var(--on-brand);
   box-shadow: 0 4px 12px rgba(17, 17, 17, 0.2), 0 1px 3px rgba(17, 17, 17, 0.12);
@@ -1157,3 +1174,5 @@ body > :is(.mem-album, .mem-preview)::before { content: ''; position: absolute; 
   .boot-mark, .boot-dots i { animation: none; }
   .boot-dots i { opacity: 0.6; }
 }
+/* 설정 창의 누르는 줄: 마우스를 올린 바탕이 글 둘레로 둥글게 (글 자리는 그대로) */
+.set-sec .setting-row.nav-row { margin-inline: -10px; padding: 6px 10px; border-radius: 14px; }
