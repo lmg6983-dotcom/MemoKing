@@ -869,6 +869,7 @@ try {
     const box = await page.locator(cardSel).boundingBox();
     const cy = box.y + box.height / 2;
     const cx = box.x + box.width / 2;
+    const startTop = await page.evaluate(() => document.getElementById('view-memos').scrollTop); // 큰 제목이 목록과 함께 스크롤되니, 되돌릴 때는 0 이 아니라 이 자리로
     await touch('touchStart', cx, cy);
     const seen = [];
     for (const dx of [20, 50, 80, 30, -20, -60, -90, -30, 20, 60, 10]) {
@@ -911,11 +912,11 @@ try {
     await touch('touchEnd', 0, 0);
     await page.waitForTimeout(300);
     const scrolledBy = await page.evaluate(() => document.getElementById('view-memos').scrollTop);
-    // 훑어서 내려간 목록을 처음으로 (아래 점검이 같은 자리를 누르게) — 관성으로 더 미끄러지는 동안은 밀기를 받지 않으니 멈출 때까지
+    // 훑어서 내려간 목록을 처음 자리로 (아래 점검이 같은 자리를 누르게) — 관성으로 더 미끄러지는 동안은 밀기를 받지 않으니 멈출 때까지
     for (let k = 0; k < 10; k++) {
-      await page.evaluate(() => (document.getElementById('view-memos').scrollTop = 0));
+      await page.evaluate((t) => (document.getElementById('view-memos').scrollTop = t), startTop);
       await page.waitForTimeout(300);
-      if (await page.evaluate(() => document.getElementById('view-memos').scrollTop === 0)) break;
+      if (await page.evaluate((t) => Math.abs(document.getElementById('view-memos').scrollTop - t) < 1, startTop)) break;
     }
     await touch('touchStart', cx, cy);
     for (const mx of [-15, -60, -120, -200]) await touch('touchMove', cx + mx, cy);
