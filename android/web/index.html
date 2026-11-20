@@ -494,11 +494,12 @@
         <b id="drive-title"></b>
         <small id="drive-sub"></small>
       </div>
-    </div>
-    <div class="sheet-actions">
-      <button id="drive-sync-now" class="btn">지금 동기화</button>
-      <button id="drive-connect" class="btn primary">연결하기</button>
-      <button id="drive-disconnect" class="btn">연결 끊기</button>
+      <!-- 단추는 상태 칸 안 오른쪽에 (따로 한 줄을 차지하지 않게) — 자리가 모자라면 칸 안에서 다음 줄로 -->
+      <div class="sheet-actions drive-actions">
+        <button id="drive-sync-now" class="btn small">지금 동기화</button>
+        <button id="drive-connect" class="btn small primary">연결하기</button>
+        <button id="drive-disconnect" class="btn small">연결 끊기</button>
+      </div>
     </div>
 
 
@@ -512,8 +513,9 @@
       <input type="checkbox" id="history-enabled" class="switch" role="switch">
       <span>다른 앱 알림 모아두기 <small id="history-note"></small></span>
     </label>
-    <div class="sheet-actions">
-      <button id="history-apps-2" class="btn">모을 앱 선택 <span id="blocked-count" class="trash-count"></span></button>
+    <div class="setting-row nav-row">
+      <span>모을 앱 <small id="blocked-count"></small></span>
+      <button id="history-apps-2" class="btn small nav-act">모을 앱 선택</button>
     </div>
 
     <p class="label">Work / Life</p>
@@ -540,15 +542,19 @@
     </label>
     <p class="label">저장 공간</p>
     <p class="sub-label">메모 폴더</p>
-    <div class="path-box" id="vault-path"></div>
-    <div class="sheet-actions">
-      <button id="change-vault" class="btn">위치 변경</button>
-      <button id="use-internal-2" class="btn">이 휴대폰으로 바꾸기</button>
+    <!-- 경로와 단추를 한 카드에 (따로 줄을 차지하지 않게) -->
+    <div class="path-card">
+      <div class="path-box" id="vault-path"></div>
+      <div class="sheet-actions">
+        <button id="change-vault" class="btn small">위치 변경</button>
+        <button id="use-internal-2" class="btn small">이 휴대폰으로 바꾸기</button>
+      </div>
     </div>
     <p class="hint" id="vault-hint">PC와 함께 쓰려면 Google Drive를 연결해 주세요.</p>
     <p class="sub-label">휴지통</p>
-    <div class="sheet-actions">
-      <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
+    <div class="setting-row nav-row">
+      <span>삭제한 메모 <small>여기서 되살리거나 영구 삭제해요 <span id="trash-count" class="trash-count"></span></small></span>
+      <button id="trash-btn" class="btn small nav-act">휴지통 보기</button>
     </div>
     <label class="setting-row select-row">
       <span>휴지통 자동 비우기 <small>기간이 지난 메모를 영구 삭제해요</small></span>
@@ -561,12 +567,13 @@
       </select>
     </label>
     <p class="label">도움말과 나눠 주기</p>
-    <div class="sheet-actions">
-      <button id="tutorial-btn" class="btn">사용법 둘러보기</button>
+    <div class="setting-row nav-row">
+      <span>사용법 둘러보기 <small>직접 눌러 보며 배워요</small></span>
+      <button id="tutorial-btn" class="btn nav-act">사용법 둘러보기</button>
     </div>
-    <div class="setting-row select-row">
+    <div class="setting-row nav-row">
       <span>메모킹 나눠 주기 <small>Windows PC 버전과 이 휴대폰 앱의 설치 링크를 메신저나 메일로 보내요. 늘 최신 버전이에요</small></span>
-      <button type="button" id="share-install" class="btn small">링크 보내기</button>
+      <button type="button" id="share-install" class="btn small nav-act">링크 보내기</button>
     </div>
     <p class="version" id="version"></p>
     <p class="copyright">© 2026 메모킹, 문의 lmg6983@gmail.com</p>

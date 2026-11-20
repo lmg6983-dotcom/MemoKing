@@ -236,6 +236,23 @@ svg { width: 20px; height: 20px; flex: none; }
 .dialog-x svg { width: 18px; height: 18px; }
 .dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
+/* 한 가지 일만 하는 설정 줄(휴지통 보기 · 단축키 · 받기 …): One UI 처럼 줄 전체를 누르고, 단추 대신 › 만 (설정 화면 · PC 설정 창 같이)
+   단추는 그대로 남아 있어 키보드 · 화면 읽기는 같고, 보이지 않는 덮개(::after)가 줄 전체를 단추로 만든다 */
+.setting-row.nav-row { position: relative; cursor: pointer; }
+.setting-row.nav-row > .btn.nav-act {
+  position: static !important; flex: none; width: 20px; min-width: 0 !important; height: 20px; padding: 0 !important; margin-left: auto;
+  background: var(--text-faint) !important; box-shadow: none !important; font-size: 0; color: transparent;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7.5 4.5 13 10l-5.5 5.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 20px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7.5 4.5 13 10l-5.5 5.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 20px no-repeat;
+}
+.setting-row.nav-row > .btn.nav-act::before { display: none !important; }
+.setting-row.nav-row > .btn.nav-act::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.setting-row.nav-row > .btn.nav-act:disabled { opacity: 0.4; }
+.setting-row.nav-row:has(> .nav-act:disabled) { cursor: default; opacity: 0.6; }
+@media (hover: hover) and (pointer: fine) { .setting-row.nav-row:hover { background-color: color-mix(in srgb, var(--text) 4%, transparent); } }
+.setting-row.nav-row:active:not(:has(> .nav-act:disabled)) { background-color: color-mix(in srgb, var(--text) 7%, transparent); }
+.setting-row.nav-row:has(> .nav-act:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
 .path-box {
   padding: 10px 12px;
   margin-bottom: 14px;
@@ -1293,7 +1310,7 @@ dialog.quick-event[open] {
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 5px !important; }
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev, .cal[data-view="dayGridMonth"] .cal-body .mk-ev > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
 /* 좁은 창(휴대폰): 달력을 화면 폭 가까이 넓혀 칸마다 글자가 더 들어가게 */
-@media (max-width: 700px) { .cal[data-view="dayGridMonth"] { margin-inline: -9px; padding-inline: 2px; } }
+@media (max-width: 700px) { .cal[data-view="dayGridMonth"] { padding-inline: 4px; } } /* 카드 끝은 다른 카드와 같은 선, 칸은 카드 안에서 넓게 */
 /* 칩 제목: 칸 폭에 맞춘 크기(공백 포함 한글 8자쯤 — 휴대폰 약 8~9px, 넓은 창은 11px 까지) · 보통 굵기 · 살짝 좁은 자간 */
 .cal[data-view="dayGridMonth"] .cal-body .mk-mt { font-size: clamp(8px, calc((var(--cal-col, 56px) - 5px) / 6.3), 11px) !important; font-weight: 500; letter-spacing: -0.03em; line-height: 1.3; padding: 1px 1.5px; }
 .cal[data-view="dayGridMonth"] .cal-body .mk-more { min-height: 0 !important; margin: 0 2px; padding: 0 2px; font-size: 11.5px; line-height: 13px; }
@@ -1688,8 +1705,8 @@ dialog.quick-event[open] {
 .mf-sep { margin: 6px 4px 0; padding: 9px 6px 3px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; list-style: none; user-select: none; }
 /* 메모 목록의 상단 고정 묶음 (PC · 휴대폰): 묶음마다 제 열 줄 — 이름 줄은 한 줄을 다 차지 (폴더 목록 .mf-sep 과 같은 모양) */
 .cards.sectioned { flex-wrap: wrap; align-content: flex-start; }
-.card-sep { flex: 0 0 100%; padding: 9px 2px 1px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; user-select: none; }
-.card-sep:first-child { border-top: 0; padding-top: 2px; }
+.card-sep { flex: 0 0 100%; padding: 18px 8px 0; color: var(--muted); font-size: 13px; line-height: 18px; font-weight: 700; user-select: none; } /* One UI 묶음 이름: 선 대신 띄움, 카드 안 글과 같이 들여 씀 */
+.card-sep:first-child { padding-top: 2px; }
 .mf-new { margin: 6px 0 0 4px; }
 .folder-dialog { width: min(360px, calc(100vw - 24px)); }
 .folder-dialog-body { max-height: min(60vh, 480px); padding: 3px; overflow-y: auto; } /* 3px: 칸의 노란 테두리가 잘리지 않게 */

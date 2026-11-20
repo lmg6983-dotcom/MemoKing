@@ -172,12 +172,14 @@
       <div class="drive-box" id="drive-box">
         <svg class="drive-box-icon"><use href="#i-cloud"/></svg>
         <div class="drive-box-text"><b id="drive-title">확인하는 중…</b><small id="drive-sub"></small><div class="sync-bar" id="drive-bar" hidden><i></i></div></div>
+        <!-- 단추는 상태 칸 안 오른쪽에 (따로 한 줄을 차지하지 않게, 휴대폰과 같음) — 상태를 읽기 전에는 연결하기만 (render 가 상태에 맞춰 보이고 숨긴다) -->
+        <div class="drive-actions">
+          <button id="drive-sync-now" class="btn primary" hidden>지금 동기화</button>
+          <button id="drive-connect" class="btn primary">연결하기</button>
+          <button id="drive-conflicts" class="btn" hidden></button>
+        </div>
       </div>
-      <div class="dialog-actions left">
-        <!-- 상태를 읽기 전에는 연결하기만 (render 가 상태에 맞춰 보이고 숨긴다) -->
-        <button id="drive-sync-now" class="btn primary" hidden>지금 동기화</button>
-        <button id="drive-connect" class="btn primary">연결하기</button>
-        <button id="drive-conflicts" class="btn" hidden></button>
+      <div class="drive-links">
         <button id="drive-folder" class="link-btn" hidden>다른 Drive 폴더로 바꾸기</button>
         <button id="drive-disconnect" class="link-btn danger" hidden>연결 끊기</button>
       </div>
@@ -188,9 +190,9 @@
     </section>
     <section class="set-sec" aria-labelledby="set-trash">
       <h3 class="set-title" id="set-trash">휴지통</h3>
-      <div class="setting-row">
-        <span>삭제한 메모 <small>여기서 되살리거나 영구 삭제해요</small></span>
-        <button id="trash-btn" class="btn">휴지통 보기 <span id="trash-count" class="trash-count"></span></button>
+      <div class="setting-row nav-row">
+        <span>삭제한 메모 <small>여기서 되살리거나 영구 삭제해요 <span id="trash-count" class="trash-count"></span></small></span>
+        <button id="trash-btn" class="btn nav-act">휴지통 보기</button>
       </div>
       <label class="setting-row select-row">
         <span>휴지통 자동 비우기 <small>기간이 지난 메모를 영구 삭제해요</small></span>
@@ -205,9 +207,9 @@
     </section>
     <section class="set-sec" aria-labelledby="set-keys">
       <h3 class="set-title" id="set-keys">단축키</h3>
-      <div class="setting-row">
+      <div class="setting-row nav-row">
         <span>단축키 바꾸기 <small>매직 카피 · 메모 목록 · 메모 창 기능의 키를 한곳에서</small></span>
-        <button type="button" class="btn" id="keymap-open">단축키 설정하기</button>
+        <button type="button" class="btn nav-act" id="keymap-open">단축키 설정하기</button>
       </div>
     </section>
     <section class="set-sec" aria-labelledby="set-daily">
@@ -271,10 +273,13 @@
     </section>
     <section class="set-sec" aria-labelledby="set-storage">
       <h3 class="set-title" id="set-storage">메모 폴더 <small>메모가 .md 파일로 저장되는 곳</small></h3>
-      <div class="path-box" id="vault-path"></div>
-      <div class="dialog-actions left">
-        <button id="reveal-vault" class="btn">폴더 열기</button>
-        <button id="change-vault" class="btn">폴더 바꾸기</button>
+      <!-- 경로와 단추를 한 칸에 (따로 한 줄을 차지하지 않게) -->
+      <div class="drive-box path-row">
+        <div class="path-box" id="vault-path"></div>
+        <div class="drive-actions">
+          <button id="reveal-vault" class="btn">폴더 열기</button>
+          <button id="change-vault" class="btn">폴더 바꾸기</button>
+        </div>
       </div>
     </section>
     <section class="set-sec" aria-labelledby="set-phone">
@@ -312,13 +317,13 @@
     <!-- 메모킹 설정이 아니라 따로 설치하는 짝 앱: 맨 아래에 받기 링크만 (단축키 · 기능은 그 앱의 알림 영역 메뉴에서) -->
     <section class="set-sec" aria-labelledby="set-apps">
       <h3 class="set-title" id="set-apps">함께 쓰는 앱 <small>따로 설치해요. 설정은 각 앱의 알림 영역 메뉴에서</small></h3>
-      <div class="setting-row split">
+      <div class="setting-row split nav-row">
         <span>MagicKey <small>어디서든 Ctrl+Alt+Space 로 메모하고, 메모 · 파일 · 앱을 찾아요</small></span>
-        <a class="btn" href="https://github.com/lmg6983-dotcom/MagicKey/releases/latest" target="_blank" rel="noopener" aria-label="MagicKey 받기">받기</a>
+        <a class="btn nav-act" href="https://github.com/lmg6983-dotcom/MagicKey/releases/latest" target="_blank" rel="noopener" aria-label="MagicKey 받기">받기</a>
       </div>
-      <div class="setting-row split">
+      <div class="setting-row split nav-row">
         <span>MagicSystem <small>OPMS 사건을 찾아요 (사내망)</small></span>
-        <a class="btn" href="https://github.com/lmg6983-dotcom/MagicSystem/releases/latest" target="_blank" rel="noopener" aria-label="MagicSystem 받기">받기</a>
+        <a class="btn nav-act" href="https://github.com/lmg6983-dotcom/MagicSystem/releases/latest" target="_blank" rel="noopener" aria-label="MagicSystem 받기">받기</a>
       </div>
     </section>
     <footer class="set-foot">

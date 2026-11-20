@@ -846,7 +846,7 @@ function setTab(tab) {
   $('view-history').hidden = tab !== 'history';
   $('large-title').textContent = { memos: '메모', reminders: '일정', history: '알림 보관함' }[tab];
   $('large-sub').hidden = tab !== 'memos';
-  document.querySelector('.list-screen').classList.remove('scrolled');
+  placeBar(tab);
   el.filterBtn.hidden = tab !== 'memos';
   el.folderBtn.hidden = tab !== 'memos'; // 폴더는 메모에만 (일정 · 보관함에는 쓸 데가 없다)
   el.search.placeholder = { memos: '메모나 #태그 검색', reminders: '일정 검색', history: UI.searchHistory }[tab];
@@ -864,14 +864,24 @@ function setTab(tab) {
   }, 0));
 }
 let tabSeq = 0;
-// One UI 큰 제목: 목록을 내리면 접고, 맨 위로 오면 다시 편다
-document.querySelector('.list-screen').addEventListener('scroll', (e) => {
-  if (!e.target.classList?.contains('view')) return;
-  const v = e.target, y = v.scrollTop, list = e.currentTarget.classList; // 접고 펴는 문턱을 벌려 둔다 (제목 높이만큼 목록이 움직여도 오락가락하지 않게)
-  // 접으면 목록 칸이 머리 높이만큼 길어진다 — 그래도 내릴 거리가 남는 긴 목록만 접는다 (짧으면 접자마자 맨 위로 돌아와 다시 펴졌다)
-  if (y > 48 && v.scrollHeight - v.clientHeight - $('large-title').parentElement.offsetHeight > 8) list.add('scrolled');
-  else if (y < 4) list.remove('scrolled');
-}, { capture: true, passive: true });
+// One UI 큰 제목: 맨 위 줄 · 큰 제목 · 검색 줄을 지금 탭의 목록 칸 맨 앞에 두고 함께 스크롤한다.
+//   검색 줄은 칸 위에 붙어 남는다 (sticky, 위 두 줄 높이만큼 위로 올라간 자리) — 제목을 접고 펴며 목록을 밀지 않으니
+//   맨 위로 올라와도 카드가 손가락 밑에서 갑자기 내려가지 않는다
+const searchbar = document.querySelector('.searchbar');
+function placeBar(tab) {
+  const view = $(`view-${tab}`);
+  if (searchbar.parentElement !== view) view.prepend(searchbar);
+  stickBar();
+}
+function stickBar() {
+  const row = el.search.closest('.search');
+  if (!row?.getClientRects().length) return;
+  const above = row.getBoundingClientRect().top - searchbar.getBoundingClientRect().top - 8; // 검색 줄 위 8px 여백은 남긴다
+  searchbar.style.setProperty('--bar-stick', `${-Math.max(0, Math.round(above))}px`);
+  searchbar.parentElement.style.setProperty('--bar-full', `${searchbar.offsetHeight}px`); // 빈 화면 안내를 머리 아래 남은 칸 가운데에
+}
+new ResizeObserver(stickBar).observe(searchbar);
+placeBar(state.tab ?? 'memos');
 tabKeys(document.querySelector('.tabs'));
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');

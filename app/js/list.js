@@ -1164,7 +1164,7 @@ async function loadSettings() {
   });
   if (api.stt) renderStt(await api.stt.status());
   if (api.ai) renderAi(await api.ai.status());
-  $('trash-count').textContent = s.trashCount ? String(s.trashCount) : '';
+  $('trash-count').textContent = s.trashCount ? `· ${s.trashCount}개` : '';
 }
 function showQuickMemo(q) {
   $('quick-memo').checked = q.enabled && q.registered;
@@ -2289,7 +2289,7 @@ function openPanelDialog(dialog) {
 }
 async function renderTrash() {
   const [items, s] = await Promise.all([api.trash.list(), api.settings.get()]);
-  $('trash-count').textContent = items.length ? String(items.length) : '';
+  $('trash-count').textContent = items.length ? `· ${items.length}개` : '';
   trashEl.note.textContent = s.trashDays > 0
     ? `삭제한 메모는 여기에 있다가 ${DAYS_LABEL[s.trashDays] ?? `${s.trashDays}일`}이 지나면 저절로 삭제돼요.`
     : '삭제한 메모는 직접 삭제할 때까지 여기에 있어요.';
@@ -2330,7 +2330,7 @@ async function renderTrash() {
 }
 async function refreshTrashCount() {
   const items = await api.trash.list();
-  $('trash-count').textContent = items.length ? String(items.length) : '';
+  $('trash-count').textContent = items.length ? `· ${items.length}개` : '';
 }
 $('trash-btn').addEventListener('click', async () => {
   await busyWhile($('trash-btn'), renderTrash());

@@ -1249,7 +1249,7 @@ function fillSettingsFromPhone() {
   $('version').textContent = `메모킹 ${info.version}`;
   refreshUpdateRow(info.version);
   const n = app.vault?.trashCount() ?? 0;
-  $('trash-count').textContent = n ? String(n) : '';
+  $('trash-count').textContent = n ? `· ${n}개` : '';
   refreshNotifyRow(info);
   refreshHistoryRow();
   renderDrive();
