@@ -286,7 +286,9 @@ function mediaView(node, view, getPos) {
     // 휴대폰: 파일 칩처럼 두 번 눌러야 크게 보기 — 한 번 누르면 단추 줄(복사 · 저장 · 지우기 · 크기, block-move.js)만.
     //   고치기 · 옮기기 방식, 한 장 사진 · 묶음 사진 · PDF 를 펼친 장 모두 같게 (예전: 옮기기에서는 한 장 사진이 아예 열리지 않고,
     //   글을 고칠 수 없는 때라 묶음 · PDF 장은 한 번만 눌러도 열렸다)
-    if (matchMedia('(pointer: coarse)').matches) {
+    //   문서의 PDF 첫 쪽 썸네일만은 한 번 누르면 바로 PDF 보기 — 가장 자주 하는 일이라 (두 번 누르기를 몰라 열지 못했다). 단추 줄은 꾹 누르기로
+    if (pdfThumb && matchMedia('(pointer: coarse)').matches) hideDeleteButton(true);
+    else if (matchMedia('(pointer: coarse)').matches) {
       const now = Date.now();
       if (now - lastTap > DOUBLE_TAP_MS) {
         lastTap = now;

@@ -1,5 +1,5 @@
 // 음성 카드 보기 (편집기 플러그인, 데스크탑·휴대폰 함께) — core/voice-card.js 의 인용을 카드로
-//   - 소리 플레이어와 받아쓴 글이 한 칸에. 아래 막대로 접기·펴기 (접으면 첫 문장만 흐리게 미리 보기)
+//   - 소리 플레이어와 받아쓴 글이 한 칸에. 아래 막대로 접기·펴기 (접으면 첫 문장만 흐리게 미리 보기) · 그 옆 복사(받아쓴 글만)
 //   - 길면(8줄 넘게) 처음엔 접힌 채로, 접기 상태는 소리 파일마다 기억
 //   - 말한 사람마다 색: "화자 1:" 이름표와 왼쪽 줄 색 (이어 말한 줄도 같은 색)
 //   - 카드는 한 줄(블록)이라 소리 이름 줄이나 받아쓴 글을 꾹 눌러 옮기면 받아쓴 글도 함께 움직인다
@@ -7,6 +7,8 @@
 import { Plugin, PluginKey, Decoration, DecorationSet } from '../vendor/milkdown.js';
 import { SPEAKER_LINE } from './core/voice-card.js';
 import { haptic } from './dom.js';
+import { copyText } from './copy-content.js';
+import { COPY_ICON, DONE_ICON } from './content-icons.js';
 
 export const voiceCardKey = new PluginKey('memoking-voice-card');
 const FOLD_KEY = 'memoking.voiceFold';
@@ -60,6 +62,15 @@ function saveFold(src, folded) {
   }
 }
 
+/** 받아쓴 글만 (소리 이름 줄 빼고, 줄마다 한 줄 — "화자 1: …" 이름표는 그대로) */
+function transcriptText(node) {
+  const lines = [];
+  node.forEach((c, _, i) => {
+    if (i > 0 && c.type.name === 'paragraph' && c.textContent.trim()) lines.push(c.textContent.trim());
+  });
+  return lines.join('\n');
+}
+
 function plainQuote() {
   const dom = document.createElement('blockquote');
   return { dom, contentDOM: dom, update: (n) => n.type.name === 'blockquote' && !isVoiceCard(n) };
@@ -85,9 +96,22 @@ function voiceView(node) {
   const peek = document.createElement('span');
   peek.className = 'mk-voice-peek';
   toggle.append(chev, label, peek);
-  bar.append(toggle);
+  // 받아쓴 글 복사 — 접기 옆 (접혀 있어도). 누르면 잠깐 ✓
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'mk-voice-copy';
+  copy.title = '받아쓴 글 복사';
+  copy.setAttribute('aria-label', '받아쓴 글 복사');
+  const copyIco = document.createElement('span');
+  copyIco.className = 'mk-voice-copy-ico';
+  copyIco.innerHTML = COPY_ICON;
+  const copyLabel = document.createElement('span');
+  copyLabel.textContent = '복사';
+  copy.append(copyIco, copyLabel);
+  bar.append(toggle, copy);
   dom.append(body, bar);
 
+  let current = node;
   let summary = voiceSummary(node);
   const stored = readFolds()[src];
   let folded = stored ?? summary.lines > AUTO_FOLD;
@@ -117,6 +141,27 @@ function voiceView(node) {
     haptic(8);
     setFolded(!folded);
   });
+  copy.addEventListener('mousedown', (e) => e.preventDefault());
+  let copyTimer = 0;
+  copy.addEventListener('click', async (e) => {
+    e.preventDefault();
+    haptic(8);
+    let ok = true;
+    try {
+      await copyText({ text: transcriptText(current) });
+    } catch {
+      ok = false;
+    }
+    copyIco.innerHTML = ok ? DONE_ICON : COPY_ICON;
+    copyLabel.textContent = ok ? '복사했어요' : '복사하지 못했어요';
+    copy.classList.toggle('done', ok);
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      copyIco.innerHTML = COPY_ICON;
+      copyLabel.textContent = '복사';
+      copy.classList.remove('done');
+    }, 1500);
+  });
   dom.mkUnfold = () => setFolded(false, false);
   render();
 
@@ -125,6 +170,7 @@ function voiceView(node) {
     contentDOM: body,
     update(next) {
       if (next.type.name !== 'blockquote' || voiceAudioOf(next)?.attrs.src !== src) return false;
+      current = next;
       summary = voiceSummary(next);
       render();
       return true;
