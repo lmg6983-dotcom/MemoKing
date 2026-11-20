@@ -44,7 +44,7 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         "reminders:take-magic" => Ok(json!(std::mem::take(&mut *state(app).magic_schedules.lock().unwrap()))),
         "reminders:magic-done" => {
             let (id, title, label) = (arg(0).as_str().unwrap_or_default(), js::string(arg(1)), js::string(arg(2)));
-            toast(app, id, if id.is_empty() { "일정을 만들지 못했어요" } else { "일정을 만들었어요" }, &title, &label, None);
+            toast(app, id, if id.is_empty() { "일정을 만들지 못했어요" } else { "일정을 만들었어요" }, &title, &label);
             Ok(Value::Null)
         }
         "calendars:feeds" => Ok(json!(feed_list(app))),
@@ -163,42 +163,64 @@ fn fire(app: &AppHandle, id: &str, r: &Value, due: Option<(Alert, bool)>, now: c
         state(app).alarms.lock().unwrap().remove(id); // 창을 열 수 없으면 알림 창으로라도
     }
     let preview = if memo["locked"] == true { String::new() } else { body::extract_preview(memo["body"].as_str().unwrap_or_default(), 120) };
-    toast(app, id, &title, &label, &preview, None);
+    toast(app, id, &title, &label, &preview);
 }
 
-/// Windows 알림 창 — 누르면 그 메모를 연다 (notice: AI 가 한 일이면 열린 메모 창 아래 막대에도 — ai:notice)
+/// Windows 알림 창 — 누르면 그 메모를 (id 가 없으면 일정 탭을) 연다.
+///   누르기는 memoking: 주소로 (Windows 가 메모킹을 다시 불러 os::launch 로) — 알림 객체에 단 처리기는 알림을 띄운 뒤
+///   사라져 눌러도 아무 일이 없었고, 알림 센터에 남은 알림도 이렇게 해야 열린다
 #[cfg(windows)]
-pub(crate) fn toast(app: &AppHandle, id: &str, title: &str, label: &str, preview: &str, notice: Option<Value>) {
-    use tauri_winrt_notification::Toast;
-    // 설치판은 설치기가 이 이름(identifier)으로 바로가기를 만든다 — 개발 중에는 Windows 가 모르는 이름이라 PowerShell 이름으로
-    let app_id = if cfg!(debug_assertions) { Toast::POWERSHELL_APP_ID.to_string() } else { app.config().identifier.clone() };
-    let (app, id) = (app.clone(), id.to_string());
-    let shown = Toast::new(&app_id)
-        .title(title)
-        .text1(label)
-        .text2(preview)
-        .on_activated(move |_| {
-            // 메모가 없는 알림(매직키 일정을 못 만듦)은 일정 탭으로
-            if id.is_empty() {
-                crate::os::show_list_tab(&app, "reminders");
-                return Ok(());
-            }
-            let _ = crate::memos::open_note(&app, &id);
-            if let Some(n) = &notice {
-                send_to_note(&app, &id, "ai:notice", n.clone());
-            }
-            Ok(())
-        })
-        .show();
+pub(crate) fn toast(app: &AppHandle, id: &str, title: &str, label: &str, preview: &str) {
+    use windows::{core::HSTRING, Data::Xml::Dom::XmlDocument, UI::Notifications::{ToastNotification, ToastNotificationManager}};
+    let link = if id.is_empty() { "memoking:reminders".to_string() } else { format!("memoking:memo/{id}") };
+    let texts: String = [title, label, preview].iter().filter(|t| !t.is_empty()).map(|t| format!("<text>{}</text>", xml_escape(t))).collect();
+    let xml = format!(r#"<toast activationType="protocol" launch="{}"><visual><binding template="ToastGeneric">{texts}</binding></visual></toast>"#, xml_escape(&link));
+    let shown = (|| {
+        let doc = XmlDocument::new()?;
+        doc.LoadXml(&HSTRING::from(xml))?;
+        ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(&toast_app_id(app)))?.Show(&ToastNotification::CreateToastNotification(&doc)?)
+    })();
     if let Err(err) = shown {
         elog!("알림을 울리지 못했습니다: {err}");
     }
 }
 
+/// 알림을 띄우는 이름 — 설치판은 설치기가 이 이름(identifier)으로 바로가기를 만든다. 개발 중에는 Windows 가 아는 PowerShell 이름으로
+#[cfg(windows)]
+fn toast_app_id(app: &AppHandle) -> String {
+    if cfg!(debug_assertions) { "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe".to_string() } else { app.config().identifier.clone() }
+}
+
+/// 켤 때: 알림의 이름 · 아이콘(바로가기가 없거나 옛 판의 것이면 아이콘이 깨진다)과 memoking: 주소(알림 누르기)를 이 메모킹으로 적는다
+///   지우기는 설치 파일의 지우개가 (installer-hooks.nsh NSIS_HOOK_PREUNINSTALL)
+#[cfg(windows)]
+pub fn register(app: &AppHandle) {
+    use crate::shell_menu::set_reg;
+    let Ok(exe) = std::env::current_exe() else { return };
+    let icon = state(app).settings_dir.join("toast-icon.png");
+    // 개발 중에는 PowerShell 이름을 빌려 쓰니 그 이름 · 아이콘은 건드리지 않는다
+    if !cfg!(debug_assertions) && std::fs::write(&icon, include_bytes!("../../../assets/icons/icon-256.png")).is_ok() {
+        let key = format!(r"Software\Classes\AppUserModelId\{}", toast_app_id(app));
+        set_reg(&key, Some("DisplayName"), "메모킹");
+        set_reg(&key, Some("IconUri"), &icon.display().to_string());
+    }
+    set_reg(r"Software\Classes\memoking", None, "URL:MemoKing");
+    set_reg(r"Software\Classes\memoking", Some("URL Protocol"), "");
+    set_reg(r"Software\Classes\memoking\shell\open\command", None, &format!("\"{}\" \"%1\"", exe.display()));
+}
+
+#[cfg(not(windows))]
+pub fn register(_app: &AppHandle) {}
+
 // shortcut: 메모킹은 Windows 판만 내므로 다른 OS 는 알림 창 없이 적기만 — 다른 OS 판을 낼 때 그 OS 알림으로
 #[cfg(not(windows))]
-pub(crate) fn toast(_app: &AppHandle, _id: &str, title: &str, label: &str, preview: &str, _notice: Option<Value>) {
+pub(crate) fn toast(_app: &AppHandle, _id: &str, title: &str, label: &str, preview: &str) {
     elog!("[알림] {title} · {label} · {preview}");
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
 // ---------- 다른 캘린더 구독 (.ics 주소 · CalDAV 계정 — 이 PC 설정에만) ----------

@@ -396,7 +396,13 @@ fn remind_from_text(text: &str, now: chrono::DateTime<chrono::Local>) -> Option<
 /// 실행 인자대로 (jump-list.js launchAction · main.js handleLaunch) — 메모 창을 열었으면 true (아니면 부르는 쪽이 목록을 띄운다)
 fn launch(app: &AppHandle, args: &[String]) -> bool {
     let val = |p: &str| args.iter().find_map(|a| a.strip_prefix(p).map(str::to_string));
-    if let Some(id) = val("--open-memo=").filter(|id| (1..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')) {
+    // Windows 알림을 눌렀다 (reminders::toast 의 memoking: 주소) — 메모 하나 또는 일정 탭
+    let link = val("memoking:").map(|l| l.trim_end_matches('/').to_string());
+    if link.as_deref() == Some("reminders") {
+        show_list_tab(app, "reminders");
+        return true;
+    }
+    if let Some(id) = val("--open-memo=").or_else(|| link.and_then(|l| l.strip_prefix("memo/").map(str::to_string))).filter(|id| (1..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')) {
         return memos::open_note(app, &id).unwrap_or(false);
     }
     if let Some(file) = val("--new-memo-file=").filter(|f| magickey_name(f)) {
@@ -413,7 +419,7 @@ fn launch(app: &AppHandle, args: &[String]) -> bool {
         if !open {
             let first: String = text.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or_default().trim_start_matches('#').trim().chars().take(40).collect();
             let when = saved.map(|r| format!("알림: {}", memoking_core::reminders::describe_reminder(&r, now))).unwrap_or_default();
-            crate::reminders::toast(app, &id, "메모를 만들었어요", &first, &if when.is_empty() { "눌러서 열기".to_string() } else { format!("{when} · 눌러서 열기") }, None);
+            crate::reminders::toast(app, &id, "메모를 만들었어요", &first, &if when.is_empty() { "눌러서 열기".to_string() } else { format!("{when} · 눌러서 열기") });
         }
         return true;
     }
@@ -454,6 +460,7 @@ pub fn start(app: &AppHandle, list: &WebviewWindow) {
     }
     if !crate::ipc::smoke() {
         crate::shell_menu::register(); // 탐색기 오른쪽 클릭 › 메모킹에 저장 (이 exe 를 부르게 — 업데이트로 자리가 바뀌어도)
+        crate::reminders::register(app); // Windows 알림의 이름 · 아이콘 · 누르기(memoking: 주소)
     }
     let app2 = app.clone();
     list.on_window_event(move |e| match e {
