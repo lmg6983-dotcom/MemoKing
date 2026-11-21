@@ -185,24 +185,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .tab-count { position: absolute; top: 5px; left: calc(50% + 9px); min-width: 15px; padding: 0 4px; border-radius: 999px; background: var(--text-strong); color: var(--surface-1); font-size: 10.5px; font-weight: 800; line-height: 15px; text-align: center; } /* 숫자 배지는 무채색 */
 .tab-count:empty { display: none; }
 
-/* One UI 큰 머리: 맨 위에서는 화면 위쪽을 비워 제목을 가운데 크게 (보는 자리),
-   내리면 접혀 로고 줄 · 검색칸(조작 자리)만 남는다 — 갤럭시 설정 · 내 파일과 같은 짜임 */
-.large-head {
-  order: 9;
-  flex-basis: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: clamp(120px, 24vh, 210px);
-  overflow: hidden;
-  text-align: center;
-}
-.large-title { margin: 0; font-size: 34px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; color: var(--text-strong); }
-.large-sub { margin: 0; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.large-sub:empty { display: none; }
-/* 맨 위 줄 · 큰 제목 · 검색 줄은 목록 칸 맨 앞에서 함께 스크롤되고, 검색 줄만 칸 위에 붙어 남는다 (list-view.js placeBar) */
+/* 맨 위 줄 · 검색 줄은 목록 칸 맨 앞에서 함께 스크롤되고, 검색 줄만 칸 위에 붙어 남는다 (list-view.js placeBar) */
 .view > .searchbar { position: sticky; top: var(--bar-stick, 0px); z-index: 6; background: var(--bg); }
 #view-memos > .searchbar { grid-column: side / -1; grid-row: 1; }
 /* 메모 화면의 아래 안내 말풍선은 떠 있는 ＋ · 다이얼 · 서식 막대 위로 (가리지 않게) */

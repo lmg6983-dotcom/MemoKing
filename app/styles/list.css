@@ -69,8 +69,8 @@ body {
 }
 .search input {
   width: 100%;
-  height: 40px;
-  padding: 0 14px 0 38px;
+  height: 36px;
+  padding: 0 14px 0 36px;
   border: 0;
   border-radius: 999px; /* 휴대폰과 같은 알약 모양 (테두리 없이 그림자) */
   background: var(--surface);
@@ -271,7 +271,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
   display: flex;
   gap: 2px;
   margin: 0 12px 8px;
-  padding: 4px;
+  padding: 3px;
   border-radius: 999px;
   max-width: 560px; /* 넓은 창에서 탭 줄이 창 끝까지 늘어나지 않게 */
   background: var(--fill-tab);
