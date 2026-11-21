@@ -6,10 +6,10 @@
 
 /* OKLab 팔레트 — 화면의 모든 색은 여기서 고른다 (메모킹 · MagicKey · MagicSystem 같은 값)
    OKLCH 좌표(밝기 L · 채도 C · 색상 h)에서 뽑아 sRGB 로 적었다. 반투명은 color-mix(in oklab, 토큰 N%, transparent)
-   꼭 필요한 것만: 무채색 10 · 색 22 (노랑 300 = 브랜드 #ffcc00) · 메모 종이 6색 × (바탕 · 머리줄 · 점) × 밝은/어두운
+   꼭 필요한 것만: 무채색 11 · 색 22 (노랑 300 = 브랜드 #ffcc00) · 메모 종이 6색 × (바탕 · 머리줄 · 점) × 밝은/어두운
    반투명은 검정 · 흰색 10단계(4 8 12 16 24 32 48 64 80 90%), 색은 5단계(8 16 32 48 80%) */
 :root {
-  --ok-gray-0: #ffffff; --ok-gray-50: #f5f5f5; --ok-gray-100: #ebebeb; --ok-gray-200: #d4d4d4; --ok-gray-400: #9e9e9e; --ok-gray-550: #737373; --ok-gray-850: #242424; --ok-gray-900: #191919; --ok-gray-950: #0e0e0e; --ok-gray-1000: #000000;
+  --ok-gray-0: #ffffff; --ok-gray-50: #f5f5f5; --ok-gray-100: #ebebeb; --ok-gray-200: #d4d4d4; --ok-gray-400: #9e9e9e; --ok-gray-550: #737373; --ok-gray-600: #696969; --ok-gray-850: #242424; --ok-gray-900: #191919; --ok-gray-950: #0e0e0e; --ok-gray-1000: #000000;
   --ok-red-100: #ffdfdc; --ok-red-400: #ff716b; --ok-red-600: #d12830; --ok-red-800: #880a16;
   --ok-orange-400: #fa7c1f;
   --ok-green-200: #a6e6b6; --ok-green-500: #00a855; --ok-green-700: #007137;
@@ -30,11 +30,11 @@
 :root {
   /* 브랜드 */
   --brand-yellow: var(--ok-yellow-300);
-  --brand-yellow-hover: var(--ok-yellow-300);
+  --brand-yellow-hover: color-mix(in oklab, var(--ok-yellow-300) 92%, var(--ok-gray-1000)); /* 누를 수 있는 노랑의 마우스 올림: 팔레트 노랑에 검정 8% */
   /* 포인트색(노랑)은 꼭 눈이 가야 할 곳에만: 주요 동작 단추 · ＋ · 달력의 오늘 · 튜토리얼 · 진행 막대 · 경고 띠.
      고른 탭 · 고른 줄 · 밑줄 · 포커스 · 스위치 · 체크 같은 "상태" 는 무채색으로 (노랑이 여기저기 흩어져 난잡하던 것) */
   --brand-yellow-soft: color-mix(in oklab, var(--ok-gray-1000) 8%, transparent); /* 고른 상태 바탕 (이름은 예전 그대로 — 이제 무채색) */
-  --accent-line: color-mix(in oklab, var(--ok-gray-1000) 32%, transparent); /* 밑줄 · 입력 포커스 선 */
+  --accent-line: color-mix(in oklab, var(--ok-gray-1000) 48%, transparent); /* 밑줄 · 입력 포커스 선 */
   --on-dark-fill: var(--ok-gray-0);
   --on-brand-soft: var(--text-strong); /* 고른 상태 위 글자 */
   --brand-black: var(--ok-gray-950);
@@ -49,8 +49,8 @@
   --fill-hover: color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   --fill-tab: color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   --text-strong: var(--ok-gray-900); /* 카톡 본문 글자색 */
-  --text-muted: var(--ok-gray-550);
-  --text-faint: var(--ok-gray-550); /* 흐린 글(안내 · 빈칸 글)도 흰 카드에서 4.5:1 넘게 (#8a8a8a 는 3.4:1) */
+  --text-muted: var(--ok-gray-600); /* 바탕(#f5f5f5) 위에서도 4.5:1 넘게 (550 은 4.35) */
+  --text-faint: var(--ok-gray-600); /* 흐린 글(안내 · 빈칸 글)도 흰 카드에서 4.5:1 넘게 (#8a8a8a 는 3.4:1) */
   --danger: var(--ok-red-600);
   --sat: var(--ok-blue-600); /* 달력 토요일 (흰 바탕 5.9:1) */
   --ok-text: var(--ok-green-700); /* 복사했어요 · 저장 같은 성공 글 */
@@ -117,9 +117,9 @@
 
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
-    --brand-yellow-hover: var(--ok-yellow-300);
+    --brand-yellow-hover: color-mix(in oklab, var(--ok-yellow-300) 84%, var(--ok-gray-0)); /* 어두운 화면은 흰색 16% 로 밝게 */
     --brand-yellow-soft: color-mix(in oklab, var(--ok-gray-0) 12%, transparent);
-    --accent-line: color-mix(in oklab, var(--ok-gray-0) 32%, transparent);
+    --accent-line: color-mix(in oklab, var(--ok-gray-0) 48%, transparent);
     --on-brand-soft: var(--text-strong);
     --surface-0: var(--ok-gray-950); /* 완전 검정 대신 아주 어두운 따뜻한 회색 */
     --surface-1: var(--ok-gray-900);
@@ -237,6 +237,7 @@ svg { width: 20px; height: 20px; flex: none; }
 @media (hover: hover) and (pointer: fine) { .btn.primary:hover { background: var(--brand-yellow-hover); } }
 .btn.danger { background: var(--danger); color: var(--on-danger); box-shadow: none; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.primary:disabled { opacity: 1; background: var(--brand-yellow-soft); color: var(--muted); box-shadow: none; } /* 누를 수 없는 주요 단추는 흐린 노랑 대신 무채색 (MagicKey · MagicSystem 같이) */
 /* 누른 일을 하는 중 (dom.js busyWhile) — 추억 공유 단추와 같은 모양 */
 :is(.btn, .icon-btn, .link-btn, .card, .cards, .stack-tab)[aria-busy="true"] { opacity: 0.6; cursor: progress; }
 
@@ -609,7 +610,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
   background: var(--surface-0); color: var(--text); font: inherit; font-size: 15px;
 }
-.event-field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.event-field input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .event-dialog .event-when { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--text); }
 .event-dialog .event-when-edit { font-size: 13px; font-weight: 600; }
 /* 바꾸기: 날짜 칸 + 새 일정 창과 같은 시각 고르기 (칩 · 다른 시각 — 모양은 .qe-time 과 함께) */
@@ -626,7 +627,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
 }
 .event-alerts button[aria-pressed="true"] { border-color: transparent; background: var(--accent); color: var(--on-brand); font-weight: 700; }
 .event-alerts button[aria-pressed="true"]::before { content: '✓ '; }
-.event-alerts button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.event-alerts button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 /* 메모 창 일정 · 알림 패널(reminder-panel.js)의 "새 일정 / 새 알림" 단추 */
 .rem-start { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
 .rem-start svg { width: 16px; height: 16px; }
@@ -974,7 +975,7 @@ dialog.quick-event[open] {
 .cal-views button { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 .cal-views button[aria-checked="true"] { background: var(--brand-yellow-soft); color: var(--on-brand-soft); }
 .cal-views > .seg-thumb { background: var(--brand-yellow-soft) !important; box-shadow: none !important; }
-.cal-views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-views button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .cal-link { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; font-size: 13px; white-space: nowrap; }
 .cal-link svg { width: 15px; height: 15px; flex: none; }
 .cal-link[hidden] { display: none; }
@@ -1410,7 +1411,7 @@ dialog.quick-event[open] {
     color: color-mix(in oklch, var(--fc-event-color) 55%, var(--ok-gray-0));
   }
 }
-.cal-body .mk-ev:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-body .mk-ev:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 /* 손가락으로 누르는 화면: 누르는 자리를 넉넉히 (보기 전환 · 앞뒤 달 · 오늘 · 달력 칩 · 다른 캘린더 창의 칸들) */
 @media (pointer: coarse) {
   .cal-views button { height: 40px; padding: 0 16px; font-size: 14px; }
@@ -1737,7 +1738,7 @@ dialog.quick-event[open] {
 .folder-dialog-body { max-height: min(60vh, 480px); padding: 3px; overflow-y: auto; } /* 3px: 칸의 노란 테두리가 잘리지 않게 */
 .mf-name-form { display: grid; gap: 8px; min-width: 0; }
 .mf-name-input { box-sizing: border-box; width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; }
-.mf-name-input:focus { outline: none; border-color: var(--brand-yellow); box-shadow: 0 0 0 2px var(--brand-yellow); }
+.mf-name-input:focus { outline: none; border-color: var(--focus-ring); box-shadow: 0 0 0 1px var(--focus-ring); } /* 포커스 테두리는 3:1 넘게 (노랑은 흰 바탕에서 1.5:1) */
 /* 폴더 목록: 누른 단추 바로 아래에 펼쳐지는 판 (folder-ui.js openFolderSheet) */
 dialog.folder-pop {
   position: fixed; inset: auto; margin: 0; padding: 0; overflow: hidden auto; box-sizing: border-box;
@@ -1858,3 +1859,7 @@ body.picking .card.picked::after {
 /* 밀거나 끌거나 날아가는 카드(.mk-live — 휴대폰 list-view.js 가 붙인다)는 칸 밖으로 나가므로 건너뛰지 않는다.
    :has() 로 카드의 상태를 보면 손가락이 움직일 때마다 목록 전체의 모양을 다시 따져 밀기가 버벅였다 */
 .cards .item.mk-measure, .cards .item.mk-live, .cards .item:hover, .cards .item:focus-within { content-visibility: visible; }
+
+/* 검색칸의 지우기(×): 브라우저 기본 파랑 대신 앱의 흐린 선 × */
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-left: 6px; background: var(--muted); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 7l10 10M17 7L7 17' stroke='black' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 7l10 10M17 7L7 17' stroke='black' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; cursor: pointer; }
+input[type="search"]::-webkit-search-cancel-button:hover { background: var(--text-strong, var(--text)); }

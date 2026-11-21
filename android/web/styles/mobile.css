@@ -334,9 +334,12 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
 .view.is-empty > .cards { display: none; }
 .view.is-empty > #empty { flex: 1; justify-content: center; margin: 0; padding: 24px 24px 88px; }
 #empty:not([hidden]) { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: mk-pop-in 0.25s ease-out both; }
-.empty-art { font-size: 44px; line-height: 1; animation: empty-bob 2.6s ease-in-out infinite; }
+/* 빈 목록 그림: 옅은 무채색 원 안에 앱의 선 아이콘 (이모지 대신 — 보관함 빈 화면의 원과 같은 짜임, 노랑은 아래 단추에만) */
+.empty-art { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; background: var(--brand-yellow-soft); color: var(--muted); animation: empty-bob 2.6s ease-in-out infinite; }
+.empty-art svg { width: 28px; height: 28px; }
+@media (prefers-reduced-motion: reduce) { .empty-art { animation: none; } }
 .empty-actions { display: flex; gap: 8px; margin-top: 6px; }
-@keyframes empty-bob { 50% { transform: translateY(-5px) rotate(-4deg); } }
+@keyframes empty-bob { 50% { transform: translateY(-4px); } }
 
 /* 새 메모 버튼 (오른쪽 아래, 엄지 자리) */
 .fab {
@@ -607,7 +610,7 @@ h2.sheet-title { font-size: 20px; }
 /* ---------- 알림 보관함 (app/js/list-history.js 가 그림) ---------- */
 .tabs button { font-size: 13.5px; gap: 4px; }
 .consent { padding: 20px 24px 32px; text-align: center; }
-.consent-icon { width: 60px; height: 60px; padding: 14px; border-radius: 50%; background: var(--brand-yellow); color: var(--on-brand); }
+.consent-icon { width: 60px; height: 60px; padding: 16px; border-radius: 50%; background: var(--brand-yellow-soft); color: var(--text-strong); } /* 노랑은 아래 시작 단추에만 (목록 빈 화면의 원과 같은 무채색) */
 .consent h3 { margin: 12px 0 6px; font-size: 20px; line-height: 28px; letter-spacing: -0.015em; }
 .consent p { margin: 0 0 12px; color: var(--muted); line-height: 1.6; }
 .consent ul { margin: 0 0 20px; padding-left: 20px; text-align: left; line-height: 1.7; font-size: 14px; }
@@ -1203,6 +1206,9 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   transform: translate(-50%, -50%);
 }
 .color-filter { gap: 10px; } /* 30px 동그라미 사이를 넓혀 옆 동그라미와 누르는 자리가 덜 겹치게 (390px 폭에서도 7개가 한 줄) */
+/* 누르는 자리는 동그라미보다 넓게 (보이는 크기는 그대로 30px — 사이 10px 의 절반씩 늘려 손가락 자리 40px, 옆과 겹치지 않음) */
+.color-filter button { position: relative; }
+.color-filter button::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; }
 .filter-group { align-items: flex-start; }
 .filter-label { line-height: 36px; }
 /* 튜토리얼 그만두기 · 안내 알겠어요 단추도 손가락 크기로 */

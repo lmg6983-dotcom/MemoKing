@@ -337,7 +337,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 
 /* 알림 보관함 */
 .consent { flex: 1; overflow-y: auto; padding: 20px 22px; text-align: center; }
-.consent-icon { width: 56px; height: 56px; padding: 12px; border-radius: 50%; background: var(--brand-yellow); color: var(--on-brand); }
+.consent-icon { width: 56px; height: 56px; padding: 15px; border-radius: 50%; background: var(--brand-yellow-soft); color: var(--text-strong); } /* 노랑은 아래 시작 단추에만 (휴대폰과 같이) */
 .consent h2 { margin: 10px 0 6px; font-size: 20px; line-height: 28px; letter-spacing: -0.015em; }
 .consent p { margin: 0 0 12px; color: var(--muted); line-height: 1.6; }
 .consent ul { margin: 0 0 18px; padding-left: 20px; text-align: left; line-height: 1.7; font-size: 13px; }
@@ -892,9 +892,12 @@ div.setting-row { cursor: default; }
 /* 메모가 없을 때는 빈 카드 칸이 자리를 차지하지 않고, 안내가 목록 칸 한가운데에 */
 .cards.is-empty { flex: 0 0 auto; padding: 0; overflow: hidden; }
 #empty:not([hidden]) { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; animation: mk-pop-in 0.25s ease-out both; }
-.empty-art { font-size: 40px; line-height: 1; animation: empty-bob 2.6s ease-in-out infinite; }
+/* 빈 목록 그림: 옅은 무채색 원 안에 앱의 선 아이콘 (이모지 대신 — 보관함 빈 화면의 원과 같은 짜임, 노랑은 아래 단추에만) */
+.empty-art { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--brand-yellow-soft); color: var(--muted); animation: empty-bob 2.6s ease-in-out infinite; }
+.empty-art svg { width: 26px; height: 26px; }
+@media (prefers-reduced-motion: reduce) { .empty-art { animation: none; } }
 .empty-actions { display: flex; gap: 8px; margin-top: 4px; }
-@keyframes empty-bob { 50% { transform: translateY(-5px) rotate(-4deg); } }
+@keyframes empty-bob { 50% { transform: translateY(-4px); } }
 
 /* ---------- v0.19.0: 새 메모 + 단추 (오른쪽 아래) · 위성 버튼 — 휴대폰과 같은 모양 ---------- */
 .fab {

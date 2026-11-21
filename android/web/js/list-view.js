@@ -410,11 +410,11 @@ new ResizeObserver(() => {
 function renderEmpty(narrowed, elsewhere = 0) {
   const art = document.createElement('span');
   art.className = 'empty-art';
-  art.textContent = narrowed ? '🔍' : '📝';
+  art.append(icon(narrowed ? 'search' : 'note')); // 이모지 대신 앱의 선 아이콘 (보관함 빈 화면과 같은 모양)
   const text = document.createElement('span');
   const other = MODE_LABEL[otherMode(state.mode)];
   const receiving = !narrowed && document.body.dataset.sync === 'syncing'; // 첫 동기화: Drive 에서 메모를 받는 중
-  if (receiving) art.textContent = '☁️';
+  if (receiving) art.replaceChildren(icon('cloud'));
   text.textContent = receiving ? 'Google Drive에서 메모를 받아 오는 중이에요.\n그동안 새 메모를 바로 써도 돼요.'
     : narrowed && elsewhere
     ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`

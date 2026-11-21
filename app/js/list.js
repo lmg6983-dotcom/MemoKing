@@ -633,7 +633,7 @@ $('filter-clear').addEventListener('click', () => {
 function renderEmpty(narrowed, elsewhere = 0) {
   const art = document.createElement('span');
   art.className = 'empty-art';
-  art.textContent = narrowed ? '🔍' : '📝';
+  art.append(icon(narrowed ? 'search' : 'note')); // 이모지 대신 앱의 선 아이콘 (보관함 빈 화면과 같은 모양)
   const text = document.createElement('span');
   const other = MODE_LABEL[otherMode(state.mode)];
   text.textContent = narrowed && elsewhere
