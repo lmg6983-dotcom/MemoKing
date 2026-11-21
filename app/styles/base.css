@@ -6,18 +6,19 @@
 
 /* OKLab 팔레트 — 화면의 모든 색은 여기서 고른다 (메모킹 · MagicKey · MagicSystem 같은 값)
    OKLCH 좌표(밝기 L · 채도 C · 색상 h)에서 뽑아 sRGB 로 적었다. 반투명은 color-mix(in oklab, 토큰 N%, transparent)
-   무채색 gray-0(흰)~1000(검정) · 색 50(밝음)~950(어두움) · 노랑 300 = 브랜드 #ffcc00 · paper-* = 메모 종이 */
+   꼭 필요한 것만: 무채색 10 · 색 22 (노랑 300 = 브랜드 #ffcc00) · 메모 종이 6색 × (바탕 · 머리줄 · 점) × 밝은/어두운
+   반투명은 검정 · 흰색 10단계(4 8 12 16 24 32 48 64 80 90%), 색은 5단계(8 16 32 48 80%) */
 :root {
-  --ok-gray-0: #ffffff; --ok-gray-25: #fafafa; --ok-gray-50: #f5f5f5; --ok-gray-100: #ebebeb; --ok-gray-150: #e1e1e1; --ok-gray-200: #d4d4d4; --ok-gray-300: #bebebe; --ok-gray-400: #9e9e9e; --ok-gray-500: #808080; --ok-gray-550: #737373; --ok-gray-600: #696969; --ok-gray-700: #4d4d4d; --ok-gray-800: #333333; --ok-gray-850: #242424; --ok-gray-900: #191919; --ok-gray-950: #0e0e0e; --ok-gray-975: #060606; --ok-gray-1000: #000000;
-  --ok-red-50: #fff2f0; --ok-red-100: #ffdfdc; --ok-red-200: #ffc3bd; --ok-red-300: #ffa098; --ok-red-400: #ff716b; --ok-red-500: #f14445; --ok-red-600: #d12830; --ok-red-700: #ae1320; --ok-red-800: #880a16; --ok-red-900: #64040c; --ok-red-950: #420205;
-  --ok-orange-50: #fff2eb; --ok-orange-100: #ffe1d1; --ok-orange-200: #ffc6a7; --ok-orange-300: #ffa571; --ok-orange-400: #fa7c1f; --ok-orange-500: #da6600; --ok-orange-600: #b65400; --ok-orange-700: #944300; --ok-orange-800: #733200; --ok-orange-900: #542300; --ok-orange-950: #361400;
-  --ok-green-50: #e8fbec; --ok-green-100: #cef3d6; --ok-green-200: #a6e6b6; --ok-green-300: #74d792; --ok-green-400: #41c170; --ok-green-500: #00a855; --ok-green-600: #008c46; --ok-green-700: #007137; --ok-green-800: #005729; --ok-green-900: #003e1c; --ok-green-950: #00270f;
-  --ok-teal-50: #e7f9fa; --ok-teal-100: #cbf0f2; --ok-teal-200: #a0e2e5; --ok-teal-300: #6ad1d6; --ok-teal-400: #2bbac1; --ok-teal-500: #00a0a6; --ok-teal-600: #00858a; --ok-teal-700: #006b70; --ok-teal-800: #005256; --ok-teal-900: #003b3e; --ok-teal-950: #002527;
-  --ok-blue-50: #eff6ff; --ok-blue-100: #d9eaff; --ok-blue-200: #b8d7ff; --ok-blue-300: #91c1ff; --ok-blue-400: #60a7ff; --ok-blue-500: #1f8aff; --ok-blue-600: #0072dd; --ok-blue-700: #005bb4; --ok-blue-800: #00468c; --ok-blue-900: #003167; --ok-blue-950: #001e44;
-  --ok-violet-50: #f4f4ff; --ok-violet-100: #e6e5ff; --ok-violet-200: #d1ceff; --ok-violet-300: #bab3ff; --ok-violet-400: #a192ff; --ok-violet-500: #8a6fff; --ok-violet-600: #764cf1; --ok-violet-700: #5f38ca; --ok-violet-800: #49299f; --ok-violet-900: #341b76; --ok-violet-950: #200e4e;
-  --ok-purple-50: #f7f3ff; --ok-purple-100: #ebe3ff; --ok-purple-200: #dbcaff; --ok-purple-300: #c9acff; --ok-purple-400: #b58afa; --ok-purple-500: #9d6fe3; --ok-purple-600: #8558c5; --ok-purple-700: #6c44a4; --ok-purple-800: #533380; --ok-purple-900: #3c235e; --ok-purple-950: #25143d;
-  --ok-pink-50: #fff1f6; --ok-pink-100: #ffdde9; --ok-pink-200: #ffbfd7; --ok-pink-300: #ff99c2; --ok-pink-400: #f075aa; --ok-pink-500: #d85891; --ok-pink-600: #ba4179; --ok-pink-700: #9a2f62; --ok-pink-800: #78224b; --ok-pink-900: #581635; --ok-pink-950: #390b21;
-  --ok-yellow-50: #fff5d6; --ok-yellow-100: #ffeaab; --ok-yellow-200: #ffdf7b; --ok-yellow-300: #ffcc00; --ok-yellow-400: #e3b916; --ok-yellow-500: #c6a000; --ok-yellow-600: #a28300; --ok-yellow-700: #866c02; --ok-yellow-800: #645000; --ok-yellow-900: #453600; --ok-yellow-950: #281e00;
+  --ok-gray-0: #ffffff; --ok-gray-50: #f5f5f5; --ok-gray-100: #ebebeb; --ok-gray-200: #d4d4d4; --ok-gray-400: #9e9e9e; --ok-gray-550: #737373; --ok-gray-850: #242424; --ok-gray-900: #191919; --ok-gray-950: #0e0e0e; --ok-gray-1000: #000000;
+  --ok-red-100: #ffdfdc; --ok-red-400: #ff716b; --ok-red-600: #d12830; --ok-red-800: #880a16;
+  --ok-orange-400: #fa7c1f;
+  --ok-green-200: #a6e6b6; --ok-green-500: #00a855; --ok-green-700: #007137;
+  --ok-teal-500: #00a0a6;
+  --ok-blue-100: #d9eaff; --ok-blue-400: #60a7ff; --ok-blue-600: #0072dd; --ok-blue-900: #003167;
+  --ok-violet-600: #764cf1;
+  --ok-purple-200: #dbcaff; --ok-purple-600: #8558c5;
+  --ok-pink-200: #ffbfd7; --ok-pink-600: #ba4179;
+  --ok-yellow-100: #ffeaab; --ok-yellow-300: #ffcc00; --ok-yellow-500: #c6a000; --ok-yellow-800: #645000;
   --ok-paper-yellow: #f4edd7; --ok-paper-yellow-bar: #ede3c2; --ok-paper-yellow-chip: #c4a953; --ok-paper-yellow-dark: #342d19; --ok-paper-yellow-dark-bar: #463c20; --ok-paper-yellow-dark-chip: #a89044;
   --ok-paper-green: #dff3e2; --ok-paper-green-bar: #cfecd3; --ok-paper-green-chip: #76be86; --ok-paper-green-dark: #213324; --ok-paper-green-dark-bar: #2c4431; --ok-paper-green-dark-chip: #63a471;
   --ok-paper-pink: #fee5ee; --ok-paper-pink-bar: #fdd7e4; --ok-paper-pink-chip: #e28dae; --ok-paper-pink-dark: #3c262f; --ok-paper-pink-dark-bar: #50333e; --ok-paper-pink-dark-chip: #c27895;
@@ -29,11 +30,11 @@
 :root {
   /* 브랜드 */
   --brand-yellow: var(--ok-yellow-300);
-  --brand-yellow-hover: var(--ok-yellow-400);
+  --brand-yellow-hover: var(--ok-yellow-300);
   /* 포인트색(노랑)은 꼭 눈이 가야 할 곳에만: 주요 동작 단추 · ＋ · 달력의 오늘 · 튜토리얼 · 진행 막대 · 경고 띠.
      고른 탭 · 고른 줄 · 밑줄 · 포커스 · 스위치 · 체크 같은 "상태" 는 무채색으로 (노랑이 여기저기 흩어져 난잡하던 것) */
-  --brand-yellow-soft: color-mix(in oklab, var(--ok-gray-900) 8%, transparent); /* 고른 상태 바탕 (이름은 예전 그대로 — 이제 무채색) */
-  --accent-line: color-mix(in oklab, var(--ok-gray-900) 32%, transparent); /* 밑줄 · 입력 포커스 선 */
+  --brand-yellow-soft: color-mix(in oklab, var(--ok-gray-1000) 8%, transparent); /* 고른 상태 바탕 (이름은 예전 그대로 — 이제 무채색) */
+  --accent-line: color-mix(in oklab, var(--ok-gray-1000) 32%, transparent); /* 밑줄 · 입력 포커스 선 */
   --on-dark-fill: var(--ok-gray-0);
   --on-brand-soft: var(--text-strong); /* 고른 상태 위 글자 */
   --brand-black: var(--ok-gray-950);
@@ -45,15 +46,15 @@
   --surface-1: var(--ok-gray-0); /* 트레이(카드 · 검색칸)는 흰색, 그림자 없이 — 카톡 트레이처럼 */
   --surface-2: var(--ok-gray-0); /* 떠 있는 판(메뉴 · 시트 · 대화상자)은 흰색 + 그림자 */
   --line: var(--ok-gray-100);
-  --fill-hover: color-mix(in oklab, var(--ok-gray-950) 6%, transparent);
-  --fill-tab: color-mix(in oklab, var(--ok-gray-950) 5%, transparent);
+  --fill-hover: color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
+  --fill-tab: color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   --text-strong: var(--ok-gray-900); /* 카톡 본문 글자색 */
-  --text-muted: var(--ok-gray-600);
+  --text-muted: var(--ok-gray-550);
   --text-faint: var(--ok-gray-550); /* 흐린 글(안내 · 빈칸 글)도 흰 카드에서 4.5:1 넘게 (#8a8a8a 는 3.4:1) */
   --danger: var(--ok-red-600);
-  --sat: var(--ok-blue-700); /* 달력 토요일 (흰 바탕 5.9:1) */
+  --sat: var(--ok-blue-600); /* 달력 토요일 (흰 바탕 5.9:1) */
   --ok-text: var(--ok-green-700); /* 복사했어요 · 저장 같은 성공 글 */
-  --err-text: var(--ok-red-700); /* 실패 글 (빨강 바탕이 아닌 글자) */
+  --err-text: var(--ok-red-800); /* 실패 글 (빨강 바탕이 아닌 글자) */
   --on-danger: var(--ok-gray-0);
   --focus-ring: var(--ok-gray-950);
 
@@ -73,8 +74,8 @@
   --radius-xl: 26px;
 
   /* One UI 9.5 의 떠 있는 판(아래 탭바 · 메뉴 · 시트): 평평한 반투명 — 9.0 의 짙은 젖빛 유리보다 블러를 줄였다 */
-  --glass-bg: color-mix(in oklab, var(--ok-gray-0) 78%, transparent);
-  --glass-line: color-mix(in oklab, var(--ok-gray-1000) 6%, transparent);
+  --glass-bg: color-mix(in oklab, var(--ok-gray-0) 80%, transparent);
+  --glass-line: color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   --glass-blur: blur(14px) saturate(1.6);
 
   /* 예전 이름 — 각 화면 CSS 가 쓰는 짧은 이름을 토큰에 잇는다 */
@@ -101,10 +102,10 @@
   --note-black-text: var(--ok-gray-50);
 
   /* 녹음·지우기 빨강 — 녹음 점·막대·단추, 밀어 지우기, CLEAR 도장이 함께 쓴다 */
-  --rec: var(--ok-red-500);
+  --rec: var(--ok-red-400);
   --rec-hover: var(--ok-red-600);
   --on-rec: var(--ok-gray-0);
-  --rec-on-dark: var(--ok-red-300); /* 검정 메모 위의 CLEAR 도장 */
+  --rec-on-dark: var(--ok-red-400); /* 검정 메모 위의 CLEAR 도장 */
 
   /* 움직임 — 곡선은 여기서만 정한다 (Emil Kowalski 기준: 나타나고 사라지는 건 ease-out, 화면 안에서 옮겨 가는 건 ease-in-out) */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);     /* 강한 ease-out: 처음이 빨라 바로 반응하는 느낌 */
@@ -118,27 +119,27 @@
   :root:where(:not([data-theme="light"])) {
     --brand-yellow-hover: var(--ok-yellow-300);
     --brand-yellow-soft: color-mix(in oklab, var(--ok-gray-0) 12%, transparent);
-    --accent-line: color-mix(in oklab, var(--ok-gray-0) 40%, transparent);
+    --accent-line: color-mix(in oklab, var(--ok-gray-0) 32%, transparent);
     --on-brand-soft: var(--text-strong);
     --surface-0: var(--ok-gray-950); /* 완전 검정 대신 아주 어두운 따뜻한 회색 */
     --surface-1: var(--ok-gray-900);
     --surface-2: var(--ok-gray-850);
-    --line: var(--ok-gray-800);
-    --glass-bg: color-mix(in oklab, var(--ok-gray-900) 74%, transparent);
+    --line: var(--ok-gray-850);
+    --glass-bg: color-mix(in oklab, var(--ok-gray-1000) 80%, transparent);
     --glass-line: color-mix(in oklab, var(--ok-gray-0) 8%, transparent);
     --fill-hover: color-mix(in oklab, var(--ok-gray-0) 8%, transparent);
-    --fill-tab: color-mix(in oklab, var(--ok-gray-0) 6%, transparent);
+    --fill-tab: color-mix(in oklab, var(--ok-gray-0) 4%, transparent);
     --text-strong: var(--ok-gray-50);
     --text-muted: var(--ok-gray-400);
-    --text-faint: var(--ok-gray-500); /* 어두운 카드(#171717) 위 4.5:1 */
+    --text-faint: var(--ok-gray-550); /* 어두운 카드(#171717) 위 4.5:1 */
     --danger: var(--ok-red-400);
     --sat: var(--ok-blue-400);
-    --ok-text: var(--ok-green-300);
-    --err-text: var(--ok-red-300);
+    --ok-text: var(--ok-green-200);
+    --err-text: var(--ok-red-400);
     --on-danger: var(--ok-gray-950);
     --focus-ring: var(--ok-gray-50);
-    --shadow-card: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 50%, transparent);
-    --shadow-pop: 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 40%, transparent), 0 8px 14px color-mix(in oklab, var(--ok-gray-1000) 45%, transparent);
+    --shadow-card: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 48%, transparent);
+    --shadow-pop: 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 32%, transparent), 0 8px 14px color-mix(in oklab, var(--ok-gray-1000) 48%, transparent);
 
     --yellow-bg: var(--ok-paper-yellow-dark); --yellow-bar: var(--ok-paper-yellow-dark-bar); --yellow-chip: var(--ok-paper-yellow-dark-chip); /* 어두운 종이: OKLCH L.30 C.035 */
     --green-bg: var(--ok-paper-green-dark); --green-bar: var(--ok-paper-green-dark-bar); --green-chip: var(--ok-paper-green-dark-chip);
@@ -251,7 +252,7 @@ svg { width: 20px; height: 20px; flex: none; }
 .dialog:focus { outline: none; } /* 창 자체(열 때 포커스)에는 테두리 없음 — 안의 단추는 그대로 */
 .dialog::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 32%, transparent); }
 /* 어두운 화면: 검정 판이 검정 앱 위에서 가장자리가 사라지지 않게 옅은 테두리 한 줄 */
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .dialog { box-shadow: var(--shadow-pop), inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-0) 10%, transparent); } :where(:root:not([data-theme="light"])) .dialog::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 55%, transparent); } }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .dialog { box-shadow: var(--shadow-pop), inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-0) 8%, transparent); } :where(:root:not([data-theme="light"])) .dialog::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 48%, transparent); } }
 .dialog h2 { margin: 0 0 12px; font-size: 20px; line-height: 28px; font-weight: 700; letter-spacing: -0.015em; }
 .dialog p { margin: 0 0 16px; line-height: 1.6; white-space: pre-line; }
 /* 긴 창(설정·휴지통 …)의 머리: 제목 + 오른쪽 위 × — 스크롤해도 위에 붙어 있다 */
@@ -308,10 +309,10 @@ svg { width: 20px; height: 20px; flex: none; }
   position: fixed;
   z-index: 900;
   border-radius: 12px;
-  box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px color-mix(in oklab, var(--ok-gray-1000) 45%, transparent);
+  box-shadow: 0 0 0 3px var(--brand-yellow), 0 0 0 9999px color-mix(in oklab, var(--ok-gray-1000) 48%, transparent);
   pointer-events: none; /* 비춘 버튼을 실제로 눌러 볼 수 있게 */
 }
-.coach-spot.center { box-shadow: 0 0 0 9999px color-mix(in oklab, var(--ok-gray-1000) 45%, transparent); }
+.coach-spot.center { box-shadow: 0 0 0 9999px color-mix(in oklab, var(--ok-gray-1000) 48%, transparent); }
 .coach-bubble {
   position: fixed;
   z-index: 901;
@@ -335,10 +336,10 @@ svg { width: 20px; height: 20px; flex: none; }
 .coach-sandbox {
   flex: none; padding: 2px 8px; border-radius: 999px;
   font-size: 11px; font-weight: 600; line-height: 16px; white-space: nowrap;
-  color: var(--mk-sandbox-ink, var(--ok-yellow-700)); background: var(--mk-sandbox-bg, color-mix(in oklab, var(--ok-yellow-400) 18%, transparent));
+  color: var(--mk-sandbox-ink, var(--ok-yellow-800)); background: var(--mk-sandbox-bg, color-mix(in oklab, var(--ok-yellow-300) 16%, transparent));
 }
 .coach-bubble.mini .coach-sandbox { display: none; }
-@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .coach-sandbox { --mk-sandbox-ink: var(--ok-yellow-200); --mk-sandbox-bg: color-mix(in oklab, var(--ok-yellow-400) 16%, transparent); } }
+@media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .coach-sandbox { --mk-sandbox-ink: var(--ok-yellow-100); --mk-sandbox-bg: color-mix(in oklab, var(--ok-yellow-300) 16%, transparent); } }
 
 .coach-emoji {
   display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px;
@@ -501,7 +502,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   height: 16px;
   border-radius: 50%;
   background: var(--surface-1);
-  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 30%, transparent);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 32%, transparent);
   transition: transform 0.15s;
 }
 .switch:checked { background: var(--text-strong); } /* 켜진 스위치는 진한 무채색 — 포인트색은 주요 동작에만 */
@@ -646,13 +647,13 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   width: 100%; min-height: 40px; margin-bottom: 6px; padding: 8px 14px;
   border: 1px solid var(--border); border-radius: 12px;
   background: var(--surface-1); color: var(--text-strong); font: inherit; font-size: 15px; font-weight: 600;
-  box-shadow: inset 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 3%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   box-sizing: border-box;
 }
 .quick-event .qe-name:focus {
   border-color: var(--brand-yellow);
-  box-shadow: 0 0 0 2px var(--brand-yellow-soft), inset 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 3%, transparent);
+  box-shadow: 0 0 0 2px var(--brand-yellow-soft), inset 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   outline: none;
 }
 .dp-quick, :is(.quick-event .qe-time, .event-dialog .event-time) .dp-quick {
@@ -892,7 +893,7 @@ dialog.quick-event[open] {
   box-shadow: 0 1px 3px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
 }
 .quick-event .flow-footer .btn.primary:hover {
-  box-shadow: 0 2px 8px color-mix(in oklab, var(--ok-yellow-300) 35%, transparent);
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--ok-yellow-300) 32%, transparent);
   filter: brightness(0.98);
 }
 @media (pointer: coarse) {
@@ -983,7 +984,7 @@ dialog.quick-event[open] {
   position: fixed;
   inset: 0;
   z-index: 45;
-  background: color-mix(in oklab, var(--ok-gray-1000) 22%, transparent);
+  background: color-mix(in oklab, var(--ok-gray-1000) 24%, transparent);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: cal-quick-fade 0.18s ease-out;
@@ -1006,7 +1007,7 @@ dialog.quick-event[open] {
   border-radius: 999px;
   background: var(--surface); /* 검색창과 동일한 흰색 배경 */
   border: 1px solid var(--border); /* 검색창과 동일한 회색 테두리 */
-  box-shadow: 0 2px 12px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent), 0 1px 3px color-mix(in oklab, var(--ok-gray-1000) 5%, transparent);
+  box-shadow: 0 2px 12px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent), 0 1px 3px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   transition: width 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease, border-color 0.2s ease;
   box-sizing: border-box;
 }
@@ -1022,7 +1023,7 @@ dialog.quick-event[open] {
 .cal-quick.is-expanded {
   width: min(540px, calc(100vw - 32px));
   border-color: var(--border);
-  box-shadow: 0 4px 20px color-mix(in oklab, var(--ok-gray-1000) 14%, transparent), 0 1px 4px color-mix(in oklab, var(--ok-gray-1000) 6%, transparent);
+  box-shadow: 0 4px 20px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent), 0 1px 4px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
 }
 .cal-quick.is-expanded:focus-within {
   border-color: var(--text-strong);
@@ -1267,17 +1268,17 @@ dialog.quick-event[open] {
 /* 생성된 일정 날짜 셀 펄스 하이라이트 애니메이션 */
 @keyframes mk-created-pulse {
   0% {
-    box-shadow: inset 0 0 0 2px var(--brand-yellow), 0 0 12px color-mix(in oklab, var(--ok-yellow-300) 75%, transparent);
+    box-shadow: inset 0 0 0 2px var(--brand-yellow), 0 0 12px color-mix(in oklab, var(--ok-yellow-300) 80%, transparent);
     background-color: color-mix(in srgb, var(--brand-yellow) 35%, transparent);
     transform: scale(1.02);
   }
   35% {
-    box-shadow: inset 0 0 0 3px var(--brand-yellow), 0 0 20px color-mix(in oklab, var(--ok-yellow-300) 95%, transparent);
+    box-shadow: inset 0 0 0 3px var(--brand-yellow), 0 0 20px color-mix(in oklab, var(--ok-yellow-300) 80%, transparent);
     background-color: color-mix(in srgb, var(--brand-yellow) 50%, transparent);
     transform: scale(1.035);
   }
   70% {
-    box-shadow: inset 0 0 0 2px var(--brand-yellow), 0 0 10px color-mix(in oklab, var(--ok-yellow-300) 50%, transparent);
+    box-shadow: inset 0 0 0 2px var(--brand-yellow), 0 0 10px color-mix(in oklab, var(--ok-yellow-300) 48%, transparent);
     background-color: color-mix(in srgb, var(--brand-yellow) 25%, transparent);
     transform: scale(1.01);
   }
@@ -1321,7 +1322,7 @@ dialog.quick-event[open] {
 /* 오늘: 숫자 밑 짧은 노란 밑줄 하나 (회상 달력과 같은 모양) */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div { position: relative; background: none !important; color: inherit !important; border-radius: 0 !important; } /* 달력이 칠하는 오늘 원은 끈다 */
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child > div::after {
-  content: ""; position: absolute; left: 50%; bottom: -3px; width: 12px; height: 2px; border-radius: 2px; transform: translateX(-50%);
+  content: ""; position: absolute; left: 50%; bottom: 0; width: 12px; height: 2px; border-radius: 2px; transform: translateX(-50%);
   background: var(--brand-yellow); pointer-events: none;
 }
 
@@ -1383,7 +1384,7 @@ dialog.quick-event[open] {
 .cal-body .mk-task.mk-done .mk-mt::before, .cal-body .mk-task.mk-done .fc-event-title::before { background: var(--note-chip, var(--yellow-chip)); }
 @media (prefers-color-scheme: dark) {
   :where(:root:not([data-theme="light"])) .cal-body .mk-ev:not(.mk-ext) { color: color-mix(in srgb, var(--note-chip, var(--yellow-chip)) 55%, var(--ok-gray-0)); }
-  :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: var(--ok-yellow-200); }
+  :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: var(--ok-yellow-100); }
   :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: var(--ok-gray-50); box-shadow: inset 0 0 0 1px var(--line); }
 }
 
@@ -1444,7 +1445,7 @@ dialog.quick-event[open] {
 .feed-swatch { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 99px; background: var(--sw); cursor: pointer; }
 .feed-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--sw); }
 @media (pointer: coarse) { .feed-swatch { width: 40px; height: 40px; } }
-.feed-device > .feed-dot { background: conic-gradient(var(--ok-blue-600) 0 25%, var(--ok-green-500) 0 50%, var(--ok-yellow-400) 0 75%, var(--ok-red-500) 0); }
+.feed-device > .feed-dot { background: conic-gradient(var(--ok-blue-600) 0 25%, var(--ok-green-500) 0 50%, var(--ok-yellow-300) 0 75%, var(--ok-red-400) 0); }
 .feed-text { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; text-align: left; }
 .feed-text b { overflow: hidden; font-size: 13.5px; white-space: nowrap; text-overflow: ellipsis; }
 .feed-text small { overflow: hidden; font-size: 11.5px; color: var(--muted); text-overflow: ellipsis; }
@@ -1546,11 +1547,11 @@ dialog.quick-event[open] {
   --ms-pad: 2px; --ms-h: 22px; --orb: calc(var(--ms-h) - 6px);
   --ms-swing: cubic-bezier(0.5, -0.32, 0.3, 1.36); /* 살짝 뒤로 물러섰다 넘어가 통 하고 멈춤 */
   position: relative; display: inline-grid; grid-template-columns: auto auto; flex: none; padding: var(--ms-pad); border-radius: 999px; overflow: hidden; isolation: isolate;
-  background: linear-gradient(180deg, var(--ok-blue-200) 0%, var(--ok-blue-50) 100%); box-shadow: inset 0 1px 2px color-mix(in oklab, var(--ok-blue-900) 18%, transparent);
+  background: linear-gradient(180deg, var(--ok-blue-100) 0%, var(--ok-blue-100) 100%); box-shadow: inset 0 1px 2px color-mix(in oklab, var(--ok-blue-900) 16%, transparent);
   -webkit-app-region: no-drag; view-transition-name: mk-mode-switch;
 }
 /* 밤하늘: 위에 겹쳐 두고 Work 에서 서서히 짙어짐 */
-.ms-scene { position: absolute; inset: 0; z-index: 0; border-radius: inherit; background: linear-gradient(180deg, var(--ok-blue-950) 0%, var(--ok-blue-900) 100%); opacity: 0; transition: opacity 0.5s ease-out; pointer-events: none; }
+.ms-scene { position: absolute; inset: 0; z-index: 0; border-radius: inherit; background: linear-gradient(180deg, var(--ok-blue-900) 0%, var(--ok-blue-900) 100%); opacity: 0; transition: opacity 0.5s ease-out; pointer-events: none; }
 /* 별: 왼쪽(Life 글자 뒤) 빈 하늘에 작은 점 다섯 */
 .ms-scene::after {
   content: ""; position: absolute; top: 0; bottom: 0; left: 6%; width: 44%;
@@ -1575,7 +1576,7 @@ dialog.quick-event[open] {
 .mode-switch::before {
   content: ""; position: absolute; z-index: 2; top: 3px; left: 3px; width: var(--orb); height: var(--orb); border-radius: 50%;
   background-color: var(--ok-yellow-300);
-  box-shadow: inset 0 0 0 0 var(--ok-yellow-50), 0 0 0 3px color-mix(in oklab, var(--ok-yellow-300) 28%, transparent), 0 0 10px 2px color-mix(in oklab, var(--ok-yellow-400) 50%, transparent);
+  box-shadow: inset 0 0 0 0 var(--ok-yellow-100), 0 0 0 3px color-mix(in oklab, var(--ok-yellow-300) 16%, transparent), 0 0 10px 2px color-mix(in oklab, var(--ok-yellow-300) 48%, transparent);
   /* 옮기기는 translate (화면 그리기와 따로 돌아 목록을 새로 그리는 동안에도 끊기지 않게) — 거리 --ms-travel 은 JS 가 잰다 (dom.js setModeSwitch) */
   transition: translate 0.6s var(--ms-swing), background-color 0.45s ease-out, box-shadow 0.5s ease-out;
   animation: ms-day 0.6s var(--ease-out);
@@ -1584,7 +1585,7 @@ dialog.quick-event[open] {
 .mode-switch[data-on="work"]::before {
   translate: var(--ms-travel, 0px) 0;
   background-color: transparent;
-  box-shadow: inset calc(var(--orb) * -0.32) calc(var(--orb) * -0.08) 0 0 var(--ok-orange-50), 0 0 0 3px color-mix(in oklab, var(--ok-orange-50) 10%, transparent), 0 0 10px 2px color-mix(in oklab, var(--ok-blue-200) 35%, transparent);
+  box-shadow: inset calc(var(--orb) * -0.32) calc(var(--orb) * -0.08) 0 0 var(--ok-orange-400), 0 0 0 3px color-mix(in oklab, var(--ok-orange-400) 8%, transparent), 0 0 10px 2px color-mix(in oklab, var(--ok-blue-100) 32%, transparent);
   animation: ms-night 0.6s var(--ease-out);
 }
 .mode-switch[data-on="work"] .ms-scene { opacity: 1; }
@@ -1595,15 +1596,15 @@ dialog.quick-event[open] {
 @keyframes ms-day { 0% { transform: none; } 35% { transform: scale(1.18, 0.86); } 70% { transform: scale(0.94, 1.06) rotate(12deg); } 100% { transform: none; } }
 .mode-switch button {
   position: relative; z-index: 3; height: calc(var(--ms-h) - 2 * var(--ms-pad)); padding: 0 3px; border: 0; border-radius: 999px; background: none;
-  color: color-mix(in oklab, var(--ok-blue-900) 50%, transparent); font: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
+  color: color-mix(in oklab, var(--ok-blue-900) 48%, transparent); font: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
   transition: color 0.3s var(--ease-out);
 }
 .mode-switch button[data-mode="life"] { padding-left: calc(var(--orb) + 4px); } /* 해 자리 */
 .mode-switch button[data-mode="work"] { padding-right: calc(var(--orb) + 4px); } /* 달 자리 */
-.mode-switch button[aria-checked="true"] { color: var(--ok-blue-950); }
-.mode-switch[data-on="work"] button { color: color-mix(in oklab, var(--ok-gray-0) 50%, transparent); }
+.mode-switch button[aria-checked="true"] { color: var(--ok-blue-900); }
+.mode-switch[data-on="work"] button { color: color-mix(in oklab, var(--ok-gray-0) 48%, transparent); }
 .mode-switch[data-on="work"] button[aria-checked="true"] { color: var(--ok-gray-0); }
-.mode-switch button:hover:not([aria-checked="true"]) { color: var(--ok-blue-950); }
+.mode-switch button:hover:not([aria-checked="true"]) { color: var(--ok-blue-900); }
 .mode-switch[data-on="work"] button:hover:not([aria-checked="true"]) { color: var(--ok-gray-0); }
 .mode-switch button:active { transform: scale(0.96); }
 @media (prefers-reduced-motion: reduce) {
@@ -1741,9 +1742,9 @@ dialog.quick-event[open] {
 dialog.folder-pop {
   position: fixed; inset: auto; margin: 0; padding: 0; overflow: hidden auto; box-sizing: border-box;
   border: 1px solid var(--line); border-radius: 16px; background: var(--surface-1, var(--ok-gray-0)); color: var(--text);
-  box-shadow: 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 22%, transparent), 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 24%, transparent), 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
 }
-dialog.folder-pop::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 18%, transparent); }
+dialog.folder-pop::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 16%, transparent); }
 .folder-pop-body { padding: 8px; }
 .folder-pop .mf-new { margin: 6px 0 2px 8px; }
 /* 새 폴더: 목록 맨 아래 그 자리에서 이름 칸 + 만들기 */
@@ -1795,7 +1796,7 @@ body.picking .card.picked::after {
 }
 .pick-bar {
   position: fixed; left: 50%; bottom: 16px; z-index: 60; display: flex; align-items: center; gap: 8px; transform: translateX(-50%);
-  padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--surface-1, var(--ok-gray-0)); box-shadow: 0 6px 24px color-mix(in oklab, var(--ok-gray-1000) 18%, transparent); font-size: 13.5px; font-weight: 700; white-space: nowrap;
+  padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--surface-1, var(--ok-gray-0)); box-shadow: 0 6px 24px color-mix(in oklab, var(--ok-gray-1000) 16%, transparent); font-size: 13.5px; font-weight: 700; white-space: nowrap;
 }
 .pick-bar[hidden] { display: none; }
 

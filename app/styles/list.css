@@ -188,7 +188,7 @@ body {
 .card-video img:not([src]) { visibility: hidden; }
 .card-video::after {
   content: ''; position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%;
-  background: color-mix(in oklab, var(--ok-gray-1000) 50%, transparent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.5 3.5v9l7-4.5z' fill='%23fff'/%3E%3C/svg%3E") 55% 50% / 16px no-repeat;
+  background: color-mix(in oklab, var(--ok-gray-1000) 48%, transparent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.5 3.5v9l7-4.5z' fill='%23fff'/%3E%3C/svg%3E") 55% 50% / 16px no-repeat;
 }
 /* 어두운 화면: 사진 · 흰 바탕 손 메모 미리 보기는 조금 어둡게 (검은 카드 사이에서 흰 칸이 튀지 않게) */
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .card-thumb { filter: brightness(0.86); } }
@@ -328,7 +328,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .row .icon-btn { width: 28px; height: 28px; flex: none; }
 .row .icon-btn svg { width: 16px; height: 16px; }
 .row-main { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 4px; border: 0; background: none; text-align: left; cursor: pointer; }
-.row-dot { width: 10px; height: 34px; flex: none; border-radius: 4px; background: var(--note-chip); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 25%, transparent); }
+.row-dot { width: 10px; height: 34px; flex: none; border-radius: 4px; background: var(--note-chip); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-0) 24%, transparent); }
 .row-text { display: flex; flex-direction: column; min-width: 0; }
 .row-title { overflow: hidden; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
 .row-sub { display: flex; align-items: flex-start; gap: 4px; font-size: 12px; line-height: 1.45; color: var(--muted); }
@@ -343,7 +343,7 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .consent ul { margin: 0 0 18px; padding-left: 20px; text-align: left; line-height: 1.7; font-size: 13px; }
 #history-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .history-bar { display: flex; align-items: center; gap: 6px; padding: 0 12px 6px; }
-.history-off { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 12px 6px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--fill-hover, color-mix(in oklab, var(--ok-gray-1000) 5%, transparent)); color: var(--muted); font-size: 12.5px; }
+.history-off { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 12px 6px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--fill-hover, color-mix(in oklab, var(--ok-gray-1000) 4%, transparent)); color: var(--muted); font-size: 12.5px; }
 .history-bar select {
   max-width: 60%;
   height: 28px;
@@ -495,7 +495,7 @@ body:not([data-tab="memos"]) .filter-btn { display: none; } /* 보기(거르기 
   border: 0;
   border-radius: 50%;
   background: var(--note-chip);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-500) 35%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ok-gray-0) 32%, transparent);
   cursor: pointer;
 }
 .color-dot[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text-strong); }
@@ -653,7 +653,7 @@ body:not([data-tab="memos"]) .folder-btn { display: none; }
   padding: 2px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
-  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-950) 8%, transparent), 0 2px 8px color-mix(in oklab, var(--ok-gray-950) 10%, transparent);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent), 0 2px 8px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
   opacity: 0;
   transition: opacity 0.12s ease-out;
 }
@@ -708,14 +708,14 @@ body.is-dragging .card:hover { transform: none; }
 .crown-btn.peeled { visibility: hidden; pointer-events: none; }
 .crown-btn { position: relative; }
 /* 작은 왕관: 스티커가 잘릴 때 이 단추 자리에 들어온 스티커 (스티커와 같은 그림 — 흰 가장자리 · 반투명 노랑) */
-.crown-btn .crown-mini { display: none; width: 24px; height: 20px; overflow: visible; filter: drop-shadow(0 1px 1px color-mix(in oklab, var(--ok-gray-1000) 25%, transparent)); }
+.crown-btn .crown-mini { display: none; width: 24px; height: 20px; overflow: visible; filter: drop-shadow(0 1px 1px color-mix(in oklab, var(--ok-gray-1000) 24%, transparent)); }
 .crown-btn.docked .crown-line, .crown-btn.undocking .crown-line { display: none; }
 .crown-btn.docked .crown-mini, .crown-btn.undocking .crown-mini { display: block; }
 .crown-btn.docked, .crown-btn.docked:hover { background: none; }
 @media (hover: hover) and (pointer: fine) { .crown-btn.docked:hover .crown-mini { transform: translateY(-1px) rotate(-4deg); } }
 .crown-btn .crown-mini { transition: transform 0.15s ease-out; }
 .cm-edge { fill: color-mix(in oklab, var(--ok-gray-0) 90%, transparent); stroke: color-mix(in oklab, var(--ok-gray-0) 90%, transparent); stroke-width: 5; stroke-linejoin: round; }
-.cm-body { fill: color-mix(in oklab, var(--ok-yellow-300) 85%, transparent); stroke: color-mix(in oklab, var(--ok-gray-950) 40%, transparent); stroke-width: 1.4; stroke-linejoin: round; }
+.cm-body { fill: color-mix(in oklab, var(--ok-yellow-300) 80%, transparent); stroke: color-mix(in oklab, var(--ok-gray-1000) 32%, transparent); stroke-width: 1.4; stroke-linejoin: round; }
 
 /* 설정: 위 항목에 딸린 줄 (켜져 있을 때만 쓸 수 있음) */
 .setting-row.sub-row { margin-left: 20px; }
@@ -910,12 +910,12 @@ div.setting-row { cursor: default; }
   border-radius: 999px; /* 휴대폰 ＋ 와 같은 원 */
   background: var(--brand-yellow);
   color: var(--on-brand);
-  box-shadow: 0 4px 12px color-mix(in oklab, var(--ok-gray-950) 20%, transparent), 0 1px 3px color-mix(in oklab, var(--ok-gray-950) 12%, transparent);
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--ok-gray-1000) 16%, transparent), 0 1px 3px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent);
   cursor: pointer;
   transition: transform 0.2s var(--ease-out), box-shadow 0.15s ease-out;
 }
 .fab svg { width: 22px; height: 22px; transition: transform 0.22s var(--ease-out); }
-.fab:hover { transform: translateY(-1px); box-shadow: 0 8px 22px color-mix(in oklab, var(--ok-gray-950) 26%, transparent), 0 2px 4px color-mix(in oklab, var(--ok-gray-950) 12%, transparent); }
+.fab:hover { transform: translateY(-1px); box-shadow: 0 8px 22px color-mix(in oklab, var(--ok-gray-1000) 24%, transparent), 0 2px 4px color-mix(in oklab, var(--ok-gray-1000) 12%, transparent); }
 .fab:active { transform: scale(0.94); }
 /* 펼친 동안: 위성 단추와 같은 앱 바탕 (버튼에 검정 바탕은 쓰지 않음) */
 .fab.open { background: var(--surface-2); color: var(--text-strong); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); }
@@ -928,7 +928,7 @@ body:not([data-tab="memos"]) .fab, body:not([data-tab="memos"]) .fab-menu, body:
 .fab-menu.closing .fab-sat { animation: fab-sat-in 0.14s var(--ease-out) both; }
 .fab-sat-label { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9px; background: var(--surface-2); box-shadow: var(--shadow-pop); font-weight: 700; font-size: 13px; }
 .fab-sat-label kbd { padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted); }
-.fab-sat-btn { display: grid; place-items: center; width: 38px; height: 38px; margin-right: 3px; border-radius: 13px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px color-mix(in oklab, var(--ok-gray-950) 20%, transparent); transition: transform 0.12s ease-out; }
+.fab-sat-btn { display: grid; place-items: center; width: 38px; height: 38px; margin-right: 3px; border-radius: 13px; background: var(--surface-2); color: var(--text-strong); box-shadow: 0 6px 16px color-mix(in oklab, var(--ok-gray-1000) 16%, transparent); transition: transform 0.12s ease-out; }
 .fab-sat[data-new="voice"] .fab-sat-btn { background: var(--rec); color: var(--on-rec); }
 .fab-sat-btn svg { width: 19px; height: 19px; }
 .fab-sat:hover .fab-sat-btn, .fab-sat:focus-visible .fab-sat-btn { transform: scale(1.06); }
@@ -1032,7 +1032,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .update-btn { min-width: 132px; transition: background-color 0.2s ease-out, color 0.2s ease-out, border-color 0.2s ease-out; }
 /* 최신: 초록 (밝은 · 어두운 화면 각각) — 새 버전 · 받아 둠은 .primary (노랑) */
 :root { --update-ok: var(--ok-green-700); --update-ok-hover: var(--ok-green-700); --update-ok-text: var(--ok-gray-0); } /* 흰 글자 5.4:1 */
-@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --update-ok: var(--ok-green-500); --update-ok-hover: var(--ok-green-400); --update-ok-text: var(--ok-green-950); } }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --update-ok: var(--ok-green-500); --update-ok-hover: var(--ok-green-500); --update-ok-text: var(--ok-green-700); } }
 
 .update-btn[data-state="latest"] { border-color: transparent; background: var(--update-ok); color: var(--update-ok-text); }
 .update-btn[data-state="downloading"] { font-variant-numeric: tabular-nums; }
