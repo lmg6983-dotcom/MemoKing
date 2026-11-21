@@ -23,6 +23,36 @@ async function brandFontCss(text) {
   const inlined = await Promise.all(files.map(async (f) => [f, await dataUrl(new URL(f.replace(/['"]/g, ''), FONT_DIR))]));
   return inlined.reduce((out, [f, d]) => out.replaceAll(`url(${f})`, `url(${d})`), css);
 }
+// 그 밖의 글꼴(수식 글꼴 등): 그림에 쓰인 글꼴의 @font-face 만 골라 파일을 넣는다
+//   html-to-image 의 getFontEmbedCSS 는 @import 를 CSS 파일이 아니라 페이지 기준 주소로 다시 받아 404 가 났다 (base.css 의 Pretendard @import)
+//   — 이미 읽힌 시트(@import 한 시트 포함)를 그대로 훑고, 파일 주소는 그 시트 기준으로
+async function otherFontCss(node) {
+  const used = new Set();
+  for (const e of [node, ...node.querySelectorAll('*')]) for (const f of getComputedStyle(e).fontFamily.split(',')) used.add(f.trim().replace(/["']/g, ''));
+  const faces = [];
+  const walk = (sheet) => {
+    let rules;
+    try { rules = sheet.cssRules; } catch { return; } // 다른 곳에서 온 시트는 읽을 수 없다
+    for (const r of rules) {
+      if (r instanceof CSSImportRule && r.styleSheet) walk(r.styleSheet);
+      else if (r instanceof CSSFontFaceRule) faces.push(r);
+    }
+  };
+  for (const sheet of document.styleSheets) walk(sheet);
+  const css = await Promise.all(faces.filter((r) => {
+    const family = r.style.getPropertyValue('font-family').trim().replace(/["']/g, '');
+    return used.has(family) && !/^Pretendard/.test(family); // 브랜드 글꼴은 brandFontCss 가
+  }).map(async (r) => {
+    let text = r.cssText;
+    for (const [whole, , u] of text.matchAll(/url\((['"]?)([^'")]+)\1\)/g)) {
+      if (u.startsWith('data:')) continue;
+      const data = await dataUrl(new URL(u, r.parentStyleSheet?.href ?? location.href)).catch(() => null);
+      if (data) text = text.replaceAll(whole, `url(${data})`);
+    }
+    return text;
+  }));
+  return css.join('\n');
+}
 
 /** 메모 → 그림 한 장 (base64 PNG). 너무 길면 PDF 로 저장하라는 오류 */
 export async function renderMemoImage(editor, opts = {}) {
@@ -38,7 +68,7 @@ const MAX_SLICES = 20;
  */
 export async function renderMemoImages(editor, { color = 'yellow', split = true } = {}) {
   if (!editor) throw new Error('메모가 열려 있지 않아요');
-  const { toCanvas, getFontEmbedCSS } = await import('../vendor/html-to-image.js');
+  const { toCanvas } = await import('../vendor/html-to-image.js');
   const source = editor.dom();
   const paper = document.createElement('div');
   paper.className = 'share-paper';
@@ -81,7 +111,7 @@ export async function renderMemoImages(editor, { color = 'yellow', split = true 
     const ratio = Math.min(2, MAX_PIXELS / Math.max(WIDTH, height));
     // 글꼴: 브랜드 글꼴은 이 메모에 나오는 글자를 가진 조각만 넣는다 (brandFontCss). 수식(KaTeX) 같은 그 밖의 글꼴은 html-to-image 가 찾는다.
     //   메모마다 글자가 달라 담아 두지 않는다 (창에 몇 MB 를 붙들고 있지 않게)
-    const fontCss = (await brandFontCss(paper.textContent).catch(() => '')) + (await getFontEmbedCSS(paper).catch(() => ''));
+    const fontCss = (await brandFontCss(paper.textContent).catch(() => '')) + (await otherFontCss(paper).catch(() => ''));
     const shoot = async (pixelRatio, clip = null) => {
       const canvas = await toCanvas(paper, {
         pixelRatio,
