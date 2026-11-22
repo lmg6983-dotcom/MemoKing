@@ -589,8 +589,8 @@ h2.sheet-title { font-size: 20px; }
 .drive-box .drive-box-text { flex: 1 1 140px; min-width: 0; }
 .drive-actions { flex: none; margin-left: auto; gap: 6px; }
 .drive-actions .btn { flex: none; }
-.settings-sheet .btn:not(.primary):not(.danger) { background: var(--surface-1); }
-.settings-sheet :is(.drive-box, .setting-row, .app-box, .path-card) .btn:not(.primary):not(.danger) { background: var(--fill-tab); } /* 흰 카드 안의 단추는 옅은 회색 */
+.settings-sheet .btn:not(.primary):not(.danger):not(.update-btn[data-state="latest"]) { background: var(--surface-1); }
+.settings-sheet :is(.drive-box, .setting-row, .app-box, .path-card) .btn:not(.primary):not(.danger):not(.update-btn[data-state="latest"]) { background: var(--fill-tab); } /* 흰 카드 안의 단추는 옅은 회색 */
 .settings-sheet > .hint { margin: 8px 12px 0; }
 .settings-sheet .sub-label { margin: 12px 4px 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .settings-sheet .sheet-actions + .setting-row { margin-top: 6px; }

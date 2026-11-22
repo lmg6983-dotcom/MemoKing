@@ -1034,8 +1034,8 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 설정 › 업데이트 · 새 버전 대화 상자 */
 .update-btn { min-width: 132px; transition: background-color 0.2s ease-out, color 0.2s ease-out, border-color 0.2s ease-out; }
 /* 최신: 초록 (밝은 · 어두운 화면 각각) — 새 버전 · 받아 둠은 .primary (노랑) */
-:root { --update-ok: var(--ok-green-700); --update-ok-hover: var(--ok-green-700); --update-ok-text: var(--ok-gray-0); } /* 흰 글자 5.4:1 */
-@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --update-ok: var(--ok-green-500); --update-ok-hover: var(--ok-green-500); --update-ok-text: var(--ok-green-700); } }
+:root { --update-ok: var(--ok-green-700); --update-ok-hover: color-mix(in oklab, var(--ok-green-700) 92%, var(--ok-gray-1000)); --update-ok-text: var(--ok-gray-0); } /* 흰 글자 5.4:1 */
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --update-ok: var(--ok-green-500); --update-ok-hover: color-mix(in oklab, var(--ok-green-500) 84%, var(--ok-gray-0)); --update-ok-text: var(--ok-green-700); } }
 
 .update-btn[data-state="latest"] { border-color: transparent; background: var(--update-ok); color: var(--update-ok-text); }
 .update-btn[data-state="downloading"] { font-variant-numeric: tabular-nums; }
