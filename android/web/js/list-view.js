@@ -23,7 +23,8 @@ import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
 import { workHours, onWorkHours } from './work-mode.js';
 import { UI } from '../../app/js/core/ui-text.js';
 import { pickFolder, createPickBar, askFolderName, renderFolderList, markCurrentFolder, pinItem } from '../../app/js/folder-ui.js';
-import { isSecretFolder, secretFolderId } from './vault-secret.js';
+import { isSecretFolder, secretFolderId, SECRET_FOLDER } from './vault-secret.js';
+import { askSecretPassword, askNewSecretPassword } from '../../app/js/secret-ui.js';
 import { isSecretId } from '../../app/js/core/secret-folders.js';
 import { openContextMenu } from '../../app/js/ctx-menu.js';
 import { folderList, movedText, isFolderName, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from '../../app/js/core/folders.js';
@@ -501,7 +502,7 @@ function folders() {
 // 고른 폴더가 없어졌으면(다른 기기 · 파일 앱에서 지움) 전체로 — 카드를 거르기 전에
 function keepFolderValid() {
   if (isSecretFolder(state.folder)) {
-    if (!secretFolders().some((f) => f.name === state.folder)) state.folder = ''; // 잠겼다 — 전체로
+    if (!secretFolders().some((f) => f.name === state.folder && !f.locked)) state.folder = ''; // 잠겼다 (앱을 나갔다 등) — 전체로
     return;
   }
   if (state.folder === UNFILED ? !folders().length : state.folder && !folders().some((f) => f.name === state.folder)) state.folder = '';
@@ -511,6 +512,11 @@ function keepFolderValid() {
 //   (예전: 누르는 순간 카드 전체를 다시 쌓고 옛 자리 · 새 자리를 모두 재느라 누른 표시까지 늦게 떠 툭툭 끊겼다)
 let folderSeq = 0;
 function setFolder(name) {
+  // 잠긴 비밀 폴더: 비밀번호부터 (맞으면 그 폴더를)
+  if (isSecretFolder(name) && secretFolders().find((f) => f.name === name)?.locked) {
+    unlockFolder(name).then((ok) => ok && setFolder(name));
+    return;
+  }
   const changed = name !== state.folder;
   state.folder = name;
   try {
@@ -626,10 +632,12 @@ async function folderMenu(name, anchor) {
   if (isSecretFolder(name)) return secretFolderMenu(name, r);
   const pick = await openContextMenu({
     x: Math.round(r.left), y: Math.round(r.bottom), label: `${name} 폴더`, clamp: true,
-    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '폴더 삭제', danger: true }],
+    items: [pinItem(state.pinnedFolders, name), { id: 'rename', label: '이름 바꾸기' }, { id: 'secret', label: '비밀 폴더로 만들기' }, { id: 'delete', label: '폴더 삭제', danger: true }],
   });
   try {
-    if (pick === 'pin') {
+    if (pick === 'secret') {
+      await makeSecret(name);
+    } else if (pick === 'pin') {
       state.pinnedFolders = app.vault.pinFolder(name, !state.pinnedFolders.includes(name));
       render();
     } else if (pick === 'rename') {
@@ -662,33 +670,84 @@ async function folderMenu(name, anchor) {
   }
 }
 
-/** 폴더를 바로 보여 준다 (비밀 폴더를 열었을 때 — app.js) */
+/** 폴더를 바로 보여 준다 (잠긴 비밀 폴더면 비밀번호부터 — 비밀 메모 알림을 눌렀을 때 app.js) */
 export function openFolder(name) {
   sideWanted = true;
   setFolder(name);
 }
 
-// 비밀 폴더 메뉴: 잠그기 · 이름 바꾸기 · 지우기 (지우기는 그 안 메모까지 — 휴지통에 두지 않으니 한 번 더 묻는다)
+/** 잠긴 비밀 폴더를 비밀번호로 연다 → 열었나 */
+export async function unlockFolder(name) {
+  const fid = secretFolderId(name);
+  const label = secretFolders().find((f) => f.name === name)?.label ?? '비밀';
+  return askSecretPassword({
+    name: label,
+    onTry: async (password) => {
+      try {
+        await app.vault.unlockSecret(fid, password);
+        return null;
+      } catch (err) {
+        return err.message || '열지 못했어요';
+      }
+    },
+  });
+}
+
+// 폴더 메뉴 › 비밀 폴더로 만들기: 비밀번호를 정하면 안의 메모 · 사진 · 파일을 모두 잠가 같은 이름의 비밀 폴더로
+async function makeSecret(name) {
+  const count = state.memos.filter((m) => m.folder === name).length;
+  let made = null;
+  const ok = await askNewSecretPassword({
+    name,
+    count,
+    onMake: async (password) => {
+      try {
+        made = await app.vault.makeSecretFolder(name, password);
+        return null;
+      } catch (err) {
+        return err.message || '비밀 폴더로 만들지 못했어요';
+      }
+    },
+  });
+  if (!ok || !made) return;
+  loadFolderDirs();
+  setFolder(`${SECRET_FOLDER}${made.fid}`);
+  toast(made.left ? `${name} 폴더를 비밀 폴더로 만들었어요. 잠긴 메모 ${made.left}개는 열 수 없어 원래 폴더에 남겼어요` : `${name} 폴더를 비밀 폴더로 만들었어요. 사진 · 파일까지 잠겼어요`);
+}
+
+// 비밀 폴더 메뉴: 잠긴 것은 열기만, 연 것은 잠그기 · 이름 바꾸기 · 보통 폴더로 되돌리기 · 지우기 (지우기는 그 안 메모까지 — 한 번 더 묻는다)
 async function secretFolderMenu(name, r) {
   const fid = secretFolderId(name);
-  const label = secretFolders().find((f) => f.name === name)?.label ?? '비밀 폴더';
+  const f = secretFolders().find((x) => x.name === name);
+  const label = f?.label ?? '비밀 폴더';
   const pick = await openContextMenu({
     x: Math.round(r.left), y: Math.round(r.bottom), label: `${label} 비밀 폴더`, clamp: true,
-    items: [{ id: 'lock', label: '잠그기' }, { id: 'rename', label: '이름 바꾸기' }, { id: 'delete', label: '비밀 폴더 삭제', danger: true }],
+    items: f?.locked ? [{ id: 'open', label: '열기' }]
+      : [{ id: 'lock', label: '잠그기' }, { id: 'rename', label: '이름 바꾸기' }, { id: 'plain', label: '보통 폴더로 되돌리기' }, { id: 'delete', label: '비밀 폴더 삭제', danger: true }],
   });
   try {
-    if (pick === 'lock') {
+    if (pick === 'open') {
+      setFolder(name);
+    } else if (pick === 'lock') {
       app.lockSecrets(fid);
     } else if (pick === 'rename') {
       const to = await askFolderName({ title: '비밀 폴더 이름 바꾸기', value: label, okLabel: '바꾸기' });
       if (!to || to === label) return;
       await app.vault.secret.rename(fid, to);
+      app.vault.refreshSecretFolders();
       render();
+    } else if (pick === 'plain') {
+      if (!(await app.confirmDanger(`${label} 비밀 폴더를 보통 폴더로 되돌릴까요?`, '안의 메모 · 사진 · 파일의 잠금이 풀려 누구나 볼 수 있어요.', '되돌리기'))) return;
+      const dir = await app.vault.makePlainFolder(fid);
+      loadFolderDirs();
+      setFolder(dir);
+      toast(`${dir} 폴더를 보통 폴더로 되돌렸어요`);
     } else if (pick === 'delete') {
       const count = app.vault.secretList(fid).length;
       if (!(await app.confirmDanger(`${label} 비밀 폴더를 삭제할까요?`, `${count ? `안의 메모 ${count}개와 사진 · 파일도 함께 지워져요. ` : ''}휴지통에 두지 않아 되돌릴 수 없어요.`, '삭제'))) return;
       await app.vault.secret.removeFolder(fid);
       app.lockSecrets(fid);
+      app.vault.refreshSecretFolders();
       if (state.folder === name) setFolder('');
       toast(`${label} 비밀 폴더를 삭제했어요`);
     }
@@ -703,6 +762,7 @@ export async function moveSecretAware(ids, to) {
   for (const id of ids) {
     if (isSecretFolder(to)) {
       if (isSecretId(id)) continue; // 비밀 폴더끼리는 꺼냈다 넣는다 (비밀번호가 다르므로) — 아직은 막는다
+      if (secretFolders().find((f) => f.name === to)?.locked && !(await unlockFolder(to))) return moved; // 잠긴 폴더에 놓으면 비밀번호부터
       await app.vault.moveToSecret(id, secretFolderId(to));
       moved++;
     } else if (isSecretId(id)) {
@@ -1551,7 +1611,7 @@ export function refresh() {
     state.results = text ? app.vault.search(text) : null;
   }
   const key = (state.results ?? state.memos).map(cardKey).join('\n') + (state.results ? '' : '|all') + state.memos.length
-    + secretFolders().map((f) => f.name).join() // 비밀 폴더는 목록(list) 밖 — 열고 잠그거나 그 안 메모를 고치면 다시 그린다
+    + secretFolders().map((f) => `${f.name}${f.locked ? 'L' : ''}${f.label}`).join() // 비밀 폴더는 목록(list) 밖 — 열고 잠그거나 그 안 메모를 고치면 다시 그린다
     + (isSecretFolder(state.folder) ? (app.vault.secretList(secretFolderId(state.folder)) ?? []).map(cardKey).join('\n') : '');
   remindersTab?.refresh({ quiet: state.tab !== 'reminders' }); // 일정 탭으로 가면 setTab 이 다시 그린다
   if (key === shownKey && el.cards.querySelector('.col')) return;

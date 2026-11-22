@@ -136,9 +136,10 @@ contextBridge.exposeInMainWorld('memoking', {
   recovered: { count: invoke('recovered:count'), restore: invoke('recovered:restore') },
   // 비밀 폴더 (desktop-rs/app/src/secret.rs) — 열쇠는 메모킹이 메모리에만, 목록을 닫거나 5분 쉬면 잠긴다
   secret: {
-    state: invoke('secret:state'), // → { opened: [{ fid, name, count }], memos: { fid: [카드] } }
-    open: invoke('secret:open'), // 비밀번호 → 연 [{ fid, name }] (맞는 폴더가 없으면 '비밀번호가 달라요')
-    create: invoke('secret:create'), // (이름, 비밀번호) → { fid, name }
+    state: invoke('secret:state'), // → { folders: [{ fid, name, open, count? }], memos: { fid: [카드] } } — 잠긴 폴더도 이름은
+    unlock: invoke('secret:unlock'), // (폴더 id, 비밀번호) → { fid, name } (다르면 '비밀번호가 달라요')
+    make: invoke('secret:make'), // (보통 폴더 이름, 비밀번호) → { fid, left } — 안의 메모를 잠가 같은 이름의 비밀 폴더로
+    unmake: invoke('secret:unmake'), // 폴더 id → 보통 폴더 이름 (메모를 풀어 꺼낸다)
     lock: invoke('secret:lock'), // 폴더 id (없으면 모두)
     rename: invoke('secret:rename'),
     remove: invoke('secret:remove'),

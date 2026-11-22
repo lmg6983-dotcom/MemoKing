@@ -8,6 +8,7 @@ import {
   SecretFolders, SECRET_DIR, SECRET_FILE_PREFIX, secretMemoId, parseSecretId, sealMemoInto, openMemoOut, secretFiles,
   sealBytes, randomId } from '../../app/js/core/secret-folders.js';
 import { normalizeMeta, toLocalIso, COLORS, extractAttachments } from '../../app/js/core/memo-file.js';
+import { cleanFolderName, folderOf } from '../../app/js/core/folders.js';
 
 /** 목록에서 비밀 폴더를 가리키는 폴더 이름 ("secret:<폴더 id>") — 진짜 폴더 이름으로 쓸 수 없는 글자(:)라 겹치지 않는다 */
 export const SECRET_FOLDER = 'secret:';
@@ -72,16 +73,54 @@ export function installSecretMethods(Vault) {
     },
 
     /** 비밀번호로 비밀 폴더를 연다 → 연 [{ fid, name }] */
-    async openSecrets(password) {
-      const opened = await this.secret.unlockWith(password);
-      for (const { fid } of opened) await this.loadSecret(fid);
+    /** 비밀 폴더 목록을 다음에 다시 읽게 (이름 바꾸기 · 지우기 뒤) */
+    refreshSecretFolders() {
+      this._secretSeen = 0;
+    },
+
+    /** 잠긴 비밀 폴더 하나를 비밀번호로 연다 (다르면 예외 '비밀번호가 달라요') */
+    async unlockSecret(fid, password) {
+      const opened = await this.secret.unlock(fid, password);
+      this._secretSeen = 0;
+      await this.loadSecret(fid);
       return opened;
     },
 
-    async createSecret(name, password) {
-      const made = await this.secret.create(name, password);
+    /**
+     * 폴더 메뉴 › 비밀 폴더로 만들기: 같은 이름의 비밀 폴더를 만들어 안의 메모(첨부까지)를 모두 잠가 옮기고 빈 폴더는 치운다
+     *   잠긴 메모는 열지 못하니 남긴다 (그 폴더도) → { fid, left }
+     */
+    async makeSecretFolder(folder, password) {
+      const made = await this.secret.create(folder, password);
+      this._secretSeen = 0;
       await this.loadSecret(made.fid);
-      return made;
+      let left = 0;
+      for (const e of [...this.entries.values()]) {
+        if (!e.file || folderOf(e.file) !== folder) continue;
+        try {
+          await this.moveToSecret(e.id, made.fid);
+        } catch {
+          left++;
+        }
+      }
+      if (!left) this.deleteFolder(folder); // 메모가 아닌 파일이 있으면 폴더는 남는다
+      return { fid: made.fid, left };
+    },
+
+    /** 비밀 폴더 메뉴 › 보통 폴더로 되돌리기: 같은 이름의 보통 폴더로 모두 풀어 꺼내고 비밀 폴더를 치운다 → 폴더 이름 */
+    async makePlainFolder(fid) {
+      const name = this.secret.opened().find((f) => f.fid === fid)?.name;
+      if (!name) throw new Error('비밀 폴더가 잠겨 있어요. 비밀번호를 넣고 다시 해 주세요');
+      const dir = this.createFolder(name);
+      for (const e of [...this.entries.values()]) {
+        if (e.secret !== fid) continue;
+        if (!e.body) this.entries.delete(e.id);
+        else await this.moveOutOfSecret(e.id, dir);
+      }
+      await this.secret.removeFolder(fid);
+      this.lockSecrets(fid);
+      this._secretSeen = 0;
+      return dir;
     },
 
     /** 연 폴더의 메모를 항목으로 (다시 읽기) */
@@ -152,11 +191,29 @@ export function installSecretMethods(Vault) {
     },
 
     /** 연 비밀 폴더 [{ name: "secret:<id>", label, count, fid }] — 폴더 목록에 */
+    //   잠긴 것도 이름은 보인다 (folder.json 의 title) — 폴더 목록이 자주 그리므로 1초 동안은 읽은 것을 쓴다
     secretFolders() {
-      return (this._secret?.opened() ?? []).map(({ fid, name }) => ({
-        name: `${SECRET_FOLDER}${fid}`, label: name, fid,
-        count: [...this.entries.values()].filter((e) => e.secret === fid && e.body).length,
-      }));
+      const now = Date.now();
+      if (!this._secretSeen || now - this._secretSeen > 1000) {
+        this._secretSeen = now;
+        this._secretRecords = [];
+        for (const d of fs.list(SECRET_DIR) ?? []) {
+          if (!d.dir || !HEX.test(d.name)) continue;
+          try {
+            const record = JSON.parse(fs.readText(`${SECRET_DIR}/${d.name}/folder.json`) ?? 'null');
+            if (record) this._secretRecords.push({ fid: d.name, title: cleanFolderName(record.title ?? '') || '비밀 폴더' });
+          } catch {
+            // 망가진 · 아직 다 받지 않은 폴더
+          }
+        }
+      }
+      const open = new Map((this._secret?.opened() ?? []).map((f) => [f.fid, f.name]));
+      return this._secretRecords
+        .map(({ fid, title }) => ({
+          name: `${SECRET_FOLDER}${fid}`, label: open.get(fid) ?? title, fid, locked: !open.has(fid),
+          count: open.has(fid) ? [...this.entries.values()].filter((e) => e.secret === fid && e.body).length : 0,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'ko'));
     },
 
     /** 비밀 폴더의 메모 카드들 */

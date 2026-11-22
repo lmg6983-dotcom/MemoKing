@@ -30,8 +30,8 @@ import { lockDialog } from '../../app/js/lock-ui.js';
 import { newLockSession } from '../../app/js/core/memo-lock.js';
 import { pickHandoff, recentlyUpdated, handoffText } from '../../app/js/core/handoff.js';
 import * as list from './list-view.js';
-import { openSecretSheet, pickSecretFolder } from '../../app/js/secret-ui.js';
-import { isSecretId } from '../../app/js/core/secret-folders.js';
+import { pickSecretFolder } from '../../app/js/secret-ui.js';
+import { isSecretId, parseSecretId } from '../../app/js/core/secret-folders.js';
 import { setupUpdates, checkForUpdate, refreshUpdateRow } from './updates.js';
 import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
@@ -409,27 +409,6 @@ app.lockSecrets = (fid = null) => {
   if (app.vault?.lockSecrets(fid)) list.refresh();
 };
 app.confirmDanger = (title, detail, label) => confirmDialog(`${title}\n${detail}`, label);
-app.openSecrets = async () => {
-  if (!app.vault) return;
-  let shown = null;
-  await openSecretSheet({
-    opened: app.vault.secret.opened(),
-    onOpen: async (password) => {
-      const opened = await app.vault.openSecrets(password);
-      shown = `secret:${opened[0].fid}`;
-      return null;
-    },
-    onCreate: async (name, password) => {
-      const made = await app.vault.createSecret(name, password);
-      shown = `secret:${made.fid}`;
-      return null;
-    },
-    onLock: (fid) => app.lockSecrets(fid),
-  });
-  if (!shown) return list.refresh();
-  closeAllSheets();
-  list.openFolder(shown); // 연 비밀 폴더를 바로 보여 준다
-};
 // 메모 위 막대의 ← (휴대폰: 목록으로) · ≡ (태블릿: 목록을 옆에 꺼내기·넣기)
 //   튜토리얼이 "목록으로 돌아가요"를 기다리는 동안은 태블릿도 메모를 닫는다 (옆에 꺼내기만 하면 다음 단계로 못 감)
 app.noteBack = () => {
@@ -461,7 +440,10 @@ app.filterByTag = (name) => {
 app.openMemo = async (id, options = {}) => {
   if (!app.vault) return;
   // 잠긴 비밀 폴더의 메모 (비밀 메모 알림을 눌렀다 등): 비밀번호부터
-  if (isSecretId(id) && !app.vault.get(id)) return app.openSecrets();
+  if (isSecretId(id) && !app.vault.get(id)) {
+    app.showList();
+    return list.openFolder(`secret:${parseSecretId(id).fid}`);
+  } // 잠긴 비밀 폴더의 메모: 그 폴더의 비밀번호부터
   // 위젯에 보일 메모를 고르는 중: 목록 카드를 누른 것만 고른 것으로, 다른 길(새 메모·알림 등)로 열면 고르기를 그만둔다
   if (options.fromList && widgets.takePick(id, { toast })) return;
   widgets.cancelPick();
@@ -1506,7 +1488,6 @@ $('tutorial-btn').addEventListener('click', () => {
   if (note.isOpen()) app.showList();
   setTimeout(startTutorial, 250);
 });
-$('secret-btn').addEventListener('click', () => app.openSecrets());
 $('trash-btn').addEventListener('click', () => {
   renderTrash();
   openSheet($('trash-sheet'));

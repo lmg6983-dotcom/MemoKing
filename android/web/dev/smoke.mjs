@@ -186,7 +186,7 @@ try {
     await page.evaluate(([px, py]) => document.elementFromPoint(px, py).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: px, clientY: py })), [x, y]);
     await page.mouse.up();
     await page.waitForTimeout(250);
-    check('폴더 꾹 누르기: 뜬 메뉴가 손을 뗀 뒤에도 그대로 (상단 고정 · 이름 바꾸기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 3);
+    check('폴더 꾹 누르기: 뜬 메뉴가 손을 뗀 뒤에도 그대로 (상단 고정 · 이름 바꾸기 · 비밀 폴더로 만들기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 4);
     await page.locator('.mk-ctx-item[data-id="pin"]').click();
     await page.waitForTimeout(300);
     check('상단 고정: 폴더가 "상단 고정" 묶음으로 (핀 없이 선으로 나눔) · 기기끼리 함께 쓰는 파일에', await page.evaluate(() => {
@@ -194,6 +194,42 @@ try {
       return Boolean(sep?.nextElementSibling?.querySelector('[data-folder="점검폴더"]')) && !document.querySelector('#folder-side .mf-pin');
     })
       && JSON.parse(read('_memoking/pinned-folders.json')).includes('점검폴더'));
+    // 비밀 폴더로 만들기 · 되돌리기 (폴더 메뉴 — vault-secret.js): 평문 .md 가 남지 않고, 되돌리면 그 폴더에 다시 .md
+    //   (따로 만든 폴더 · 메모로 — 꺼낸 메모는 새 id 라 뒤의 점검이 쓰는 메모를 건드리지 않게)
+    {
+      const sid = await page.evaluate(async () => {
+        const { app } = await import('/m/js/state.js');
+        app.vault.createFolder('비밀점검');
+        const nid = app.vault.create({ folder: '비밀점검' });
+        const e = app.vault.entries.get(nid);
+        e.body = '# 비밀점검 메모\n\n아무도 모르는 글';
+        app.vault.write(e);
+        return nid;
+      });
+      const made = await page.evaluate(async () => (await import('/m/js/state.js')).app.vault.makeSecretFolder('비밀점검', 'pass1234'));
+      await page.waitForTimeout(300);
+      const sdir = path.join(vault, '_memoking/secret', made.fid);
+      const sealed = fs.readdirSync(sdir).filter((f) => f.endsWith('.mks')).length;
+      const plainLeft = fs.readdirSync(vault, { recursive: true }).filter((f) => String(f).endsWith('.md') && read(String(f)).includes('아무도 모르는 글'));
+      check('비밀 폴더로 만들기: 폴더의 메모가 잠근 파일로만 (평문 폴더 · .md 없음)', made.left === 0 && sealed === 1 && !fs.existsSync(path.join(vault, '비밀점검')) && !plainLeft.length, JSON.stringify({ sid, made, sealed, plainLeft }));
+      check('비밀 폴더: 잠긴 동안에도 이름은 폴더 목록에 자물쇠와 함께', await page.evaluate(async () => {
+        const { app } = await import('/m/js/state.js');
+        app.lockSecrets();
+        app.vault.refreshSecretFolders();
+        return app.vault.secretFolders().some((f) => f.label === '비밀점검' && f.locked);
+      }));
+      const dir = await page.evaluate(async (fid) => {
+        const { app } = await import('/m/js/state.js');
+        await app.vault.unlockSecret(fid, 'pass1234');
+        return app.vault.makePlainFolder(fid);
+      }, made.fid);
+      await page.waitForTimeout(300);
+      check('보통 폴더로 되돌리기: 그 폴더에 .md 로 · 비밀 폴더는 치움', dir === '비밀점검' && fs.readdirSync(path.join(vault, '비밀점검')).filter((f) => f.endsWith('.md')).length === 1 && !fs.existsSync(sdir));
+      fs.rmSync(path.join(vault, '비밀점검'), { recursive: true }); // 뒤의 점검(메모 수)에 끼지 않게
+      await page.evaluate(async () => (await import('/m/js/state.js')).app.vault.scan?.());
+      await page.evaluate(async () => (await import('/m/js/list-view.js')).refresh());
+      await page.waitForTimeout(300);
+    }
     await page.evaluate(() => document.querySelector('#folder-side [data-folder-menu="점검폴더"]')?.click());
     await page.waitForTimeout(300);
     await page.locator('.mk-ctx-item[data-id="delete"]').click();
