@@ -96,35 +96,21 @@ export function lockDialog({ onLock, title = '' }) {
 /**
  * 잠긴 메모를 열 때: 메모 자리에 비밀번호 화면. onTry 가 null 을 주면(맞음) 화면을 치우고 true
  * @param {HTMLElement} container 메모 화면
- * @param {{ title: string, onTry: (password: string) => Promise<string|null>, onCancel?: () => void }} o
+ * @param {{ title: string, onTry: (password: string) => Promise<string|null> }} o
  * @returns {Promise<boolean>}
  */
 // bio: { label, get: () => Promise<비밀번호|null> } — 지문 · 얼굴로 열기 단추 (휴대폰, 감싸 둔 비밀번호가 있을 때). 화면이 뜨면 바로 한 번 묻는다
-export function lockScreen(container, { title, onTry, onCancel, bio = null }) {
+export function lockScreen(container, { title, onTry, bio = null }) {
   return new Promise((resolve) => {
     const screen = el('form', { class: 'lock-screen', role: 'dialog', 'aria-labelledby': 'lock-screen-title' });
     const field = passwordField('비밀번호', 'lock-open-pass');
     field.input.setAttribute('autocomplete', 'current-password');
+    field.input.placeholder = '비밀번호';
     const error = el('p', { class: 'lock-error', role: 'alert' });
     const open = el('button', { type: 'submit', class: 'btn primary' }, '열기');
     const actions = el('div', { class: 'dialog-actions' });
     let busy = false;
-    let cancelLater = false;
-    const close = () => {
-      screen.remove();
-      onCancel();
-      resolve(false);
-    };
-    if (onCancel) {
-      // 여는 중(비밀번호 확인)에 닫으면: 확인이 끝난 뒤에 닫는다 (맞았어도 열지 않음 — 부르는 쪽이 열쇠를 거둔다)
-      const cancel = el('button', { type: 'button', class: 'btn', 'data-lock-cancel': '' }, '닫기');
-      cancel.addEventListener('click', () => {
-        if (!busy) return close();
-        cancelLater = true;
-        cancel.textContent = '닫는 중';
-      });
-      actions.append(cancel);
-    }
+    // 닫기 단추는 두지 않는다 — 나가기는 위의 뒤로(←) · 휴대폰 뒤로 가기로 (열기 하나만, 칸 폭 그대로)
     actions.append(open);
     let bioBtn = null;
     const useBio = async () => {
@@ -160,7 +146,6 @@ export function lockScreen(container, { title, onTry, onCancel, bio = null }) {
         fail = err?.message || UI.openFail;
       }
       busy = false;
-      if (cancelLater) return close();
       if (fail) {
         error.textContent = fail;
         open.disabled = false;

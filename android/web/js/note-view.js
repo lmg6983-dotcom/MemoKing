@@ -1298,7 +1298,6 @@ export async function openNote(memoId, options = {}) {
             return err.message;
           }
         },
-        onCancel: () => {},
       });
       if (id === memoId || id === null) el.screen.classList.remove('memo-locked'); // 그사이 다른 메모가 열렸으면 그 화면은 그대로
       if (!opened) {

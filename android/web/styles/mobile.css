@@ -1362,7 +1362,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 여러 장 고르기 막대: 아래 탭 막대 위에 */
 .pick-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .pick-bar .btn { min-height: 44px; }
-body.picking var(--ok-pink-200) { display: none; }
+body.picking #fab { display: none; }
 
 /* ========== 메모 탭: 왼쪽 폴더 목록 + 카드 (PC 처럼 탐색기 모양 — folder-ui.js renderFolderList) ==========
    메모 칸은 그대로 하나의 스크롤. 폴더 목록은 왼쪽 칸에 붙어(sticky) 카드를 내려도 그 자리에 있고, 넘치면 따로 스크롤한다.
@@ -1422,6 +1422,3 @@ body.m-dragging .folder-side .mf-new { visibility: hidden; }
 .compare-actions { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
 /* 알림 보관함: 하루에 같은 앱 알림이 많으면 "N개 더" 한 줄 (app/js/list-history.js — PC list.css 와 같게) */
 .noti-more { display: block; width: 100%; min-height: 40px; padding: 6px 16px 10px 64px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; text-align: left; }
-
-/* 잠긴 메모(비밀번호를 넣기 전): 뒤로 · 메뉴만 — 되돌리기 · 일정 · 알림 · 서식 막대 · + · 다이얼 · 키보드 단추는 쓸 데가 없다 (note.css 와 같은 규칙) */
-.note-screen:has(.lock-screen) :is(#format-bar, #event-btn, #bell-btn, #tag-suggest-bar, #undo-btn, #redo-btn, #add-btn, #kb-btn, #move-bar, #mode-guide, .mode-knob) { display: none !important; }

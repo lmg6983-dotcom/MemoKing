@@ -2121,14 +2121,19 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .lock-screen .lock-icon { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto 10px; border-radius: 50%; background: color-mix(in srgb, var(--note-text) 8%, transparent); color: var(--note-text); }
 .lock-screen .lock-icon svg { width: 26px; height: 26px; }
 .lock-screen .lock-field { color: var(--note-muted); }
+/* 가운데 한 줄로: 칸 이름은 읽어 주기에만 (자리 글 "비밀번호"가 보인다) — 아이콘 · 제목 · 칸 · 열기가 같은 가운데 선 */
+.lock-screen .lock-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.lock-screen .lock-field input { text-align: center; }
+.lock-screen .lock-field input:focus-visible { outline-offset: -2px; } /* 포커스 테두리를 칸 안쪽에 — 아래 열기 단추와 양 끝이 맞게 */
+.lock-screen .lock-error { text-align: center; }
 /* 단추도 가운데 위 아이콘 · 제목과 맞춰 칸 폭 그대로 (닫기 1 : 열기 2 — 다른 창의 아래 막대와 같은 비율). 닫기가 없으면 열기가 한 줄 */
 .lock-screen .dialog-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
 .lock-screen .dialog-actions:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 .lock-screen .dialog-actions .btn { width: 100%; min-height: 40px; }
 @media (pointer: coarse) { .lock-field input { min-height: 48px; font-size: 16px; } }
 /* 비밀번호를 넣기 전: 서식 막대·+ 는 숨김 */
-.memo-locked #format-bar, .memo-locked var(--ok-teal-500)-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
-.memo-locked #bell-btn, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
+.memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
+.memo-locked #bell-btn, .memo-locked #event-btn, .memo-locked #tag-suggest-bar, .memo-locked #kb-btn, .memo-locked #move-bar, .memo-locked #mode-guide, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
 .lock-dialog h2 { margin-bottom: 8px; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
 .lock-hide-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 4px 0; font-size: 13px; color: var(--muted); }
@@ -2786,7 +2791,3 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 /* 화면 스냅샷 (note.js showSnapshot): 편집기를 만드는 동안 지난번 모습을 먼저 — 만드는 중인 편집기는 그 뒤에 감춰 둔다 */
 .editor > .mk-snapshot { pointer-events: none; }
 .editor > .mk-snapshot ~ .milkdown { position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; }
-
-
-/* 잠긴 메모(비밀번호를 넣기 전): 글을 고치는 도구는 감춘다 — 서식 막대 · 일정 · 알림 · 추천 태그 (휴대폰은 mobile.css 에서 되돌리기 · + · 다이얼도) */
-body:has(.lock-screen) :is(#format-bar, #event-btn, #bell-btn, #tag-suggest-bar, #undo-btn, #redo-btn) { display: none !important; }

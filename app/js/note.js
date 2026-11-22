@@ -2111,7 +2111,6 @@ if (memo?.needsPassword) {
       memo = { ...memo, ...r };
       return null;
     },
-    onCancel: () => api.win.close(),
   });
   markPainted();
   const opened = await unlocking;
