@@ -136,7 +136,7 @@ export function markCurrentFolder(container, current) {
   }
 }
 
-// 두 줄로도 다 안 들어가는 이름에 .long — 고른 폴더 · 끌어 올려놓은 폴더에서는 한 줄로 천천히 흘러 끝까지 보인다 (base.css)
+// 한 줄에 다 안 들어가는 이름에 .long — 고른 폴더 · 끌어 올려놓은 폴더에서는 한 줄로 천천히 흘러 끝까지 보인다 (base.css)
 //   --mf-w: 이름 칸의 폭 (흐를 거리), --mf-dur: 글자 수에 맞춘 흐르는 시간
 function markLongNames(container) {
   for (const name of container.querySelectorAll('.mf-name')) {
