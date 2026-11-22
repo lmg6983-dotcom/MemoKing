@@ -589,6 +589,9 @@ h2.sheet-title { font-size: 20px; }
 .drive-box .drive-box-text { flex: 1 1 140px; min-width: 0; }
 .drive-actions { flex: none; margin-left: auto; gap: 6px; }
 .drive-actions .btn { flex: none; }
+/* 연결된 뒤 단추 셋(지금 동기화 · 폴더 바꾸기 · 연결 끊기)은 한 줄 전체를 똑같이 나눠 — 112px 씩이면 390px 폭에서 끝이 잘렸다 */
+.drive-actions:has(> .btn:not([hidden]) ~ .btn:not([hidden])) { flex: 1 1 100%; margin-left: 0; }
+.drive-actions:has(> .btn:not([hidden]) ~ .btn:not([hidden])) .btn { flex: 1 1 0; min-width: 0; padding-inline: 8px; }
 .settings-sheet .btn:not(.primary):not(.danger):not(.update-btn[data-state="latest"]) { background: var(--surface-1); }
 .settings-sheet :is(.drive-box, .setting-row, .app-box, .path-card) .btn:not(.primary):not(.danger):not(.update-btn[data-state="latest"]) { background: var(--fill-tab); } /* 흰 카드 안의 단추는 옅은 회색 */
 .settings-sheet > .hint { margin: 8px 12px 0; }
