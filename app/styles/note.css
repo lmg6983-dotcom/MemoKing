@@ -201,7 +201,8 @@ body, .note-screen, .share-paper {
 .mk-doc ul, .mk-doc ol { margin: 0.2em 0 0.4em; padding-left: 1.4em; }
 .mk-doc li > p { margin: 0.05em 0; }
 /* 메모 안 콘텐츠: One UI 9.5 — 굵은 띠 · 진한 선 대신 옅은 바탕의 둥근 칸 (휴대폰 · PC · 인쇄 같이) */
-.mk-doc blockquote { margin: 0.5em 0; padding: 0.55em 0.85em; border-radius: 14px; background: color-mix(in srgb, var(--note-text) 6%, transparent); color: var(--note-muted); }
+.mk-doc blockquote { margin: 0.4em 0; padding: 0.1em 0 0.1em 0.8em; border-left: 3px solid var(--note-accent); color: var(--note-muted); } /* 인용(출처 줄 등): 왼쪽 세로줄 + 흐린 글 (1.5.3 모양으로 되돌림 — 둥근 칸보다 출처가 또렷하다) */
+body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--note-text); }
 /* 코드 글꼴: 한글은 고정폭 글꼴에 없으니 Pretendard 로 ("코드  조각" 처럼 벌어지지 않게) */
 .mk-doc code { padding: 0.1em 0.4em; border-radius: 8px; background: var(--note-hover); font-family: ui-monospace, Consolas, Menlo, "Roboto Mono", "Droid Sans Mono", "DejaVu Sans Mono", "Pretendard Variable", Pretendard, monospace; font-size: 0.9em; }
 .mk-doc pre { padding: 12px 14px; border-radius: 14px; background: var(--note-hover); font-family: ui-monospace, Consolas, Menlo, "Roboto Mono", "Droid Sans Mono", "DejaVu Sans Mono", "Pretendard Variable", Pretendard, monospace; font-size: 0.9em; line-height: 1.6; overflow-x: auto; }
@@ -1211,7 +1212,7 @@ body.mk-row-resizing { user-select: none; }
 .s-h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
 .s-h2 { font-size: 17px; font-weight: 750; }
 .s-h3 { font-size: 15px; font-weight: 700; }
-.s-quote { padding: 2px 8px; border-radius: 8px; background: color-mix(in srgb, var(--note-text, var(--text)) 6%, transparent); color: var(--muted); font-size: 14px; } /* 실제 인용(.mk-doc blockquote)과 같은 옅은 칸 — 노란 왼쪽 줄은 예전 모양 */
+.s-quote { padding-left: 8px; border-left: 3px solid var(--muted); color: var(--muted); font-size: 14px; } /* 실제 인용(.mk-doc blockquote)과 같은 왼쪽 세로줄 */
 .s-code { padding: 1px 6px; border-radius: 6px; background: var(--fill-hover); font: 13px ui-monospace, Consolas, monospace; }
 
 /* ---------- v0.17.4: 표 막대는 좁은 창에서도 버튼이 가려지지 않게 여러 줄로 ---------- */
