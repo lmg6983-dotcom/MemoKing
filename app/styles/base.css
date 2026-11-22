@@ -237,7 +237,7 @@ svg { width: 20px; height: 20px; flex: none; }
 @media (hover: hover) and (pointer: fine) { .btn.primary:hover { background: var(--brand-yellow-hover); } }
 .btn.danger { background: var(--danger); color: var(--on-danger); box-shadow: none; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn.primary:disabled { opacity: 1; background: var(--brand-yellow-soft); color: var(--muted); box-shadow: none; } /* 누를 수 없는 주요 단추는 흐린 노랑 대신 무채색 (MagicKey · MagicSystem 같이) */
+.btn:is(.primary, .danger):disabled { opacity: 1; background: var(--brand-yellow-soft); color: var(--muted); box-shadow: none; } /* 누를 수 없는 주요 · 지우기 단추는 흐린 노랑 · 분홍 대신 무채색 (MagicKey · MagicSystem 같이) */
 /* 누른 일을 하는 중 (dom.js busyWhile) — 추억 공유 단추와 같은 모양 */
 :is(.btn, .icon-btn, .link-btn, .card, .cards, .stack-tab)[aria-busy="true"] { opacity: 0.6; cursor: progress; }
 
@@ -625,7 +625,7 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   min-height: 34px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 99px;
   background: var(--surface-0); color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
 }
-.event-alerts button[aria-pressed="true"] { border-color: transparent; background: var(--accent); color: var(--on-brand); font-weight: 700; }
+.event-alerts button[aria-pressed="true"] { border-color: transparent; background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1.5px var(--text-strong); font-weight: 700; } /* 고른 칩은 목록 · 필터 칩과 같은 무채색 (노랑은 저장 단추에만) */
 .event-alerts button[aria-pressed="true"]::before { content: '✓ '; }
 .event-alerts button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 /* 메모 창 일정 · 알림 패널(reminder-panel.js)의 "새 일정 / 새 알림" 단추 */
@@ -652,9 +652,9 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   box-sizing: border-box;
 }
-.quick-event .qe-name:focus {
-  border-color: var(--brand-yellow);
-  box-shadow: 0 0 0 2px var(--brand-yellow-soft), inset 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
+.quick-event .qe-name:focus { /* 포커스 테두리는 다른 입력칸과 같은 진한 선 (노랑은 흰 바탕에서 1.5:1) */
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px var(--focus-ring), inset 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   outline: none;
 }
 .dp-quick, :is(.quick-event .qe-time, .event-dialog .event-time) .dp-quick {
@@ -699,9 +699,9 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
   box-sizing: border-box;
 }
 .quick-event .qe-fresh-body:focus {
-  border-color: var(--brand-yellow);
+  border-color: var(--focus-ring);
   outline: none;
-  box-shadow: 0 0 0 2px var(--brand-yellow-soft);
+  box-shadow: 0 0 0 1px var(--focus-ring);
 }
 .quick-event { --flow-bg: var(--surface-2); }
 .quick-event .qe-memo span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1528,7 +1528,7 @@ dialog.quick-event[open] {
 .memory-day .md-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .memory-day .md-chip { min-height: 34px; padding: 0 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-1); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; transition: background-color 0.15s ease-out, transform 0.1s ease-out; }
 .memory-day .md-chip:active { transform: scale(0.95); }
-.memory-day .md-chip[aria-checked="true"] { border-color: transparent; background: var(--accent); color: var(--on-brand); font-weight: 700; }
+.memory-day .md-chip[aria-checked="true"] { border-color: transparent; background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1.5px var(--text-strong); font-weight: 700; }
 .memory-day .md-date { position: relative; display: flex; align-items: center; gap: 8px; min-height: 44px; margin-bottom: 18px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); color: var(--text-strong); font-weight: 700; cursor: pointer; }
 .memory-day .md-date svg { flex: none; width: 18px; height: 18px; }
 .memory-day .md-date::after { content: '›'; margin-left: auto; color: var(--muted); font-weight: 800; }

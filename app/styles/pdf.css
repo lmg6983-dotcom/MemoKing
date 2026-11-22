@@ -64,7 +64,7 @@ body {
   transition: background-color 0.15s ease-out, transform 0.1s ease-out;
 }
 .chips button:active { transform: scale(0.95); }
-.chips button[aria-checked="true"] { border-color: var(--brand-yellow); background: var(--brand-yellow); color: var(--on-brand); }
+.chips button[aria-checked="true"] { border-color: transparent; background: var(--brand-yellow-soft); color: var(--text-strong); box-shadow: inset 0 0 0 1.5px var(--text-strong); font-weight: 700; } /* 고른 칩은 무채색 (목록 · 필터 칩과 같이) */
 
 .slider-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13px; font-weight: 600; }
 .slider-row input { flex: 1; accent-color: var(--brand-black); }
