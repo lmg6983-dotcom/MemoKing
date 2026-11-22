@@ -1225,6 +1225,9 @@ export async function openNote(memoId, options = {}) {
     toast(UI.memoMissing, true);
     return;
   }
+  // 비밀 메모: 잠근 사진 · 파일을 먼저 풀어 두고(화면이 바로 보이게), 새로 넣는 첨부는 잠가서 그 폴더로
+  if (next.secret) await app.vault.prepareSecret(memoId);
+  app.vault.setSecretTarget(next.secret ? memoId : null);
   opening = (async () => {
     id = memoId;
     memo = next;
@@ -1483,6 +1486,7 @@ export function closeNote({ quiet = false } = {}) {
   // 잠긴 메모에서 녹음하던 중에 닫으면: 열쇠는 앱이 따로 들고 있다가 녹음·받아쓰기를 그 메모에 넣을 때만 잠깐 쓴다
   if ((recorder.recordingFor() === closing || app.transcribing?.has(closing)) && app.vault.locks.has(closing)) app.holdLock(closing, app.vault.locks.get(closing));
   app.vault.closeLock(closing); // 잠금 메모는 닫으면 다시 비밀번호로
+  app.vault.setSecretTarget(null); // 다음 첨부는 보통 첨부로
   document.activeElement?.blur();
   if (quiet || reduceMotion()) {
     el.screen.hidden = true;

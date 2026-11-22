@@ -11,6 +11,7 @@ import { fs, toBase64, scanCache } from './native.js';
 import { isLockedBody, parseLocked } from '../../app/js/core/memo-lock.js';
 import { isLiveCached } from '../../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles, diskCopy } from '../../app/js/core/vault-locks.js';
+import { installSecretMethods, isSecretFolder, secretFolderId } from './vault-secret.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import { folderOf, cleanFolderName, isFolderName, resolveMovedTwin, withoutId, PINNED_FOLDERS_FILE, parsePinned, pinFolder, renamePinned } from '../../app/js/core/folders.js';
 import {
@@ -358,6 +359,7 @@ export class Vault extends EventTarget {
       device: entry.meta.device ?? null,
       day: entry.meta.day || '',
       mode: entry.meta.mode ?? 'life',
+      secret: entry.secret ?? null, // 비밀 폴더 id (비밀 메모면)
     };
   }
 
@@ -421,6 +423,7 @@ export class Vault extends EventTarget {
   // mode: Work / Life (없으면 지금 고른 모드 — defaultMode)
   //   folder: 넣을 메모킹 폴더 (없으면 맨 위)
   create({ color, mode, folder } = {}) {
+    if (isSecretFolder(folder)) return this.createSecretMemo(secretFolderId(folder), { color, mode }); // 비밀 폴더를 보는 중이면 그 폴더에 (잠가서)
     const id = uuid();
     this.entries.set(id, this.newEntry(id, color, mode ?? this.defaultMode, folder));
     return id;
@@ -520,6 +523,7 @@ export class Vault extends EventTarget {
 
   // known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것을 넘긴다)
   write(entry, known = entry.body, { copy = true } = {}) {
+    if (entry.secret) return this.writeSecret(entry); // 비밀 메모는 늘 잠가서 _memoking/secret 으로 (vault-secret.js)
     // 그사이 다른 기기가 이 메모를 잠갔다면 덮어쓰지 않는다 (잠금이 풀리거나 비밀번호가 되돌아가지 않게)
     if (entry.file) {
       const kept = this.keepChangedOnDisk(entry, known, { copy });
@@ -580,6 +584,11 @@ export class Vault extends EventTarget {
   finalize(id) {
     const entry = this.entries.get(id);
     if (!entry) return;
+    if (entry.secret) {
+      // 비밀 메모: 파일 이름이 무작위라 맞출 것이 없다 — 빈 메모만 치운다
+      if (isBlankBody(entry.body)) this.removeSecret(id);
+      return;
+    }
     if (isBlankBody(entry.body)) {
       if (entry.file) this.trash(id);
       else this.entries.delete(id);
@@ -754,6 +763,7 @@ export class Vault extends EventTarget {
   trash(id) {
     const entry = this.entries.get(id);
     if (!entry) return false;
+    if (entry.secret) return this.removeSecret(id); // 휴지통은 잠기지 않는 곳 — 비밀 메모는 바로 지운다
     this.entries.delete(id);
     let trashed = null;
     if (entry.file && fs.stat(entry.file)) {
@@ -950,6 +960,7 @@ export class Vault extends EventTarget {
   }
 
   saveAttachment(bytes, ext) {
+    if (this.secretTarget) return this.saveSecretAttachment(bytes, ext); // 비밀 메모에 넣는 첨부는 잠가서
     const rel = this.newAttachmentPath(ext);
     fs.writeBase64(rel, toBase64(bytes));
     return rel;
@@ -959,6 +970,8 @@ export class Vault extends EventTarget {
   commitAttachment(tempId, ext) {
     const rel = this.newAttachmentPath(ext);
     fs.commitTemp(tempId, rel);
+    // 비밀 메모: 앱이 받아 둔 파일은 바이트로 읽을 길이 없어 잠깐 첨부 폴더에 두었다가 잠가 옮기고 바로 지운다
+    if (this.secretTarget) return this.sealCommitted(rel, ext);
     return rel;
   }
 
@@ -1040,3 +1053,4 @@ function indexOffThread(memos) {
 }
 
 installLockMethods(Vault);
+installSecretMethods(Vault);

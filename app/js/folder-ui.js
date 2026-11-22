@@ -50,7 +50,7 @@ export const pinItem = (pinned, name) => ({ id: 'pin', label: pinned?.includes(n
 
 export function renderFolderList(container, { folders, current, total = 0, onPick, onNew, onMenu }) {
   // 폴더 · 수가 그대로면 목록을 다시 만들지 않고 고른 줄만 바꾼다 (폴더를 누를 때마다 목록을 통째로 새로 만들고 이름 길이를 다시 재 멈칫했다)
-  const key = JSON.stringify([folders.map((f) => [f.name, f.label ?? '', f.count, Boolean(f.pinned)]), total, Boolean(onMenu)]);
+  const key = JSON.stringify([folders.map((f) => [f.name, f.label ?? '', f.count, Boolean(f.pinned), Boolean(f.secret)]), total, Boolean(onMenu)]);
   if (container.mfKey === key && container.querySelector('.mf-list')) {
     markCurrentFolder(container, current);
     return;
@@ -74,7 +74,7 @@ export function renderFolderList(container, { folders, current, total = 0, onPic
     return li;
   };
   list.append(item(folderButton({ name: '', label: '전체', count: total, current: !current, iconName: 'note' }), ''));
-  const make = (f) => item(folderButton({ name: f.name, label: f.label ?? f.name, count: f.count, current: f.name === current, iconName: isReal(f.name) ? '' : 'inbox' }), f.name);
+  const make = (f) => item(folderButton({ name: f.name, label: f.label ?? f.name, count: f.count, current: f.name === current, iconName: f.secret ? 'lock' : isReal(f.name) ? '' : 'inbox' }), f.name);
   for (const f of folders) if (!isReal(f.name)) list.append(make(f));
   // 전체 · 미분류 | 상단 고정 | 폴더 — 묶음마다 선과 이름으로 나눈다 (상단 고정한 폴더가 없으면 그 묶음도 없음)
   const section = (title, items) => {
@@ -83,9 +83,10 @@ export function renderFolderList(container, { folders, current, total = 0, onPic
     head.setAttribute('aria-hidden', 'true');
     list.append(head, ...items.map(make));
   };
-  const real = folders.filter((f) => isReal(f.name));
+  const real = folders.filter((f) => isReal(f.name) && !f.secret);
   section('상단 고정', real.filter((f) => f.pinned));
   section('폴더', real.filter((f) => !f.pinned));
+  section('비밀 폴더', folders.filter((f) => f.secret)); // 연 비밀 폴더만 (잠기면 이름까지 사라진다 — core/secret-folders.js)
   list.addEventListener('click', (e) => {
     const m = e.target.closest('[data-folder-menu]');
     if (m) return onMenu?.(m.dataset.folderMenu, m);
@@ -319,7 +320,7 @@ export function closeFolderInput(container) {
 }
 
 /** 작은 창 하나 (머리 · 닫기 · 몸통) → { dialog, body, done(값) } — 닫으면 값으로 끝난다 */
-function sheet(title, className) {
+export function sheet(title, className) {
   let result = null;
   const dialog = el('dialog', `dialog folder-dialog ${className}`);
   const head = el('div', 'dialog-head');

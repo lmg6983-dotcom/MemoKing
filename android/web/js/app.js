@@ -14,7 +14,7 @@ import { importText, isTextDocument, stripFrontMatter } from '../../app/js/core/
 import { mediaKind } from '../../app/js/media.js';
 import { vocabularyFrom, fixTranscript } from '../../app/js/core/transcript-fix.js';
 import { voiceCardMarkdown, attachTranscript, recordingWhen } from '../../app/js/core/voice-card.js';
-import { native, call, on, setBackHandler, drive, history, fs, setSandbox } from './native.js';
+import { native, call, on, setBackHandler, drive, history, fs, setSandbox, awayForPick } from './native.js';
 import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
@@ -30,6 +30,7 @@ import { lockDialog } from '../../app/js/lock-ui.js';
 import { newLockSession } from '../../app/js/core/memo-lock.js';
 import { pickHandoff, recentlyUpdated, handoffText } from '../../app/js/core/handoff.js';
 import * as list from './list-view.js';
+import { openSecretSheet, pickSecretFolder } from '../../app/js/secret-ui.js';
 import { setupUpdates, checkForUpdate, refreshUpdateRow } from './updates.js';
 import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
@@ -50,7 +51,7 @@ import { UI } from '../../app/js/core/ui-text.js';
 const $ = (x) => document.getElementById(x);
 
 // 공용 코드(app/js/media.js)가 첨부 주소를 만들 때 쓴다
-window.memoking = { platform: 'android', vaultBase: `${location.origin}/vault/`, posterBase: `${location.origin}/poster/`, historyBase: `${location.origin}/history/` };
+window.memoking = { ...window.memoking, platform: 'android', vaultBase: `${location.origin}/vault/`, posterBase: `${location.origin}/poster/`, historyBase: `${location.origin}/history/` };
 
 injectIcons();
 attachSliders(); // 탭·고르기 칸: 선택 표시가 미끄러진다
@@ -397,6 +398,37 @@ app.showList = () => {
   list.show();
   syncPane();
 };
+
+// ---------- 비밀 폴더 (vault-secret.js · secret-ui.js) ----------
+/** 비밀 폴더를 잠근다 (fid 없으면 모두) — 그 폴더의 메모를 보고 있었으면 목록으로 */
+app.lockSecrets = (fid = null) => {
+  const cur = note.currentId();
+  const curSecret = cur ? app.vault?.get(cur)?.secret : null;
+  if (curSecret && (!fid || curSecret === fid)) app.showList();
+  if (app.vault?.lockSecrets(fid)) list.refresh();
+};
+app.confirmDanger = (title, detail, label) => confirmDialog(`${title}\n${detail}`, label);
+app.openSecrets = async () => {
+  if (!app.vault) return;
+  let shown = null;
+  await openSecretSheet({
+    opened: app.vault.secret.opened(),
+    onOpen: async (password) => {
+      const opened = await app.vault.openSecrets(password);
+      shown = `secret:${opened[0].fid}`;
+      return null;
+    },
+    onCreate: async (name, password) => {
+      const made = await app.vault.createSecret(name, password);
+      shown = `secret:${made.fid}`;
+      return null;
+    },
+    onLock: (fid) => app.lockSecrets(fid),
+  });
+  if (!shown) return list.refresh();
+  closeAllSheets();
+  list.openFolder(shown); // 연 비밀 폴더를 바로 보여 준다
+};
 // 메모 위 막대의 ← (휴대폰: 목록으로) · ≡ (태블릿: 목록을 옆에 꺼내기·넣기)
 //   튜토리얼이 "목록으로 돌아가요"를 기다리는 동안은 태블릿도 메모를 닫는다 (옆에 꺼내기만 하면 다음 단계로 못 감)
 app.noteBack = () => {
@@ -492,6 +524,14 @@ app.memoMenu = (id) => {
   memoSheet.querySelector('[data-memo-action="folder"] small').textContent = folderOf(memo.file) || '폴더 없음';
   memoSheet.querySelector('[data-memo-action="pick"]').hidden = inNote; // 여러 장 고르기는 목록에서만
   memoSheet.querySelector('[data-memo-action="compare"]').hidden = !conflictOriginal(memo); // 충돌 사본이고 원본이 있을 때만
+  // 비밀 메모: 비밀 폴더에서 꺼내기만 — 잠그기 · 위젯(홈 화면에 글이 드러남) · 버전 · 보통 폴더로 옮기기는 없다
+  const secretItem = memoSheet.querySelector('[data-memo-action="secret"]');
+  secretItem.hidden = !memo.secret && !app.vault.secret.opened().length;
+  secretItem.querySelector('span').textContent = memo.secret ? '비밀 폴더에서 꺼내기' : '비밀 폴더로 옮기기';
+  for (const a of ['lock', 'widget', 'versions', 'folder']) {
+    const b = memoSheet.querySelector(`[data-memo-action="${a}"]`);
+    if (b) b.hidden = Boolean(memo.secret);
+  }
   pin.querySelector('svg').replaceWith(icon(memo.pinned ? 'pin-fill' : 'pin'));
   openSheet(memoSheet);
 };
@@ -585,6 +625,28 @@ memoSheet.addEventListener('click', async (e) => {
       closeSheet(memoSheet);
       deleteMemo(id);
       break;
+    case 'secret': {
+      closeSheet(memoSheet);
+      note.flush();
+      try {
+        if (memo.secret) {
+          if (note.currentId() === id) app.showList();
+          await app.vault.moveOutOfSecret(id, '');
+          toast('비밀 폴더에서 꺼냈어요. 이제 잠기지 않은 보통 메모예요');
+        } else {
+          const opened = app.vault.secret.opened();
+          const fid = opened.length === 1 ? opened[0].fid : await pickSecretFolder(opened);
+          if (!fid) break;
+          if (note.currentId() === id) app.showList();
+          await app.vault.moveToSecret(id, fid);
+          toast(`${opened.find((f) => f.fid === fid)?.name ?? '비밀'} 폴더로 옮겼어요. 사진 · 파일까지 잠겼어요`);
+        }
+      } catch (err) {
+        toast(err.message || '옮기지 못했어요', true);
+      }
+      list.refresh();
+      break;
+    }
     case 'versions':
       closeSheet(memoSheet);
       openVersions(id);
@@ -718,6 +780,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 /** @param {{ flown?: boolean }} [o] flown: 카드가 이미 밀려 날아갔다 (목록 밀어 지우기) — 따로 날리지 않는다 */
 async function deleteMemo(id, { flown = false } = {}) {
   if (!app.vault?.get(id)) return;
+  // 비밀 메모는 휴지통(잠기지 않는 곳)에 두지 않으므로 되돌릴 수 없다 — 한 번 더 묻는다
+  if (app.vault.get(id).secret && !(await confirmDialog('비밀 메모를 삭제할까요?\n비밀 메모는 휴지통에 두지 않아 되돌릴 수 없어요.', '삭제'))) return;
   const inNote = note.currentId() === id;
   const body = inNote ? note.editorMarkdown() : app.vault.get(id)?.body ?? '';
   const motion = !reduceMotion();
@@ -1439,6 +1503,7 @@ $('tutorial-btn').addEventListener('click', () => {
   if (note.isOpen()) app.showList();
   setTimeout(startTutorial, 250);
 });
+$('secret-btn').addEventListener('click', () => app.openSecrets());
 $('trash-btn').addEventListener('click', () => {
   renderTrash();
   openSheet($('trash-sheet'));
@@ -1859,6 +1924,8 @@ on('app', (state) => {
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
   note.flush();
+  // 앱을 나가면 비밀 폴더는 바로 잠근다 — 사진 · 파일을 고르거나 공유하러 잠깐 다른 화면에 간 것은 빼고
+  if (!awayForPick()) app.lockSecrets();
   widgets.cancelPick(); // 위젯 고르기 중에 앱을 떠나면 그만 (돌아와 연 메모가 위젯에 놓이지 않게)
 });
 

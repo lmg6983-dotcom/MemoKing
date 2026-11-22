@@ -4,6 +4,7 @@
 
 export function vaultUrl(src) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(src)) return src; // http:, data:, blob: 는 그대로
+  if (String(src).startsWith('secret-file/')) return globalThis.memoking?.secretUrl?.(src) || ''; // 비밀 폴더의 잠근 첨부: 연 동안 풀어 둔 주소 (core/secret-folders.js)
   let decoded = src;
   try {
     decoded = decodeURI(src);
@@ -20,9 +21,9 @@ let imageThumb = 0;
 /** 이 창의 메모 안 사진을 줄여 보인다 (긴 변 w px) — PC 메모 창만 부른다 (인쇄 · PDF 저장 · 휴대폰은 원본) */
 export const useImageThumbs = (w) => void (imageThumb = Math.round(w));
 /** 메모 안에 보일 사진 주소 */
-export const shownUrl = (src) => (imageThumb && /\.(jpe?g|png|webp|bmp)$/i.test(src) ? `${vaultUrl(src)}?thumb=${imageThumb}` : vaultUrl(src));
+export const shownUrl = (src) => (imageThumb && !String(src).startsWith('secret-file/') && /\.(jpe?g|png|webp|bmp)$/i.test(src) ? `${vaultUrl(src)}?thumb=${imageThumb}` : vaultUrl(src));
 /** 작은 자리(사진 줄의 썸네일 등)에 보일 주소 — 줄인 그림을 쓰는 창이면 폭 w 로 */
-export const smallUrl = (url, src, w) => (imageThumb && /\.(jpe?g|png|webp|bmp)$/i.test(src) ? `${url}?thumb=${w}` : url);
+export const smallUrl = (url, src, w) => (imageThumb && !String(src).startsWith('secret-file/') && /\.(jpe?g|png|webp|bmp)$/i.test(src) ? `${url}?thumb=${w}` : url);
 /** 줄인 그림 주소 → 원본 주소 */
 export const fullUrl = (url) => String(url).replace(/\?thumb=\d+$/, '');
 
