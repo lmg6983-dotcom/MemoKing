@@ -2787,3 +2787,6 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .editor > .mk-snapshot { pointer-events: none; }
 .editor > .mk-snapshot ~ .milkdown { position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; }
 
+
+/* 잠긴 메모(비밀번호를 넣기 전): 글을 고치는 도구는 감춘다 — 서식 막대 · 일정 · 알림 · 추천 태그 (휴대폰은 mobile.css 에서 되돌리기 · + · 다이얼도) */
+body:has(.lock-screen) :is(#format-bar, #event-btn, #bell-btn, #tag-suggest-bar, #undo-btn, #redo-btn) { display: none !important; }
