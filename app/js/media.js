@@ -4,7 +4,8 @@
 
 export function vaultUrl(src) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(src)) return src; // http:, data:, blob: 는 그대로
-  if (String(src).startsWith('secret-file/')) return globalThis.memoking?.secretUrl?.(src) || ''; // 비밀 폴더의 잠근 첨부: 연 동안 풀어 둔 주소 (core/secret-folders.js)
+  // 비밀 폴더의 잠근 첨부: 휴대폰은 연 동안 풀어 둔 blob 주소 (vault-secret.js), PC 는 아래 memoking://vault/secret-file/… 를 Rust 가 메모리에서 풀어 준다 (잠기면 404)
+  if (String(src).startsWith('secret-file/') && globalThis.memoking?.secretUrl) return globalThis.memoking.secretUrl(src) || '';
   let decoded = src;
   try {
     decoded = decodeURI(src);

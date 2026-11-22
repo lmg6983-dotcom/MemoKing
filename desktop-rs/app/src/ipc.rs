@@ -21,6 +21,10 @@ pub fn smoke() -> bool {
 }
 
 pub fn dispatch(app: &AppHandle, label: &str, channel: &str, args: Vec<Value>) -> Result<Value, String> {
+    crate::secret::touch(); // 비밀 폴더: 5분 동안 아무것도 하지 않으면 잠근다 (secret.rs)
+    if let Some(r) = crate::secret::handle(app, label, channel, &args) {
+        return r;
+    }
     if let Some(r) = crate::memos::handle(app, label, channel, &args) {
         return r;
     }

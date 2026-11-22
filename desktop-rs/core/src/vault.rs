@@ -33,6 +33,8 @@ pub struct Entry {
     pub id_saved: bool,
     /// 지금 파일에 있는 머리말 (머리말만 쓰는 사이 다른 기기가 고쳤을 때, 이 기기가 바꾼 항목만 골라 더하려고)
     disk_meta: Option<Meta>,
+    /// 비밀 폴더 id (비밀 메모면 — file 은 늘 None, 저장은 잠가서 _memoking/secret 으로: vault/secret_store.rs)
+    pub secret: Option<String>,
 }
 
 /// 다시 읽은 결과 — 화면에 알릴 것 (vault.js 의 'changed' 이벤트)
@@ -82,7 +84,13 @@ pub struct Vault {
     parts: std::sync::Mutex<HashMap<String, (u64, std::sync::Arc<Parts>)>>,
     /// 다른 기기 글을 받아들인 메모 (adopt_theirs) — 다음 scan 이 external 로 알린다
     adopted: Vec<String>,
+    /// 연 비밀 폴더의 열쇠 (폴더 id → 열쇠 · 이름) — 잠그면 잊는다
+    secrets: HashMap<String, crate::secret::Folder>,
+    /// 비밀 메모로 잠가 옮긴 첨부: 옛 주소 → (폴더 id, 잠근 주소) — 메모 창이 아직 옛 주소로 저장해도 잠근 쪽으로
+    secret_alias: HashMap<String, (String, String)>,
 }
+
+mod secret_store;
 
 /// 목록 카드 · 찾기가 본문에서 쓰는 것
 pub struct Parts {
@@ -148,6 +156,8 @@ impl Vault {
             locks: HashMap::new(),
             parts: Default::default(),
             adopted: vec![],
+            secrets: HashMap::new(),
+            secret_alias: HashMap::new(),
         }
     }
 
@@ -260,7 +270,7 @@ impl Vault {
             if old_body != Some(body.as_str()) && !self.own_files.contains(&file) {
                 external.push(id.clone());
             }
-            next.insert(id.clone(), Entry { id: id.clone(), file: Some(file), folder: String::new(), disk_meta: Some(meta.clone()), meta, body, stamp: Some(stamp), id_saved });
+            next.insert(id.clone(), Entry { id: id.clone(), file: Some(file), folder: String::new(), disk_meta: Some(meta.clone()), meta, body, stamp: Some(stamp), id_saved, secret: None });
             changed.push(id);
         }
         let removed: Vec<String> = old.keys().filter(|id| !next.contains_key(*id)).cloned().collect();
@@ -371,6 +381,7 @@ impl Vault {
             "linkCount": e.meta.links.iter().filter(|id| self.entries.contains_key(*id)).count(),
             "tasks": p.tasks,
             "locked": p.locked,
+            "secret": e.secret,
         })
     }
 
@@ -433,6 +444,7 @@ impl Vault {
             "mode": e.meta.mode,
             "aiTags": extra_list("aiTags"),
             "aiEvents": extra_list("aiEvents"),
+            "secret": e.secret,
         }))
     }
 
@@ -448,7 +460,7 @@ impl Vault {
             data.insert("color".into(), c.into());
         }
         data.insert("mode".into(), mode.unwrap_or(&self.default_mode).into());
-        Entry { id: id.into(), file: None, folder: memo_file::clean_folder_name(folder), meta: memo_file::normalize_meta(&data), body: String::new(), stamp: None, id_saved: true, disk_meta: None }
+        Entry { id: id.into(), file: None, folder: memo_file::clean_folder_name(folder), meta: memo_file::normalize_meta(&data), body: String::new(), stamp: None, id_saved: true, disk_meta: None, secret: None }
     }
 
     /// 새 메모 — 내용이 생길 때 파일로 만든다 (빈 파일이 쌓이지 않게)
@@ -475,6 +487,10 @@ impl Vault {
 
     /// 메모 저장 → 목록 카드 (저장하지 않았으면 refused · retry · invalid 를 더해)
     pub fn save(&mut self, id: &str, body: &str) -> io::Result<(Value, bool)> {
+        if !self.entries.contains_key(id) && crate::secret::is_secret_id(id) {
+            // 잠긴 비밀 폴더의 메모: 풀린 글로 되살려 쓰지 않는다 (보통 메모 파일로 새지 않게)
+            return Err(io::Error::other(crate::secret::LOCKED));
+        }
         if !self.entries.contains_key(id) {
             // 쓰는 사이 파일이 지워졌다면, 화면에 남은 내용으로 되살린다 (잠깐 사라졌던 메모면 그 머리말로)
             let mut e = self.new_entry(id, None, None, "");
@@ -512,6 +528,12 @@ impl Vault {
             m.insert("copied".into(), false.into());
             Ok((Some(m), false))
         };
+        if e.secret.is_some() {
+            if body::is_locked_body(body) {
+                return refuse(true, false);
+            }
+            return self.save_secret(e, body).map(|changed| (None, changed));
+        }
         // 잠금 형식 글을 통째로: 지금 파일과 같으면 할 일 없음, 다르면 아무도 열 수 없게 되므로 저장하지 않는다
         if body::is_locked_body(body) {
             return if e.file.is_some() && body == e.body { Ok((None, false)) } else { refuse(true, false) };
@@ -577,6 +599,9 @@ impl Vault {
     /// known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것).
     ///   copy: 그사이 다른 기기가 고친 글을 사본으로 남기고 쓴다 — 잠그기 · 풀기 · 되돌리기는 false (멈추고 "다시 해 주세요")
     fn write(&mut self, e: &mut Entry, known: &str, copy: bool) -> io::Result<Wrote> {
+        if e.secret.is_some() {
+            return self.write_secret(e).map(|()| Wrote::Yes); // 비밀 메모는 늘 잠가서 (파일 이름 · 충돌 사본 없음)
+        }
         if e.file.is_some() {
             if let Some(w) = self.keep_changed_on_disk(e, known, copy)? {
                 return Ok(w);
@@ -769,6 +794,9 @@ impl Vault {
 
     /// 저장하지 못한 글을 사본 메모로 — 원래 메모가 잠겼으면 같은 열쇠로 잠근 사본 (풀린 글이 새지 않게)
     pub fn import_copy_of(&mut self, source_id: &str, body: &str) -> io::Result<Option<String>> {
+        if crate::secret::is_secret_id(source_id) {
+            return Ok(None); // 비밀 메모의 글은 보통 메모 사본으로 남기지 않는다
+        }
         let Some(src) = self.entries.get(source_id).cloned() else { return self.import(body, None) };
         match self.locks.get(source_id).cloned() {
             Some(s) if !body::is_locked_body(body) => self.new_locked_copy(&src, body, &s).map(Some),
@@ -785,7 +813,7 @@ impl Vault {
     /// 잠그기: 지금 본문을 잠근 글로, 잠그기 전 버전(풀린 글)은 지운다. keep_open: 열린 메모면 열쇠를 들고 있는다
     pub fn lock(&mut self, id: &str, s: lock::Session, keep_open: bool, hide_title: bool) -> io::Result<Option<Value>> {
         let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
-        if body::is_locked_body(&e.body) {
+        if body::is_locked_body(&e.body) || e.secret.is_some() {
             self.entries.insert(id.into(), e);
             return Ok(None);
         }
@@ -891,6 +919,13 @@ impl Vault {
     /// 창을 닫을 때: 빈 메모는 치우고, 제목이 바뀌었으면 파일 이름을 맞춘다 → 바뀌었는가
     pub fn finalize(&mut self, id: &str) -> io::Result<bool> {
         let Some(e) = self.entries.get(id) else { return Ok(false) };
+        if e.secret.is_some() {
+            if body::is_blank_body(&e.body) {
+                self.remove_secret(id)?; // 빈 비밀 메모는 남기지 않는다
+                return Ok(true);
+            }
+            return Ok(false);
+        }
         if body::is_blank_body(&e.body) {
             if e.file.is_some() {
                 self.trash(id)?;
@@ -927,6 +962,10 @@ impl Vault {
     /// 휴지통으로 → 휴지통 파일 이름 (되돌리기에 씀)
     ///   shortcut: 이 메모만 쓰던 첨부를 휴지통으로 옮기는 정리(trashAttachments)는 아직 — 첨부는 그대로 남는다 (잃는 것 없음)
     pub fn trash(&mut self, id: &str) -> io::Result<Option<String>> {
+        if self.entries.get(id).is_some_and(|e| e.secret.is_some()) {
+            self.remove_secret(id)?; // 휴지통은 잠기지 않는 곳 — 비밀 메모는 바로 지운다
+            return Ok(None);
+        }
         let Some(e) = self.entries.remove(id) else { return Ok(None) };
         self.locks.remove(id); // 지운 잠긴 메모의 열쇠를 남기지 않는다 (되살리면 다시 비밀번호로)
         let Some(file) = &e.file else { return Ok(None) };
@@ -1046,7 +1085,7 @@ impl Vault {
             e.meta.mode = m.into();
         }
         let known = e.body.clone();
-        let wrote = if e.file.is_some() { self.write(&mut e, &known, true) } else { Ok(Wrote::Yes) };
+        let wrote = if e.file.is_some() || e.secret.is_some() { self.write(&mut e, &known, true) } else { Ok(Wrote::Yes) };
         let ok = matches!(wrote, Ok(Wrote::Yes));
         if !ok {
             e.meta = prev; // 쓰지 못했다 — 바뀐 것처럼 보이지 않게
@@ -1156,7 +1195,7 @@ impl Vault {
         if on {
             let mut t = self.entries.remove(target).unwrap();
             let known = t.body.clone();
-            let r = if t.file.is_some() && !t.id_saved { self.write(&mut t, &known, true) } else { Ok(Wrote::Yes) };
+            let r = if (t.file.is_some() || t.secret.is_some()) && !t.id_saved { self.write(&mut t, &known, true) } else { Ok(Wrote::Yes) };
             self.entries.insert(target.into(), t);
             if !matches!(r?, Wrote::Yes) {
                 return Ok(None);
@@ -1169,7 +1208,7 @@ impl Vault {
             e.meta.links.push(target.into());
         }
         let known = e.body.clone();
-        let r = if e.file.is_some() { self.write(&mut e, &known, true) } else { Ok(Wrote::Yes) };
+        let r = if e.file.is_some() || e.secret.is_some() { self.write(&mut e, &known, true) } else { Ok(Wrote::Yes) };
         let ok = matches!(r, Ok(Wrote::Yes));
         if !ok {
             e.meta.links = prev;

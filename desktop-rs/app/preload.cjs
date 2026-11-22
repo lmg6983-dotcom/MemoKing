@@ -10,7 +10,8 @@ const EVENTS = [
   'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:hover', 'list:on-top', 'list:crown-docked',
   'stt:status', 'ai:status', 'ai:notice', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'edit:paste-plain', 'edit:clear-format',
-  'media:converting', 'media:ready', // PC Rust 판만 보낸다: HEVC 영상의 H.264 사본 (desktop-rs/app/src/video.rs)
+  'media:converting', 'media:ready',
+  'secret:changed', // 비밀 폴더: 연 폴더 · 그 안 메모 카드 (desktop-rs/app/src/secret.rs) // PC Rust 판만 보낸다: HEVC 영상의 H.264 사본 (desktop-rs/app/src/video.rs)
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
@@ -133,6 +134,17 @@ contextBridge.exposeInMainWorld('memoking', {
   // 휴지통 (지운 메모)
   // 창을 닫으며 저장하지 못해 따로 남긴 글 (ipc-handlers memo:save-sync) — 몇 개인지 · 메모로 되살리기 → 되살린 수
   recovered: { count: invoke('recovered:count'), restore: invoke('recovered:restore') },
+  // 비밀 폴더 (desktop-rs/app/src/secret.rs) — 열쇠는 메모킹이 메모리에만, 목록을 닫거나 5분 쉬면 잠긴다
+  secret: {
+    state: invoke('secret:state'), // → { opened: [{ fid, name, count }], memos: { fid: [카드] } }
+    open: invoke('secret:open'), // 비밀번호 → 연 [{ fid, name }] (맞는 폴더가 없으면 '비밀번호가 달라요')
+    create: invoke('secret:create'), // (이름, 비밀번호) → { fid, name }
+    lock: invoke('secret:lock'), // 폴더 id (없으면 모두)
+    rename: invoke('secret:rename'),
+    remove: invoke('secret:remove'),
+    moveIn: invoke('secret:move-in'), // (메모 id, 폴더 id) → 비밀 메모 id
+    moveOut: invoke('secret:move-out'), // (비밀 메모 id, 보통 폴더) → 새 메모 id
+  },
   // 충돌 사본 비교: get(사본 id) → { copy, original } | null · resolve(사본 id, 'copy' | 'original') → { ok, message }
   conflict: { get: invoke('conflict:get'), resolve: invoke('conflict:resolve') },
   trash: {

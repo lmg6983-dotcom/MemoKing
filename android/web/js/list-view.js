@@ -686,7 +686,7 @@ async function secretFolderMenu(name, r) {
       render();
     } else if (pick === 'delete') {
       const count = app.vault.secretList(fid).length;
-      if (!(await app.confirmDanger(`${label} 비밀 폴더를 삭제할까요?`, count ? `안의 메모 ${count}개와 사진 · 파일도 함께 지워지고 되돌릴 수 없어요.` : '되돌릴 수 없어요.', '삭제'))) return;
+      if (!(await app.confirmDanger(`${label} 비밀 폴더를 삭제할까요?`, `${count ? `안의 메모 ${count}개와 사진 · 파일도 함께 지워져요. ` : ''}휴지통에 두지 않아 되돌릴 수 없어요.`, '삭제'))) return;
       await app.vault.secret.removeFolder(fid);
       app.lockSecrets(fid);
       if (state.folder === name) setFolder('');

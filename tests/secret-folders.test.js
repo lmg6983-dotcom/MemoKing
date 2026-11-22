@@ -172,3 +172,13 @@ test('비밀 폴더: 이름 바꾸기 · 통째로 지우기', async () => {
   assert.equal(fs.files.size, 0);
   assert.deepEqual(store.opened(), []);
 });
+
+test('PC 카드 메뉴: 비밀 메모는 꺼내기만 (잠그기 · 버전 · 폴더 없음), 연 비밀 폴더가 있으면 보통 메모에 옮기기', async () => {
+  const { cardMenuSpec } = await import('../app/js/list-card-menu.js');
+  const ids = (spec) => spec.items.map((i) => i.id).filter(Boolean);
+  const secret = ids(cardMenuSpec({ id: 'secret:abcdef/012345', secret: 'abcdef' }));
+  assert.ok(secret.includes('secret') && !['lock', 'versions', 'folder', 'pick'].some((x) => secret.includes(x)));
+  assert.equal(cardMenuSpec({ secret: 'abcdef' }).items.find((i) => i.id === 'secret').label, '비밀 폴더에서 꺼내기');
+  assert.ok(!ids(cardMenuSpec({ id: 'a' })).includes('secret'), '연 비밀 폴더가 없으면 없다');
+  assert.equal(cardMenuSpec({ id: 'a' }, { secretOpen: true }).items.find((i) => i.id === 'secret').label, '비밀 폴더로 옮기기');
+});

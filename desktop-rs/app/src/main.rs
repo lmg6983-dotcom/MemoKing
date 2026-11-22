@@ -21,6 +21,7 @@ mod ipc;
 mod memos;
 mod os;
 mod reminders;
+mod secret;
 mod services;
 mod settings;
 mod shell_menu;
@@ -193,6 +194,7 @@ fn main() {
             windows::sync_resize(&list);
             os::start(app, &list);
             reminders::start(app);
+            secret::start(app);
             shortcuts::start(app);
             Ok(())
         })
@@ -225,6 +227,15 @@ fn memoking_uri(app: &AppHandle, label: &str, req: &http::Request<Vec<u8>>) -> h
         return match shot {
             Some(jpg) => file_response(&jpg, "image/jpeg", None, allow).unwrap_or_else(|| status(404)),
             None => http::Response::builder().status(204).header("Access-Control-Allow-Origin", allow).body(Vec::new()).unwrap(),
+        };
+    }
+    // vault/secret-file/…: 비밀 폴더의 잠근 첨부 — 메모리에서 풀어 (캐시 · 썸네일 파일을 만들지 않는다), 잠겼으면 404
+    if let Some(src) = path.strip_prefix("/vault/").filter(|r| r.starts_with(memoking_core::secret::FILE_PREFIX)) {
+        let src = percent_decode(src);
+        let mime = memos::serve_vault(app, &src).map_or("application/octet-stream", |(_, m)| m);
+        return match secret::serve(app, &src) {
+            Some(bytes) => http::Response::builder().header("Content-Type", mime).header("Cache-Control", "no-store").header("Access-Control-Allow-Origin", allow).body(bytes).unwrap(),
+            None => status(404),
         };
     }
     let served = match (path.strip_prefix("/vault/"), path.strip_prefix("/history/")) {

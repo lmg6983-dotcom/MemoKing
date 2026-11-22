@@ -471,6 +471,7 @@ pub fn start(app: &AppHandle, list: &WebviewWindow) {
         // 목록을 닫아도 메모킹은 알림 영역에서 계속 (끝내기는 알림 영역 메뉴로)
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
+            crate::secret::lock(&app2, None); // 목록을 닫으면 비밀 폴더는 잠근다
             if let Some(w) = app2.get_webview_window("list") {
                 crate::windows::rest_hidden(&w);
                 let _ = w.hide();
