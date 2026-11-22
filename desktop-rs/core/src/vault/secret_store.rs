@@ -75,6 +75,17 @@ impl Vault {
             let (mut meta, body) = memo_file::parse_memo_file(&plain);
             let id = secret::memo_id(fid, mid);
             meta.id = Some(id.clone());
+            // 잠긴 동안 울린 알림의 울림 표시(last · 꺼짐)는 알림 파일에만 — 메모로 옮겨 온다 (다음 저장에서 다시 울리지 않게)
+            let fired = self.secret_alarm_list(fid, mid);
+            for r in meta.reminders.iter_mut() {
+                if let Some(a) = fired.iter().find(|a| a["id"] == r["id"]) {
+                    for k in ["last", "enabled"] {
+                        if let Some(v) = a.get(k) {
+                            r[k] = v.clone();
+                        }
+                    }
+                }
+            }
             self.entries.insert(id.clone(), Entry { id, file: None, folder: String::new(), meta, body, stamp: None, id_saved: true, disk_meta: None, secret: Some(fid.into()) });
         }
     }
@@ -328,6 +339,54 @@ impl Vault {
         Ok(self.secret_lock(Some(fid)))
     }
 
+    /// 비밀 메모 하나의 알림 파일 (때만)
+    fn secret_alarm_list(&self, fid: &str, mid: &str) -> Vec<Value> {
+        fs::read_to_string(self.abs(&secret::alarms_path(fid, mid)))
+            .ok()
+            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+            .and_then(|v| v["reminders"].as_array().cloned())
+            .unwrap_or_default()
+    }
+
+    /// 알림 실행기가 울릴 비밀 메모의 알림 [{ memoId, reminder }] — 잠겨 있어도 (이름 없이)
+    pub fn secret_alarm_items(&self) -> Vec<Value> {
+        self.secret_alarms().into_iter().flat_map(|a| a["reminders"].as_array().cloned().unwrap_or_default().into_iter().map(move |r| json!({ "memoId": a["memoId"], "reminder": r }))).collect()
+    }
+
+    /// 비밀 메모 알림 하나의 지금 모습 (울리기 직전에 다시 확인하려고)
+    pub fn secret_alarm(&self, id: &str, reminder_id: &Value) -> Option<Value> {
+        let (fid, mid) = secret::parse_id(id)?;
+        self.secret_alarm_list(fid, mid).into_iter().find(|r| r["id"] == *reminder_id)
+    }
+
+    /// 울림 표시를 적는다 — 알림 파일에, 연 폴더면 메모에도 (잠가서) → 적었나
+    pub fn secret_set_alarm(&mut self, id: &str, reminder: &Value) -> io::Result<bool> {
+        let Some((fid, mid)) = secret::parse_id(id).map(|(f, m)| (f.to_string(), m.to_string())) else { return Ok(false) };
+        if let Some(mut e) = self.entries.remove(id) {
+            for r in e.meta.reminders.iter_mut() {
+                if r["id"] == reminder["id"] {
+                    let title = r.get("title").cloned(); // 알림 파일의 알림에는 이름이 없다 — 메모의 이름은 그대로
+                    *r = reminder.clone();
+                    if let (Some(t), Some(o)) = (title, r.as_object_mut()) {
+                        o.insert("title".into(), t);
+                    }
+                }
+            }
+            let r = self.write_secret(&mut e);
+            self.entries.insert(id.into(), e);
+            r?;
+        }
+        let mut list = self.secret_alarm_list(&fid, &mid);
+        let Some(slot) = list.iter_mut().find(|r| r["id"] == reminder["id"]) else { return Ok(self.entries.contains_key(id)) };
+        let mut next = reminder.clone();
+        if let Some(o) = next.as_object_mut() {
+            o.shift_remove("title"); // 이름은 알림 파일에 남기지 않는다
+        }
+        *slot = next;
+        write_atomic(&self.abs(&secret::alarms_path(&fid, &mid)), json!({ "reminders": list }).to_string().as_bytes())?;
+        Ok(true)
+    }
+
     /// 모든 비밀 폴더의 일정 · 알림 (잠겨 있어도) → [{ memoId, reminders }] — 이름 없이 "비밀 메모의 일정" 으로만 알린다
     pub fn secret_alarms(&self) -> Vec<Value> {
         let mut out = vec![];
@@ -411,10 +470,19 @@ mod tests {
         let alarms = v.secret_alarms();
         assert_eq!(alarms[0]["memoId"], json!(id));
         assert!(!json!(alarms).to_string().contains("병원"));
+        // 잠긴 동안 울림 표시는 알림 파일에 — 다시 열면 메모로 옮겨 온다
+        let item = v.secret_alarm_items().pop().unwrap();
+        let mut fired = item["reminder"].clone();
+        fired["last"] = "2026-12-01T09:00:00".into();
+        fired["enabled"] = false.into();
+        assert!(v.secret_set_alarm(&id, &fired).unwrap());
+        assert_eq!(v.secret_alarm(&id, &json!("r1")).unwrap()["enabled"], false);
         // 다른 비밀번호로는 열리지 않고, 맞으면 다시
         assert!(open_with(&mut v, "wrong999").is_empty());
         assert_eq!(open_with(&mut v, "pass1234"), vec![fid.clone()]);
         assert!(v.get(&id).unwrap()["body"].as_str().unwrap().contains("아무도 모르는"));
+        let r = &v.get(&id).unwrap()["reminders"][0];
+        assert_eq!((r["enabled"].clone(), r["last"].clone(), r["title"].clone()), (json!(false), json!("2026-12-01T09:00:00"), json!("병원 예약")));
         assert_eq!(v.secret_opened()[0]["name"], "일기장");
         // 지우면 휴지통이 아니라 바로
         v.trash(&id).unwrap();

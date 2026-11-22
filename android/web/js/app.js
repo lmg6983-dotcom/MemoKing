@@ -31,6 +31,7 @@ import { newLockSession } from '../../app/js/core/memo-lock.js';
 import { pickHandoff, recentlyUpdated, handoffText } from '../../app/js/core/handoff.js';
 import * as list from './list-view.js';
 import { openSecretSheet, pickSecretFolder } from '../../app/js/secret-ui.js';
+import { isSecretId } from '../../app/js/core/secret-folders.js';
 import { setupUpdates, checkForUpdate, refreshUpdateRow } from './updates.js';
 import * as note from './note-view.js';
 import { setupTutorial, maybeStartTutorial, startTutorial, tutEvent, tutorialWaitsFor } from './tutorial.js';
@@ -459,6 +460,8 @@ app.filterByTag = (name) => {
 
 app.openMemo = async (id, options = {}) => {
   if (!app.vault) return;
+  // 잠긴 비밀 폴더의 메모 (비밀 메모 알림을 눌렀다 등): 비밀번호부터
+  if (isSecretId(id) && !app.vault.get(id)) return app.openSecrets();
   // 위젯에 보일 메모를 고르는 중: 목록 카드를 누른 것만 고른 것으로, 다른 길(새 메모·알림 등)로 열면 고르기를 그만둔다
   if (options.fromList && widgets.takePick(id, { toast })) return;
   widgets.cancelPick();

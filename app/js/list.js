@@ -2051,6 +2051,8 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// 잠긴 비밀 메모의 알림을 눌렀다 → 비밀번호부터
+api.on('secret:ask', () => openSecrets());
 // 비밀 폴더: 열고 잠그거나 그 안 메모가 바뀌면 (메모 목록(memos:changed)에는 들지 않는다)
 api.on('secret:changed', (snap) => {
   state.secret = { opened: snap?.opened ?? [], memos: snap?.memos ?? {} };

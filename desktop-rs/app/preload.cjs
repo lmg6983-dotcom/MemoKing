@@ -11,7 +11,7 @@ const EVENTS = [
   'stt:status', 'ai:status', 'ai:notice', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'edit:paste-plain', 'edit:clear-format',
   'media:converting', 'media:ready',
-  'secret:changed', // 비밀 폴더: 연 폴더 · 그 안 메모 카드 (desktop-rs/app/src/secret.rs) // PC Rust 판만 보낸다: HEVC 영상의 H.264 사본 (desktop-rs/app/src/video.rs)
+  'secret:changed', 'secret:ask', // 비밀 폴더: 연 폴더 · 그 안 메모 카드 (desktop-rs/app/src/secret.rs) // PC Rust 판만 보낸다: HEVC 영상의 H.264 사본 (desktop-rs/app/src/video.rs)
 ];
 const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 

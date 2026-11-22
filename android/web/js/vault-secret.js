@@ -49,6 +49,20 @@ const forgetBlobs = () => {
   blobs.clear();
 };
 
+/** 비밀 메모 알림의 이름 (Rust reminders.rs SECRET_ALARM 과 같은 글) */
+export const SECRET_ALARM = '비밀 메모의 일정';
+const HEX = /^[0-9a-f]{6,64}$/;
+
+/** 비밀 메모 하나의 알림 파일 (때만 — 이름 없음) */
+function secretAlarmList(fid, mid) {
+  try {
+    const list = JSON.parse(fs.readText(`${SECRET_DIR}/${fid}/${mid}.alarms.json`) ?? 'null')?.reminders;
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
 export function installSecretMethods(Vault) {
   // defineProperties: Object.assign 은 get secret() 을 한 번 불러 값만 베낀다 (그러면 vault 마다 열쇠가 따로 남지 않는다)
   Object.defineProperties(Vault.prototype, Object.getOwnPropertyDescriptors({
@@ -74,6 +88,13 @@ export function installSecretMethods(Vault) {
     async loadSecret(fid) {
       for (const [id, e] of this.entries) if (e.secret === fid) this.entries.delete(id);
       for (const m of await this.secret.memos(fid)) {
+        // 잠긴 동안 울린 알림의 울림 표시(last · 꺼짐)는 알림 파일에만 — 메모로 옮겨 온다 (다음 저장에서 다시 울리지 않게, Rust secret_load 와 같음)
+        const fired = secretAlarmList(fid, m.mid);
+        for (const r of m.meta.reminders ?? []) {
+          const a = fired.find((x) => x.id === r.id);
+          if (a && 'last' in a) r.last = a.last;
+          if (a && 'enabled' in a) r.enabled = a.enabled;
+        }
         this.entries.set(m.id, { id: m.id, file: null, secret: fid, mid: m.mid, meta: m.meta, body: m.body, mtimeMs: 0, size: 0, idSaved: true });
       }
       this.changed([]);
@@ -95,6 +116,38 @@ export function installSecretMethods(Vault) {
       if (!this.secret.keys.size) forgetBlobs();
       this.secretTarget = null;
       this.changed(ids);
+      return true;
+    },
+
+    /** 알림 실행기가 울릴 비밀 메모의 알림 [{ memoId, title, reminder }] — 잠겨 있어도 (이름 없이) */
+    secretAlarmItems() {
+      const out = [];
+      for (const d of fs.list(SECRET_DIR) ?? []) {
+        if (!d.dir || !HEX.test(d.name)) continue;
+        for (const f of fs.list(`${SECRET_DIR}/${d.name}`) ?? []) {
+          const mid = /^([0-9a-f]{6,64})\.alarms\.json$/.exec(f.name)?.[1];
+          if (!mid) continue;
+          for (const reminder of secretAlarmList(d.name, mid)) out.push({ memoId: secretMemoId(d.name, mid), title: SECRET_ALARM, reminder });
+        }
+      }
+      return out;
+    },
+
+    /** 울림 표시를 적는다 — 알림 파일에, 연 폴더면 메모에도 (잠가서) → 적었나 */
+    setSecretAlarm(id, reminder) {
+      const p = parseSecretId(id);
+      if (!p) return false;
+      const entry = this.entries.get(id);
+      if (entry) {
+        // 알림 파일의 알림에는 이름이 없다 — 메모의 이름은 그대로
+        this.setReminders(id, entry.meta.reminders.map((r) => (r.id === reminder.id ? { ...reminder, ...(r.title ? { title: r.title } : {}) } : r)));
+      }
+      const list = secretAlarmList(p.fid, p.mid);
+      const i = list.findIndex((r) => r.id === reminder.id);
+      if (i < 0) return Boolean(entry);
+      const { title: _t, ...rest } = reminder;
+      list[i] = rest;
+      fs.writeText(`${SECRET_DIR}/${p.fid}/${p.mid}.alarms.json`, JSON.stringify({ reminders: list }));
       return true;
     },
 

@@ -402,6 +402,15 @@ fn launch(app: &AppHandle, args: &[String]) -> bool {
         show_list_tab(app, "reminders");
         return true;
     }
+    // 비밀 메모의 알림: 열린 비밀 폴더면 그 메모, 잠겼으면 목록에서 비밀번호부터 (휴대폰 openMemo 와 같음)
+    if let Some(id) = link.as_deref().and_then(|l| l.strip_prefix("memo/")).filter(|id| memoking_core::secret::is_secret_id(id)) {
+        if memos::open_note(app, id).unwrap_or(false) {
+            return true;
+        }
+        show_list(app);
+        let _ = app.emit_to("list", "secret:ask", ());
+        return true;
+    }
     if let Some(id) = val("--open-memo=").or_else(|| link.and_then(|l| l.strip_prefix("memo/").map(str::to_string))).filter(|id| (1..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')) {
         return memos::open_note(app, &id).unwrap_or(false);
     }
