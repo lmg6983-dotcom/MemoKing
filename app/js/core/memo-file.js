@@ -11,11 +11,11 @@ export const COLORS = ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'cha
 export const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 export const DEFAULT_COLOR = 'yellow';
 // 메모 색 점 (매직키 · 모두 찾기 결과 줄)
-export const COLOR_DOTS = { yellow: '#ede3c2', green: '#cfecd3', pink: '#fdd7e4', purple: '#e7ddfd', blue: '#cbe7ff', gray: '#e7e2db', charcoal: '#333333' };
+export const COLOR_DOTS = { yellow: '#fee47c', green: '#b7f7c3', pink: '#ffd9e6', purple: '#e9deff', blue: '#cfe8ff', gray: '#e9e4db', charcoal: '#333333' };
 // 메모 바탕색 (화면 CSS 와 같은 값) — 창이 뜨는 순간의 배경 · 한 장으로 그림의 메모지
 export const NOTE_BG = {
-  light: { yellow: '#f4edd7', green: '#dff3e2', pink: '#fee5ee', purple: '#f0e9ff', blue: '#deefff', gray: '#f0ece7', charcoal: '#191919' },
-  dark: { yellow: '#342d19', green: '#213324', pink: '#3c262f', purple: '#302a3d', blue: '#1f303e', gray: '#2f2d2a', charcoal: '#191919' },
+  light: { yellow: '#ffefae', green: '#c9fed3', pink: '#ffe7ef', purple: '#f1ebff', blue: '#e1f1ff', gray: '#f2eee7', charcoal: '#191919' },
+  dark: { yellow: '#3c3207', green: '#193b22', pink: '#4a2534', purple: '#382b4d', blue: '#15364f', gray: '#35322e', charcoal: '#191919' },
 };
 export const UNTITLED = '제목 없음';
 

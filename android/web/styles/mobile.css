@@ -185,24 +185,7 @@ input, textarea, select, .mk-doc, .ProseMirror { -webkit-user-select: text; user
 .tab-count { position: absolute; top: 5px; left: calc(50% + 9px); min-width: 15px; padding: 0 4px; border-radius: 999px; background: var(--text-strong); color: var(--surface-1); font-size: 10.5px; font-weight: 800; line-height: 15px; text-align: center; } /* 숫자 배지는 무채색 */
 .tab-count:empty { display: none; }
 
-/* One UI 큰 머리: 맨 위에서는 화면 위쪽을 비워 제목을 가운데 크게 (보는 자리),
-   내리면 접혀 로고 줄 · 검색칸(조작 자리)만 남는다 — 갤럭시 설정 · 내 파일과 같은 짜임 */
-.large-head {
-  order: 9;
-  flex-basis: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: clamp(120px, 24vh, 210px);
-  overflow: hidden;
-  text-align: center;
-}
-.large-title { margin: 0; font-size: 34px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; color: var(--text-strong); }
-.large-sub { margin: 0; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.large-sub:empty { display: none; }
-/* 맨 위 줄 · 큰 제목 · 검색 줄은 목록 칸 맨 앞에서 함께 스크롤되고, 검색 줄만 칸 위에 붙어 남는다 (list-view.js placeBar) */
+/* 맨 위 줄 · 검색 줄은 목록 칸 맨 앞에서 함께 스크롤되고, 검색 줄만 칸 위에 붙어 남는다 (list-view.js placeBar) */
 .view > .searchbar { position: sticky; top: var(--bar-stick, 0px); z-index: 6; background: var(--bg); }
 #view-memos > .searchbar { grid-column: side / -1; grid-row: 1; }
 /* 메모 화면의 아래 안내 말풍선은 떠 있는 ＋ · 다이얼 · 서식 막대 위로 (가리지 않게) */
@@ -351,9 +334,12 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
 .view.is-empty > .cards { display: none; }
 .view.is-empty > #empty { flex: 1; justify-content: center; margin: 0; padding: 24px 24px 88px; }
 #empty:not([hidden]) { display: flex; flex-direction: column; align-items: center; gap: 10px; animation: mk-pop-in 0.25s ease-out both; }
-.empty-art { font-size: 44px; line-height: 1; animation: empty-bob 2.6s ease-in-out infinite; }
+/* 빈 목록 그림: 옅은 무채색 원 안에 앱의 선 아이콘 (이모지 대신 — 보관함 빈 화면의 원과 같은 짜임, 노랑은 아래 단추에만) */
+.empty-art { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; background: var(--brand-yellow-soft); color: var(--muted); animation: empty-bob 2.6s ease-in-out infinite; }
+.empty-art svg { width: 28px; height: 28px; }
+@media (prefers-reduced-motion: reduce) { .empty-art { animation: none; } }
 .empty-actions { display: flex; gap: 8px; margin-top: 6px; }
-@keyframes empty-bob { 50% { transform: translateY(-5px) rotate(-4deg); } }
+@keyframes empty-bob { 50% { transform: translateY(-4px); } }
 
 /* 새 메모 버튼 (오른쪽 아래, 엄지 자리) */
 .fab {
@@ -603,8 +589,11 @@ h2.sheet-title { font-size: 20px; }
 .drive-box .drive-box-text { flex: 1 1 140px; min-width: 0; }
 .drive-actions { flex: none; margin-left: auto; gap: 6px; }
 .drive-actions .btn { flex: none; }
-.settings-sheet .btn:not(.primary):not(.danger) { background: var(--surface-1); }
-.settings-sheet :is(.drive-box, .setting-row, .app-box, .path-card) .btn:not(.primary):not(.danger) { background: var(--fill-tab); } /* 흰 카드 안의 단추는 옅은 회색 */
+/* 연결된 뒤 단추 셋(지금 동기화 · 폴더 바꾸기 · 연결 끊기)은 한 줄 전체를 똑같이 나눠 — 112px 씩이면 390px 폭에서 끝이 잘렸다 */
+.drive-actions:has(> .btn:not([hidden]) ~ .btn:not([hidden])) { flex: 1 1 100%; margin-left: 0; }
+.drive-actions:has(> .btn:not([hidden]) ~ .btn:not([hidden])) .btn { flex: 1 1 0; min-width: 0; padding-inline: 8px; }
+.settings-sheet .btn:not(.primary):not(.danger):not(.update-btn[data-state="latest"]) { background: var(--surface-1); }
+.settings-sheet :is(.drive-box, .setting-row, .app-box, .path-card) .btn:not(.primary):not(.danger):not(.update-btn[data-state="latest"]) { background: var(--fill-tab); } /* 흰 카드 안의 단추는 옅은 회색 */
 .settings-sheet > .hint { margin: 8px 12px 0; }
 .settings-sheet .sub-label { margin: 12px 4px 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .settings-sheet .sheet-actions + .setting-row { margin-top: 6px; }
@@ -624,7 +613,7 @@ h2.sheet-title { font-size: 20px; }
 /* ---------- 알림 보관함 (app/js/list-history.js 가 그림) ---------- */
 .tabs button { font-size: 13.5px; gap: 4px; }
 .consent { padding: 20px 24px 32px; text-align: center; }
-.consent-icon { width: 60px; height: 60px; padding: 14px; border-radius: 50%; background: var(--brand-yellow); color: var(--on-brand); }
+.consent-icon { width: 60px; height: 60px; padding: 16px; border-radius: 50%; background: var(--brand-yellow-soft); color: var(--text-strong); } /* 노랑은 아래 시작 단추에만 (목록 빈 화면의 원과 같은 무채색) */
 .consent h3 { margin: 12px 0 6px; font-size: 20px; line-height: 28px; letter-spacing: -0.015em; }
 .consent p { margin: 0 0 12px; color: var(--muted); line-height: 1.6; }
 .consent ul { margin: 0 0 20px; padding-left: 20px; text-align: left; line-height: 1.7; font-size: 14px; }
@@ -1220,6 +1209,9 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
   transform: translate(-50%, -50%);
 }
 .color-filter { gap: 10px; } /* 30px 동그라미 사이를 넓혀 옆 동그라미와 누르는 자리가 덜 겹치게 (390px 폭에서도 7개가 한 줄) */
+/* 누르는 자리는 동그라미보다 넓게 (보이는 크기는 그대로 30px — 사이 10px 의 절반씩 늘려 손가락 자리 40px, 옆과 겹치지 않음) */
+.color-filter button { position: relative; }
+.color-filter button::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; }
 .filter-group { align-items: flex-start; }
 .filter-label { line-height: 36px; }
 /* 튜토리얼 그만두기 · 안내 알겠어요 단추도 손가락 크기로 */

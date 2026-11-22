@@ -17,7 +17,6 @@ import { tutEvent, tutorialStepId } from './tutorial.js';
 import { haptic, reduceMotion, tabKeys, syncTabStops, stackCards, withViewTransition, setModeSwitch, EASE_OUT, slideSide } from '../../app/js/dom.js';
 import { hintOnce, closeHint } from '../../app/js/hints.js';
 import { SORTS, DEFAULT_SORT, sortMemos, validSort, sortLabel } from '../../app/js/core/memo-sort.js';
-import { listContext } from '../../app/js/core/list-context.js';
 import { MODE_KEY, MODE_LABEL, validMode, splitByMode, memoMode, otherMode, fillModeTag } from '../../app/js/core/modes.js';
 import { modeClock } from '../../app/js/core/work-hours.js';
 import { openModeHelper } from '../../app/js/mode-helper-dialog.js';
@@ -411,11 +410,11 @@ new ResizeObserver(() => {
 function renderEmpty(narrowed, elsewhere = 0) {
   const art = document.createElement('span');
   art.className = 'empty-art';
-  art.textContent = narrowed ? '🔍' : '📝';
+  art.append(icon(narrowed ? 'search' : 'note')); // 이모지 대신 앱의 선 아이콘 (보관함 빈 화면과 같은 모양)
   const text = document.createElement('span');
   const other = MODE_LABEL[otherMode(state.mode)];
   const receiving = !narrowed && document.body.dataset.sync === 'syncing'; // 첫 동기화: Drive 에서 메모를 받는 중
-  if (receiving) art.textContent = '☁️';
+  if (receiving) art.replaceChildren(icon('cloud'));
   text.textContent = receiving ? 'Google Drive에서 메모를 받아 오는 중이에요.\n그동안 새 메모를 바로 써도 돼요.'
     : narrowed && elsewhere
     ? `${MODE_LABEL[state.mode]}에는 '${state.query}' 메모가 없어요.\n${other}에서 ${elsewhere}개를 찾았어요.`
@@ -471,7 +470,6 @@ export function render() {
   $('other-mode').textContent = elsewhere ? `${MODE_LABEL[otherMode(state.mode)]}에서 ${elsewhere}개 더 찾았어요` : '';
   // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)
   glideCards(() => layoutCards(memos));
-  $('large-sub').textContent = listContext({ folder: state.folder, mode: state.mode, workLife: workLifeOn(), query: state.query, filters: filterCount(), shown: memos.length }); // 개수 대신 지금 보는 곳 (PC list.js 검색 줄 아래와 같은 글)
   el.empty.hidden = memos.length > 0;
   el.empty.parentElement.classList.toggle('is-empty', !memos.length); // 안내 · 단추를 목록 칸 가운데에 (PC 와 같이)
   if (!memos.length) renderEmpty(narrowed, elsewhere);
@@ -845,8 +843,6 @@ function setTab(tab) {
   $('view-memos').hidden = tab !== 'memos';
   $('view-reminders').hidden = tab !== 'reminders';
   $('view-history').hidden = tab !== 'history';
-  $('large-title').textContent = { memos: '메모', reminders: '일정', history: '알림 보관함' }[tab];
-  $('large-sub').hidden = tab !== 'memos';
   placeBar(tab);
   el.filterBtn.hidden = tab !== 'memos';
   el.folderBtn.hidden = tab !== 'memos'; // 폴더는 메모에만 (일정 · 보관함에는 쓸 데가 없다)
@@ -865,7 +861,7 @@ function setTab(tab) {
   }, 0));
 }
 let tabSeq = 0;
-// One UI 큰 제목: 맨 위 줄 · 큰 제목 · 검색 줄을 지금 탭의 목록 칸 맨 앞에 두고 함께 스크롤한다.
+// 맨 위 줄 · 검색 줄을 지금 탭의 목록 칸 맨 앞에 두고 함께 스크롤한다.
 //   검색 줄은 칸 위에 붙어 남는다 (sticky, 위 두 줄 높이만큼 위로 올라간 자리) — 제목을 접고 펴며 목록을 밀지 않으니
 //   맨 위로 올라와도 카드가 손가락 밑에서 갑자기 내려가지 않는다
 const searchbar = document.querySelector('.searchbar');

@@ -87,9 +87,15 @@ const server = spawn(process.execPath, [path.join(here, 'server.mjs'), vault, '-
 await new Promise((resolve) => server.stdout.once('data', resolve));
 // 다이얼 둘레 칸은 다이얼을 누르는 동안만 펼쳐진다 — 펼친 것으로 놓고 그 칸을 바로 누른다
 const pickMode = async (page, m) => {
-  await page.evaluate(() => document.querySelector('.mode-knob').classList.add('open'));
-  await page.waitForTimeout(250);
-  await page.tap(`.mode-knob .mk-stop-${m}`);
+  // 펼친 칸이 다이얼 밖으로 나와 누를 수 있을 때 누른다 — 느린 환경에서는 그 사이 둘레가 다시 접혀 다이얼이 칸을 덮을 때가 있어 다시 펼친다
+  const sel = `.mode-knob .mk-stop-${m}`;
+  for (let i = 0; i < 4; i++) {
+    await page.evaluate(() => document.querySelector('.mode-knob').classList.add('open'));
+    await page.waitForTimeout(250);
+    const free = await page.evaluate((s) => { const b = document.querySelector(s)?.getBoundingClientRect(); return Boolean(b && b.width && document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest(s)); }, sel);
+    if (free) break;
+  }
+  await page.tap(sel);
 };
 const devLog = async () => (await fetch(`${base}/dev/log`)).json();
 const post = (p, body) => fetch(`${base}${p}`, { method: 'POST', body: JSON.stringify(body) });
@@ -118,7 +124,7 @@ try {
   });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => { errors.push(e.message); if (process.env.MK_DUMP) console.log('PAGEERROR', e.stack); });
-  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  page.on('console', (m) => m.type() === 'error' && errors.push(`${m.text()} ${m.location()?.url ?? ''}`));
   const shot = (name) => page.screenshot({ path: path.join(outDir, `${name}.png`) });
   const back = () => page.evaluate(() => window.__mk.back());
 
@@ -1683,6 +1689,7 @@ try {
   await shot('18b-delete-btn');
   // 복사 단추: 그림은 그림 자체(PNG)로 휴대폰 클립보드에 · 누르면 ✓
   const copiedBefore = (await devLog()).log.filter((x) => x.copyImage).length;
+  await page.waitForSelector('.mk-copy-btn:not(.mk-arming)', { timeout: 2000 }).catch(() => {}); // 막 뜬 단추는 0.35초 동안 누름을 받지 않는다 (delete-button.js)
   await page.tap('.mk-copy-btn');
   await page.waitForTimeout(600);
   const logNow = await devLog();
@@ -1694,6 +1701,7 @@ try {
   await page.waitForTimeout(650);
   await touch('touchEnd', ib.x + 40, ib.y + 40);
   await page.waitForTimeout(150);
+  await page.waitForSelector('.mk-delete-btn:not(.mk-arming)', { timeout: 2000 }).catch(() => {}); // 막 뜬 단추는 0.35초 동안 누름을 받지 않는다 (delete-button.js)
   await page.tap('.mk-delete-btn');
   await page.waitForFunction(() => document.querySelectorAll('img.mk-image').length === 1, null, { timeout: 4000 }).catch(() => {}); // 접히는 움직임 뒤 (느린 환경에서도)
   await page.waitForTimeout(1500); // 그리고 파일에 저장될 때까지
@@ -1720,6 +1728,7 @@ try {
     // 두 번 누르면 크게 보기 (묶음 사진과 같은 보기) — 닫으면 그 그림의 단추 줄
     const big = await page.evaluate(() => { const v = document.querySelector('.mk-album-view'); return v && { src: Boolean(v.querySelector('.mk-album-big')?.src), count: v.querySelector('.mk-album-count').textContent, row: Boolean(document.querySelector('.mk-delete-btn')) }; });
     check('그림 두 번 누르기: 크게 보기 (번호 없이 · 단추 줄은 닫은 뒤에)', Boolean(big?.src) && big.count === '' && !big.row, JSON.stringify(big));
+    await page.waitForTimeout(300); // 사진 보기는 열린 뒤 0.4초 동안 손가락 누름을 버린다 (album-viewer.js guardUntil — 연 누름이 닫기에 떨어지지 않게)
     await page.tap('.mk-album-view button[aria-label="닫기"]');
     await page.waitForTimeout(250);
     const shown = await page.isVisible('.mk-delete-btn') && await page.isVisible('.mk-copy-btn') && await page.isVisible('.mk-save-btn');
@@ -1730,6 +1739,7 @@ try {
       const cutOrder = await page.evaluate(() => ['.mk-save-btn', '.mk-cut-btn', '.mk-copy-btn', '.mk-delete-btn'].map((s) => Math.round(document.querySelector(s)?.getBoundingClientRect().left ?? -1)));
       const imgsBefore = await page.locator('img.mk-image').count();
       const copyLog = (await devLog()).log.filter((x) => x.copyImage).length;
+      await page.waitForSelector('.mk-cut-btn:not(.mk-arming)', { timeout: 2000 }).catch(() => {}); // 막 뜬 단추는 0.35초 동안 누름을 받지 않는다
       await page.tap('.mk-cut-btn');
       await page.waitForTimeout(1400);
       const imgsAfter = await page.locator('img.mk-image').count();
@@ -1861,13 +1871,16 @@ try {
     const opens1 = (await devLog()).log.filter((x) => x.openFile).length;
     check('파일 칩: 짧게 눌러도 바로 열지 않고 열기 · 공유 · 저장 · 복사 · × (왼쪽부터)', opens1 === opens0 && row.every((x) => x >= 0) && row.every((x, i) => i === 0 || row[i - 1] < x) && openLabel === '이 파일 열기', JSON.stringify({ row, openLabel, opens0, opens1 }));
     await shot('18e-file-open-button');
+    // PDF 는 앱 안 미리보기로 연다 (note-view.js openAttachment — 다른 앱으로는 미리보기의 "다른 앱으로")
+    const pdfShown = () => page.waitForSelector('.mk-pdf-view', { timeout: 3000 }).then(() => true, () => false);
+    const pdfClose = async () => { await page.keyboard.press('Escape'); await page.waitForSelector('.mk-pdf-view', { state: 'detached', timeout: 3000 }).catch(() => {}); };
     await page.tap('.mk-open-btn');
-    await page.waitForTimeout(500);
-    const opened = (await devLog()).log.filter((x) => x.openFile);
-    check('열기 버튼: 누르면 그 파일을 연다 (버튼은 거둠)', opened.length === opens0 + 1 && opened.at(-1).openFile === 'attachments/안내서.pdf' && !(await page.locator('.mk-open-btn').count()), JSON.stringify(opened.at(-1)));
+    const openedPdf = await pdfShown();
+    check('열기 버튼: 누르면 그 파일을 연다 — PDF 는 앱 안 미리보기 (버튼은 거둠)', openedPdf && (await page.locator('.mk-pdf-view[aria-label^="안내서.pdf"]').count()) === 1 && !(await page.locator('.mk-open-btn').count()));
+    await pdfClose();
     await page.locator('.mk-doc a[data-file]').first().dispatchEvent('dblclick');
-    await page.waitForTimeout(400);
-    check('파일 칩: 두 번 누르면 연다', (await devLog()).log.filter((x) => x.openFile).length === opened.length + 1);
+    check('파일 칩: 두 번 누르면 연다', await pdfShown());
+    await pdfClose();
     // 수식: 눌러도 고치기 창이 바로 뜨지 않고 단추 + "고치기"
     await tapAt('.mk-doc .mk-math-block');
     const mathRow = { editor: await page.locator('.mk-math-editor').count(), label: await page.getAttribute('.mk-open-btn', 'aria-label').catch(() => null) };
@@ -2283,6 +2296,7 @@ try {
     await page.waitForTimeout(500);
     await touch('touchEnd', 0, 0);
     await page.waitForTimeout(300);
+    await page.waitForSelector('.mk-delete-btn:not(.mk-arming)', { timeout: 2000 }).catch(() => {}); // 막 뜬 단추는 0.35초 동안 누름을 받지 않는다
     const x = await page.locator('.mk-delete-btn').boundingBox();
     await touch('touchStart', x.x + 15, x.y + 15);
     await touch('touchEnd', 0, 0);
@@ -2306,8 +2320,10 @@ try {
     const lab = await page.locator('.mk-delete-btn').getAttribute('aria-label').catch(() => null);
     const look = await page.evaluate(() => { const e = document.querySelector('.mk-delete-btn'); if (!e) return null; const c = getComputedStyle(e); return { w: Math.round(e.getBoundingClientRect().width), bg: c.backgroundColor, color: c.color }; });
     // 바탕: 밝은 화면은 흰색, 어두운 화면은 시트와 같은 짙은 바탕(--surface-2) — 어느 쪽이든 빨간 × 가 또렷하게
-    const delBg = process.env.MK_DARK ? 'rgb(37, 37, 34)' : 'rgb(255, 255, 255)';
-    check('목록 전체: 놓으면 목록 전체 × (밝은 화면 흰 바탕 · 어두운 화면 짙은 바탕 · 빨간 × · 작게)', lab === '이 목록 삭제' && look?.bg === delBg && look?.color === (process.env.MK_DARK ? 'rgb(255, 107, 112)' : 'rgb(196, 40, 46)') && look.w <= 26 && (await page.locator('.mk-doc ul.mk-delete-target').count()) === 1, JSON.stringify({ lab, look }));
+    const tok = (v, prop = 'color') => page.evaluate(([v, prop]) => { const d = document.createElement('div'); d.style[prop] = `var(${v})`; document.body.append(d); const c = getComputedStyle(d)[prop]; d.remove(); return c; }, [v, prop]); // 팔레트 값 (base.css --ok-*)
+    const delBg = process.env.MK_DARK ? await tok('--surface-2', 'backgroundColor') : 'rgb(255, 255, 255)';
+    const delRed = await tok(process.env.MK_DARK ? '--ok-red-400' : '--ok-red-600');
+    check('목록 전체: 놓으면 목록 전체 × (밝은 화면 흰 바탕 · 어두운 화면 짙은 바탕 · 빨간 × · 작게)', lab === '이 목록 삭제' && look?.bg === delBg && look?.color === delRed && look.w <= 26 && (await page.locator('.mk-doc ul.mk-delete-target').count()) === 1, JSON.stringify({ lab, look }));
     const xb = await page.locator('.mk-delete-btn').boundingBox();
     await touch('touchStart', xb.x + 12, xb.y + 12);
     await touch('touchEnd', 0, 0);

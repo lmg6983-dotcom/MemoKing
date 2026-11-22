@@ -2,7 +2,7 @@
 html.print-page {
   color-scheme: light;
   --surface-0: var(--ok-gray-0); --surface-1: var(--ok-gray-0); --surface-2: var(--ok-gray-0); --line: var(--ok-gray-100);
-  --text-strong: var(--ok-gray-950); --text-muted: var(--ok-gray-550); --fill-hover: color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
+  --text-strong: var(--ok-gray-950); --text-muted: var(--ok-gray-600); --fill-hover: color-mix(in oklab, var(--ok-gray-1000) 4%, transparent);
   --yellow-bg: var(--ok-yellow-100); --yellow-bar: var(--ok-yellow-100);
   --green-bg: var(--ok-green-200); --green-bar: var(--ok-green-200);
   --pink-bg: var(--ok-pink-200); --pink-bar: var(--ok-pink-200);
