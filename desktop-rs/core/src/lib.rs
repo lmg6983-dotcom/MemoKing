@@ -20,6 +20,7 @@ pub mod release_notes;
 pub mod reminders;
 pub mod schedule_parse;
 pub mod search;
+pub mod secret;
 pub mod share_text;
 pub mod stacks;
 pub mod tables;

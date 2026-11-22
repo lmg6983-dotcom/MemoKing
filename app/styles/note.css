@@ -201,7 +201,8 @@ body, .note-screen, .share-paper {
 .mk-doc ul, .mk-doc ol { margin: 0.2em 0 0.4em; padding-left: 1.4em; }
 .mk-doc li > p { margin: 0.05em 0; }
 /* 메모 안 콘텐츠: One UI 9.5 — 굵은 띠 · 진한 선 대신 옅은 바탕의 둥근 칸 (휴대폰 · PC · 인쇄 같이) */
-.mk-doc blockquote { margin: 0.5em 0; padding: 0.55em 0.85em; border-radius: 14px; background: color-mix(in srgb, var(--note-text) 6%, transparent); color: var(--note-muted); }
+.mk-doc blockquote { margin: 0.4em 0; padding: 0.1em 0 0.1em 0.8em; border-left: 3px solid var(--note-accent); color: var(--note-muted); } /* 인용(출처 줄 등): 왼쪽 세로줄 + 흐린 글 (1.5.3 모양으로 되돌림 — 둥근 칸보다 출처가 또렷하다) */
+body[data-color="yellow"] .mk-doc blockquote { border-left-color: var(--note-text); }
 /* 코드 글꼴: 한글은 고정폭 글꼴에 없으니 Pretendard 로 ("코드  조각" 처럼 벌어지지 않게) */
 .mk-doc code { padding: 0.1em 0.4em; border-radius: 8px; background: var(--note-hover); font-family: ui-monospace, Consolas, Menlo, "Roboto Mono", "Droid Sans Mono", "DejaVu Sans Mono", "Pretendard Variable", Pretendard, monospace; font-size: 0.9em; }
 .mk-doc pre { padding: 12px 14px; border-radius: 14px; background: var(--note-hover); font-family: ui-monospace, Consolas, Menlo, "Roboto Mono", "Droid Sans Mono", "DejaVu Sans Mono", "Pretendard Variable", Pretendard, monospace; font-size: 0.9em; line-height: 1.6; overflow-x: auto; }
@@ -1211,7 +1212,7 @@ body.mk-row-resizing { user-select: none; }
 .s-h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
 .s-h2 { font-size: 17px; font-weight: 750; }
 .s-h3 { font-size: 15px; font-weight: 700; }
-.s-quote { padding: 2px 8px; border-radius: 8px; background: color-mix(in srgb, var(--note-text, var(--text)) 6%, transparent); color: var(--muted); font-size: 14px; } /* 실제 인용(.mk-doc blockquote)과 같은 옅은 칸 — 노란 왼쪽 줄은 예전 모양 */
+.s-quote { padding-left: 8px; border-left: 3px solid var(--muted); color: var(--muted); font-size: 14px; } /* 실제 인용(.mk-doc blockquote)과 같은 왼쪽 세로줄 */
 .s-code { padding: 1px 6px; border-radius: 6px; background: var(--fill-hover); font: 13px ui-monospace, Consolas, monospace; }
 
 /* ---------- v0.17.4: 표 막대는 좁은 창에서도 버튼이 가려지지 않게 여러 줄로 ---------- */
@@ -2120,14 +2121,19 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .lock-screen .lock-icon { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto 10px; border-radius: 50%; background: color-mix(in srgb, var(--note-text) 8%, transparent); color: var(--note-text); }
 .lock-screen .lock-icon svg { width: 26px; height: 26px; }
 .lock-screen .lock-field { color: var(--note-muted); }
+/* 가운데 한 줄로: 칸 이름은 읽어 주기에만 (자리 글 "비밀번호"가 보인다) — 아이콘 · 제목 · 칸 · 열기가 같은 가운데 선 */
+.lock-screen .lock-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.lock-screen .lock-field input { text-align: center; }
+.lock-screen .lock-field input:focus-visible { outline-offset: -2px; } /* 포커스 테두리를 칸 안쪽에 — 아래 열기 단추와 양 끝이 맞게 */
+.lock-screen .lock-error { text-align: center; }
 /* 단추도 가운데 위 아이콘 · 제목과 맞춰 칸 폭 그대로 (닫기 1 : 열기 2 — 다른 창의 아래 막대와 같은 비율). 닫기가 없으면 열기가 한 줄 */
 .lock-screen .dialog-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
 .lock-screen .dialog-actions:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 .lock-screen .dialog-actions .btn { width: 100%; min-height: 40px; }
 @media (pointer: coarse) { .lock-field input { min-height: 48px; font-size: 16px; } }
 /* 비밀번호를 넣기 전: 서식 막대·+ 는 숨김 */
-.memo-locked #format-bar, .memo-locked var(--ok-teal-500)-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
-.memo-locked #bell-btn, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
+.memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
+.memo-locked #bell-btn, .memo-locked #event-btn, .memo-locked #tag-suggest-bar, .memo-locked #kb-btn, .memo-locked #move-bar, .memo-locked #mode-guide, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
 .lock-dialog h2 { margin-bottom: 8px; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
 .lock-hide-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 4px 0; font-size: 13px; color: var(--muted); }
@@ -2785,4 +2791,3 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 /* 화면 스냅샷 (note.js showSnapshot): 편집기를 만드는 동안 지난번 모습을 먼저 — 만드는 중인 편집기는 그 뒤에 감춰 둔다 */
 .editor > .mk-snapshot { pointer-events: none; }
 .editor > .mk-snapshot ~ .milkdown { position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; }
-

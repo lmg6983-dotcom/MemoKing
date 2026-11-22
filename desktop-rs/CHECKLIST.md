@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **179 / 179**
-- 이벤트 (Rust → 화면): **58 / 58**
+- 채널 (화면 → Rust): **187 / 187**
+- 이벤트 (Rust → 화면): **60 / 60**
 
 ➖ 는 Rust 판에 일부러 두지 않은 것 (AI 비서 연결 MCP: AI 는 Google Drive 의 메모 폴더를 직접 읽고 쓴다)
 
@@ -137,6 +137,14 @@
 | ✅ | `reminders:magic-done` |
 | ✅ | `reminders:set` |
 | ✅ | `reminders:take-magic` |
+| ✅ | `secret:create` |
+| ✅ | `secret:lock` |
+| ✅ | `secret:move-in` |
+| ✅ | `secret:move-out` |
+| ✅ | `secret:open` |
+| ✅ | `secret:remove` |
+| ✅ | `secret:rename` |
+| ✅ | `secret:state` |
 | ✅ | `share:targets` |
 | ✅ | `shortcuts:pause` |
 | ✅ | `shortcuts:set` |
@@ -236,6 +244,8 @@
 | ✅ | `mode:changed` |
 | ✅ | `reminders:changed` |
 | ✅ | `schedule:magic` |
+| ✅ | `secret:ask` |
+| ✅ | `secret:changed` |
 | ✅ | `shortcuts:changed` |
 | ✅ | `stack:activating` |
 | ✅ | `stack:hover` |

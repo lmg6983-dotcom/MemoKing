@@ -39,6 +39,7 @@ import { createFindBar } from './find-bar.js';
 import { createAiWritePanel } from './ai-write-panel.js';
 import { UI } from './core/ui-text.js';
 import { pickFolder } from './folder-ui.js';
+import { pickSecretFolder } from './secret-ui.js';
 import { folderOf, UNFILED_LABEL } from './core/folders.js';
 import { paintTableBar, bindTableBar, createPalette, linkItem as sharedLinkItem, showNoteBanner } from './note-shared.js';
 
@@ -459,7 +460,35 @@ function applyMeta(next) {
   $('folder-tag').title = folder ? '다른 폴더로 옮기기' : '폴더에 넣기';
   $('folder-tag').querySelector('span').textContent = folder || UNFILED_LABEL;
   $('folder-label').textContent = folder || UNFILED_LABEL;
+  showSecretState();
 }
+
+// 비밀 메모 (비밀 폴더 — desktop-rs secret_store.rs): 잠그기 · 이전 버전 · 보통 폴더로 옮기기는 없다 (휴대폰 메모 메뉴와 같음)
+//   비밀 폴더로 옮기기 · 꺼내기는 메뉴를 열 때 연 비밀 폴더가 있는지 물어서
+function showSecretState() {
+  const secret = Boolean(memo?.secret);
+  document.body.classList.toggle('is-secret', secret);
+  for (const b of ['folder-tag', 'folder-btn', 'lock-btn', 'versions-btn']) if (secret) $(b).hidden = true;
+  if (!secret) for (const b of ['folder-btn', 'lock-btn', 'versions-btn']) $(b).hidden = false;
+  $('secret-move-btn').querySelector('span').textContent = secret ? '비밀 폴더에서 꺼내기' : '비밀 폴더로 옮기기';
+  $('secret-move-btn').hidden = !secret;
+  if (!secret) api.secret?.state().then((s) => ($('secret-move-btn').hidden = !s?.opened?.length)).catch(() => {});
+}
+$('secret-move-btn').addEventListener('click', async () => {
+  closeMenu();
+  await flush();
+  try {
+    if (memo?.secret) {
+      await api.secret.moveOut(id, ''); // 이 창은 닫히고 꺼낸 메모는 목록에
+      return;
+    }
+    const { opened = [] } = (await api.secret.state()) ?? {};
+    const fid = opened.length === 1 ? opened[0].fid : await pickSecretFolder(opened.map(({ fid: f, name }) => ({ fid: f, name })));
+    if (fid) await api.secret.moveIn(id, fid);
+  } catch (err) {
+    setStatus(err?.message || '옮기지 못했어요', true);
+  }
+});
 
 for (const color of COLORS) {
   const swatch = document.createElement('button');
@@ -736,6 +765,8 @@ $('show-list').addEventListener('click', () => {
 });
 $('delete-btn').addEventListener('click', async () => {
   closeMenu();
+  // 비밀 메모는 휴지통에 두지 않고 바로 지운다 — 되돌릴 수 없으니 먼저 묻는다
+  if (memo?.secret && !(await confirmDialog('비밀 메모를 삭제할까요? 휴지통에 두지 않아 되돌릴 수 없어요.', '삭제'))) return;
   // 묻지 않고 바로 휴지통으로 (목록 창에 되돌리기) — 창이 휴지통으로 빨려 들어가듯 사라진다
   const keep = saved;
   saved = current; // 삭제하는 메모는 저장하지 않는다
@@ -2111,7 +2142,6 @@ if (memo?.needsPassword) {
       memo = { ...memo, ...r };
       return null;
     },
-    onCancel: () => api.win.close(),
   });
   markPainted();
   const opened = await unlocking;

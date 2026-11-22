@@ -103,6 +103,9 @@ pub fn start(app: &AppHandle) {
     });
 }
 
+/// 비밀 메모 알림의 이름 (휴대폰 alarms.js 와 같은 글)
+const SECRET_ALARM: &str = "비밀 메모의 일정";
+
 /// 날짜 · 시간 · 반복 · 타이머
 fn tick(app: &AppHandle) {
     run(app, |r, now| rem::due_occurrence(r, now).map(Some));
@@ -114,7 +117,8 @@ fn run(app: &AppHandle, pick: impl Fn(&Value, chrono::DateTime<chrono::Local>) -
     static RUNNING: Mutex<()> = Mutex::new(());
     let _one = RUNNING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let now = chrono::Local::now();
-    let Some(all) = vault(app, |v| v.all_reminders()) else { return };
+    // 비밀 메모의 알림도 (잠겨 있어도 — 때만 든 알림 파일에서, 이름 없이 "비밀 메모의 일정" 으로 울린다)
+    let Some(all) = vault(app, |v| [v.all_reminders(), v.secret_alarm_items()].concat()) else { return };
     let mut rang = false;
     for item in all {
         let (id, r) = (item["memoId"].as_str().unwrap_or_default(), &item["reminder"]);
@@ -124,6 +128,11 @@ fn run(app: &AppHandle, pick: impl Fn(&Value, chrono::DateTime<chrono::Local>) -
         // 울리기 "전에" 먼저 울림 표시(last)를 파일에 적는다 — 적지 못했으면(그사이 파일이 바뀜) 이번엔 울리지 않는다 (두 번 울리지 않게).
         //   목록을 읽은 뒤 채널이 알림을 옮기거나 끄거나 지웠을 수 있다 — 지금 알림으로 다시 고르고 적는다 (옛 것으로 되돌리지 않게)
         let marked = vault(app, |v| {
+            if memoking_core::secret::is_secret_id(id) {
+                let cur = v.secret_alarm(id, &r["id"])?;
+                let due = pick(&cur, now)?;
+                return v.secret_set_alarm(id, &rem::mark_fired(&cur, now)).map_err(|e| elog!("울림 표시를 적지 못했습니다: {e}")).ok().filter(|ok| *ok).map(|_| (cur, due));
+            }
             let now_list = &v.entry(id)?.meta.reminders;
             let cur = now_list.iter().find(|x| x["id"] == r["id"])?.clone();
             let due = pick(&cur, now)?;
@@ -145,6 +154,12 @@ fn run(app: &AppHandle, pick: impl Fn(&Value, chrono::DateTime<chrono::Local>) -
 
 // shortcut: 알림 보관함(history) 기록과 퇴근 뒤 Work 알림 조용히 두기(quietAlarm)는 없다 — 보관함 없이 조용히 두면 알림을 잃으니 늘 울린다, 보관함을 옮길 때 같이
 fn fire(app: &AppHandle, id: &str, r: &Value, due: Option<(Alert, bool)>, now: chrono::DateTime<chrono::Local>) {
+    if memoking_core::secret::is_secret_id(id) {
+        // 비밀 메모: 제목 · 내용 없이 (열려 있어도 알림 창은 보는 사람을 가리지 않는다). 누르면 열린 동안만 그 메모가
+        let (title, label, _) = rem::alarm_text(r, SECRET_ALARM, due.as_ref(), now);
+        toast(app, id, &title, &label, "");
+        return;
+    }
     let Some(memo) = vault(app, |v| v.get(id)).flatten() else { return };
     let memo_title = memo["title"].as_str().unwrap_or_default();
     let (title, label, full) = rem::alarm_text(r, memo_title, due.as_ref(), now);

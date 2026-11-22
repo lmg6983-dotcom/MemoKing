@@ -7,6 +7,11 @@ import { extractPreview } from '../../app/js/core/memo-file.js';
 import { native } from './native.js';
 import { quietAlarm } from '../../app/js/core/work-hours.js';
 import { UI } from '../../app/js/core/ui-text.js';
+import { SECRET_ALARM } from './vault-secret.js';
+import { isSecretId } from '../../app/js/core/secret-folders.js';
+
+// 보통 메모의 알림 + 비밀 메모의 알림 (잠겨 있어도 — 때만 든 알림 파일에서, 이름 · 내용 없이 "비밀 메모의 일정" 으로)
+const allAlarms = (vault) => [...vault.allReminders(), ...(vault.secretAlarmItems?.() ?? [])];
 
 // 일정의 미리 알림마다 따로 (같은 일정의 "하루 전" 과 "30분 전" 이 서로를 지우지 않게)
 const keyOf = (memoId, reminder, offset = 0) => `${memoId}/${reminder.id}${offset ? `/${offset}` : ''}`;
@@ -26,6 +31,19 @@ export function createAlarms({ getVault, onFire, getHours = () => null, interval
 
   function fire(memoId, reminder, info, { silent = false } = {}) {
     const vault = getVault();
+    if (isSecretId(memoId)) {
+      // 비밀 메모: 제목 · 내용 없이 (열려 있어도 — 알림 막대는 잠금 화면에도 보인다)
+      const { title, label, full } = alarmText(reminder, SECRET_ALARM, info);
+      if (!silent) {
+        try {
+          native.notify({ key: keyOf(memoId, reminder, info.offset), title, text: label, memoId, label: full });
+        } catch (err) {
+          console.warn('알림을 띄우지 못했어요', err);
+        }
+      }
+      if (vault?.get(memoId)) onFire(memoId, reminder, { reminderId: reminder.id, label: full, missed: Boolean(info.missed) }); // 연 동안만 그 메모를
+      return;
+    }
     const memo = vault?.get(memoId);
     if (!memo) return;
     const { title, label, full } = alarmText(reminder, memo.title, info);
@@ -52,13 +70,13 @@ export function createAlarms({ getVault, onFire, getHours = () => null, interval
     if (!vault) return 0;
     const t = new Date();
     let count = 0;
-    for (const { memoId, reminder } of vault.allReminders()) {
+    for (const { memoId, reminder } of allAlarms(vault)) {
       const info = pick(reminder, t);
       if (!info) continue;
       // 울리기 "전에" 먼저 울림 표시(last)를 파일에 적어, 같은 알림이 두 번 울리지 않게 한다.
       let marked = null;
       try {
-        marked = vault.updateReminder(memoId, markFired(reminder, t));
+        marked = isSecretId(memoId) ? vault.setSecretAlarm(memoId, markFired(reminder, t)) : vault.updateReminder(memoId, markFired(reminder, t));
       } catch (err) {
         console.error(UI.ringMarkFail, err); // 이 메모만 건너뛰고 다른 알림은 계속
       }
@@ -92,11 +110,12 @@ export function createAlarms({ getVault, onFire, getHours = () => null, interval
     if (!vault) return;
     const now = new Date();
     const items = [];
-    for (const { memoId, title: memoTitle, reminder: r } of vault.allReminders()) {
+    for (const { memoId, title: memoTitle, reminder: r } of allAlarms(vault)) {
       if (!r.enabled || r.kind === 'startup') continue;
       if (r.kind === 'timer' && r.last) continue;
-      const memo = vault.get(memoId);
-      const preview = memo?.locked ? '' : extractPreview(memo?.body ?? '', 120); // 잠긴 메모의 풀린 글이 예약 알림에 실리지 않게
+      const secret = isSecretId(memoId);
+      const memo = secret ? null : vault.get(memoId);
+      const preview = secret || memo?.locked ? '' : extractPreview(memo?.body ?? '', 120); // 잠긴 메모 · 비밀 메모의 글이 예약 알림에 실리지 않게
       const title = alarmTitle(r, memoTitle);
       // 앞으로 울릴 알림(미리 알림 포함)을 몇 번 함께 맡겨, 앱을 한동안 열지 않아도 계속 울리게 한다
       const lastFired = r.last ? new Date(r.last) : null;

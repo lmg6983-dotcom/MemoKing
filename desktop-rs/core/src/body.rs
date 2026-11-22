@@ -240,7 +240,7 @@ pub fn extract_media(body: &str) -> Vec<Media> {
     for m in MEDIA.captures_iter(body).flatten() {
         let embed = &m[1] == "!";
         let src = decode(&m[3]);
-        if !is_local_path(&src) || seen.contains(&src) || (!embed && !src.starts_with("attachments/")) {
+        if !is_local_path(&src) || seen.contains(&src) || (!embed && !src.starts_with("attachments/") && !src.starts_with("secret-file/")) {
             continue;
         }
         seen.insert(src.clone());

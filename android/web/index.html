@@ -299,6 +299,7 @@
     <button class="menu-item" data-memo-action="day"><svg><use href="#i-calendar"/></svg><span>회상 날짜 정하기 <small></small></span></button>
     <button class="menu-item" data-memo-action="mode"><svg><use href="#i-swap"/></svg><span>Work로 옮기기</span></button>
     <button class="menu-item" data-memo-action="folder"><svg><use href="#i-folder"/></svg><span>폴더로 옮기기 <small></small></span></button>
+    <button class="menu-item" data-memo-action="secret" hidden><svg><use href="#i-lock"/></svg><span>비밀 폴더로 옮기기</span></button>
     <button class="menu-item" data-memo-action="pick"><svg><use href="#i-check"/></svg><span>여러 개 고르기</span></button>
     <button class="menu-item" data-memo-action="lock"><svg><use href="#i-lock"/></svg><span>잠그기</span></button>
     <button class="menu-item" data-memo-action="find"><svg><use href="#i-search"/></svg><span>찾기, 바꾸기</span></button>
@@ -550,6 +551,11 @@
       </div>
     </div>
     <p class="hint" id="vault-hint">PC와 함께 쓰려면 Google Drive를 연결해 주세요.</p>
+    <p class="sub-label">비밀 폴더</p>
+    <div class="setting-row nav-row">
+      <span>비밀 폴더 <small>폴더 비밀번호로 메모 · 사진까지 잠가요. 잠긴 동안은 이름도 보이지 않아요</small></span>
+      <button id="secret-btn" class="btn small nav-act">비밀 폴더 열기</button>
+    </div>
     <p class="sub-label">휴지통</p>
     <div class="setting-row nav-row">
       <span>삭제한 메모 <small>여기서 되살리거나 영구 삭제해요 <span id="trash-count" class="trash-count"></span></small></span>

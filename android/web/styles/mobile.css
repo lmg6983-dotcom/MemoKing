@@ -1362,7 +1362,7 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 /* 여러 장 고르기 막대: 아래 탭 막대 위에 */
 .pick-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .pick-bar .btn { min-height: 44px; }
-body.picking var(--ok-pink-200) { display: none; }
+body.picking #fab { display: none; }
 
 /* ========== 메모 탭: 왼쪽 폴더 목록 + 카드 (PC 처럼 탐색기 모양 — folder-ui.js renderFolderList) ==========
    메모 칸은 그대로 하나의 스크롤. 폴더 목록은 왼쪽 칸에 붙어(sticky) 카드를 내려도 그 자리에 있고, 넘치면 따로 스크롤한다.
@@ -1378,7 +1378,7 @@ body.picking var(--ok-pink-200) { display: none; }
 #view-memos.is-empty > #empty { min-height: calc(var(--view-h, 70vh) - var(--bar-full, 0px) - 120px); justify-content: center; margin: 0; padding: 24px 16px 88px; }
 #view-memos > .folder-side {
   grid-column: side; grid-row: 3 / span 30; align-self: start; position: sticky; top: 64px; z-index: 2; /* 붙어 남는 검색 줄(64px) 아래 */
-  display: flex; flex-direction: column; width: 112px; height: calc(var(--view-h, 70vh) - 68px); /* 늘 보이는 칸 높이 — 오른쪽 선이 중간에서 끊기지 않게 */ padding: 2px 4px 10px 8px;
+  display: flex; flex-direction: column; width: 124px; height: calc(var(--view-h, 70vh) - 68px); /* 늘 보이는 칸 높이 — 오른쪽 선이 중간에서 끊기지 않게 */ padding: 2px 4px 10px 8px;
   overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); background: var(--bg);
 }
 #view-memos > .folder-side[hidden] { display: none; }
@@ -1389,7 +1389,7 @@ body.picking var(--ok-pink-200) { display: none; }
 .folder-side .mf-sep { margin: 6px 0 0; padding-left: 8px; border-top-color: color-mix(in srgb, var(--line) 55%, transparent); }
 .folder-side .mf-row:has(> [aria-current="true"]), .folder-side .mf-row:has(> [aria-current="true"]) + .mf-row { box-shadow: none; }
 .folder-side .mf-count { font-size: 11px; line-height: 17px; padding: 0 5px; min-width: 18px; }
-.folder-side .mf-item { min-height: 42px; padding: 8px 8px; gap: 6px; font-size: 13.5px; -webkit-touch-callout: none; user-select: none; }
+.folder-side .mf-item { min-height: 42px; padding: 8px 6px; gap: 5px; font-size: 13.5px; -webkit-touch-callout: none; user-select: none; }
 .folder-side .mf-item svg { width: 15px; height: 15px; }
 .folder-side .mf-more { display: none; } /* 이름 바꾸기 · 지우기는 폴더를 꾹 눌러 (좁은 목록에서 이름 자리를 지킨다) */
 #view-memos > .folder-side .mf-new { /* 누르는 자리를 넓히는 .link-btn 의 position 보다 앞서게 */

@@ -21,7 +21,7 @@ pub(crate) fn arg_str(args: &[Value], i: usize) -> String {
 }
 
 /// 메모 폴더를 쓰는 일 (없으면 Err)
-fn with_vault<T>(app: &AppHandle, f: impl FnOnce(&mut memoking_core::vault::Vault) -> Result<T, String>) -> Result<T, String> {
+pub(crate) fn with_vault<T>(app: &AppHandle, f: impl FnOnce(&mut memoking_core::vault::Vault) -> Result<T, String>) -> Result<T, String> {
     let st = state(app);
     let mut guard = st.vault.lock().unwrap();
     f(guard.as_mut().ok_or(NO_VAULT)?)
@@ -187,6 +187,9 @@ pub fn push_list(app: &AppHandle) {
     crate::index::mark(); // 메모가 바뀌면 목록에 알릴 때마다 — 색인도 다시
     crate::drive::request(1000); // Google Drive 에도 (메모 저장은 이미 0.6초 모아서 오므로 1초면 충분)
     let _ = app.emit_to("list", "memos:changed", [list_memos(app)]);
+    if with_vault(app, |v| Ok(v.secret_is_open())).unwrap_or(false) {
+        crate::secret::push(app); // 비밀 메모 카드도 (목록(list)에는 들지 않는다)
+    }
     crate::windows::push_all_stacks(app);
     crate::os::refresh_tray(app); // 알림 영역의 최근 메모 · 열린 메모 (메모 창을 열고 닫을 때도 여기로 온다)
 }
@@ -449,7 +452,12 @@ pub fn closed_note(app: &AppHandle, id: &str, label: &str) {
 
 /// from: 새 메모를 만든 창 — 새 창은 그 창 옆에 겹치지 않게 (windows::new_memo_spot)
 fn create_memo(app: &AppHandle, from: &str, opts: &Value) -> Result<Value, String> {
-    let id = with_vault(app, |v| Ok(v.create(opts["color"].as_str(), opts["mode"].as_str(), opts["folder"].as_str().unwrap_or(""))))?;
+    let folder = opts["folder"].as_str().unwrap_or("");
+    let id = match folder.strip_prefix("secret:") {
+        // 비밀 폴더를 보는 중이면 그 폴더에 (잠가서 — secret_store.rs)
+        Some(fid) => with_vault(app, |v| v.secret_create_memo(fid, opts["color"].as_str(), opts["mode"].as_str()).map_err(|e| e.to_string()))?,
+        None => with_vault(app, |v| Ok(v.create(opts["color"].as_str(), opts["mode"].as_str(), folder)))?,
+    };
     crate::windows::place_new_memo(app, &id, from);
     open_note(app, &id)?;
     Ok(id.into())
@@ -926,7 +934,14 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         "attachment:save" => {
             let Some(bytes) = arg_bytes(args, 0) else { return Some(Err("넣으려는 파일을 읽지 못했어요. 파일을 다시 골라 주세요".into())) };
-            with_vault(app, |v| v.save_attachment(&bytes, &arg_str(args, 1)).map(Value::from).map_err(|e| e.to_string()))
+            // 비밀 메모 창이면 잠가서 그 비밀 폴더에 (풀린 채 attachments/ 에 두지 않는다)
+            let secret = crate::secret::folder_of_window(app, label);
+            with_vault(app, |v| match &secret {
+                Some(fid) => v.secret_save_file(fid, &bytes, &arg_str(args, 1)),
+                None => v.save_attachment(&bytes, &arg_str(args, 1)),
+            }
+            .map(Value::from)
+            .map_err(|e| e.to_string()))
         }
         "attachment:read" => read_attachment(app, &arg_str(args, 0)),
         "attachment:rotate" => rotate_attachment(app, &arg_str(args, 0)),

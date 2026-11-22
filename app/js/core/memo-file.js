@@ -268,7 +268,7 @@ export function extractMedia(body) {
     const embed = m[1] === '!';
     const src = safeDecode(m[3]);
     if (!isLocalPath(src) || seen.has(src)) continue;
-    if (!embed && !src.startsWith('attachments/')) continue; // 다른 메모로 가는 링크 등은 첨부가 아님
+    if (!embed && !/^(attachments|secret-file)\//.test(src)) continue; // 다른 메모로 가는 링크 등은 첨부가 아님 (secret-file/ = 비밀 폴더의 잠근 첨부)
     seen.add(src);
     found.push({ src, alt: m[2], kind: embed ? mediaKindOf(src, m[2]) ?? 'file' : 'file', title: m[4] ?? '' });
     // PDF 썸네일이 가리키는 PDF 도 이 메모의 첨부 (지우기 · 되살리기 · 동기화가 함께 다루게)
