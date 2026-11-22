@@ -115,7 +115,7 @@ let seq = 0;
 
 // 앱을 잠깐 떠나 다른 앱 화면(파일 고르기 · 사진 · 공유 · 저장 위치)으로 가는 호출 — 그동안 앱이 뒤로 가도 '앱을 나간 것' 이 아니다
 //   (비밀 폴더는 앱을 나가면 바로 잠기는데, 비밀 메모에 사진을 넣으려고 고르는 동안 잠기면 안 되므로)
-const AWAY = new Set(['pickFiles', 'pickFolder', 'share', 'shareFile', 'shareFiles', 'sharePdf', 'shareContent', 'saveAs', 'openFile', 'takePhoto', 'scanDocument']);
+const AWAY = new Set(['pickFiles', 'pickFolder', 'share', 'shareFile', 'shareFiles', 'sharePdf', 'shareContent', 'saveAs', 'openFile', 'takePhoto', 'scanDocument', 'bioOpen', 'bioSave']); // 지문 · 얼굴 창도 (비밀 폴더를 여는 사이 잠그지 않게)
 let away = 0;
 /** 다른 앱 화면에 다녀오는 중인가 */
 export const awayForPick = () => away > 0;
