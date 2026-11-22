@@ -186,7 +186,7 @@ try {
     await page.evaluate(([px, py]) => document.elementFromPoint(px, py).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: px, clientY: py })), [x, y]);
     await page.mouse.up();
     await page.waitForTimeout(250);
-    check('폴더 꾹 누르기: 뜬 메뉴가 손을 뗀 뒤에도 그대로 (상단 고정 · 이름 바꾸기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 3);
+    check('폴더 꾹 누르기: 뜬 메뉴가 손을 뗀 뒤에도 그대로 (상단 고정 · 이름 바꾸기 · 비밀 폴더로 만들기 · 폴더 지우기)', (await page.locator('.mk-ctx .mk-ctx-item').count()) === 4);
     await page.locator('.mk-ctx-item[data-id="pin"]').click();
     await page.waitForTimeout(300);
     check('상단 고정: 폴더가 "상단 고정" 묶음으로 (핀 없이 선으로 나눔) · 기기끼리 함께 쓰는 파일에', await page.evaluate(() => {

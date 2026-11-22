@@ -63,18 +63,19 @@ pub fn lock(app: &AppHandle, fid: Option<&str>) {
     });
 }
 
-/// 목록 창에 비밀 폴더의 지금 모습 (연 폴더 · 그 안 메모 카드)
+/// 목록 창에 비밀 폴더의 지금 모습 (모든 비밀 폴더 — 잠긴 것도 이름은 · 연 폴더의 메모 카드)
 pub fn push(app: &AppHandle) {
     let _ = app.emit_to("list", "secret:changed", [snapshot(app)]);
 }
 
 fn snapshot(app: &AppHandle) -> Value {
     with_vault(app, |v| {
-        let opened = v.secret_opened();
-        let memos: serde_json::Map<String, Value> = opened.iter().filter_map(|f| f["fid"].as_str()).map(|fid| (fid.to_string(), json!(v.secret_list(fid)))).collect();
-        Ok(json!({ "opened": opened, "memos": memos }))
+        let folders = v.secret_folders();
+        let memos: serde_json::Map<String, Value> =
+            folders.iter().filter(|f| f["open"] == true).filter_map(|f| f["fid"].as_str()).map(|fid| (fid.to_string(), json!(v.secret_list(fid)))).collect();
+        Ok(json!({ "folders": folders, "memos": memos }))
     })
-    .unwrap_or_else(|_| json!({ "opened": [], "memos": {} }))
+    .unwrap_or_else(|_| json!({ "folders": [], "memos": {} }))
 }
 
 /// 열려 있는 메모 창의 메모가 비밀 메모면 그 폴더 (첨부를 잠가 넣으려고)
@@ -101,43 +102,42 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
     Some(match channel {
         "secret:state" => Ok(snapshot(app)),
         // 비밀번호에 맞는 비밀 폴더를 모두 연다 (폴더마다 비밀번호가 따로) — 열쇠 만들기(느림)는 메모 폴더를 붙잡지 않고
-        "secret:open" => {
-            let password = arg_str(args, 0);
-            let records = match with_vault(app, |v| Ok(v.secret_records())) {
-                Ok(r) => r,
+        // 잠긴 비밀 폴더 하나를 비밀번호로 연다 — 열쇠 만들기(느림)는 메모 폴더를 붙잡지 않고
+        "secret:unlock" => {
+            let (fid, password) = (arg_str(args, 0), arg_str(args, 1));
+            let record = match with_vault(app, |v| Ok(v.secret_record(&fid))) {
+                Ok(Some(r)) => r,
+                Ok(None) => return Some(Err("비밀 폴더를 찾지 못했어요".into())),
                 Err(e) => return Some(Err(e)),
             };
-            let mut opened = vec![];
-            let mut broken = None;
-            for (fid, record) in records {
-                match secret::unlock_record(&record, &password) {
-                    Ok(f) => {
-                        let name = f.name.clone();
-                        let _ = with_vault(app, |v| {
-                            v.secret_add(&fid, f);
-                            Ok(())
-                        });
-                        opened.push(json!({ "fid": fid, "name": name }));
-                    }
-                    Err(e) if e != secret::WRONG_PASSWORD => broken = broken.or(Some(e)),
-                    Err(_) => {}
+            match secret::unlock_record(&record, &password) {
+                Err(e) => Err(e),
+                Ok(f) => {
+                    let name = f.name.clone();
+                    done(with_vault(app, |v| {
+                        v.secret_add(&fid, f);
+                        Ok(json!({ "fid": fid, "name": name }))
+                    }))
                 }
-            }
-            if opened.is_empty() {
-                Err(broken.unwrap_or_else(|| secret::WRONG_PASSWORD.into()))
-            } else {
-                done(Ok(json!(opened)))
             }
         }
-        "secret:create" => {
-            let (name, password) = (arg_str(args, 0), arg_str(args, 1));
-            match secret::new_record(&name, &password, secret::ITERATIONS) {
+        // 폴더 메뉴 › 비밀 폴더로 만들기: 안의 메모를 모두 잠가 같은 이름의 비밀 폴더로 (열린 메모 창은 먼저 닫는다 — 옛 id 로 저장하지 않게)
+        "secret:make" => {
+            let (folder, password) = (arg_str(args, 0), arg_str(args, 1));
+            match secret::new_record(&folder, &password, secret::ITERATIONS) {
                 Err(e) => Err(e),
                 Ok((record, f)) => {
-                    let clean = f.name.clone();
-                    done(with_vault(app, |v| v.secret_insert_new(&record, f)).map(|fid| json!({ "fid": fid, "name": clean })))
+                    let ids: Vec<String> = with_vault(app, |v| Ok(v.list().into_iter().filter(|m| m["folder"] == folder.as_str()).filter_map(|m| m["id"].as_str().map(str::to_string)).collect())).unwrap_or_default();
+                    close_windows(app, |id| ids.iter().any(|x| x == id));
+                    done(with_vault(app, |v| v.secret_from_folder(&folder, &record, f)).map(|(fid, left)| json!({ "fid": fid, "left": left })))
                 }
             }
+        }
+        // 비밀 폴더 메뉴 › 보통 폴더로 되돌리기
+        "secret:unmake" => {
+            let fid = arg_str(args, 0);
+            close_windows(app, |id| secret::parse_id(id).is_some_and(|(f, _)| f == fid));
+            done(with_vault(app, |v| v.secret_to_folder(&fid)).map(Value::from))
         }
         "secret:lock" => {
             let fid = args.first().and_then(Value::as_str).map(str::to_string);

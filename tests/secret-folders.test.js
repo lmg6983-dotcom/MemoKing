@@ -54,9 +54,9 @@ test('비밀 폴더: 글 · 바이트 잠그고 풀기 (열쇠가 다르면 null
   assert.equal(openBytes(new Uint8Array([1, 2, 3]), key), null);
 });
 
-test('비밀 폴더: 비밀번호가 다르면 열리지 않고, 이름도 파일에 드러나지 않는다', async () => {
+test('비밀 폴더: 비밀번호가 다르면 열리지 않는다 (이름은 잠긴 동안에도 보인다)', async () => {
   const { record } = await newFolderRecord('가족 사진', 'abcd1234', FAST);
-  assert.ok(!JSON.stringify(record).includes('가족'));
+  assert.equal(record.title, '가족 사진');
   await assert.rejects(unlockRecord(record, 'nope1234'), /비밀번호가 달라요/);
   const { name } = await unlockRecord(record, 'abcd1234');
   assert.equal(name, '가족 사진');
@@ -80,8 +80,13 @@ test('비밀 폴더: 폴더마다 비밀번호가 따로 — 맞는 폴더만 �
   assert.deepEqual(store.opened().map((o) => o.name), ['계좌', '일기']);
   store.lock(a.fid);
   await assert.rejects(store.memos(a.fid), /잠겨 있어요/);
-  // 파일 이름 · 내용 어디에도 폴더 이름이 없다
-  for (const [p, v] of fs.files) assert.ok(!p.includes('일기') && !new TextDecoder().decode(v).includes('일기'), p);
+  // 잠긴 폴더도 이름은 목록에 (자물쇠와 함께) — 하나씩 연다
+  assert.deepEqual(await store.folders(), [{ fid: b.fid, name: '계좌', open: true }, { fid: a.fid, name: '일기', open: false }]);
+  await assert.rejects(store.unlock(a.fid, 'bbbb2222'), /비밀번호가 달라요/);
+  assert.deepEqual(await store.unlock(a.fid, 'aaaa1111'), { fid: a.fid, name: '일기' });
+  await assert.rejects(store.create('일기', 'cccc3333', FAST), /이미 있어요/);
+  // 파일 이름에는 폴더 이름이 없다
+  for (const p of fs.files.keys()) assert.ok(!p.includes('일기'), p);
 });
 
 test('비밀 메모: 저장 · 목록 · 읽기 — 파일에는 제목 · 본문 · 태그가 없다', async () => {
@@ -99,7 +104,8 @@ test('비밀 메모: 저장 · 목록 · 읽기 — 파일에는 제목 · 본�
   assert.equal(parseSecretId('abc'), null);
   for (const [p, v] of fs.files) {
     const t = new TextDecoder().decode(v);
-    assert.ok(!/고백|일기|비밀|pink/.test(t), `${p} 에 드러남`);
+    if (!p.endsWith('folder.json')) assert.ok(!/고백|일기|비밀|pink/.test(t), `${p} 에 드러남`);
+    assert.ok(!/고백|비밀|pink/.test(t), `${p} 에 드러남`);
     assert.ok(p.startsWith(`${SECRET_DIR}/`));
   }
   const doc = await store.read(fid, mid);

@@ -472,7 +472,7 @@ function showSecretState() {
   if (!secret) for (const b of ['folder-btn', 'lock-btn', 'versions-btn']) $(b).hidden = false;
   $('secret-move-btn').querySelector('span').textContent = secret ? '비밀 폴더에서 꺼내기' : '비밀 폴더로 옮기기';
   $('secret-move-btn').hidden = !secret;
-  if (!secret) api.secret?.state().then((s) => ($('secret-move-btn').hidden = !s?.opened?.length)).catch(() => {});
+  if (!secret) api.secret?.state().then((s) => ($('secret-move-btn').hidden = !s?.folders?.some((f) => f.open))).catch(() => {});
 }
 $('secret-move-btn').addEventListener('click', async () => {
   closeMenu();
@@ -482,8 +482,9 @@ $('secret-move-btn').addEventListener('click', async () => {
       await api.secret.moveOut(id, ''); // 이 창은 닫히고 꺼낸 메모는 목록에
       return;
     }
-    const { opened = [] } = (await api.secret.state()) ?? {};
-    const fid = opened.length === 1 ? opened[0].fid : await pickSecretFolder(opened.map(({ fid: f, name }) => ({ fid: f, name })));
+    const opened = ((await api.secret.state())?.folders ?? []).filter((f) => f.open).map(({ fid: f, name }) => ({ fid: f, name }));
+    if (!opened.length) return setStatus('먼저 목록에서 비밀 폴더를 눌러 열어 주세요', true);
+    const fid = opened.length === 1 ? opened[0].fid : await pickSecretFolder(opened);
     if (fid) await api.secret.moveIn(id, fid);
   } catch (err) {
     setStatus(err?.message || '옮기지 못했어요', true);

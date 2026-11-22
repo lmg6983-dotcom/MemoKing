@@ -1,4 +1,5 @@
 //! 비밀 폴더 — app/js/core/secret-folders.js 와 같은 파일 모양 · 같은 암호 (PC · 휴대폰이 서로의 비밀 폴더를 연다)
+//!   폴더 이름(title)은 잠긴 동안에도 폴더 목록에 자물쇠와 함께 보인다 — 누르면 비밀번호를 묻는다
 //!   _memoking/secret/<폴더 id>/folder.json · <메모 id>.mks · <메모 id>.alarms.json · files/<무작위>.<확장자>.mks
 //!   열쇠: PBKDF2-SHA256(비밀번호 NFC, 소금 16바이트, n 번) → 32바이트 → AES-256-GCM
 use crate::memo_file::{self, Meta};
@@ -119,7 +120,7 @@ pub fn new_record(name: &str, password: &str, iterations: u32) -> Result<(Value,
     }
     let salt = random::<16>();
     let key = derive(password, &salt, iterations);
-    let record = json!({ "v": VERSION, "n": iterations, "s": B64.encode(salt), "check": seal_text(CHECK, &key), "name": seal_text(&clean, &key) });
+    let record = json!({ "v": VERSION, "n": iterations, "s": B64.encode(salt), "check": seal_text(CHECK, &key), "name": seal_text(&clean, &key), "title": clean });
     Ok((record, Folder { key, name: clean }))
 }
 
@@ -151,6 +152,7 @@ pub fn renamed_record(record: &Value, key: &[u8; 32], name: &str) -> Result<(Val
     }
     let mut next = record.clone();
     next["name"] = seal_text(&clean, key).into();
+    next["title"] = clean.clone().into(); // 잠긴 동안에도 폴더 목록에 보이는 이름
     Ok((next, clean))
 }
 
@@ -226,7 +228,7 @@ mod tests {
     #[test]
     fn record_unlock() {
         let (record, _) = new_record("가족 사진", "abcd1234", 1000).unwrap();
-        assert!(!record.to_string().contains("가족"));
+        assert_eq!(record["title"], "가족 사진");
         assert_eq!(unlock_record(&record, "nope1234").err().as_deref(), Some(WRONG_PASSWORD));
         assert_eq!(unlock_record(&record, "abcd1234").unwrap().name, "가족 사진");
         let mut bad = record.clone();

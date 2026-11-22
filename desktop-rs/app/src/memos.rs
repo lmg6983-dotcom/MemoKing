@@ -187,9 +187,7 @@ pub fn push_list(app: &AppHandle) {
     crate::index::mark(); // 메모가 바뀌면 목록에 알릴 때마다 — 색인도 다시
     crate::drive::request(1000); // Google Drive 에도 (메모 저장은 이미 0.6초 모아서 오므로 1초면 충분)
     let _ = app.emit_to("list", "memos:changed", [list_memos(app)]);
-    if with_vault(app, |v| Ok(v.secret_is_open())).unwrap_or(false) {
-        crate::secret::push(app); // 비밀 메모 카드도 (목록(list)에는 들지 않는다)
-    }
+    crate::secret::push(app); // 비밀 폴더 · 비밀 메모 카드도 (목록(list)에는 들지 않는다 — 다른 기기에서 만든 비밀 폴더도 보이게)
     crate::windows::push_all_stacks(app);
     crate::os::refresh_tray(app); // 알림 영역의 최근 메모 · 열린 메모 (메모 창을 열고 닫을 때도 여기로 온다)
 }

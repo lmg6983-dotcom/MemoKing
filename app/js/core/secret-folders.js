@@ -1,7 +1,8 @@
-// 비밀 폴더 — 폴더 비밀번호로 메모 · 첨부 · 폴더 이름까지 암호화해 메모 폴더 안 _memoking/secret/ 에 둔다 (PC · 휴대폰 같은 규칙)
-//   _memoking 은 메모 목록 · 검색 · 위젯 · AI 비서가 보지 않는 곳이라 비밀 폴더는 이름까지 드러나지 않고, Drive 동기화는 그대로 된다.
+// 비밀 폴더 — 폴더 비밀번호로 메모 · 첨부를 암호화해 메모 폴더 안 _memoking/secret/ 에 둔다 (PC · 휴대폰 같은 규칙)
+//   _memoking 은 메모 목록 · 검색 · 위젯 · AI 비서가 보지 않는 곳이라 비밀 메모는 드러나지 않고, Drive 동기화는 그대로 된다.
+//   폴더 이름은 잠긴 동안에도 폴더 목록에 자물쇠와 함께 보인다 (title) — 누르면 비밀번호를 묻는다
 //   _memoking/secret/<폴더 id>/
-//     folder.json          { v, n, s, check, name } — 소금 · 반복 횟수와, 폴더 열쇠로 잠근 확인 글 · 폴더 이름
+//     folder.json          { v, n, s, check, name, title } — 소금 · 반복 횟수, 폴더 열쇠로 잠근 확인 글 · 이름, 보이는 이름(title)
 //     <메모 id>.mks         메모 파일 전체(머리말 + 본문)를 잠근 글 — 파일 이름은 무작위라 무엇인지 알 수 없다
 //     <메모 id>.alarms.json 일정 · 알림의 때만 (잠기지 않음 — 잠긴 동안에도 "비밀 메모의 일정" 으로 알리려고. 이름 · 내용은 없음)
 //     files/<무작위>.<확장자>.mks  첨부(사진 · 파일)를 잠근 바이트
@@ -89,7 +90,7 @@ export async function newFolderRecord(name, password, { iterations = SECRET_ITER
   if (problem) throw new Error(problem);
   const salt = random(16);
   const key = await deriveKey(password, salt, iterations);
-  return { record: { v: VERSION, n: iterations, s: b64(salt), check: sealText(CHECK, key), name: sealText(clean, key) }, key, name: clean };
+  return { record: { v: VERSION, n: iterations, s: b64(salt), check: sealText(CHECK, key), name: sealText(clean, key), title: clean }, key, name: clean };
 }
 
 /** 폴더 기록을 비밀번호로 연다 → { key, name } (다르면 예외) */
@@ -107,7 +108,7 @@ export async function unlockRecord(record, password) {
 export function renamedRecord(record, key, name) {
   const clean = cleanFolderName(name);
   if (!clean) throw new Error('폴더 이름으로 쓸 수 없어요');
-  return { ...record, name: sealText(clean, key) };
+  return { ...record, name: sealText(clean, key), title: clean };
 }
 
 const folderDir = (fid) => `${SECRET_DIR}/${fid}`;
@@ -149,6 +150,28 @@ export class SecretFolders {
     return list.filter((e) => e.dir && SAFE.test(e.name)).map((e) => e.name);
   }
 
+  /** 모든 비밀 폴더 [{ fid, name, open }] (이름순) — 잠긴 것도 이름은 보인다 */
+  async folders() {
+    const out = [];
+    for (const fid of await this.ids()) {
+      const open = this.keys.get(fid);
+      const record = open ? null : await this.record(fid);
+      if (!open && !record) continue; // 망가진 · 아직 다 받지 않은 폴더
+      out.push({ fid, name: open?.name ?? (cleanFolderName(record.title ?? '') || '비밀 폴더'), open: Boolean(open) });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  }
+
+  /** 비밀 폴더 하나를 비밀번호로 연다 → { fid, name } (다르면 예외 '비밀번호가 달라요') */
+  async unlock(fid, password) {
+    if (this.keys.has(fid)) return { fid, name: this.keys.get(fid).name };
+    const record = await this.record(fid);
+    const { key, name } = await unlockRecord(record, password);
+    this.keys.set(fid, { key, name });
+    if (record.title !== name) await this.fs.writeText(recordPath(fid), JSON.stringify({ ...record, title: name })).catch(() => {}); // 이름이 보이기 전에 만든 폴더
+    return { fid, name };
+  }
+
   async record(fid) {
     const text = await this.fs.readText(recordPath(fid)).catch(() => null);
     if (!text) return null;
@@ -162,7 +185,7 @@ export class SecretFolders {
   /** 새 비밀 폴더 → { fid, name } (만들면 바로 열린 채) */
   async create(name, password, o) {
     const { record, key, name: clean } = await newFolderRecord(name, password, o);
-    for (const [, v] of this.keys) if (v.name === clean) throw new Error('같은 이름의 비밀 폴더가 이미 열려 있어요');
+    if ((await this.folders()).some((f) => f.name === clean)) throw new Error('같은 이름의 비밀 폴더가 이미 있어요');
     const fid = randomId();
     await this.fs.writeText(recordPath(fid), JSON.stringify(record));
     this.keys.set(fid, { key, name: clean });

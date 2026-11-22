@@ -34,26 +34,47 @@ impl Vault {
 
     /// 아직 열지 않은 비밀 폴더의 기록들 — 비밀번호 맞추기(느림)는 부르는 쪽이 메모 폴더를 붙잡지 않고
     pub fn secret_records(&self) -> Vec<(String, Value)> {
-        self.secret_ids()
-            .into_iter()
-            .filter(|fid| !self.secrets.contains_key(fid))
-            .filter_map(|fid| {
-                let text = fs::read_to_string(self.abs(&secret::record_path(&fid))).ok()?;
-                Some((fid, serde_json::from_str(&text).ok()?))
-            })
-            .collect()
+        self.secret_ids().into_iter().filter(|fid| !self.secrets.contains_key(fid)).filter_map(|fid| Some((fid.clone(), self.secret_record(&fid)?))).collect()
     }
 
-    /// 비밀번호를 맞춘 폴더를 연다 — 그 안 메모를 항목으로
+    /// 비밀 폴더 하나의 기록 (folder.json)
+    pub fn secret_record(&self, fid: &str) -> Option<Value> {
+        serde_json::from_str(&fs::read_to_string(self.abs(&secret::record_path(fid))).ok()?).ok()
+    }
+
+    /// 비밀번호를 맞춘 폴더를 연다 — 그 안 메모를 항목으로. 이름이 보이기 전에 만든 폴더면 보이는 이름(title)을 적어 둔다
     pub fn secret_add(&mut self, fid: &str, folder: Folder) {
+        if let Some(mut record) = self.secret_record(fid).filter(|r| r["title"].as_str() != Some(folder.name.as_str())) {
+            record["title"] = folder.name.clone().into();
+            let _ = write_atomic(&self.abs(&secret::record_path(fid)), record.to_string().as_bytes());
+        }
         self.secrets.insert(fid.into(), folder);
         self.secret_load(fid);
     }
 
+    /// 모든 비밀 폴더 [{ fid, name, open, count }] (이름순) — 잠긴 것도 이름은 보인다 (count 는 연 폴더만)
+    pub fn secret_folders(&self) -> Vec<Value> {
+        let mut list: Vec<Value> = self
+            .secret_ids()
+            .into_iter()
+            .filter_map(|fid| {
+                if let Some(f) = self.secrets.get(&fid) {
+                    let count = self.entries.values().filter(|e| e.secret.as_ref() == Some(&fid) && !body::is_blank_body(&e.body)).count();
+                    return Some(json!({ "fid": fid, "name": f.name, "open": true, "count": count }));
+                }
+                let record = self.secret_record(&fid)?;
+                let name = memo_file::clean_folder_name(record["title"].as_str().unwrap_or_default());
+                Some(json!({ "fid": fid, "name": if name.is_empty() { "비밀 폴더".to_string() } else { name }, "open": false }))
+            })
+            .collect();
+        list.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+        list
+    }
+
     /// 새 비밀 폴더를 만들어 연 채로 → 폴더 id
     pub fn secret_insert_new(&mut self, record: &Value, folder: Folder) -> Result<String, String> {
-        if self.secrets.values().any(|f| f.name == folder.name) {
-            return Err("같은 이름의 비밀 폴더가 이미 열려 있어요".into());
+        if self.secret_folders().iter().any(|f| f["name"] == folder.name.as_str()) {
+            return Err("같은 이름의 비밀 폴더가 이미 있어요".into());
         }
         let fid = secret::random_id(9);
         let path = self.abs(&secret::record_path(&fid));
@@ -106,18 +127,6 @@ impl Vault {
 
     pub fn secret_is_open(&self) -> bool {
         !self.secrets.is_empty()
-    }
-
-    /// 연 비밀 폴더 [{ fid, name, count }] (이름순)
-    pub fn secret_opened(&self) -> Vec<Value> {
-        let mut list: Vec<(&String, &Folder)> = self.secrets.iter().collect();
-        list.sort_by(|a, b| a.1.name.cmp(&b.1.name));
-        list.into_iter()
-            .map(|(fid, f)| {
-                let count = self.entries.values().filter(|e| e.secret.as_ref() == Some(fid) && !body::is_blank_body(&e.body)).count();
-                json!({ "fid": fid, "name": f.name, "count": count })
-            })
-            .collect()
     }
 
     /// 비밀 폴더의 메모 카드들 (고정한 것 먼저, 최근 고친 순)
@@ -322,6 +331,40 @@ impl Vault {
         Ok(new_id)
     }
 
+    /// 보통 폴더 → 비밀 폴더: 같은 이름의 비밀 폴더를 만들어 안의 메모(첨부까지)를 모두 잠가 옮기고, 빈 폴더는 치운다 → 폴더 id
+    ///   잠긴 메모는 열지 못하니 남긴다 (그 폴더도 남는다) → (폴더 id, 남긴 메모 수)
+    pub fn secret_from_folder(&mut self, folder: &str, record: &Value, f: Folder) -> Result<(String, usize), String> {
+        if folder.is_empty() || memo_file::clean_folder_name(folder) != folder {
+            return Err("폴더 이름으로 쓸 수 없어요".into());
+        }
+        let fid = self.secret_insert_new(record, f)?;
+        let ids: Vec<String> = self.entries.values().filter(|e| e.file.as_deref().is_some_and(|p| memo_file::folder_of(p) == folder)).map(|e| e.id.clone()).collect();
+        let mut left = 0;
+        for id in ids {
+            if self.move_to_secret(&id, &fid).is_err() {
+                left += 1;
+            }
+        }
+        let _ = fs::remove_dir(self.root.join(folder)); // 다른 파일이 남았으면 그대로
+        Ok((fid, left))
+    }
+
+    /// 비밀 폴더 → 보통 폴더 (같은 이름): 메모를 모두 풀어 꺼내고 비밀 폴더를 치운다 → 폴더 이름
+    pub fn secret_to_folder(&mut self, fid: &str) -> Result<String, String> {
+        let name = self.secrets.get(fid).map(|f| f.name.clone()).ok_or(secret::LOCKED)?;
+        let dir = self.create_folder(&name)?;
+        let ids: Vec<String> = self.entries.values().filter(|e| e.secret.as_deref() == Some(fid)).map(|e| e.id.clone()).collect();
+        for id in ids {
+            if self.entries.get(&id).is_some_and(|e| body::is_blank_body(&e.body)) {
+                self.remove_secret(&id).map_err(|e| e.to_string())?;
+                continue;
+            }
+            self.move_out_of_secret(&id, &dir).map_err(|e| e.to_string())?;
+        }
+        self.secret_remove_folder(fid).map_err(|e| e.to_string())?;
+        Ok(dir)
+    }
+
     pub fn secret_rename(&mut self, fid: &str, name: &str) -> Result<String, String> {
         let key = self.secret_key(fid).map_err(|e| e.to_string())?;
         let path = self.abs(&secret::record_path(fid));
@@ -460,7 +503,8 @@ mod tests {
         assert_eq!(v.secret_list(&fid).len(), 1, "다시 읽어도 남는다");
         for (p, b) in all_text(&root) {
             let t = String::from_utf8_lossy(&b);
-            assert!(!t.contains("첫사랑") && !t.contains("일기장") && !t.contains("병원") && !p.ends_with(".md"), "{p} 에 드러남");
+            assert!(!t.contains("첫사랑") && !t.contains("병원") && !p.ends_with(".md"), "{p} 에 드러남");
+            assert!(!t.contains("일기장") || p.ends_with("folder.json"), "{p} 에 이름 (folder.json 의 보이는 이름만)");
         }
         // 잠그면 항목이 사라지고, 잠긴 메모로는 저장하지 않는다 (보통 메모로 되살아나지 않게)
         assert_eq!(v.secret_lock(None), vec![id.clone()]);
@@ -477,13 +521,14 @@ mod tests {
         fired["enabled"] = false.into();
         assert!(v.secret_set_alarm(&id, &fired).unwrap());
         assert_eq!(v.secret_alarm(&id, &json!("r1")).unwrap()["enabled"], false);
+        assert_eq!(v.secret_folders()[0], json!({ "fid": fid, "name": "일기장", "open": false }), "잠겨도 이름은 보인다");
         // 다른 비밀번호로는 열리지 않고, 맞으면 다시
         assert!(open_with(&mut v, "wrong999").is_empty());
         assert_eq!(open_with(&mut v, "pass1234"), vec![fid.clone()]);
         assert!(v.get(&id).unwrap()["body"].as_str().unwrap().contains("아무도 모르는"));
         let r = &v.get(&id).unwrap()["reminders"][0];
         assert_eq!((r["enabled"].clone(), r["last"].clone(), r["title"].clone()), (json!(false), json!("2026-12-01T09:00:00"), json!("병원 예약")));
-        assert_eq!(v.secret_opened()[0]["name"], "일기장");
+        assert_eq!(v.secret_folders()[0], json!({ "fid": fid, "name": "일기장", "open": true, "count": 1 }));
         // 지우면 휴지통이 아니라 바로
         v.trash(&id).unwrap();
         assert!(v.secret_list(&fid).is_empty() && !root.join("_memoking/trash").read_dir().unwrap().any(|_| true));
@@ -520,6 +565,33 @@ mod tests {
         assert_eq!(v.list().len(), 1);
         assert!(v.secret_list(&fid).is_empty());
         assert!(!root.join("_memoking/secret").join(&fid).join("files").read_dir().unwrap().any(|_| true), "잠근 첨부도 치운다");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn folder_to_secret_and_back() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        v.create_folder("일기").unwrap();
+        let src = v.save_attachment(&[9, 8, 7], "png").unwrap();
+        let a = v.create(None, None, "일기");
+        v.save(&a, &format!("# 첫날\n\n![]({src})\n")).unwrap();
+        let b = v.create(None, None, "");
+        v.save(&b, "# 밖의 메모").unwrap();
+        let (record, f) = secret::new_record("일기", "pass1234", 1000).unwrap();
+        let (fid, left) = v.secret_from_folder("일기", &record, f).unwrap();
+        assert_eq!(left, 0);
+        assert!(!root.join("일기").exists(), "빈 보통 폴더는 치운다");
+        assert_eq!(v.list().len(), 1, "밖의 메모는 그대로");
+        assert_eq!(v.secret_list(&fid)[0]["title"], "첫날");
+        assert!(v.resolve(&src).is_some_and(|p| !p.exists()), "첨부도 잠가 옮긴다");
+        // 되돌리기: 같은 이름의 보통 폴더로
+        assert_eq!(v.secret_to_folder(&fid).unwrap(), "일기");
+        let back: Vec<Value> = v.list().into_iter().filter(|m| m["folder"] == "일기").collect();
+        assert_eq!(back.len(), 1);
+        assert!(v.get(back[0]["id"].as_str().unwrap()).unwrap()["body"].as_str().unwrap().contains("attachments/"));
+        assert!(v.secret_folders().is_empty());
         fs::remove_dir_all(root).unwrap();
     }
 }
