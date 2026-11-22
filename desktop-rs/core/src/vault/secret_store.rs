@@ -32,11 +32,6 @@ impl Vault {
         ids
     }
 
-    /// 아직 열지 않은 비밀 폴더의 기록들 — 비밀번호 맞추기(느림)는 부르는 쪽이 메모 폴더를 붙잡지 않고
-    pub fn secret_records(&self) -> Vec<(String, Value)> {
-        self.secret_ids().into_iter().filter(|fid| !self.secrets.contains_key(fid)).filter_map(|fid| Some((fid.clone(), self.secret_record(&fid)?))).collect()
-    }
-
     /// 비밀 폴더 하나의 기록 (folder.json)
     pub fn secret_record(&self, fid: &str) -> Option<Value> {
         serde_json::from_str(&fs::read_to_string(self.abs(&secret::record_path(fid))).ok()?).ok()
@@ -476,7 +471,9 @@ mod tests {
 
     fn open_with(v: &mut Vault, pw: &str) -> Vec<String> {
         let mut opened = vec![];
-        for (fid, record) in v.secret_records() {
+        let locked: Vec<String> = v.secret_folders().into_iter().filter(|f| f["open"] == false).filter_map(|f| f["fid"].as_str().map(str::to_string)).collect();
+        let records: Vec<(String, Value)> = locked.into_iter().filter_map(|fid| Some((fid.clone(), v.secret_record(&fid)?))).collect();
+        for (fid, record) in records {
             if let Ok(f) = secret::unlock_record(&record, pw) {
                 v.secret_add(&fid, f);
                 opened.push(fid);

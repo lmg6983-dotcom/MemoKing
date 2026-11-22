@@ -164,13 +164,24 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
     })
 }
 
-/// 옮기거나 지우는 메모의 창을 바로 닫는다 (저장 없이 — 옮기기 전에 화면이 먼저 저장했다)
+/// 옮기거나 지우는 메모의 창을 닫는다 — 닫으며 마지막 글을 저장하게 하고(close), 그 저장을 기다린 뒤에 옮긴다
+///   (예전: 바로 없애(destroy) 0.6초 안에 친 글은 저장되지 않고 사라졌다). 이 채널은 막아도 되는 스레드에서 돈다 (ipc.rs)
 fn close_windows(app: &AppHandle, pick: impl Fn(&str) -> bool) {
     let labels: Vec<(String, String)> = state(app).note_labels.lock().unwrap().iter().filter(|(id, _)| pick(id)).map(|(id, l)| (id.clone(), l.clone())).collect();
+    if labels.is_empty() {
+        return;
+    }
+    for (id, l) in &labels {
+        crate::windows::remove_from_stack(app, id, "none"); // 탭이면 먼저 떼어 낸다 (스택 창을 닫으면 다른 탭까지 닫힌다)
+        if let Some(w) = app.get_webview_window(l) {
+            let _ = w.close(); // 닫으며 저장 (note.js — 동기 저장)
+        }
+    }
+    std::thread::sleep(Duration::from_millis(1500)); // lock 과 같게: 닫히는 창의 마지막 저장을 기다린다
     for (id, l) in labels {
-        crate::windows::remove_from_stack(app, &id, "none");
-        state(app).note_labels.lock().unwrap().remove(&id);
-        if let Some(w) = app.get_webview_window(&l) {
+        // 아직 그 메모의 창이면 없앤다 (저장은 끝났다). 닫힌 창은 예비 창으로 되돌아가 다른 메모를 열 수 있다 — 그 창은 두고
+        let still = state(app).note_labels.lock().unwrap().remove_entry(&id).filter(|(_, x)| *x == l).is_some();
+        if let Some(w) = app.get_webview_window(&l).filter(|_| still) {
             let _ = w.destroy();
         }
     }
