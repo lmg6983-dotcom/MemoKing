@@ -98,7 +98,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   if (viewId === MEMORIES && !memoriesOn()) viewId = VIEWS[0].id;
   let compact = false; // 낮은 창: 월 보기 칸에 일정 막대 대신 색 점 (fitSize)
   let lastFit = '';
-  let maxEvents = 2; // 월 보기 한 칸에 보이는 일정 수 (fitSize)
+  const MAX_EVENTS = 3; // 월 보기 한 칸에 보이는 일정 수 — 나머지는 +n (칸 높이는 내용만큼, fitSize)
   let lastCellKey = 0; // 날 칸을 마지막으로 그린 때의 고른 날
 
   // ---------- 다른 캘린더 (읽기만) ----------
@@ -729,7 +729,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       headerToolbar: false,
       height: 'auto',
       fixedWeekCount: true,
-      dayMaxEvents: maxEvents, // 칸 높이에 들어가는 만큼(fitSize 가 다시 정함), 나머지는 +n (낮은 창은 막대 대신 색 점)
+      dayMaxEvents: MAX_EVENTS, // 3개까지, 나머지는 +n (낮은 창은 막대 대신 색 점)
       moreLinkClass: 'mk-more',
       moreLinkText: (n) => `+${n}`,
       nowIndicator: true,
@@ -793,6 +793,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       },
     });
       calendar.render();
+      lastFit = ''; // 달력이 생기기 전에 잰 크기라 그대로면 건너뛰어, 칸 높이(aspectRatio)가 기본값으로 남았다 (넓은 창)
       fitSize();
       render();
     });
@@ -893,19 +894,11 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       // 비율은 요일 줄을 뺀 날 칸들의 것
       const weekdays = calEl.querySelector('[role="columnheader"]')?.getBoundingClientRect().height || 26;
       if (viewId === 'dayGridMonth') {
-        // 칸 높이: 보이는 높이에 맞추되 칩이 4개 이상 들어가게는 (휴대폰은 달력이 화면보다 길어져 밀어서 봄) —
-        //   높이는 지금 그려진 칩 · 날짜 줄 · "+n" 을 잰다 (칸보다 많이 넣으면 칸이 늘어나며 달력이 크기를 다시 재는 고리를 돌았다)
-        const chip = calEl.querySelector('.mk-ev');
-        const chipH = Math.max(12, chip ? chip.offsetHeight + (parseFloat(getComputedStyle(chip).marginBottom) || 0) : 14); // 아직 일정이 없으면 base.css 의 칩 높이쯤
+        // 칸 높이: 내용만큼 — 일정이 없는 주는 날짜 + 칩 한 줄 자리만, 일정이 많은 주는 칩(두 줄 제목까지) 3개 + "+n" 만큼 늘어난다.
+        //   여기서는 가장 낮은 칸 높이만 정한다 (칩 수를 칸 높이로 맞추면 칸이 늘어나며 달력이 크기를 다시 재는 고리를 돌았다)
         const topH = calEl.querySelector('[role="gridcell"] > :first-child')?.offsetHeight || 24;
-        const moreH = calEl.querySelector('.mk-more')?.offsetHeight || 13;
-        const rowH = compact ? (room - weekdays) / 6 : Math.max((room - weekdays) / 6, topH + 4 * chipH + moreH + 2); // 낮은 창(색 점)은 한 달이 다 보이게
+        const rowH = compact ? (room - weekdays) / 6 : topH + 26; // 낮은 창(색 점)은 한 달이 다 보이게
         calendar?.setOption('aspectRatio', Math.min(8, Math.max(0.5, w / Math.max(100, rowH * 6))));
-        const fit = Math.max(1, Math.floor((rowH - topH - moreH - 1) / chipH));
-        if (fit !== maxEvents) {
-          maxEvents = fit;
-          calendar?.setOption('dayMaxEvents', fit);
-        }
       }
     }
   }
