@@ -120,10 +120,17 @@ let away = 0;
 /** 다른 앱 화면에 다녀오는 중인가 */
 export const awayForPick = () => away > 0;
 
+// 다녀오는 일이 끝났는데 앱이 아직 화면 밖이면(그사이 홈으로 나갔다 — 지문 창 · 사진 고르기를 띄운 채) 앱을 나간 것으로 다시 알린다
+//   (나간 순간에는 '다녀오는 중' 이라 비밀 폴더를 잠그지 않았으므로 — app.js visibilitychange 가 잠근다)
+function backFromAway() {
+  away = Math.max(0, away - 1);
+  if (!away && document.hidden) document.dispatchEvent(new Event('visibilitychange'));
+}
+
 export function call(method, args = {}) {
   const leaves = AWAY.has(method);
   if (leaves) away++;
-  const done = leaves ? () => void (away = Math.max(0, away - 1)) : () => {};
+  const done = leaves ? backFromAway : () => {};
   return new Promise((resolve, reject) => {
     const id = ++seq;
     pending.set(id, { resolve: (v) => (done(), resolve(v)), reject: (e) => (done(), reject(e)) });

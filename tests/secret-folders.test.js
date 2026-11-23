@@ -188,3 +188,12 @@ test('PC 카드 메뉴: 비밀 메모는 꺼내기만 (잠그기 · 버전 · �
   assert.ok(!ids(cardMenuSpec({ id: 'a' })).includes('secret'), '연 비밀 폴더가 없으면 없다');
   assert.equal(cardMenuSpec({ id: 'a' }, { secretOpen: true }).items.find((i) => i.id === 'secret').label, '비밀 폴더로 옮기기');
 });
+
+test('다른 캘린더 색 → 가장 가까운 메모 색 (달력 · 색 고르기)', async () => {
+  const { nearestMemoColor, MEMO_DOT } = await import('../app/js/core/memo-colors.js');
+  const cases = { '#4285f4': 'blue', '#039be5': 'blue', '#0b8043': 'green', '#33b679': 'green', '#8e24aa': 'purple', '#f6bf26': 'yellow', '#d50000': 'pink', '#616161': 'gray' };
+  for (const [hex, want] of Object.entries(cases)) assert.equal(nearestMemoColor(hex), want, hex);
+  for (const [name, hex] of Object.entries(MEMO_DOT)) assert.equal(nearestMemoColor(hex), name, `${name} 은 자기 자신`);
+  assert.equal(nearestMemoColor('red'), 'blue');
+  assert.equal(nearestMemoColor(undefined), 'blue');
+});
