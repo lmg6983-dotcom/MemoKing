@@ -263,7 +263,7 @@ const STACK_CHUNK = 80;
  *   can(): 지금 닫아도 되는가 (골라야 할 것이 남은 안내는 밀어도 제자리로)
  * @param {{ up?: boolean, onHold?: (holding: boolean) => void, can?: () => boolean }} [o]
  */
-export function swipeDismiss(el, onDismiss, { up = false, onHold = () => {}, can = () => true } = {}) {
+export function swipeDismiss(el, onDismiss, { up = false, down = false, onHold = () => {}, can = () => true } = {}) {
   if (el.dataset.swipe) return;
   el.dataset.swipe = '1';
   let s = null;
@@ -283,13 +283,13 @@ export function swipeDismiss(el, onDismiss, { up = false, onHold = () => {}, can
     const dy = e.clientY - s.y;
     if (!s.axis) {
       if (Math.hypot(dx, dy) < 6) return;
-      s.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : up && dy < 0 ? 'y' : 'none';
+      s.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : (up && dy < 0) || (down && dy > 0) ? 'y' : 'none'; // up · down: 위 · 아래로 밀어도 닫힘
       if (s.axis === 'none') return;
       el.setPointerCapture?.(e.pointerId);
       el.style.transition = 'none';
     }
     if (s.axis === 'none') return;
-    s.d = s.axis === 'x' ? dx : Math.min(0, dy);
+    s.d = s.axis === 'x' ? dx : up ? Math.min(0, dy) : Math.max(0, dy);
     const span = s.axis === 'x' ? el.offsetWidth : el.offsetHeight * 1.5;
     el.style.translate = s.axis === 'x' ? `${s.d}px 0` : `0 ${s.d}px`;
     el.style.opacity = String(Math.max(0.15, 1 - Math.abs(s.d) / Math.max(1, span)));
@@ -300,11 +300,11 @@ export function swipeDismiss(el, onDismiss, { up = false, onHold = () => {}, can
     s = null;
     if (!g.axis || g.axis === 'none') return onHold(false);
     const speed = Math.abs(g.d) / Math.max(1, performance.now() - g.t); // px/ms
-    const far = g.axis === 'x' ? Math.abs(g.d) > Math.min(90, el.offsetWidth * 0.3) : -g.d > 28;
+    const far = g.axis === 'x' ? Math.abs(g.d) > Math.min(90, el.offsetWidth * 0.3) : Math.abs(g.d) > 28;
     if (e.type !== 'pointercancel' && can() && (far || (speed > 0.6 && Math.abs(g.d) > 16))) {
       // 민 쪽으로 날아가며 사라짐 (나가는 움직임은 짧게)
       el.style.transition = 'translate 0.18s ease-out, opacity 0.18s ease-out';
-      el.style.translate = g.axis === 'x' ? `${Math.sign(g.d) * (el.offsetWidth + 48)}px 0` : `0 ${-(el.offsetHeight + 48)}px`;
+      el.style.translate = g.axis === 'x' ? `${Math.sign(g.d) * (el.offsetWidth + 48)}px 0` : `0 ${Math.sign(g.d) * (el.offsetHeight + 48)}px`;
       el.style.opacity = '0';
       setTimeout(() => {
         reset();

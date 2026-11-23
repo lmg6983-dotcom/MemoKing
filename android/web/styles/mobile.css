@@ -750,7 +750,9 @@ h2.sheet-title { font-size: 20px; }
 .toast {
   position: fixed;
   left: 50%;
-  top: calc(12px + env(safe-area-inset-top));
+  /* 아래 탭바 · + 단추 위 (갤럭시 앱의 스낵바처럼) — 위에 뜨면 로고 · 설정 · 검색 줄을 가려 누를 수 없었다.
+     실제 자리는 ui.js placeToast 가 그때 떠 있는 아래 단추들 위로 맞춘다 (이 값은 재기 전 · 못 잴 때) */
+  bottom: calc(var(--tabbar-h) + 92px + env(safe-area-inset-bottom));
   z-index: 950; /* 튜토리얼 말풍선(901) 위 — 알림의 단추를 말풍선이 가리지 않게 */
   width: max-content; /* left: 50% 이면 폭이 화면 반으로 줄어 글이 여러 줄로 접힌다 */
   max-width: calc(100vw - 32px);
@@ -768,7 +770,7 @@ h2.sheet-title { font-size: 20px; }
   user-select: none;
 }
 .toast.error { background: var(--danger); color: var(--on-danger); }
-@keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 /* 처음 두 번: 나타난 뒤 살짝 옆으로 밀렸다 돌아옴 — 밀어서 닫을 수 있다는 몸짓 (translate 는 밀기와 따로 쓰는 속성) */
 .toast.swipe-teach { animation: toast-in 0.2s ease-out, toast-nudge 0.7s 0.9s cubic-bezier(0.23, 1, 0.32, 1); }
 @keyframes toast-nudge { 0%, 100% { translate: 0 0; } 35% { translate: 18px 0; } }

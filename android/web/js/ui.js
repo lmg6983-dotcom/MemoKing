@@ -152,6 +152,7 @@ export function toast(text, isError = false, action = null) {
   el.setAttribute('role', isError ? 'alert' : 'status'); // 잘못된 것은 화면 읽기가 바로 읽게
   el.classList.toggle('has-action', Boolean(action));
   el.hidden = false;
+  placeToast(el);
   el.style.animation = 'none';
   void el.offsetWidth;
   el.style.animation = '';
@@ -170,12 +171,15 @@ export function toast(text, isError = false, action = null) {
   clearTimeout(toastTimer);
   toastLife = action ? 5000 : isError ? 4500 : 2600;
   toastTimer = setTimeout(() => (el.hidden = true), toastLife);
-  // 옆이나 위로 밀면 바로 닫힌다 (다 읽었는데 5초 기다리지 않게) · 손을 대고 있는 동안은 사라지지 않음
+  // 알림 밖을 누르면 바로 닫힌다 — 그 누름은 막지 않아 아래 단추가 그대로 눌린다 (알림이 단추를 가려 기다려야 하던 것)
+  document.removeEventListener('pointerdown', closeOnOutside, true);
+  document.addEventListener('pointerdown', closeOnOutside, true);
+  // 옆이나 아래로 밀면 바로 닫힌다 (다 읽었는데 5초 기다리지 않게) · 손을 대고 있는 동안은 사라지지 않음
   swipeDismiss(el, () => {
     clearTimeout(toastTimer);
     el.hidden = true;
   }, {
-    up: true,
+    down: true,
     onHold: (holding) => {
       clearTimeout(toastTimer);
       if (!holding && !el.hidden) toastTimer = setTimeout(() => (el.hidden = true), Math.min(toastLife, 2400));
@@ -183,6 +187,25 @@ export function toast(text, isError = false, action = null) {
   });
 }
 let toastLife = 2600;
+// 아래에 떠 있는 단추 · 막대(탭바 · + · 서식 막대 · 추천 태그 · 커서 단추) 중 가장 높은 것 바로 위에 — 아무 단추도 가리지 않게
+//   (메모 화면은 추천 태그 막대가 뜨면 + · 커서 단추가 올라가 자리가 그때그때 다르다)
+const BOTTOM_CHROME = '.tabs, #fab, #add-btn, #kb-btn, #tag-suggest-bar, .format-bar';
+function placeToast(el) {
+  let top = innerHeight;
+  for (const n of document.querySelectorAll(BOTTOM_CHROME)) {
+    const r = n.getBoundingClientRect();
+    if (r.height && r.top > innerHeight / 2 && r.top < top && n.checkVisibility?.() !== false) top = r.top;
+  }
+  el.style.bottom = top < innerHeight ? `${Math.round(innerHeight - top + 12)}px` : '';
+}
+function closeOnOutside(e) {
+  const el = $('toast');
+  if (el.hidden) return document.removeEventListener('pointerdown', closeOnOutside, true);
+  if (el.contains(e.target)) return;
+  clearTimeout(toastTimer);
+  el.hidden = true;
+  document.removeEventListener('pointerdown', closeOnOutside, true);
+}
 
 // ---------- 넓은 화면 (펼친 폴더블 · 태블릿): 목록과 메모를 나란히 ----------
 
