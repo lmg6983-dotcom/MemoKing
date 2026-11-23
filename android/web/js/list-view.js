@@ -10,7 +10,7 @@ import { COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
 import { matchChrome, confirmDialog, isTwoPane, toast, copiedToast, adoptSheet, releaseSheet } from './ui.js';
-import { call } from './native.js';
+import { call, native } from './native.js';
 import { renderCollage, collageName } from '../../app/js/memories-collage.js';
 import { base64Bytes, collageMemoBody } from '../../app/js/collage-preview.js';
 import { tutEvent, tutorialStepId } from './tutorial.js';
@@ -680,16 +680,60 @@ export function openFolder(name) {
 export async function unlockFolder(name) {
   const fid = secretFolderId(name);
   const label = secretFolders().find((f) => f.name === name)?.label ?? '비밀';
-  return askSecretPassword({
+  const bio = bioOf(fid);
+  // 지문 · 얼굴을 켜 둔 폴더: 바로 지문 창 (취소하면 비밀번호 창으로) — 잠긴 메모와 같은 장치 (Bio.kt)
+  if (bio.available && bio.saved) {
+    const pw = await call('bioOpen', { memoId: bioKey(fid) }).catch(() => null);
+    if (pw) {
+      try {
+        await app.vault.unlockSecret(fid, pw);
+        return true;
+      } catch {
+        forgetBio(fid); // 감싸 둔 비밀번호가 맞지 않다 (다른 기기에서 폴더를 다시 만듦 등) — 잊고 비밀번호로
+        toast('비밀번호가 바뀌었어요. 새 비밀번호를 넣어 주세요', true);
+      }
+    }
+  }
+  let typed = null;
+  const ok = await askSecretPassword({
     name: label,
     onTry: async (password) => {
       try {
         await app.vault.unlockSecret(fid, password);
+        typed = password;
         return null;
       } catch (err) {
         return err.message || '열지 못했어요';
       }
     },
+  });
+  if (ok && typed) offerBio(fid, typed);
+  return ok;
+}
+
+// ---------- 비밀 폴더 지문 · 얼굴 열기 (휴대폰만 — 비밀번호를 휴대폰 보안 칩의 열쇠로 감싸 둔다, Bio.kt) ----------
+//   켜기: 비밀번호로 처음 열 때(만들 때 포함) 한 번 묻는다. 끄기: 보통 폴더로 되돌리기 · 삭제 · 비밀번호가 맞지 않을 때 저절로
+const bioKey = (fid) => `secret-folder:${fid}`; // 잠긴 메모(메모 id)와 겹치지 않게
+function bioOf(fid) {
+  try {
+    return native.bioStatus(bioKey(fid));
+  } catch {
+    return { available: false, saved: false }; // 예전 앱
+  }
+}
+function forgetBio(fid) {
+  try {
+    native.bioForget(bioKey(fid));
+  } catch {
+    // 예전 앱
+  }
+}
+function offerBio(fid, password) {
+  const bio = bioOf(fid);
+  if (!bio.available || bio.saved) return;
+  toast('다음부터 이 폴더를 지문 · 얼굴로 열까요?', false, {
+    label: '켜기',
+    run: () => call('bioSave', { memoId: bioKey(fid), password }).then((ok) => ok && toast('다음부터 지문 · 얼굴로 열어요')).catch(() => {}),
   });
 }
 
@@ -697,12 +741,14 @@ export async function unlockFolder(name) {
 async function makeSecret(name) {
   const count = state.memos.filter((m) => m.folder === name).length;
   let made = null;
+  let typedPw = null;
   const ok = await askNewSecretPassword({
     name,
     count,
     onMake: async (password) => {
       try {
         made = await app.vault.makeSecretFolder(name, password);
+        typedPw = password;
         return null;
       } catch (err) {
         return err.message || '비밀 폴더로 만들지 못했어요';
@@ -712,6 +758,7 @@ async function makeSecret(name) {
   if (!ok || !made) return;
   loadFolderDirs();
   setFolder(`${SECRET_FOLDER}${made.fid}`);
+  if (typedPw) setTimeout(() => offerBio(made.fid, typedPw), 2500); // 만든 알림 뒤에
   toast(made.left ? `${name} 폴더를 비밀 폴더로 만들었어요. 잠긴 메모 ${made.left}개는 열 수 없어 원래 폴더에 남겼어요` : `${name} 폴더를 비밀 폴더로 만들었어요. 사진 · 파일까지 잠겼어요`);
 }
 
@@ -739,6 +786,7 @@ async function secretFolderMenu(name, r) {
     } else if (pick === 'plain') {
       if (!(await app.confirmDanger(`${label} 비밀 폴더를 보통 폴더로 되돌릴까요?`, '안의 메모 · 사진 · 파일의 잠금이 풀려 누구나 볼 수 있어요.', '되돌리기'))) return;
       const dir = await app.vault.makePlainFolder(fid);
+      forgetBio(fid);
       loadFolderDirs();
       setFolder(dir);
       toast(`${dir} 폴더를 보통 폴더로 되돌렸어요`);
@@ -746,6 +794,7 @@ async function secretFolderMenu(name, r) {
       const count = app.vault.secretList(fid).length;
       if (!(await app.confirmDanger(`${label} 비밀 폴더를 삭제할까요?`, `${count ? `안의 메모 ${count}개와 사진 · 파일도 함께 지워져요. ` : ''}휴지통에 두지 않아 되돌릴 수 없어요.`, '삭제'))) return;
       await app.vault.secret.removeFolder(fid);
+      forgetBio(fid);
       app.lockSecrets(fid);
       app.vault.refreshSecretFolders();
       if (state.folder === name) setFolder('');

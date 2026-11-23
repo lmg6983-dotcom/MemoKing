@@ -4,15 +4,15 @@
 import { icon } from './icons.js';
 import { normalizeFeedUrl, icsName, feedLabel, feedCalendars, MAX_FEEDS } from './core/calendar-feeds.js';
 import { koClock, relativeDay, koMonthDay } from './core/time.js';
+import { MEMO_DOT, nearestMemoColor } from './core/memo-colors.js';
+import { COLOR_NAMES } from './core/memo-file.js';
 
 const NAVER_CALDAV = 'https://caldav.calendar.naver.com';
 // Google 이 공개한 대한민국 공휴일 캘린더 (설날 · 추석 · 대체공휴일까지)
 const KR_HOLIDAYS = 'https://calendar.google.com/calendar/ical/ko.south_korea%23holiday%40group.v.calendar.google.com/public/basic.ics';
-// 고를 수 있는 캘린더 색 (Google 캘린더 색 이름처럼)
-const COLORS = [
-  ['#d50000', '토마토'], ['#e67c73', '플라밍고'], ['#f4511e', '귤'], ['#f6bf26', '바나나'], ['#33b679', '세이지'], ['#0b8043', '바질'],
-  ['#039be5', '공작'], ['#3f51b5', '블루베리'], ['#7986cb', '라벤더'], ['#8e24aa', '포도'], ['#616161', '흑연'],
-];
+// 고를 수 있는 캘린더 색: 메모 색과 같은 한 벌 (달력에서는 어떤 색이든 가장 가까운 메모 색으로 보인다 — core/memo-colors.js)
+const COLORS = Object.entries(MEMO_DOT).map(([name, hex]) => [hex, COLOR_NAMES[name] ?? name]);
+const shown = (color) => `var(--${nearestMemoColor(color)}-chip)`; // 점에 보일 색 (예전에 고른 구글 색도 메모 색으로)
 
 /** 받은 때: "방금" · "12분 전" · "오늘 오후 3:20" · "10월 14일" */
 function receivedAt(ms, now = Date.now()) {
@@ -64,7 +64,7 @@ function colorPicker(name, current, onPick) {
     b.type = 'button';
     b.title = label;
     b.setAttribute('aria-label', label);
-    b.setAttribute('aria-pressed', String(color === String(current ?? '').toLowerCase()));
+    b.setAttribute('aria-pressed', String(nearestMemoColor(color) === nearestMemoColor(current))); // 예전에 고른 구글 색도 가까운 메모 색이 골라진 것으로
     b.style.setProperty('--sw', color);
     b.addEventListener('click', () => onPick(color));
     palette.append(b);
@@ -78,7 +78,7 @@ function colorPicker(name, current, onPick) {
  */
 function subRow({ name, sub = '', color, on, onToggle, onColor }) {
   const li = el('li', 'feed-sub');
-  li.style.setProperty('--ext-color', color);
+  li.style.setProperty('--ext-color', shown(color));
   const [dot, palette] = colorPicker(name, color, onColor);
   const text = el('span', 'feed-text');
   text.append(el('b', '', name));
@@ -158,7 +158,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
 
     function feedRow(f) {
       const li = el('li', 'feed-row');
-      li.style.setProperty('--ext-color', f.color);
+      li.style.setProperty('--ext-color', shown(f.color));
       const saveFeed = async (patch) => {
         try {
           feeds = await calendars.setFeeds(feeds.map((x) => (x.id === f.id ? patch(x) : x)));

@@ -16,14 +16,14 @@
     "id": "g1",
     "name": "내 일정",
     "url": "https://calendar.google.com/calendar/ical/x/basic.ics",
-    "color": "#4285f4",
+    "color": "#61b9ff",
     "on": true
    },
    {
     "id": "g2",
     "name": "iCloud 캘린더",
     "url": "https://p01-caldav.icloud.com/a%20b",
-    "color": "#0b8043",
+    "color": "#68ca80",
     "on": true
    }
   ]
@@ -53,7 +53,7 @@
     "id": "n1",
     "name": "네이버 캘린더",
     "url": "https://caldav.calendar.naver.com/",
-    "color": "#4285f4",
+    "color": "#61b9ff",
     "on": true,
     "user": "me@naver.com",
     "pass": "12345",
@@ -96,7 +96,7 @@
     "id": "n2",
     "name": "네이버 캘린더",
     "url": "https://caldav.calendar.naver.com/",
-    "color": "#4285f4",
+    "color": "#61b9ff",
     "on": true,
     "user": "a",
     "pass": ""
@@ -105,7 +105,7 @@
     "id": "n3",
     "name": "5",
     "url": "https://caldav.calendar.naver.com/",
-    "color": "#0b8043",
+    "color": "#68ca80",
     "on": true,
     "user": "b",
     "pass": ""
@@ -151,14 +151,14 @@
     "id": "w",
     "name": "example.com",
     "url": "http://www.example.com:8080/cal?x=1#h",
-    "color": "#0b8043",
+    "color": "#68ca80",
     "on": true
    },
    {
     "id": "x",
     "name": "iCloud 캘린더",
     "url": "https://me.com/c",
-    "color": "#8e24aa",
+    "color": "#bf9bfc",
     "on": true
    }
   ]
@@ -231,70 +231,70 @@
     "id": "f0",
     "name": "example.com",
     "url": "https://example.com/0.ics",
-    "color": "#4285f4",
+    "color": "#61b9ff",
     "on": true
    },
    {
     "id": "f1",
     "name": "가가가가가",
     "url": "https://example.com/1.ics",
-    "color": "#0b8043",
+    "color": "#68ca80",
     "on": true
    },
    {
     "id": "f2",
     "name": "가가가가가가가가가가",
     "url": "https://example.com/2.ics",
-    "color": "#8e24aa",
+    "color": "#bf9bfc",
     "on": true
    },
    {
     "id": "f3",
     "name": "가가가가가가가가가가가가가가가",
     "url": "https://example.com/3.ics",
-    "color": "#f4511e",
+    "color": "#f589b6",
     "on": true
    },
    {
     "id": "f4",
     "name": "가가가가가가가가가가가가가가가가가가가가",
     "url": "https://example.com/4.ics",
-    "color": "#039be5",
+    "color": "#ccb034",
     "on": true
    },
    {
     "id": "f5",
     "name": "가가가가가가가가가가가가가가가가가가가가가가가가가",
     "url": "https://example.com/5.ics",
-    "color": "#616161",
+    "color": "#b8b0a3",
     "on": true
    },
    {
     "id": "f6",
     "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
     "url": "https://example.com/6.ics",
-    "color": "#4285f4",
+    "color": "#61b9ff",
     "on": true
    },
    {
     "id": "f7",
     "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
     "url": "https://example.com/7.ics",
-    "color": "#0b8043",
+    "color": "#68ca80",
     "on": true
    },
    {
     "id": "f8",
     "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
     "url": "https://example.com/8.ics",
-    "color": "#8e24aa",
+    "color": "#bf9bfc",
     "on": true
    },
    {
     "id": "f9",
     "name": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
     "url": "https://example.com/9.ics",
-    "color": "#f4511e",
+    "color": "#f589b6",
     "on": true
    }
   ]

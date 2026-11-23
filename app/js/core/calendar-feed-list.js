@@ -4,7 +4,7 @@ import { UI } from './ui-text.js';
 export const MAX_FEED_BYTES = 5 * 1024 * 1024;
 export const MAX_FEEDS = 10;
 // 구독 캘린더 색 (메모 색과 겹치지 않는 진한 색 — 달력에서 "다른 캘린더" 로 보이게)
-export const FEED_COLORS = ['#4285f4', '#0b8043', '#8e24aa', '#f4511e', '#039be5', '#616161'];
+export const FEED_COLORS = ['#61b9ff', '#68ca80', '#bf9bfc', '#f589b6', '#ccb034', '#b8b0a3']; // 메모 색 점 (파랑 · 초록 · 보라 · 분홍 · 노랑 · 회색) — Rust calendar_feeds.rs 와 같음
 
 /**
  * 붙여 넣은 캘린더 주소 → 받을 수 있는 주소 (webcal:// 은 https:// 로). 아니면 null

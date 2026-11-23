@@ -4,6 +4,7 @@
 // 이미 고른 날을 한 번 더 눌러도 같다. 한 번짜리 일정은 달력에서 끌어 다른 날·시각으로 옮긴다.
 // 다른 캘린더: Google 캘린더 등 .ics 구독 · 휴대폰 캘린더(삼성 캘린더) 일정도 함께 보인다 — 읽기만 ("메모로 가져오기"는 메모킹 안에서)
 //   (calendar-links.js · core/calendar-feeds.js)
+import { MEMO_DOT, nearestMemoColor } from './core/memo-colors.js';
 import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
 import { describeReminder, describeTask, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
@@ -98,7 +99,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   if (viewId === MEMORIES && !memoriesOn()) viewId = VIEWS[0].id;
   let compact = false; // 낮은 창: 월 보기 칸에 일정 막대 대신 색 점 (fitSize)
   let lastFit = '';
-  let maxEvents = 2; // 월 보기 한 칸에 보이는 일정 수 (fitSize)
+  const MAX_EVENTS = 3; // 월 보기 한 칸에 보이는 일정 수 — 나머지는 +n (칸 높이는 내용만큼, fitSize)
   let lastCellKey = 0; // 날 칸을 마지막으로 그린 때의 고른 날
 
   // ---------- 다른 캘린더 (읽기만) ----------
@@ -638,8 +639,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       const dots = el('span', 'cal-dots');
       for (const o of list) {
         const dot = el('i');
-        if (o.ext) dot.style.background = o.ext.color || '#4285f4';
-        else dot.dataset.color = o.item.color;
+        dot.dataset.color = o.ext ? nearestMemoColor(o.ext.color) : o.item.color; // 다른 캘린더도 가장 가까운 메모 색
         dots.append(dot);
       }
       wrap.append(dots);
@@ -695,8 +695,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
         end: e.end,
         allDay: e.allDay,
         editable: false,
-        className: 'mk-ev mk-ext',
-        color: e.color || '#4285f4',
+        className: 'mk-ev mk-ext', // 다른 캘린더 (표시는 내 일정과 같은 칩 — 그 캘린더 색에 가장 가까운 메모 색: eventDidMount data-color)
+        color: 'var(--note-chip)',
         extendedProps: { ext: e },
       });
     }
@@ -729,7 +729,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       headerToolbar: false,
       height: 'auto',
       fixedWeekCount: true,
-      dayMaxEvents: maxEvents, // 칸 높이에 들어가는 만큼(fitSize 가 다시 정함), 나머지는 +n (낮은 창은 막대 대신 색 점)
+      dayMaxEvents: MAX_EVENTS, // 3개까지, 나머지는 +n (낮은 창은 막대 대신 색 점)
       moreLinkClass: 'mk-more',
       moreLinkText: (n) => `+${n}`,
       nowIndicator: true,
@@ -748,7 +748,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       eventDidMount: (arg) => {
         const { item, ext } = arg.event.extendedProps;
         if (item) arg.el.dataset.color = item.color;
-        if (ext) arg.el.style.setProperty('--ext-color', ext.color || '#4285f4');
+        if (ext) arg.el.dataset.color = nearestMemoColor(ext.color);
         arg.el.title = ext ? `${arg.event.title}\n${ext.source}${ext.location ? `, ${ext.location}` : ''}` : arg.event.title;
       },
       datesSet: (arg) => {
@@ -793,6 +793,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       },
     });
       calendar.render();
+      lastFit = ''; // 달력이 생기기 전에 잰 크기라 그대로면 건너뛰어, 칸 높이(aspectRatio)가 기본값으로 남았다 (넓은 창)
       fitSize();
       render();
     });
@@ -893,19 +894,11 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       // 비율은 요일 줄을 뺀 날 칸들의 것
       const weekdays = calEl.querySelector('[role="columnheader"]')?.getBoundingClientRect().height || 26;
       if (viewId === 'dayGridMonth') {
-        // 칸 높이: 보이는 높이에 맞추되 칩이 4개 이상 들어가게는 (휴대폰은 달력이 화면보다 길어져 밀어서 봄) —
-        //   높이는 지금 그려진 칩 · 날짜 줄 · "+n" 을 잰다 (칸보다 많이 넣으면 칸이 늘어나며 달력이 크기를 다시 재는 고리를 돌았다)
-        const chip = calEl.querySelector('.mk-ev');
-        const chipH = Math.max(12, chip ? chip.offsetHeight + (parseFloat(getComputedStyle(chip).marginBottom) || 0) : 14); // 아직 일정이 없으면 base.css 의 칩 높이쯤
+        // 칸 높이: 내용만큼 — 일정이 없는 주는 날짜 + 칩 한 줄 자리만, 일정이 많은 주는 칩(두 줄 제목까지) 3개 + "+n" 만큼 늘어난다.
+        //   여기서는 가장 낮은 칸 높이만 정한다 (칩 수를 칸 높이로 맞추면 칸이 늘어나며 달력이 크기를 다시 재는 고리를 돌았다)
         const topH = calEl.querySelector('[role="gridcell"] > :first-child')?.offsetHeight || 24;
-        const moreH = calEl.querySelector('.mk-more')?.offsetHeight || 13;
-        const rowH = compact ? (room - weekdays) / 6 : Math.max((room - weekdays) / 6, topH + 4 * chipH + moreH + 2); // 낮은 창(색 점)은 한 달이 다 보이게
+        const rowH = compact ? (room - weekdays) / 6 : topH + 26; // 낮은 창(색 점)은 한 달이 다 보이게
         calendar?.setOption('aspectRatio', Math.min(8, Math.max(0.5, w / Math.max(100, rowH * 6))));
-        const fit = Math.max(1, Math.floor((rowH - topH - moreH - 1) / chipH));
-        if (fit !== maxEvents) {
-          maxEvents = fit;
-          calendar?.setOption('dayMaxEvents', fit);
-        }
       }
     }
   }
@@ -1065,7 +1058,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   function externalRow(e) {
     const past = e.end < new Date();
     const div = el('div', `row ev-row ev-ext${past ? ' off' : ''}`);
-    div.style.setProperty('--ext-color', e.color || '#4285f4');
+    div.style.setProperty('--ext-color', `var(--${nearestMemoColor(e.color)}-chip)`); // 달력 칩과 같은 메모 색
     const main = el('button', 'row-main');
     const time = el('span', 'ev-time', e.allDay ? '하루 종일' : koClock(e.start));
     const dot = el('span', 'row-dot');
@@ -1123,7 +1116,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       start: e.start,
       end: e.end,
       allDay: e.allDay,
-      color: e.color || '#4285f4',
+      memoColor: nearestMemoColor(e.color), // 달력 칩과 같은 메모 색
       source: e.source,
       readOnly: true,
       lines: [{ icon: 'pin', text: e.location }],
@@ -1141,7 +1134,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     const when = whenText(e, { relative: false }); // 그림에 남으니 "내일" 대신 날짜
     try {
       if (api.attachments?.save) {
-        const png = await monthSketchPng({ start: e.start, end: e.end, allDay: e.allDay, title: e.title, when, color: e.color });
+        const png = await monthSketchPng({ start: e.start, end: e.end, allDay: e.allDay, title: e.title, when, color: MEMO_DOT[nearestMemoColor(e.color)] });
         imageRel = (await api.attachments.save(png, 'png')) || '';
       }
     } catch (err) {
