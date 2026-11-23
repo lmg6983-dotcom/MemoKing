@@ -1261,8 +1261,8 @@ dialog.quick-event[open] {
 @media (hover: hover) and (pointer: fine) { .row > .icon-btn:last-child:hover { color: var(--danger); } }
 
 .cal-body [role="gridcell"] { cursor: pointer; }
-/* 고른 날: 노란 테두리 없이 옅은 노랑 바탕이 스르르 (고를 때마다 페이드 인) */
-.cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); border-radius: 14px; animation: mk-day-pick 0.24s ease-out; }
+/* 고른 날: 그 칸을 테두리 · 둥근 모서리 없이 옅게 채운다 (격자 칸 그대로 — 둥근 겹 판은 격자 위에서 어수선했다), 고를 때마다 페이드 인 */
+.cal-body [role="gridcell"].mk-selected { background: var(--brand-yellow-soft); border-radius: 0; animation: mk-day-pick 0.24s ease-out; }
 @keyframes mk-day-pick { from { background-color: transparent; } }
 @media (prefers-reduced-motion: reduce) { .cal-body [role="gridcell"].mk-selected { animation: none; } }
 
@@ -1319,7 +1319,7 @@ dialog.quick-event[open] {
 .cal[data-view="dayGridMonth"] .cal-body [role="grid"] { border-radius: 0; }
 .cal[data-view="dayGridMonth"] .cal-body [role="columnheader"] { font-size: 13px; font-weight: 800; color: var(--text-strong); }
 .cal[data-view="dayGridMonth"] .cal-body [role="columnheader"], .cal[data-view="dayGridMonth"] .cal-body [role="columnheader"] > * { justify-content: center; align-items: center !important; text-align: center; } /* 요일도 날짜처럼 칸 가운데 (넓은 창에서 왼쪽에 붙었다) */
-.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { display: flex; justify-content: center; padding-top: 2px; font-size: 12px; line-height: 17px; font-weight: 500; color: var(--muted); }
+.cal[data-view="dayGridMonth"] .cal-body [role="gridcell"] > :first-child { display: flex; justify-content: center; padding-top: 4px; padding-bottom: 4px; font-size: 12px; line-height: 17px; font-weight: 500; color: var(--muted); }
 .cal[data-view="dayGridMonth"] .cal-body [role="gridcell"][aria-current="date"] > :first-child { font-weight: 800; color: var(--text-strong); }
 :root { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23d93a30' stroke-linecap='round' stroke-linejoin='round' opacity='0.8'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } /* 오늘 표시 (달력 · 회상 달력 같이) */
 @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --mk-today-ring: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 30'%3E%3Cdefs%3E%3Cfilter id='p' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='1.5' result='d'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.2' numOctaves='1' seed='3' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.6 1.5' result='ga'/%3E%3CfeComposite in='d' in2='ga' operator='in'/%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url%28%23p%29' fill='none' stroke='%23ff6f61' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'%3E%3Cpath d='M25 6.4C19.6 2.8 9.4 3.6 5.8 10.2 2.7 16 6.2 24.8 15.4 25.8 24.6 26.8 30.6 20.6 29.6 13.6 28.9 8.6 24.4 5.4 17.6 4.6' stroke-width='2.7'/%3E%3Cpath d='M23.4 5.6C18.6 3.6 10.6 4.6 7.4 10.4 4.8 15.6 8 23.4 15.8 24.4 23.4 25.4 28.6 20.2 28.2 14.2' stroke-width='1.3' opacity='.55'/%3E%3C/g%3E%3C/svg%3E"); } }
@@ -1340,7 +1340,8 @@ dialog.quick-event[open] {
 @media (prefers-color-scheme: dark) { :where(:root:not([data-theme="light"])) .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sun, [role="gridcell"].mk-sun > :first-child) { color: var(--danger); } }
 .cal[data-view="dayGridMonth"] .cal-body :is([role="columnheader"].mk-sat, [role="gridcell"].mk-sat > :first-child) { color: var(--sat); } /* 토요일 파랑도 */
 
-.cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 5px !important; }
+.cal[data-view="dayGridMonth"] .cal-body .mk-ev { min-height: 0; margin: 0 1px 1px !important; border-radius: 5px !important; } /* 칩 사이 · 칸 옆 여백 1px (2px 이내) */
+/* 날짜 줄 위아래 4px: 오늘의 빨간 동그라미(26px)가 숫자(19px)보다 커 첫 칩과 겹치지 않게 — 모든 날에 같게 (한 주의 칩 줄이 나란하게) */
 .cal[data-view="dayGridMonth"] .cal-body .mk-ev, .cal[data-view="dayGridMonth"] .cal-body .mk-ev > div { padding: 0 !important; border: 0 !important; } /* 칩 높이 = 글자 줄 (달력이 더하는 안쪽 여백 · 테두리 없이) */
 /* 좁은 창(휴대폰): 달력을 화면 폭 가까이 넓혀 칸마다 글자가 더 들어가게 */
 @media (max-width: 700px) { .cal[data-view="dayGridMonth"] .cal-body { margin-inline: -6px; } } /* 칸만 카드 안에서 넓게 — 카드 안쪽 여백은 그대로 두어 머리줄이 회상 보기와 같은 자리 (바꿀 때 옆으로 튀지 않게) */
@@ -1363,15 +1364,15 @@ dialog.quick-event[open] {
 .cal-daytop { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .cal-daytop .cal-dots { display: flex; gap: 2px; height: 4px; }
 .cal-daytop .cal-dots i { width: 4px; height: 4px; border-radius: 99px; background: var(--note-chip); }
-/* 칩 색: 메모 카드와 같은 메모지 색 — 연한 메모 바탕 + 메모 줄 색 얇은 테두리 + 같은 색 계열의 진한 글자 (목록 카드와 한 벌로 보이게) */
-.cal-body .mk-ev:not(.mk-ext) {
-  background: var(--note-bg, var(--yellow-bg)) !important;
-  box-shadow: inset 0 0 0 1px var(--note-bar, var(--yellow-bar));
-  color: color-mix(in srgb, var(--note-chip, var(--yellow-chip)) 38%, var(--ok-gray-900));
+/* 칩 색: 메모 색 고르기의 점 색으로 꽉 채우고 진한 글자 — 종이색(모두 같은 밝기)은 작은 칩에서 분홍 · 보라 · 파랑이 서로 구분되지 않았다.
+   다른 캘린더 일정도 가장 가까운 메모 색으로 (list-reminders.js data-color — core/memo-colors.js) */
+.cal-body .mk-ev:not(.mk-task) {
+  background: var(--note-chip, var(--yellow-chip)) !important;
+  box-shadow: none;
+  color: var(--ok-gray-950);
   font-weight: 600;
 }
-.cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: var(--ok-yellow-800); } /* 노랑은 섞으면 탁해져 따로 (갈색 글자) */
-.cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: var(--ok-gray-50); box-shadow: none; }
+.cal-body .mk-ev[data-color="charcoal"]:not(.mk-task) { color: var(--ok-gray-50); } /* 검정 칩은 흰 글자 */
 /* 알림(구글 리마인더처럼): 동그라미를 누르면 완료 — 메모 창 목록 · 일정 탭 목록 */
 .task-check {
   display: grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0;
@@ -1387,7 +1388,7 @@ dialog.quick-event[open] {
 .task-row-item.done .row-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--text-faint); }
 .task-row-item > .task-check { margin-left: 10px; }
 /* 달력의 알림: 바탕 없이 동그라미 + 이름 (꽉 찬 칩은 일정) — 완료하면 동그라미를 채우고 줄을 긋는다 */
-.cal-body .mk-ev.mk-task:not(.mk-ext) { background: transparent !important; box-shadow: none; color: var(--text); font-weight: 600; }
+.cal-body .mk-ev.mk-task { background: transparent !important; box-shadow: none; color: var(--text); font-weight: 600; }
 .cal-body .mk-task .mk-mt::before, .cal-body .mk-task .fc-event-title::before {
   content: ''; display: inline-block; flex: none; width: 7px; height: 7px; margin: 0 3px 1px 1px; vertical-align: middle;
   border: 1.5px solid var(--note-chip, var(--yellow-chip)); border-radius: 50%;
@@ -1396,33 +1397,15 @@ dialog.quick-event[open] {
 .cal-body .mk-task.mk-done .mk-mt, .cal-body .mk-task.mk-done .fc-event-title { text-decoration: line-through; }
 .cal-body .mk-task.mk-done .mk-mt::before, .cal-body .mk-task.mk-done .fc-event-title::before { background: var(--note-chip, var(--yellow-chip)); }
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .cal-body .mk-ev:not(.mk-ext) { color: color-mix(in srgb, var(--note-chip, var(--yellow-chip)) 55%, var(--ok-gray-0)); }
-  :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="yellow"]:not(.mk-ext) { color: var(--ok-yellow-100); }
-  :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="charcoal"]:not(.mk-ext) { color: var(--ok-gray-50); box-shadow: inset 0 0 0 1px var(--line); }
+  :where(:root:not([data-theme="light"])) .cal-body .mk-ev[data-color="charcoal"]:not(.mk-task) { color: var(--ok-gray-950); } /* 어두운 화면의 검정 칩은 밝은 회색 — 진한 글자 */
 }
 
   
-/* 지난 · 끝난 내 일정: 바탕 없이 메모 줄 색 테두리 + 흐린 글자 (채운 칩보다 한발 물러나 보이게) */
-.cal-body .mk-ev.off:not(.mk-ext) { opacity: 1; background: var(--surface-1) !important; box-shadow: inset 0 0 0 1px var(--note-bar, var(--line)); color: var(--muted); }
-.cal-body .mk-ev:not(.mk-ext) * { color: inherit !important; } /* 칩 안쪽 글자도 (FullCalendar 가 안쪽에 색을 따로 줌) */
-/* 목록 보기는 줄이 넓어 꽉 채우면 무거움 — 메모 일정은 진한 옅은 바탕, 다른 캘린더는 더 옅게 (무게 차이는 그대로) */
-.cal[data-view="listMonth"] .cal-body .mk-ev:not(.mk-ext) { background: color-mix(in srgb, var(--fc-event-color) 26%, transparent) !important; color: var(--text-strong); }
-/* 다른 캘린더 일정: 내 메모 일정과 같은 한 벌 — 그 캘린더 색을 메모지 색처럼 옅은 바탕 + 한 단계 진한 얇은 테두리 + 같은 색 계열의 진한 글자.
-   oklch 로 섞어 색이 탁해지지 않게 (검정을 섞은 아래 그림자는 갈색으로 죽어 보였다) */
-.cal-body .mk-ext {
-  background: color-mix(in oklch, var(--fc-event-color) 20%, var(--ok-gray-0)) !important;
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 42%, var(--ok-gray-0));
-  color: color-mix(in oklch, var(--fc-event-color) 40%, var(--ok-gray-900));
-  font-weight: 600;
-}
-.cal-body .mk-ext * { color: inherit !important; }
-@media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) .cal-body .mk-ext {
-    background: color-mix(in oklch, var(--fc-event-color) 26%, var(--ok-gray-900)) !important;
-    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--fc-event-color) 40%, var(--ok-gray-900));
-    color: color-mix(in oklch, var(--fc-event-color) 55%, var(--ok-gray-0));
-  }
-}
+/* 지난 · 끝난 일정: 바탕 없이 그 메모 색 테두리 + 흐린 글자 (채운 칩보다 한발 물러나 보이게, 색은 그대로 알아보게) */
+.cal-body .mk-ev.off:not(.mk-task) { opacity: 1; background: var(--surface-1) !important; box-shadow: inset 0 0 0 1.5px var(--note-chip, var(--line)); color: var(--muted); }
+.cal-body .mk-ev * { color: inherit !important; } /* 칩 안쪽 글자도 (FullCalendar 가 안쪽에 색을 따로 줌) */
+/* 목록 보기는 줄이 넓어 꽉 채우면 무거움 — 메모 색을 옅게 */
+.cal[data-view="listMonth"] .cal-body .mk-ev:not(.off) { background: color-mix(in srgb, var(--note-chip) 26%, transparent) !important; color: var(--text-strong); }
 .cal-body .mk-ev:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 /* 손가락으로 누르는 화면: 누르는 자리를 넉넉히 (보기 전환 · 앞뒤 달 · 오늘 · 달력 칩 · 다른 캘린더 창의 칸들) */
 @media (pointer: coarse) {

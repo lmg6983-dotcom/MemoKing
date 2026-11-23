@@ -4,6 +4,7 @@
 // 이미 고른 날을 한 번 더 눌러도 같다. 한 번짜리 일정은 달력에서 끌어 다른 날·시각으로 옮긴다.
 // 다른 캘린더: Google 캘린더 등 .ics 구독 · 휴대폰 캘린더(삼성 캘린더) 일정도 함께 보인다 — 읽기만 ("메모로 가져오기"는 메모킹 안에서)
 //   (calendar-links.js · core/calendar-feeds.js)
+import { MEMO_DOT, nearestMemoColor } from './core/memo-colors.js';
 import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
 import { describeReminder, describeTask, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
@@ -638,8 +639,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       const dots = el('span', 'cal-dots');
       for (const o of list) {
         const dot = el('i');
-        if (o.ext) dot.style.background = o.ext.color || '#4285f4';
-        else dot.dataset.color = o.item.color;
+        dot.dataset.color = o.ext ? nearestMemoColor(o.ext.color) : o.item.color; // 다른 캘린더도 가장 가까운 메모 색
         dots.append(dot);
       }
       wrap.append(dots);
@@ -695,8 +695,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
         end: e.end,
         allDay: e.allDay,
         editable: false,
-        className: 'mk-ev mk-ext',
-        color: e.color || '#4285f4',
+        className: 'mk-ev mk-ext', // 다른 캘린더 (표시는 내 일정과 같은 칩 — 그 캘린더 색에 가장 가까운 메모 색: eventDidMount data-color)
+        color: 'var(--note-chip)',
         extendedProps: { ext: e },
       });
     }
@@ -748,7 +748,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       eventDidMount: (arg) => {
         const { item, ext } = arg.event.extendedProps;
         if (item) arg.el.dataset.color = item.color;
-        if (ext) arg.el.style.setProperty('--ext-color', ext.color || '#4285f4');
+        if (ext) arg.el.dataset.color = nearestMemoColor(ext.color);
         arg.el.title = ext ? `${arg.event.title}\n${ext.source}${ext.location ? `, ${ext.location}` : ''}` : arg.event.title;
       },
       datesSet: (arg) => {
@@ -1058,7 +1058,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   function externalRow(e) {
     const past = e.end < new Date();
     const div = el('div', `row ev-row ev-ext${past ? ' off' : ''}`);
-    div.style.setProperty('--ext-color', e.color || '#4285f4');
+    div.style.setProperty('--ext-color', `var(--${nearestMemoColor(e.color)}-chip)`); // 달력 칩과 같은 메모 색
     const main = el('button', 'row-main');
     const time = el('span', 'ev-time', e.allDay ? '하루 종일' : koClock(e.start));
     const dot = el('span', 'row-dot');
@@ -1116,7 +1116,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       start: e.start,
       end: e.end,
       allDay: e.allDay,
-      color: e.color || '#4285f4',
+      memoColor: nearestMemoColor(e.color), // 달력 칩과 같은 메모 색
       source: e.source,
       readOnly: true,
       lines: [{ icon: 'pin', text: e.location }],
@@ -1134,7 +1134,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     const when = whenText(e, { relative: false }); // 그림에 남으니 "내일" 대신 날짜
     try {
       if (api.attachments?.save) {
-        const png = await monthSketchPng({ start: e.start, end: e.end, allDay: e.allDay, title: e.title, when, color: e.color });
+        const png = await monthSketchPng({ start: e.start, end: e.end, allDay: e.allDay, title: e.title, when, color: MEMO_DOT[nearestMemoColor(e.color)] });
         imageRel = (await api.attachments.save(png, 'png')) || '';
       }
     } catch (err) {
