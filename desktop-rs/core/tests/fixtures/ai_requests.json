@@ -1,0 +1,2053 @@
+[
+ {
+  "kind": "op",
+  "raw": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "#특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "op": "TAG",
+   "id": "b",
+   "add": "할일"
+  },
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "tag",
+   "memo": "c",
+   "add": [
+    "1"
+   ]
+  },
+  "op": {
+   "do": "tag",
+   "memo": "c",
+   "error": "#1 는 태그로 쓸 수 없어요"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "tag"
+  },
+  "op": {
+   "do": "tag",
+   "memo": "",
+   "error": "더하거나 뺄 태그가 없어요"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "color",
+   "memo": "x",
+   "color": "Blue"
+  },
+  "op": {
+   "do": "color",
+   "memo": "x",
+   "color": "blue"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "color",
+   "memo": "x",
+   "color": "red"
+  },
+  "op": {
+   "do": "color",
+   "memo": "x",
+   "error": "색은 yellow · green · pink · purple · blue · gray · charcoal 가운데 하나예요"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "move",
+   "memo": "업무/회의.md",
+   "folder": "/서류함/"
+  },
+  "op": {
+   "do": "move",
+   "memo": "업무/회의.md",
+   "folder": "서류함"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "move",
+   "file": "a.md",
+   "to": ""
+  },
+  "op": {
+   "do": "move",
+   "memo": "a.md",
+   "folder": ""
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\r\ny",
+   "with": "z"
+  },
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "replace",
+   "memo": "a"
+  },
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "error": "바꿀 글(find)이 없어요"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "append",
+   "memo": "a",
+   "text": "  덧붙임 \n"
+  },
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "append",
+   "memo": "a"
+  },
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "error": "덧붙일 글(text)이 없어요"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "merge",
+   "into": "a",
+   "from": [
+    "b",
+    "a",
+    " c "
+   ]
+  },
+  "op": {
+   "do": "merge",
+   "memo": "a",
+   "from": [
+    "b",
+    "c"
+   ]
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "merge",
+   "into": "a"
+  },
+  "op": {
+   "do": "merge",
+   "memo": "a",
+   "error": "합칠 메모(into · from)가 없어요"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "trash",
+   "memo": "a"
+  },
+  "op": {
+   "do": "trash",
+   "memo": "a"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "create",
+   "text": "# 새 메모\n본문",
+   "folder": "할일/",
+   "color": "PINK"
+  },
+  "op": {
+   "do": "create",
+   "memo": "",
+   "text": "# 새 메모\n본문",
+   "folder": "할일",
+   "color": "pink"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "create",
+   "body": ""
+  },
+  "op": {
+   "do": "create",
+   "memo": "",
+   "error": "새 메모의 글(text)이 없어요"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": "nope",
+   "memo": 1
+  },
+  "op": {
+   "do": "nope",
+   "memo": "1",
+   "error": "모르는 요청이에요 (nope) — tag · color · move · replace · append · merge · trash · create"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": "text",
+  "op": {
+   "do": "",
+   "memo": "",
+   "error": "모르는 요청이에요 (빈 do) — tag · color · move · replace · append · merge · trash · create"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": null,
+  "op": {
+   "do": "",
+   "memo": "",
+   "error": "모르는 요청이에요 (빈 do) — tag · color · move · replace · append · merge · trash · create"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": [
+   1
+  ],
+  "op": {
+   "do": "",
+   "memo": "",
+   "error": "모르는 요청이에요 (빈 do) — tag · color · move · replace · append · merge · trash · create"
+  }
+ },
+ {
+  "kind": "op",
+  "raw": {
+   "do": 7
+  },
+  "op": {
+   "do": "7",
+   "memo": "",
+   "error": "모르는 요청이에요 (7) — tag · color · move · replace · append · merge · trash · create"
+  }
+ },
+ {
+  "kind": "parse",
+  "text": "",
+  "ops": [],
+  "error": false
+ },
+ {
+  "kind": "parse",
+  "text": "no fence",
+  "ops": [],
+  "error": false
+ },
+ {
+  "kind": "parse",
+  "text": "```json\n\n```",
+  "ops": [],
+  "error": false
+ },
+ {
+  "kind": "parse",
+  "text": "```json\n[{\"do\":\"trash\",\"memo\":\"a\"}]\n```",
+  "ops": [
+   {
+    "do": "trash",
+    "memo": "a"
+   }
+  ],
+  "error": false
+ },
+ {
+  "kind": "parse",
+  "text": "```\n{\"ops\":[{\"do\":\"color\",\"memo\":\"a\",\"color\":\"gray\"}]}\n```",
+  "ops": [
+   {
+    "do": "color",
+    "memo": "a",
+    "color": "gray"
+   }
+  ],
+  "error": false
+ },
+ {
+  "kind": "parse",
+  "text": "```json\n{\"x\":1}\n```",
+  "ops": [],
+  "error": true
+ },
+ {
+  "kind": "parse",
+  "text": "```json\n[1,\n```",
+  "ops": [],
+  "error": true
+ },
+ {
+  "kind": "parse",
+  "text": "# 메모킹 AI 요청\n\nAI 비서(Gemini 등)는 메모를 직접 다시 쓰지 말고 이 파일만 고쳐 주세요. 아래 json 칸에 요청을 넣고 이 파일 전체를 다시 저장하면, 메모킹(PC · 휴대폰)이 메모를 고치고 이 파일에 결과를 적은 뒤 칸을 비워요.\n메모 주소(memo)는 메모의 id 또는 메모 폴더 기준 파일 경로(\"업무/회의.md\")예요. 자세한 방법은 _memoking/README.md 에 있어요.\n\n```json\n[]\n```\n",
+  "ops": [],
+  "error": false
+ },
+ {
+  "kind": "parse",
+  "text": "```json\n[{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"},{\"do\":\"trash\",\"memo\":\"a\"}]\n```",
+  "ops": [
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   },
+   {
+    "do": "trash",
+    "memo": "a"
+   }
+  ],
+  "error": true
+ },
+ {
+  "kind": "edit",
+  "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "# OA 프롬프트\n\n내용 본문\n\n#프롬프트 #특허\n",
+   "status": "ok",
+   "note": "#프롬프트 #특허 더함, #ETRI #공유 뺌"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유 #할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "# OA 프롬프트\n\n내용 본문\n\n#공유\n",
+   "status": "ok",
+   "note": "#ETRI 뺌"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "# 제목\n본문\n\n#프롬프트 #특허\n",
+   "status": "ok",
+   "note": "#프롬프트 #특허 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# 제목\n본문\n\n#할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "# 제목\n본문",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# 제목\n본문\n\n#ETRI\n",
+   "status": "ok",
+   "note": "#ETRI 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "# 제목\n본문",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "# 제목\n본문\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "# 제목\n본문",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문 #프롬프트 #특허",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "# 제목\n본문 #프롬프트 #특허",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문 #프롬프트 #특허",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# 제목\n본문 #프롬프트 #특허\n\n#할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문 #프롬프트 #특허",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "# 제목\n본문 #프롬프트 #특허",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문 #프롬프트 #특허",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# 제목\n본문 #프롬프트 #특허\n\n#ETRI\n",
+   "status": "ok",
+   "note": "#ETRI 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문 #프롬프트 #특허",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "# 제목\n본문 #프롬프트 #특허",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문 #프롬프트 #특허",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "# 제목\n본문 #프롬프트 #특허\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 제목\n본문 #프롬프트 #특허",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "# 제목\n본문 #프롬프트 #특허",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "# 코드\n```\n#ETRI\n```\n    #공유\n\n#프롬프트 #특허\n",
+   "status": "ok",
+   "note": "#프롬프트 #특허 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# 코드\n```\n#ETRI\n```\n    #공유\n\n#할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# 코드\n```\n#ETRI\n```\n    #공유\n\n#ETRI\n",
+   "status": "ok",
+   "note": "#ETRI 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "# 코드\n```\n#ETRI\n```\n    #공유\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "# 코드\n```\n#ETRI\n```\n    #공유\n",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# a\r\n\r\n#etri, #공유하기 #공유\n#프롬프트",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "# a\n\n#특허, #공유하기\n#프롬프트\n",
+   "status": "ok",
+   "note": "#특허 더함, #ETRI #공유 뺌"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# a\r\n\r\n#etri, #공유하기 #공유\n#프롬프트",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# a\n\n#etri, #공유하기 #공유\n#프롬프트 #할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# a\r\n\r\n#etri, #공유하기 #공유\n#프롬프트",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "# a\n\n, #공유하기 #공유\n#프롬프트\n",
+   "status": "ok",
+   "note": "#ETRI 뺌"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# a\r\n\r\n#etri, #공유하기 #공유\n#프롬프트",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "# a\n\n#etri, #공유하기 #공유\n#프롬프트",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# a\r\n\r\n#etri, #공유하기 #공유\n#프롬프트",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "# a\n\n#etri, #공유하기 #공유\n#프롬프트",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# a\r\n\r\n#etri, #공유하기 #공유\n#프롬프트",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "# a\n\n#etri, #공유하기 #공유\n#프롬프트\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "# a\r\n\r\n#etri, #공유하기 #공유\n#프롬프트",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "# a\n\n#etri, #공유하기 #공유\n#프롬프트",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "x\ny 한 번",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "x\ny 한 번\n\n#프롬프트 #특허\n",
+   "status": "ok",
+   "note": "#프롬프트 #특허 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "x\ny 한 번",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "x\ny 한 번\n\n#할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "x\ny 한 번",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "x\ny 한 번",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "x\ny 한 번",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "x\ny 한 번\n\n#ETRI\n",
+   "status": "ok",
+   "note": "#ETRI 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "x\ny 한 번",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "z 한 번",
+   "status": "ok",
+   "note": "글을 바꿈"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "x\ny 한 번",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "x\ny 한 번\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "x\ny 한 번",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "y\ny 한 번",
+   "status": "ok",
+   "note": "글을 바꿈"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "a x b x",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "a x b x\n\n#프롬프트 #특허\n",
+   "status": "ok",
+   "note": "#프롬프트 #특허 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "a x b x",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "a x b x\n\n#할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "a x b x",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "a x b x",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "a x b x",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "a x b x\n\n#ETRI\n",
+   "status": "ok",
+   "note": "#ETRI 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "a x b x",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "a x b x",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "a x b x",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "a x b x\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "a x b x",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "a x b x",
+   "status": "fail",
+   "note": "바꿀 글이 2곳에 있어요 — 한 곳만 있게 더 길게 적어 주세요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "z 이미",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "z 이미\n\n#프롬프트 #특허\n",
+   "status": "ok",
+   "note": "#프롬프트 #특허 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "z 이미",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "z 이미\n\n#할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "z 이미",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "z 이미",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "z 이미",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "z 이미\n\n#ETRI\n",
+   "status": "ok",
+   "note": "#ETRI 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "z 이미",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "z 이미",
+   "status": "same",
+   "note": "이미 바뀌어 있어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "z 이미",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "z 이미\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "z 이미",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "z 이미",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "덧붙임 이미 있음",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "덧붙임 이미 있음\n\n#프롬프트 #특허\n",
+   "status": "ok",
+   "note": "#프롬프트 #특허 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "덧붙임 이미 있음",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "덧붙임 이미 있음\n\n#할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "덧붙임 이미 있음",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "덧붙임 이미 있음",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "덧붙임 이미 있음",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "덧붙임 이미 있음\n\n#ETRI\n",
+   "status": "ok",
+   "note": "#ETRI 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "덧붙임 이미 있음",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "덧붙임 이미 있음",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "덧붙임 이미 있음",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "덧붙임 이미 있음",
+   "status": "same",
+   "note": "이미 들어 있어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "덧붙임 이미 있음",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "덧붙임 이미 있음",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "\n\n#프롬프트 #특허\n",
+   "status": "ok",
+   "note": "#프롬프트 #특허 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "\n\n#할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "\n\n#ETRI\n",
+   "status": "ok",
+   "note": "#ETRI 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "(#ETRI) **#공유** 끝",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "out": {
+   "body": "(#프롬프트 #특허) **** 끝\n",
+   "status": "ok",
+   "note": "#프롬프트 #특허 더함, #ETRI #공유 뺌"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "(#ETRI) **#공유** 끝",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "(#ETRI) **#공유** 끝\n\n#할일\n",
+   "status": "ok",
+   "note": "#할일 더함"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "(#ETRI) **#공유** 끝",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "out": {
+   "body": "() **#공유** 끝\n",
+   "status": "ok",
+   "note": "#ETRI 뺌"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "(#ETRI) **#공유** 끝",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "ETRI"
+   ],
+   "remove": []
+  },
+  "out": {
+   "body": "(#ETRI) **#공유** 끝",
+   "status": "same",
+   "note": "이미 그 태그예요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "(#ETRI) **#공유** 끝",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x\ny",
+   "with": "z"
+  },
+  "out": {
+   "body": "(#ETRI) **#공유** 끝",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "(#ETRI) **#공유** 끝",
+  "op": {
+   "do": "append",
+   "memo": "a",
+   "text": "덧붙임"
+  },
+  "out": {
+   "body": "(#ETRI) **#공유** 끝\n\n덧붙임\n",
+   "status": "ok",
+   "note": "끝에 덧붙임"
+  }
+ },
+ {
+  "kind": "edit",
+  "body": "(#ETRI) **#공유** 끝",
+  "op": {
+   "do": "replace",
+   "memo": "a",
+   "find": "x",
+   "with": "y"
+  },
+  "out": {
+   "body": "(#ETRI) **#공유** 끝",
+   "status": "fail",
+   "note": "바꿀 글을 찾지 못했어요"
+  }
+ },
+ {
+  "kind": "merge",
+  "into": "# A\n1",
+  "froms": [
+   "# B\n2",
+   "# A\n1",
+   "  "
+  ],
+  "out": {
+   "body": "# A\n1\n\n---\n\n# B\n2\n",
+   "added": 1
+  }
+ },
+ {
+  "kind": "merge",
+  "into": "",
+  "froms": [
+   "x"
+  ],
+  "out": {
+   "body": "\n\n---\n\nx\n",
+   "added": 1
+  }
+ },
+ {
+  "kind": "merge",
+  "into": "# A\r\n1\r\n",
+  "froms": [
+   "1"
+  ],
+  "out": {
+   "body": "# A\n1\n",
+   "added": 0
+  }
+ },
+ {
+  "kind": "line",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "status": "ok",
+  "title": "OA",
+  "note": "메모",
+  "line": "- ✅ 태그 · OA — 메모"
+ },
+ {
+  "kind": "line",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "status": "same",
+  "title": "",
+  "note": "메모",
+  "line": "- ➖ 태그 · a — 메모"
+ },
+ {
+  "kind": "line",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [
+    "프롬프트",
+    "특허",
+    "프롬프트"
+   ],
+   "remove": [
+    "ETRI",
+    "공유"
+   ]
+  },
+  "status": "fail",
+  "title": "",
+  "note": "",
+  "line": "- ⚠️ 태그 · a"
+ },
+ {
+  "kind": "line",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "status": "ok",
+  "title": "OA",
+  "note": "메모",
+  "line": "- ✅ 태그 · OA — 메모"
+ },
+ {
+  "kind": "line",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "status": "same",
+  "title": "",
+  "note": "메모",
+  "line": "- ➖ 태그 · b — 메모"
+ },
+ {
+  "kind": "line",
+  "op": {
+   "do": "tag",
+   "memo": "b",
+   "add": [
+    "할일"
+   ],
+   "remove": []
+  },
+  "status": "fail",
+  "title": "",
+  "note": "",
+  "line": "- ⚠️ 태그 · b"
+ },
+ {
+  "kind": "line",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "status": "ok",
+  "title": "OA",
+  "note": "메모",
+  "line": "- ✅ 태그 · OA — 메모"
+ },
+ {
+  "kind": "line",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "status": "same",
+  "title": "",
+  "note": "메모",
+  "line": "- ➖ 태그 · a — 메모"
+ },
+ {
+  "kind": "line",
+  "op": {
+   "do": "tag",
+   "memo": "a",
+   "add": [],
+   "remove": [
+    "ETRI"
+   ]
+  },
+  "status": "fail",
+  "title": "",
+  "note": "",
+  "line": "- ⚠️ 태그 · a"
+ },
+ {
+  "kind": "text",
+  "lines": [],
+  "stamp": "",
+  "text": "# 메모킹 AI 요청\n\nAI 비서(Gemini 등)는 메모를 직접 다시 쓰지 말고 이 파일만 고쳐 주세요. 아래 json 칸에 요청을 넣고 이 파일 전체를 다시 저장하면, 메모킹(PC · 휴대폰)이 메모를 고치고 이 파일에 결과를 적은 뒤 칸을 비워요.\n메모 주소(memo)는 메모의 id 또는 메모 폴더 기준 파일 경로(\"업무/회의.md\")예요. 자세한 방법은 _memoking/README.md 에 있어요.\n\n```json\n[]\n```\n"
+ },
+ {
+  "kind": "text",
+  "lines": [
+   "- ✅ a",
+   "- ⚠️ b"
+  ],
+  "stamp": "2026-11-23 17:04",
+  "text": "# 메모킹 AI 요청\n\nAI 비서(Gemini 등)는 메모를 직접 다시 쓰지 말고 이 파일만 고쳐 주세요. 아래 json 칸에 요청을 넣고 이 파일 전체를 다시 저장하면, 메모킹(PC · 휴대폰)이 메모를 고치고 이 파일에 결과를 적은 뒤 칸을 비워요.\n메모 주소(memo)는 메모의 id 또는 메모 폴더 기준 파일 경로(\"업무/회의.md\")예요. 자세한 방법은 _memoking/README.md 에 있어요.\n\n```json\n[]\n```\n\n## 지난 결과 (2026-11-23 17:04)\n\n- ✅ a\n- ⚠️ b\n"
+ }
+]
