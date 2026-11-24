@@ -60,8 +60,6 @@ class Bridge(private val activity: MainActivity) {
             .put("model", android.os.Build.MODEL ?: "") // 기기 상태 파일의 이름 (web/js/device.js)
             .put("vault", vaultInfo() ?: JSONObject.NULL)
             .put("exactAlarms", Alarms.exactAllowed(ctx))
-            // 녹음은 모든 버전, 받아쓰기는 휴대폰의 Google 음성 인식(안드로이드 13+)
-            .put("record", JSONObject().put("stt", Stt.systemAvailable(ctx)).put("system", Stt.systemAvailable(ctx)))
     }
 
     @JavascriptInterface
@@ -271,7 +269,6 @@ class Bridge(private val activity: MainActivity) {
 
     fun driveInfo(): JSONObject = JSONObject()
         .put("configured", GoogleAuth.configured(ctx))
-        .put("builtIn", GoogleAuth.builtIn())
         .put("nativeAvailable", NativeAuth.available(ctx))
         .put("browserConfigured", GoogleAuth.clientId(ctx).isNotBlank())
         .put("connected", GoogleAuth.connected(ctx))

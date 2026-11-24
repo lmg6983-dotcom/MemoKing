@@ -50,7 +50,6 @@ const sync = {
     sdk: 35,
     vault: vaultRoot ? { internal: false, drive: fakeDrive.active, label: fakeDrive.active ? `Google Drive › ${fakeDrive.folderName}` : vaultRoot, ok: true } : null,
     exactAlarms: true,
-    record: { system: true },
   }),
   sandbox: (on) => {
     if (sandboxRoot) fs.rmSync(sandboxRoot, { recursive: true, force: true });
@@ -261,7 +260,7 @@ const fakeDrive = {
   status: { state: 'off', lastSync: 0, error: '', changed: false, conflicts: [] },
   folders: { root: [{ id: 'f-memo', name: '메모킹 동기화' }, { id: 'f-work', name: '업무' }, { id: 'f-photo', name: '사진' }], 'f-work': [{ id: 'f-work-2026', name: '2026' }] },
 };
-const driveInfo = () => ({ ...fakeDrive, configured: true, builtIn: false, nativeAvailable: !process.env.NO_PLAY_SERVICES, browserConfigured: fakeDrive.configured, folders: undefined });
+const driveInfo = () => ({ ...fakeDrive, configured: true, nativeAvailable: !process.env.NO_PLAY_SERVICES, browserConfigured: fakeDrive.configured, folders: undefined });
 const fakeHistory = { enabled: false, granted: false, blocked: {}, entries: [] };
 let pendingIntent = null;
 const widgetMemos = new Set();
