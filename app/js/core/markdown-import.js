@@ -2,6 +2,7 @@
 //   - "## 제목", "- 항목", "1. 항목", "- [ ] 할 일", "> 인용", ``` 코드, | 표 |, **굵게**, [글](주소) 같은 표시가 보이면 마크다운
 //   - ChatGPT 등에서 온 수식 \( x \) · \[ x \] · $x$ 는 메모킹 수식 표기($$x$$)로
 // 마크다운이 아니면 줄마다 문단으로 (마크다운에서 줄 하나 바꿈은 같은 문단으로 붙어 버린다).
+import { parseMemoFile } from './memo-file.js';
 
 const STRONG = [
   /^#{1,6}\s+\S/m, // 제목
@@ -70,9 +71,5 @@ export function importText(text) {
 /** .md · .markdown · .txt 파일이면 글로 읽어 메모 본문으로 쓸 수 있다 */
 export const isTextDocument = (name = '', mime = '') => /\.(md|markdown|mdown|mkd|txt)$/i.test(name) || /^text\/(markdown|x-markdown|plain)$/i.test(mime);
 
-/** .md 파일 내용: 머리말(--- … ---)은 빼고 본문만 */
-export function stripFrontMatter(text) {
-  const t = tidy(text);
-  const m = /^---\n[\s\S]*?\n---\n?/.exec(t);
-  return m ? t.slice(m[0].length).trim() : t;
-}
+/** .md 파일 내용: 머리말(--- … ---)은 빼고 본문만 — 메모 파일과 같은 규칙 ("키: 값" 일 때만, 구분선 사이 글은 남긴다) */
+export const stripFrontMatter = (text) => parseMemoFile(tidy(text)).body.trim();

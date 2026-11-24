@@ -48,6 +48,10 @@ test('가져오기: 다른 곳의 수식 표기를 $$ 로', () => {
 
 test('.md 파일: 머리말 빼기', () => {
   assert.equal(stripFrontMatter('---\nid: 1\n---\n# 제목\n본문'), '# 제목\n본문');
+  // 구분선 사이 글 · 목록은 머리말이 아니다 (잃지 않게)
+  assert.equal(stripFrontMatter('---\n첫 문단\n---\n둘째'), '---\n첫 문단\n---\n둘째');
+  assert.equal(stripFrontMatter('---\n- a\n- b\n---\n끝'), '---\n- a\n- b\n---\n끝');
+  assert.equal(stripFrontMatter('본문만'), '본문만');
   assert.equal(isTextDocument('노트.md'), true);
   assert.equal(isTextDocument('a.bin', 'text/markdown'), true);
   assert.equal(isTextDocument('a.pdf', 'application/pdf'), false);
