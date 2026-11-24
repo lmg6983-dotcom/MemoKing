@@ -585,19 +585,46 @@ class Mover {
     // PC: 그림 · 파일 칩 · 소리 · 동영상을 잡고 메모 밖(탐색기 · 바탕화면 · 카카오톡)으로 끌면 그 파일이 복사돼 간다
     //   (메모 안에서 순서를 바꾸는 것은 꾹 눌러 들어 올리기 — block-move 가 따로 한다. 이 끌기는 창 밖 프로그램용)
     if (canDragOut()) {
-      this.onDragStart = (e) => {
-        if (this.busy() || e.defaultPrevented) return;
-        const host = e.target instanceof Element ? e.target.closest('img.mk-image, .mk-ink img, a[data-file], .mk-media-label') : null;
-        if (!host || !view.dom.contains(host)) return;
+      const startOut = (host) => {
         const block = blockFromTarget(view, host);
-        if (!block || !isContentBlock(block.node)) return;
+        if (!block || !isContentBlock(block.node)) return false;
         const dom = view.nodeDOM(block.pos);
-        e.preventDefault(); // 편집기 안에서 옮기는 기본 끌기 대신 (옮기기는 꾹 누르기)
-        e.stopPropagation();
         hideDeleteButton(true);
         dragOutBlock(view, block.pos, block.node, dom instanceof Element ? dom : host, dragOutInfo(dom, host)?.name ?? '').catch((err) => console.warn('끌어내기', err));
+        return true;
+      };
+      this.onDragStart = (e) => {
+        if (this.busy() || e.defaultPrevented) return;
+        const host = e.target instanceof Element ? e.target.closest(DRAG_OUT_HOST) : null;
+        if (!host || !view.dom.contains(host)) return;
+        e.preventDefault(); // 편집기 안에서 옮기는 기본 끌기 대신 (옮기기는 꾹 누르기)
+        e.stopPropagation();
+        startOut(host);
       };
       view.dom.addEventListener('dragstart', this.onDragStart, true);
+      // 파일 캡슐: 누를 때 커서가 캡슐 안에 들어가지 않게 mousedown 을 막아(file-chip-guard.js) 브라우저의 끌기가 시작되지 않는다
+      //   → 누른 채 조금 움직이면 직접 끌어내기를 시작한다 (끄는 아이콘 · 놓기는 셸이 맡는다 — memos.rs start_file_drag)
+      this.onChipDown = (e) => {
+        if (e.button !== 0 || this.busy() || !(e.target instanceof Element)) return;
+        const chip = e.target.closest('a[data-file]');
+        if (!chip || !view.dom.contains(chip)) return;
+        const [x, y] = [e.clientX, e.clientY];
+        const move = (m) => {
+          if (!(m.buttons & 1)) return stop();
+          if (Math.hypot(m.clientX - x, m.clientY - y) < 6) return;
+          stop();
+          this.cancelPress(); // 꾹 누르기(들어 올리기) 판정은 접는다
+          this.lifted = true; // 끌기를 마친 뒤 오는 click 이 캡슐을 열지 않게 (onLongClick)
+          startOut(chip);
+        };
+        const stop = () => {
+          window.removeEventListener('mousemove', move, true);
+          window.removeEventListener('mouseup', stop, true);
+        };
+        window.addEventListener('mousemove', move, true);
+        window.addEventListener('mouseup', stop, true);
+      };
+      view.dom.addEventListener('mousedown', this.onChipDown, true);
     }
   }
 
@@ -1264,6 +1291,7 @@ class Mover {
     if (this.onHoverHint) this.view.dom.removeEventListener('mouseover', this.onHoverHint);
     if (this.onContextMenu) this.view.dom.removeEventListener('contextmenu', this.onContextMenu, true);
     if (this.onDragStart) this.view.dom.removeEventListener('dragstart', this.onDragStart, true);
+    if (this.onChipDown) this.view.dom.removeEventListener('mousedown', this.onChipDown, true);
     this.cancelPress();
     if (this.drag) this.finish(false);
     clearTimeout(this.flashTimer);

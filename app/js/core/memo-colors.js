@@ -1,7 +1,7 @@
 // 다른 캘린더(구글 · 네이버 · 휴대폰)의 색 → 가장 가까운 메모 색 — 달력 · 일정 목록이 메모 색 한 벌로 보이게
 //   색상(hue) 위주로 견준다 (OKLab 의 a · b). 거의 무채색이면 회색
 /** 메모 색 고르기의 점 색 (base.css --ok-paper-*-chip, 밝은 화면) — 다른 캘린더 색 고르기도 이 색들 */
-export const MEMO_DOT = { yellow: '#ccb034', green: '#68ca80', pink: '#f589b6', purple: '#bf9bfc', blue: '#61b9ff', gray: '#b8b0a3' };
+export const MEMO_DOT = { yellow: '#ffd43b', green: '#68ca80', pink: '#f589b6', purple: '#bf9bfc', blue: '#61b9ff', gray: '#c9ccd3', charcoal: '#0e0e0e' };
 
 function oklab(hex) {
   const n = parseInt(String(hex).replace('#', ''), 16);
@@ -20,12 +20,12 @@ function oklab(hex) {
 export function nearestMemoColor(hex) {
   if (!/^#?[0-9a-f]{6}$/i.test(String(hex ?? ''))) return 'blue';
   const [, a, b] = oklab(hex);
-  if (Math.hypot(a, b) < 0.04) return 'gray';
+  if (Math.hypot(a, b) < 0.04) return oklab(hex)[0] < 0.45 ? 'charcoal' : 'gray'; // 무채색: 어두우면 검정
   const hue = Math.atan2(b, a);
   let best = 'blue';
   let bestD = Infinity;
   for (const [name, dot] of Object.entries(MEMO_DOT)) {
-    if (name === 'gray') continue;
+    if (name === 'gray' || name === 'charcoal') continue;
     const [, da, db] = oklab(dot);
     const d = Math.abs(Math.atan2(Math.sin(hue - Math.atan2(db, da)), Math.cos(hue - Math.atan2(db, da))));
     if (d < bestD) [best, bestD] = [name, d];
@@ -34,8 +34,8 @@ export function nearestMemoColor(hex) {
 }
 
 // 다른 캘린더 색 — 사람이 고르지 않았으면 캘린더 이름으로 정한다: 같은 이름은 PC · 휴대폰 어디서나 같은 색,
-//   이 기기의 캘린더끼리는 겹치지 않게 (6개가 넘으면 다시 돈다). 이름 차례 · 해시만 쓰므로 캘린더가 같으면 기기가 달라도 같은 답
-const AUTO = ['blue', 'green', 'purple', 'pink', 'yellow', 'gray'];
+//   이 기기의 캘린더끼리는 겹치지 않게 (7개가 넘으면 다시 돈다). 이름 차례 · 해시만 쓰므로 캘린더가 같으면 기기가 달라도 같은 답
+const AUTO = ['blue', 'green', 'purple', 'pink', 'yellow', 'gray', 'charcoal']; // 메모 색 7가지
 const hash = (s) => {
   let h = 2166136261;
   for (const ch of s) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0;

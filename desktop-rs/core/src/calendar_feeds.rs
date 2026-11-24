@@ -9,7 +9,7 @@ pub const FEED_FRESH_MS: i64 = 15 * 60 * 1000; // 받은 지 이보다 오래되
 pub const TOO_BIG: &str = "캘린더가 너무 커요 (5MB 넘음)";
 const MAX_FEEDS: usize = 10;
 // 구독 캘린더 색 (메모 색과 겹치지 않는 진한 색 — 달력에서 "다른 캘린더" 로 보이게)
-const FEED_COLORS: [&str; 6] = ["#61b9ff", "#68ca80", "#bf9bfc", "#f589b6", "#ccb034", "#b8b0a3"]; // 메모 색 점 — calendar-feed-list.js 와 같음
+const FEED_COLORS: [&str; 6] = ["#61b9ff", "#68ca80", "#bf9bfc", "#f589b6", "#ffd43b", "#c9ccd3"]; // 메모 색 점 — calendar-feed-list.js 와 같음
 
 /// 붙여 넣은 캘린더 주소 → 받을 수 있는 주소 (webcal:// 은 https:// 로). 아니면 None
 fn normalize_feed_url(raw: &Value) -> Option<String> {
