@@ -101,7 +101,6 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
     };
     Some(match channel {
         "secret:state" => Ok(snapshot(app)),
-        // 비밀번호에 맞는 비밀 폴더를 모두 연다 (폴더마다 비밀번호가 따로) — 열쇠 만들기(느림)는 메모 폴더를 붙잡지 않고
         // 잠긴 비밀 폴더 하나를 비밀번호로 연다 — 열쇠 만들기(느림)는 메모 폴더를 붙잡지 않고
         "secret:unlock" => {
             let (fid, password) = (arg_str(args, 0), arg_str(args, 1));

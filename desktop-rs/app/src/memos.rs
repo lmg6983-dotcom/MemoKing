@@ -868,7 +868,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             let (layer, stack) = (crate::windows::layer_state(app, &arg_str(args, 0)), crate::windows::stack_state(app, &arg_str(args, 0)));
             with_vault(app, |v| {
                 let Some(mut m) = v.get(&arg_str(args, 0)) else { return Ok(Value::Null) };
-                                let o = m.as_object_mut().unwrap();
+                let o = m.as_object_mut().unwrap();
                 let insert = st.inserts.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
                 o.insert("insert".into(), insert);
                 let command = st.commands.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
