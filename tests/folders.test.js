@@ -14,6 +14,8 @@ test('폴더 이름: 못 쓰는 글자 · 메모킹이 쓰는 폴더 · 장치 �
   assert.equal(cleanFolderName('  업무  일  '), '업무 일');
   assert.equal(cleanFolderName('a/b:c'), 'a b c');
   assert.equal(cleanFolderName('끝에 점...'), '끝에 점');
+  assert.equal(cleanFolderName(`${'가'.repeat(39)}😀`), '가'.repeat(39)); // 40자에서 그림 글자를 반만 남기지 않는다
+  assert.equal(cleanFolderName(`${'가'.repeat(38)} 😀`), '가'.repeat(38));
   for (const bad of ['', '   ', '.숨김', '_memoking', 'Attachments', 'CON', 'nul', '~$임시']) assert.equal(cleanFolderName(bad), '', bad);
   assert.equal(cleanFolderName('가'.repeat(60)).length, 40);
   // 목록에 둘 폴더: 이름 그대로 쓸 수 있는 것만 ("" 은 폴더 없음, Drive 웹에서 만든 "회의:2026" 은 아님)

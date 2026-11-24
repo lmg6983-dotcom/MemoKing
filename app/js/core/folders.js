@@ -20,7 +20,9 @@ export const folderOf = (file) => {
 
 /** 쓴 폴더 이름 → 파일 이름으로 쓸 수 있는 이름, 못 쓰면 "" */
 export function cleanFolderName(raw) {
-  const name = String(raw ?? '').replace(BAD_CHARS, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_FOLDER_NAME).replace(/[.\s]+$/, '');
+  const name = String(raw ?? '').replace(BAD_CHARS, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_FOLDER_NAME)
+    .replace(/[\uD800-\uDBFF]$/, '') // 그림 글자(😀)를 반만 자르지 않게 — Rust slice16 과 같게
+    .replace(/[.\s]+$/, '');
   if (!name || name.startsWith('.') || name.startsWith('~$') || RESERVED.has(name.toLowerCase())) return '';
   // Windows 가 장치 이름으로 쓰는 이름 (CON, NUL, COM1 …)
   if (/^(con|prn|aux|nul|com\d|lpt\d)$/i.test(name)) return '';
