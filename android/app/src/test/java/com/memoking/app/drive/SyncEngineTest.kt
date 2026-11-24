@@ -16,6 +16,7 @@ import java.security.MessageDigest
 
 /** 동기화 엔진: 가짜 Google Drive + 실제 파일 폴더로 PC·휴대폰 사이 상황을 차례로 확인한다 */
 class SyncEngineTest {
+    // 엔진이 여러 줄에서 한꺼번에 부르니 가짜도 한 번에 하나씩 (@Synchronized)
     class FakeDrive : Remote {
         data class F(val id: String, var name: String, var parent: String, val folder: Boolean, var data: ByteArray = ByteArray(0), var modified: Long = 0, var trashed: Boolean = false)
         val files = LinkedHashMap<String, F>()
@@ -39,20 +40,20 @@ class SyncEngineTest {
             note(f.id)
         }
         fun text(rel: String) = path(rel)?.data?.toString(Charsets.UTF_8)
-        override fun listChildren(folderId: String) = files.values.filter { it.parent == folderId && !it.trashed }.map(::item).also { calls++ }
-        override fun download(id: String, out: OutputStream) { out.write(files[id]!!.data) }
-        override fun upload(parentId: String, name: String, existingId: String?, size: Long, open: () -> InputStream): Remote.Item {
+        @Synchronized override fun listChildren(folderId: String) = files.values.filter { it.parent == folderId && !it.trashed }.map(::item).also { calls++ }
+        @Synchronized override fun download(id: String, out: OutputStream) { out.write(files[id]!!.data) }
+        @Synchronized override fun upload(parentId: String, name: String, existingId: String?, size: Long, open: () -> InputStream): Remote.Item {
             val f = existingId?.let { files[it] } ?: F("f${++seq}", name, parentId, false).also { files[it.id] = it }
             f.data = open().use { it.readBytes() }; f.modified = System.currentTimeMillis()
             note(f.id)
             return item(f)
         }
-        override fun createFolder(parentId: String, name: String): Remote.Item { val f = F("d${++seq}", name, parentId, true); files[f.id] = f; note(f.id); return item(f) }
-        override fun trash(id: String) { files[id]!!.trashed = true; note(id) }
+        @Synchronized override fun createFolder(parentId: String, name: String): Remote.Item { val f = F("d${++seq}", name, parentId, true); files[f.id] = f; note(f.id); return item(f) }
+        @Synchronized override fun trash(id: String) { files[id]!!.trashed = true; note(id) }
         // log 를 켜면 실제 Drive 처럼 바뀐 것 목록(items)을 준다
         var log: MutableList<String>? = null
-        fun note(id: String) { log?.add(id) }
-        override fun changesSince(token: String?, knownIds: Set<String>): Remote.Changes {
+        @Synchronized fun note(id: String) { log?.add(id) }
+        @Synchronized override fun changesSince(token: String?, knownIds: Set<String>): Remote.Changes {
             val l = log
             if (l == null || token == null) { val c = changed || token == null; changed = false; return Remote.Changes(c, "t") }
             val items = l.distinct().map { id -> files[id]!!.let { Remote.Change(id, it.trashed, listOf(it.parent), item(it)) } }
@@ -86,6 +87,25 @@ class SyncEngineTest {
         drive.put("_memoking/README.md", "guide")
         val r = sync()
         assertEquals(3, r.downloaded)
+    }
+
+    @Test
+    fun manyFilesGoBothWaysInLanesWithProgress() {
+        // 여러 줄로 한꺼번에 주고받아도 하나도 빠지지 않고, 진행은 끝에 "다 했음" 까지 온다
+        for (i in 1..30) lw("폰 $i.md", "# 폰 $i")
+        for (i in 1..30) drive.put("PC 폴더 ${i % 3}/PC $i.md", "# PC $i")
+        val seen = java.util.Collections.synchronizedList(ArrayList<Triple<String, Int, Int>>())
+        val r = SyncEngine(local, drive, "ROOT", state, { phase, done, total -> seen += Triple(phase, done, total) }).run()
+        assertEquals(30, r.uploaded)
+        assertEquals(30, r.downloaded)
+        for (i in 1..30) {
+            assertEquals("# 폰 $i", drive.text("폰 $i.md"))
+            assertEquals("# PC $i", lt("PC 폴더 ${i % 3}/PC $i.md"))
+        }
+        assertEquals(Triple("transfer", 60, 60), seen.last())
+        assertTrue("폴더를 살펴본 만큼", seen.any { it.first == "scan" && it.second == 4 && it.third == 4 })
+        assertNull("받다 남은 임시 파일 없음", File(dir, "_memoking").listFiles()?.firstOrNull { it.name.endsWith(".tmp") })
+        assertTrue("다시 돌리면 할 일 없음", sync().let { it.uploaded + it.downloaded == 0 })
     }
 
     @Test

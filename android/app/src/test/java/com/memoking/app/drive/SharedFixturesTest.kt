@@ -47,9 +47,9 @@ class SharedFixturesTest {
         private fun md5(b: ByteArray) = MessageDigest.getInstance("MD5").digest(b).joinToString("") { "%02x".format(it) }
         private fun out(it: It) = Remote.Item(it.id, it.name, it.folder, if (it.folder || it.gdoc) null else md5(it.data), it.modified, it.data.size.toLong())
 
-        override fun listChildren(folderId: String) = items.filter { it.parent == folderId && !it.trashed }.map(::out)
-        override fun download(id: String, out: OutputStream) = out.write(items.first { it.id == id }.data)
-        override fun upload(parentId: String, name: String, existingId: String?, size: Long, open: () -> InputStream): Remote.Item {
+        @Synchronized override fun listChildren(folderId: String) = items.filter { it.parent == folderId && !it.trashed }.map(::out)
+        @Synchronized override fun download(id: String, out: OutputStream) = out.write(items.first { it.id == id }.data)
+        @Synchronized override fun upload(parentId: String, name: String, existingId: String?, size: Long, open: () -> InputStream): Remote.Item {
             val data = open().use { it.readBytes() }
             val it = existingId?.let { id -> items.first { it.id == id } }?.also { it.data = data; it.modified = now }
                 ?: run {
@@ -59,14 +59,14 @@ class SharedFixturesTest {
                 }
             return out(it)
         }
-        override fun createFolder(parentId: String, name: String): Remote.Item {
+        @Synchronized override fun createFolder(parentId: String, name: String): Remote.Item {
             val id = folder(parentId, pathOf(parentId).let { if (it.isEmpty()) name else "$it/$name" }, name)
             return out(items.first { it.id == id })
         }
-        override fun trash(id: String) { items.first { it.id == id }.trashed = true }
+        @Synchronized override fun trash(id: String) { items.first { it.id == id }.trashed = true }
 
         // Rust drive_sync::pick_changes 와 같게: 아는 폴더 안의 것만 (새 폴더 안의 것도)
-        override fun changesSince(token: String?, knownIds: Set<String>): Remote.Changes {
+        @Synchronized override fun changesSince(token: String?, knownIds: Set<String>): Remote.Changes {
             if (token == null || raw == null) return Remote.Changes(true, "t1")
             val all = (0 until raw.length()).map { raw.getJSONObject(it) }
             fun parents(c: JSONObject) = c.optJSONObject("file")?.optJSONArray("parents")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList()

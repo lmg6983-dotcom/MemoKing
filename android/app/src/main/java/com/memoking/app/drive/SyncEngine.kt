@@ -8,6 +8,9 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /** Google Drive 쪽 (테스트에서는 가짜로 바꿔 끼운다) */
 interface Remote {
@@ -45,6 +48,8 @@ class SyncEngine(
     private val remote: Remote,
     private val rootId: String,
     private val state: JSONObject, // { pageToken, files: { 경로: { id, md5, lmtime, lsize } } }
+    /** 어디까지 했는지 (scan: Drive 폴더 total 개 중 done 개, compare: 양쪽에 다 있는 파일 비교, transfer: 맞출 파일 total 개 중 done 개) — 여러 줄에서 부른다 */
+    private val onProgress: (phase: String, done: Int, total: Int) -> Unit = { _, _, _ -> },
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     data class Result(
@@ -74,6 +79,8 @@ class SyncEngine(
         private const val MERGE_JSON = "_memoking/link-previews.json"
         private const val MASS_DELETE_MIN = 20
         private const val MASS_CONFLICT_MAX = 20 // 양쪽에서 엇갈린 파일이 이보다 많으면 사본을 만들기 전에 멈춘다 (PC sync-engine.js 와 같음)
+        // 한꺼번에 주고받는 파일 수 — 하나씩이면 메모가 많을 때 너무 느리다 (PC drive_sync.rs CONCURRENCY 와 같음)
+        private const val CONCURRENCY = 4
 
         fun skipName(name: String) = name.startsWith(".") || name.startsWith("~$") || name.endsWith(".tmp") || name == "desktop.ini" || name == "Thumbs.db"
         fun skipPath(rel: String) = rel in LOCAL_ONLY || rel.split('/').any(::skipName)
@@ -97,16 +104,43 @@ class SyncEngine(
 
     private val files: JSONObject = state.optJSONObject("files") ?: JSONObject().also { state.put("files", it) }
     private val folderIds = HashMap<String, String>() // 상대 경로 → Drive 폴더 id ("" = 메모 폴더)
+    private val renaming = Any() // 휴지통 · 충돌 사본 이름 고르기와 옮기기를 한 줄씩 (두 줄이 같은 이름을 고르지 않게)
+
+    /** CONCURRENCY 개의 줄이 0 until count 를 나눠 한다. 한 줄이 실패하면 다른 줄은 지금 하는 것만 끝내고 멈춘다 (끝낸 파일의 기준은 남게, PC lanes 와 같음) */
+    private fun lanes(count: Int, f: (Int) -> Unit) {
+        val next = AtomicInteger(0)
+        val failed = AtomicReference<Throwable?>(null)
+        val threads = (0 until minOf(CONCURRENCY, count)).map {
+            Thread {
+                while (failed.get() == null) {
+                    val i = next.getAndIncrement()
+                    if (i >= count) break
+                    try {
+                        f(i)
+                    } catch (e: Throwable) {
+                        failed.compareAndSet(null, e)
+                    }
+                }
+            }.apply { start() }
+        }
+        threads.forEach { it.join() }
+        failed.get()?.let { throw it }
+    }
 
     private data class Local(val mtime: Long, val size: Long)
     private data class Base(val id: String, val md5: String, val lmtime: Long, val lsize: Long)
 
-    private fun base(rel: String): Base? = files.optJSONObject(rel)?.let {
+    // 기준 기록은 여러 줄이 함께 읽고 쓴다
+    private fun base(rel: String): Base? = synchronized(files) { files.optJSONObject(rel) }?.let {
         Base(it.optString("id"), it.optString("md5"), it.optLong("lmtime"), it.optLong("lsize"))
     }
 
     private fun record(rel: String, id: String, md5: String, l: Storage.Entry) {
-        files.put(rel, JSONObject().put("id", id).put("md5", md5).put("lmtime", l.mtime).put("lsize", l.size))
+        synchronized(files) { files.put(rel, JSONObject().put("id", id).put("md5", md5).put("lmtime", l.mtime).put("lsize", l.size)) }
+    }
+
+    private fun forget(rel: String) {
+        synchronized(files) { files.remove(rel) }
     }
 
     // ---------- 양쪽 둘러보기 ----------
@@ -128,16 +162,16 @@ class SyncEngine(
      * 다른 기기에서 지운 파일을 휴대폰에서도 — 메모(.md)는 바로 지우지 않고 메모킹 휴지통으로 (_memoking/trash/제목 (지운 시각).md, vault.js trashPath 와 같은 이름).
      * 다른 앱(Google Drive 데스크탑 앱 등)이 파일을 새로 만들어 바꿔 Drive 에서 "지운 것" 으로 보였을 때도 되살리게 (PC drive_sync.rs remove_local 과 같음)
      */
-    private fun removeLocal(rel: String, moved: Boolean): Boolean {
+    private fun removeLocal(rel: String, moved: Boolean): Boolean = synchronized(renaming) {
         val name = rel.substringAfterLast('/')
-        if (moved || !name.endsWith(".md") || rel.startsWith("_memoking/")) return local.delete(rel)
+        if (moved || !name.endsWith(".md") || rel.startsWith("_memoking/")) return@synchronized local.delete(rel)
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date(now()))
         val base = name.removeSuffix(".md")
         local.mkdirs("_memoking/trash")
         val to = generateSequence(1) { it + 1 }
             .map { n -> "_memoking/trash/$base${if (n > 1) " ($n)" else ""} ($stamp).md" }
             .first { local.stat(it) == null }
-        return local.move(rel, to)
+        local.move(rel, to)
     }
 
     /** 메모 폴더 맨 위의 사용자 폴더 이름들 (휴대폰) */
@@ -192,21 +226,36 @@ class SyncEngine(
     private fun walkRemote(): Map<String, Remote.Item> {
         val out = HashMap<String, Remote.Item>()
         folderIds[""] = rootId
-        fun walk(folderId: String, dir: String) {
-            // Drive 는 한 폴더에 같은 이름을 여러 개 둘 수 있다 — 가장 최근 것만 쓴다
-            val byName = remote.listChildren(folderId).groupBy { it.name }.mapValues { (_, v) -> v.maxBy { it.modified } }
-            for (item in byName.values) {
-                if (skipName(item.name)) continue
-                val rel = if (dir.isEmpty()) item.name else "$dir/${item.name}"
-                if (item.folder) {
-                    folderIds[rel] = item.id
-                    walk(item.id, rel)
-                } else if (item.md5 != null && !skipPath(rel)) {
-                    out[rel] = item // md5 가 없는 것은 구글 문서 같은 Drive 전용 파일
+        // 한 층씩, 그 층의 폴더들은 한꺼번에 훑는다 (PC drive_sync.rs walk_remote 와 같음)
+        var level = listOf(rootId to "")
+        val read = AtomicInteger(0)
+        var found = 1
+        while (level.isNotEmpty()) {
+            val lists = arrayOfNulls<List<Remote.Item>>(level.size)
+            val known = found
+            lanes(level.size) { i ->
+                lists[i] = remote.listChildren(level[i].first)
+                onProgress("scan", read.incrementAndGet(), known)
+            }
+            val next = ArrayList<Pair<String, String>>()
+            for ((i, at) in level.withIndex()) {
+                val dir = at.second
+                // Drive 는 한 폴더에 같은 이름을 여러 개 둘 수 있다 — 가장 최근 것만 쓴다
+                val byName = lists[i]!!.groupBy { it.name }.mapValues { (_, v) -> v.maxBy { it.modified } }
+                for (item in byName.values) {
+                    if (skipName(item.name)) continue
+                    val rel = if (dir.isEmpty()) item.name else "$dir/${item.name}"
+                    if (item.folder) {
+                        folderIds[rel] = item.id
+                        next += item.id to rel
+                    } else if (item.md5 != null && !skipPath(rel)) {
+                        out[rel] = item // md5 가 없는 것은 구글 문서 같은 Drive 전용 파일
+                    }
                 }
             }
+            found += next.size
+            level = next
         }
-        walk(rootId, "")
         return out
     }
 
@@ -269,12 +318,13 @@ class SyncEngine(
         return out
     }
 
-    private fun ensureRemoteFolder(dir: String): String {
-        folderIds[dir]?.let { return it }
+    // 한 번에 하나만 만든다 (여러 줄이 같은 이름 폴더를 둘 만들지 않게)
+    private fun ensureRemoteFolder(dir: String): String = synchronized(folderIds) {
+        folderIds[dir]?.let { return@synchronized it }
         val parent = ensureRemoteFolder(dir.substringBeforeLast('/', ""))
         val created = remote.createFolder(parent, dir.substringAfterLast('/'))
         folderIds[dir] = created.id
-        return created.id
+        created.id
     }
 
     // ---------- 동기화 ----------
@@ -330,22 +380,24 @@ class SyncEngine(
                 (b == null || b.lmtime != l.mtime || b.lsize != l.size) && (b == null || b.md5 != r.md5)
         }
         val differ = ArrayList<String>()
-        for (p in clashes) {
+        for ((i, p) in clashes.withIndex()) {
             val r = remoteFiles.getValue(p)
             val m = try { local.openRead(p).use(::md5) } catch (e: Exception) { null } // 둘러보는 사이 없어진 파일
             val now = local.stat(p)
             if (m != null && m == r.md5 && now != null) record(p, r.id, m, now) else differ += p.substringAfterLast('/')
+            onProgress("compare", i + 1, clashes.size)
         }
         // 다르게 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
         if (differ.size > MASS_CONFLICT_MAX) {
             throw SafetyStop("양쪽에서 엇갈린 메모가 ${differ.size}개라 동기화를 멈췄어요 (${differ.take(3).joinToString(", ")} 등). 사본이 계속 늘어나지 않게 ${MASS_CONFLICT_MAX}개가 넘으면 맞추지 않아요. 메모 폴더를 다른 동기화 앱도 맞추고 있는지 확인해 주세요.")
         }
 
-        var uploaded = 0
-        var downloaded = 0
-        var deletedLocal = 0
-        var deletedRemote = 0
-        val conflicts = ArrayList<String>()
+        // 여러 줄이 함께 센다
+        val uploaded = AtomicInteger()
+        val downloaded = AtomicInteger()
+        val deletedLocal = AtomicInteger()
+        val deletedRemote = AtomicInteger()
+        val conflicts = java.util.Collections.synchronizedList(ArrayList<String>())
 
         fun localMd5(rel: String) = local.openRead(rel).use(::md5)
 
@@ -354,7 +406,7 @@ class SyncEngine(
             val parent = ensureRemoteFolder(rel.substringBeforeLast('/', ""))
             val item = remote.upload(parent, rel.substringAfterLast('/'), existingId, before.size) { local.openRead(rel) }
             record(rel, item.id, item.md5 ?: "", before)
-            uploaded++
+            uploaded.incrementAndGet()
         }
 
         fun download(rel: String, item: Remote.Item, expect: Local?) {
@@ -366,13 +418,13 @@ class SyncEngine(
             if (!untouched()) return
             // 먼저 임시 파일에 다 받고 나서 옮겨 쓴다 — 고른 폴더(SAF)는 바꿔치기 쓰기가 안 돼, 받다 끊기면 반쪽 파일이 남아
             // 다음 동기화 때 "휴대폰에서 고친 것" 으로 Drive 의 온전한 파일을 덮어쓰므로 (임시 파일은 "." 으로 시작해 동기화하지 않음)
-            val tmp = "_memoking/.download-${System.nanoTime()}.tmp"
+            val tmp = "_memoking/.download-${UUID.randomUUID()}.tmp" // 여러 줄이 함께 받아도 겹치지 않게
             try {
                 local.write(tmp) { remote.download(item.id, it) }
                 if (!untouched()) return // 받는 사이 휴대폰에서 고쳤다 — 덮어쓰지 않고 다음 차례에
                 val entry = local.openRead(tmp).use { input -> local.write(rel) { input.copyTo(it) } }
                 record(rel, item.id, item.md5 ?: "", entry)
-                downloaded++
+                downloaded.incrementAndGet()
             } finally {
                 local.delete(tmp)
             }
@@ -413,15 +465,14 @@ class SyncEngine(
                 upload(rel, item.id)
                 return
             }
-            val copy = conflictName(rel)
-            if (!local.move(rel, copy)) return
+            val copy = synchronized(renaming) { conflictName(rel).takeIf { local.move(rel, it) } } ?: return
             conflicts += copy
             download(rel, item, null)
             upload(copy, null)
         }
 
         val remoteIds = remoteFiles.values.map { it.id }.toHashSet()
-        for (rel in paths) {
+        fun one(rel: String) {
             val l = localFiles[rel]
             val r = remoteFiles[rel]
             val b = base(rel)
@@ -443,25 +494,36 @@ class SyncEngine(
                         b == null || localChanged || keepMissing -> upload(rel, null) // 새 파일, 또는 Drive 에서 지웠지만 휴대폰에서 고침 → 되살림
                         else -> {
                             // Drive(PC)에서 지움 → 휴대폰에서도. 메모는 휴지통으로 (이름만 바꾼 · 옮긴 것은 그냥 지운다)
-                            if (removeLocal(rel, moved = b != null && remoteIds.contains(b.id))) deletedLocal++
-                            files.remove(rel)
+                            if (removeLocal(rel, moved = remoteIds.contains(b.id))) deletedLocal.incrementAndGet()
+                            forget(rel)
                         }
                     }
                     l == null && r != null -> when {
                         b == null || remoteChanged -> download(rel, r, null) // 새 파일, 또는 휴대폰에서 지웠지만 PC 에서 고침 → 되살림
                         else -> {
                             remote.trash(r.id)
-                            deletedRemote++
-                            files.remove(rel)
+                            deletedRemote.incrementAndGet()
+                            forget(rel)
                         }
                     }
-                    else -> files.remove(rel) // 양쪽 다 지움
+                    else -> forget(rel) // 양쪽 다 지움
                 }
-            } catch (e: SafetyStop) {
-                throw e
             } catch (e: java.io.FileNotFoundException) {
                 // 둘러보는 사이 없어진 파일 — 다음 차례에
             }
+        }
+        // 할 일이 있는 파일만 골라 (그대로인 것은 바로) 몇 개씩 한꺼번에 (PC drive_sync.rs 와 같음)
+        val work = paths.filter { rel ->
+            val l = localFiles[rel]
+            val r = remoteFiles[rel]
+            val b = base(rel)
+            !(l != null && r != null && b != null && b.lmtime == l.mtime && b.lsize == l.size && b.md5 == r.md5)
+        }
+        val done = AtomicInteger()
+        onProgress("transfer", 0, work.size)
+        lanes(work.size) { i ->
+            one(work[i])
+            onProgress("transfer", done.incrementAndGet(), work.size)
         }
 
         val dirsChanged = syncDirs()
@@ -470,6 +532,6 @@ class SyncEngine(
         state.remove("keepMissing") // 다 올렸으면 다음부터는 보통대로
         if (quick == null) state.put("lastFullScan", now())
         state.put("folders", JSONObject(folderIds.toMap()))
-        return Result(uploaded, downloaded, deletedLocal, deletedRemote, conflicts, dirsChanged = dirsChanged)
+        return Result(uploaded.get(), downloaded.get(), deletedLocal.get(), deletedRemote.get(), conflicts.toList(), dirsChanged = dirsChanged)
     }
 }
