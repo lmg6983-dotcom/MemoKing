@@ -7,7 +7,7 @@ const EVENTS = [
   'memos:changed', 'shortcuts:changed', 'memo:external', 'memo:removed', 'memo:trashed', 'memo:meta', 'memo:links-changed', 'vault:opened',
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
-  'stack:state', 'stack:hover', 'memo:handoff', 'ai:requests', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:hover', 'list:on-top', 'list:crown-docked',
+  'stack:state', 'stack:hover', 'memo:handoff', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:hover', 'list:on-top', 'list:crown-docked',
   'stt:status', 'ai:status', 'ai:notice', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'edit:paste-plain', 'edit:clear-format',
   'media:converting', 'media:ready',

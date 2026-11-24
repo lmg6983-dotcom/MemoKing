@@ -29,7 +29,6 @@ import { noThink, sseText, engineError, chatBody } from '../../app/js/core/llama
 import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibleFix } from '../../app/js/core/ai-write.js';
 import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
 import { chunkMemo, askedPeriod, buildIndex as ragBuildIndex, retrieve as ragRetrieve, expandMessages, expandResult, ragMessages, finishAnswer } from '../../app/js/core/rag.js';
-import * as ar from '../../app/js/core/ai-requests.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -620,24 +619,3 @@ write('ai_events', aeBodies.flatMap((body) => aeNows.map((iso) => {
     results, existing: ae.aiEventResult(aeAnswers[0], c, first.slice(0, 1), now).map(noId), later: ae.aiEventResult(aeAnswers[0], c, [], new Date(now.getTime() + 2 * 86_400_000)).map(noId), seen,
   };
 })));
-
-// AI 요청 메모 — 요청 정리 · 본문 고치기 · 합치기 · 결과 글
-const arReq = [
-  { do: 'tag', memo: 'a', add: ['프롬프트', '#특허', '프롬프트'], remove: ['ETRI', '공유'] }, { op: 'TAG', id: 'b', add: '할일' }, { do: 'tag', memo: 'c', add: ['1'] }, { do: 'tag' },
-  { do: 'color', memo: 'x', color: 'Blue' }, { do: 'color', memo: 'x', color: 'red' }, { do: 'move', memo: '업무/회의.md', folder: '/서류함/' }, { do: 'move', file: 'a.md', to: '' },
-  { do: 'replace', memo: 'a', find: 'x\r\ny', with: 'z' }, { do: 'replace', memo: 'a' }, { do: 'append', memo: 'a', text: '  덧붙임 \n' }, { do: 'append', memo: 'a' },
-  { do: 'merge', into: 'a', from: ['b', 'a', ' c '] }, { do: 'merge', into: 'a' }, { do: 'trash', memo: 'a' }, { do: 'create', text: '# 새 메모\n본문', folder: '할일/', color: 'PINK' },
-  { do: 'create', body: '' }, { do: 'nope', memo: 1 }, 'text', null, [1], { do: 7 },
-];
-const arBodies = ['# OA 프롬프트\n\n내용 #ETRI 본문\n\n#ETRI #공유\n', '# 제목\n본문', '# 제목\n본문 #프롬프트 #특허', '# 코드\n```\n#ETRI\n```\n    #공유\n', '# a\r\n\r\n#etri, #공유하기 #공유\n#프롬프트',
-  'x\ny 한 번', 'a x b x', 'z 이미', '덧붙임 이미 있음', '', '(#ETRI) **#공유** 끝'];
-const arOps = [arReq[0], arReq[1], { do: 'tag', memo: 'a', add: [], remove: ['ETRI'] }, { do: 'tag', memo: 'a', add: ['ETRI'], remove: [] }, arReq[8], arReq[10], { do: 'replace', memo: 'a', find: 'x', with: 'y' }].map(ar.normalizeOp);
-write('ai_requests', [
-  ...arReq.map((raw) => ({ kind: 'op', raw, op: ar.normalizeOp(raw) })),
-  ...['', 'no fence', '```json\n\n```', '```json\n[{"do":"trash","memo":"a"}]\n```', '```\n{"ops":[{"do":"color","memo":"a","color":"gray"}]}\n```', '```json\n{"x":1}\n```', '```json\n[1,\n```', ar.requestsText(), `\`\`\`json\n${JSON.stringify(Array.from({ length: 52 }, () => ({ do: 'trash', memo: 'a' })))}\n\`\`\``]
-    .map((text) => { const r = ar.parseRequests(text); return { kind: 'parse', text, ops: r.ops, error: Boolean(r.error) }; }),
-  ...arBodies.flatMap((body) => arOps.map((op) => ({ kind: 'edit', body, op, out: ar.editBody(body, op) }))),
-  ...[['# A\n1', ['# B\n2', '# A\n1', '  ']], ['', ['x']], ['# A\r\n1\r\n', ['1']]].map(([into, froms]) => ({ kind: 'merge', into, froms, out: ar.mergeBodies(into, froms) })),
-  ...arOps.slice(0, 3).flatMap((op) => ['ok', 'same', 'fail'].map((status) => ({ kind: 'line', op, status, title: status === 'ok' ? 'OA' : '', note: status === 'fail' ? '' : '메모', line: ar.resultLine({ op, title: status === 'ok' ? 'OA' : '', status, note: status === 'fail' ? '' : '메모' }) }))),
-  { kind: 'text', lines: [], stamp: '', text: ar.requestsText([], '') }, { kind: 'text', lines: ['- ✅ a', '- ⚠️ b'], stamp: '2026-11-23 17:04', text: ar.requestsText(['- ✅ a', '- ⚠️ b'], '2026-11-23 17:04') },
-]);

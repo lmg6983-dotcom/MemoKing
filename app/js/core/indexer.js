@@ -208,21 +208,15 @@ export function indexOutput(memos) {
 
 export const AGENT_GUIDE = `# 메모킹 폴더 안내 (LLM 에이전트용)
 
-이 폴더는 메모킹 앱의 메모 저장소입니다. \`_memoking/index.json\` 이 있으면 먼저 읽고, 필요한 메모 파일만 여세요.
-(index.json 은 기기마다 만들어 Google Drive 에는 올리지 않습니다. 없으면 폴더의 \`*.md\` 를 훑으세요.)
-
-**메모를 고칠 때는 메모 파일을 다시 쓰지 말고 \`_memoking/AI 요청.md\` 에 요청을 적으세요** (아래 "고치기").
-큰 메모를 통째로 다시 쓰면 잘리거나 바뀔 수 있고, 메모킹은 Google Drive 에서 메모킹이 만든 파일만 보므로 새로 만든 파일은 앱에 나타나지 않습니다.
+이 폴더는 메모킹 앱의 메모 저장소입니다. **먼저 \`_memoking/index.json\` 을 읽고**, 필요한 메모 파일만 여세요.
 
 ## 구조
-- \`*.md\` — 메모 1개 = 파일 1개. YAML 머리말 + 마크다운 본문. 첫 줄이 제목, 파일명도 제목을 따름. 하위 폴더 = 메모킹의 폴더.
+- \`*.md\` — 메모 1개 = 파일 1개. YAML 머리말 + 마크다운 본문. 첫 줄이 제목, 파일명도 제목을 따름.
 - \`attachments/\` — 메모에 넣은 파일. 이미지·소리·동영상은 \`![설명](attachments/파일)\`, 그 밖의 파일은 \`[파일명](attachments/파일)\` 로 참조.
 - 본문 서식은 마크다운 + 일부 인라인 HTML: 밑줄 \`<u>\`, 하이라이트 \`<mark>\`, 글자 색 \`<span style="color: …">\` (태그를 빼면 글자만 남음).
-- 태그는 본문의 \`#태그\` (띄어쓰기 없이). 따로 저장하지 않음.
 - 링크 카드: 한 줄에 \`[페이지 제목](주소 "미리보기")\` 만 있으면 앱에서 미리보기 카드로 보임. 페이지 설명은 \`_memoking/link-previews.json\` 에 주소별로 있음.
-- \`_memoking/index.json\` — 모든 메모의 요약·키워드·연결·관련도 (앱이 자동 갱신, 이 기기에만).
-- \`_memoking/AI 요청.md\` — AI 가 메모를 고치는 곳 (앱이 만들어 둠).
-- \`_memoking/trash/\` — 삭제된 메모 (검색 대상 아님). \`_memoking/secret/\` — 비밀 폴더 (암호화됨, 열지 않음).
+- \`_memoking/index.json\` — 모든 메모의 요약·키워드·연결·관련도 (앱이 자동 갱신).
+- \`_memoking/trash/\` — 삭제된 메모 (검색 대상 아님).
 
 ## 메모 머리말
 | 키 | 뜻 |
@@ -248,21 +242,4 @@ export const AGENT_GUIDE = `# 메모킹 폴더 안내 (LLM 에이전트용)
 1. index.json에서 title·summary·keywords로 후보를 찾는다.
 2. 후보의 related를 따라 score 높은 메모를 함께 확인한다.
 3. 필요한 메모의 file을 열어 본문을 읽는다.
-
-## 고치기 (_memoking/AI 요청.md)
-\`AI 요청.md\` 의 json 칸에 요청 목록을 넣고 파일 전체를 다시 저장합니다. 메모킹(PC · 휴대폰)이 몇 초 안에 메모를 고치고, 같은 파일의 "지난 결과" 에 한 줄씩 적은 뒤 칸을 비웁니다 (✅ 했음 · ➖ 이미 되어 있음 · ⚠️ 못 함).
-\`memo\` 는 메모 id 또는 폴더 기준 파일 경로("업무/회의.md"). 한 번에 50개까지. 고치기 전 글은 메모킹이 지난 버전으로 남깁니다.
-
-| do | 쓰는 법 |
-|---|---|
-| tag | \`{"do":"tag","memo":"업무/회의.md","add":["회의"],"remove":["공유"]}\` — 뺀 자리에 새 태그 |
-| color | \`{"do":"color","memo":"…","color":"blue"}\` — yellow · green · pink · purple · blue · gray · charcoal |
-| move | \`{"do":"move","memo":"…","folder":"서류함"}\` — 맨 위는 "" |
-| replace | \`{"do":"replace","memo":"…","find":"바꿀 글","with":"새 글"}\` — find 가 본문에 꼭 한 번 있을 때만 |
-| append | \`{"do":"append","memo":"…","text":"덧붙일 글"}\` — 본문 끝에 |
-| merge | \`{"do":"merge","into":"남길 메모","from":["합칠 메모", "…"]}\` — from 의 글을 into 끝에 잇고 from 은 휴지통으로 |
-| trash | \`{"do":"trash","memo":"…"}\` — 휴지통으로 (되살릴 수 있음) |
-| create | \`{"do":"create","text":"# 제목\\n본문 #태그","folder":"할일","color":"yellow"}\` — 새 메모 |
-
-잠긴 메모(본문이 암호)와 비밀 폴더의 메모는 고치지 않습니다.
 `;

@@ -90,7 +90,6 @@ pub struct Vault {
     secret_alias: HashMap<String, (String, String)>,
 }
 
-mod ai_ops;
 mod secret_store;
 
 /// 목록 카드 · 찾기가 본문에서 쓰는 것
