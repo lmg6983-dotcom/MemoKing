@@ -95,7 +95,7 @@ class SyncEngineTest {
         for (i in 1..30) lw("폰 $i.md", "# 폰 $i")
         for (i in 1..30) drive.put("PC 폴더 ${i % 3}/PC $i.md", "# PC $i")
         val seen = java.util.Collections.synchronizedList(ArrayList<Triple<String, Int, Int>>())
-        val r = SyncEngine(local, drive, "ROOT", state, { phase, done, total -> seen += Triple(phase, done, total) }).run()
+        val r = SyncEngine(local, drive, "ROOT", state, onProgress = { phase, done, total -> seen += Triple(phase, done, total) }).run()
         assertEquals(30, r.uploaded)
         assertEquals(30, r.downloaded)
         for (i in 1..30) {
@@ -106,6 +106,21 @@ class SyncEngineTest {
         assertTrue("폴더를 살펴본 만큼", seen.any { it.first == "scan" && it.second == 4 && it.third == 4 })
         assertNull("받다 남은 임시 파일 없음", File(dir, "_memoking").listFiles()?.firstOrNull { it.name.endsWith(".tmp") })
         assertTrue("다시 돌리면 할 일 없음", sync().let { it.uploaded + it.downloaded == 0 })
+    }
+
+    @Test
+    fun massConflictKeepsSameFilesAndManualSyncGoesOn() {
+        // 기준 없이 양쪽에 다 있는 파일: 같은 것은 멈추더라도 기준에 남고, 엇갈린 것이 많으면 자동은 멈추고 "지금 동기화"(full) 는 사본으로 맞춘다 (PC 와 같음)
+        for (i in 0 until 25) { lw("같음$i.md", "same"); drive.put("같음$i.md", "same") }
+        for (i in 0 until 21) { lw("다름$i.md", "mine"); drive.put("다름$i.md", "theirs") }
+        val stop = assertThrows(SyncEngine.SafetyStop::class.java) { sync() }
+        assertTrue(stop.message!!, stop.message!!.contains("21개"))
+        val kept = state.getJSONObject("files").keys().asSequence().toList()
+        assertEquals("같은 파일은 멈춰도 기준에 남는다", 25, kept.size)
+        assertTrue(kept.all { it.startsWith("같음") })
+        val r = SyncEngine(local, drive, "ROOT", state).run(full = true)
+        assertEquals("지금 동기화는 엇갈린 것을 사본으로 남기고 맞춘다", 21, r.conflicts.size)
+        assertEquals("theirs", lt("다름0.md"))
     }
 
     @Test

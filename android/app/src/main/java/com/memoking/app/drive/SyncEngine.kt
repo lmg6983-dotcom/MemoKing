@@ -48,6 +48,8 @@ class SyncEngine(
     private val remote: Remote,
     private val rootId: String,
     private val state: JSONObject, // { pageToken, files: { 경로: { id, md5, lmtime, lsize } } }
+    /** 앱이 메모 파일을 쓸 때 잡는 잠금 (DriveSync.withFiles) — 확인하고 바꿔치기 · 옮기는 사이에 앱의 저장이 끼어들지 않게 (PC Options.locked 와 같음) */
+    private val fileLock: Any = Any(),
     /** 어디까지 했는지 (scan: Drive 폴더 total 개 중 done 개, compare: 양쪽에 다 있는 파일 비교, transfer: 맞출 파일 total 개 중 done 개) — 여러 줄에서 부른다 */
     private val onProgress: (phase: String, done: Int, total: Int) -> Unit = { _, _, _ -> },
     private val now: () -> Long = System::currentTimeMillis,
@@ -104,7 +106,6 @@ class SyncEngine(
 
     private val files: JSONObject = state.optJSONObject("files") ?: JSONObject().also { state.put("files", it) }
     private val folderIds = HashMap<String, String>() // 상대 경로 → Drive 폴더 id ("" = 메모 폴더)
-    private val renaming = Any() // 휴지통 · 충돌 사본 이름 고르기와 옮기기를 한 줄씩 (두 줄이 같은 이름을 고르지 않게)
 
     /** CONCURRENCY 개의 줄이 0 until count 를 나눠 한다. 한 줄이 실패하면 다른 줄은 지금 하는 것만 끝내고 멈춘다 (끝낸 파일의 기준은 남게, PC lanes 와 같음) */
     private fun lanes(count: Int, f: (Int) -> Unit) {
@@ -162,16 +163,16 @@ class SyncEngine(
      * 다른 기기에서 지운 파일을 휴대폰에서도 — 메모(.md)는 바로 지우지 않고 메모킹 휴지통으로 (_memoking/trash/제목 (지운 시각).md, vault.js trashPath 와 같은 이름).
      * 다른 앱(Google Drive 데스크탑 앱 등)이 파일을 새로 만들어 바꿔 Drive 에서 "지운 것" 으로 보였을 때도 되살리게 (PC drive_sync.rs remove_local 과 같음)
      */
-    private fun removeLocal(rel: String, moved: Boolean): Boolean = synchronized(renaming) {
+    private fun removeLocal(rel: String, moved: Boolean): Boolean {
         val name = rel.substringAfterLast('/')
-        if (moved || !name.endsWith(".md") || rel.startsWith("_memoking/")) return@synchronized local.delete(rel)
+        if (moved || !name.endsWith(".md") || rel.startsWith("_memoking/")) return local.delete(rel)
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date(now()))
         val base = name.removeSuffix(".md")
         local.mkdirs("_memoking/trash")
         val to = generateSequence(1) { it + 1 }
             .map { n -> "_memoking/trash/$base${if (n > 1) " ($n)" else ""} ($stamp).md" }
             .first { local.stat(it) == null }
-        local.move(rel, to)
+        return local.move(rel, to)
     }
 
     /** 메모 폴더 맨 위의 사용자 폴더 이름들 (휴대폰) */
@@ -379,17 +380,25 @@ class SyncEngine(
             p != MERGE_JSON && l != null && r != null &&
                 (b == null || b.lmtime != l.mtime || b.lsize != l.size) && (b == null || b.md5 != r.md5)
         }
+        // 시각을 먼저 재고 내용을 본다 — 비교한 뒤 고쳤으면 그 시각이 달라 다음 차례에 올라간다 (PC 는 둘러볼 때의 시각)
+        val befores = arrayOfNulls<Storage.Entry>(clashes.size)
+        val sums = arrayOfNulls<String>(clashes.size)
+        val checked = AtomicInteger()
+        lanes(clashes.size) { i ->
+            befores[i] = local.stat(clashes[i])
+            sums[i] = try { local.openRead(clashes[i]).use(::md5) } catch (e: Exception) { null } // 둘러보는 사이 없어진 파일
+            onProgress("compare", checked.incrementAndGet(), clashes.size)
+        }
         val differ = ArrayList<String>()
         for ((i, p) in clashes.withIndex()) {
             val r = remoteFiles.getValue(p)
-            val m = try { local.openRead(p).use(::md5) } catch (e: Exception) { null } // 둘러보는 사이 없어진 파일
-            val now = local.stat(p)
-            if (m != null && m == r.md5 && now != null) record(p, r.id, m, now) else differ += p.substringAfterLast('/')
-            onProgress("compare", i + 1, clashes.size)
+            val before = befores[i]
+            if (sums[i] != null && sums[i] == r.md5 && before != null) record(p, r.id, sums[i]!!, before) else differ += p.substringAfterLast('/')
         }
-        // 다르게 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
-        if (differ.size > MASS_CONFLICT_MAX) {
-            throw SafetyStop("양쪽에서 엇갈린 메모가 ${differ.size}개라 동기화를 멈췄어요 (${differ.take(3).joinToString(", ")} 등). 사본이 계속 늘어나지 않게 ${MASS_CONFLICT_MAX}개가 넘으면 맞추지 않아요. 메모 폴더를 다른 동기화 앱도 맞추고 있는지 확인해 주세요.")
+        // 다르게 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다).
+        //   "지금 동기화"(full) 로 직접 맞추면 사본으로 남기고 맞춘다 — 기준을 잃고 양쪽에서 고친 것이면 그 밖에 빠져나갈 길이 없다
+        if (differ.size > MASS_CONFLICT_MAX && !full) {
+            throw SafetyStop("양쪽에서 엇갈린 메모가 ${differ.size}개라 동기화를 멈췄어요 (${differ.take(3).joinToString(", ")} 등). 사본이 계속 늘어나지 않게 ${MASS_CONFLICT_MAX}개가 넘으면 맞추지 않아요. 메모 폴더를 다른 동기화 앱도 맞추고 있는지 확인해 주세요. 그렇지 않다면 \"지금 동기화\"를 누르면 엇갈린 메모는 사본으로 남기고 맞춰요.")
         }
 
         // 여러 줄이 함께 센다
@@ -421,8 +430,12 @@ class SyncEngine(
             val tmp = "_memoking/.download-${UUID.randomUUID()}.tmp" // 여러 줄이 함께 받아도 겹치지 않게
             try {
                 local.write(tmp) { remote.download(item.id, it) }
-                if (!untouched()) return // 받는 사이 휴대폰에서 고쳤다 — 덮어쓰지 않고 다음 차례에
-                val entry = local.openRead(tmp).use { input -> local.write(rel) { input.copyTo(it) } }
+                // 확인과 바꿔치기는 앱의 저장과 한 줄로 — 받는 사이 휴대폰에서 고쳤으면 덮어쓰지 않고 다음 차례에
+                // shortcut: 받은 파일을 잠금 안에서 복사한다 — 큰 첨부면 그동안 앱 저장이 기다린다, 느리면 Storage 에 바꿔치기(rename)를 더한다
+                val entry = synchronized(fileLock) {
+                    if (!untouched()) return
+                    local.openRead(tmp).use { input -> local.write(rel) { input.copyTo(it) } }
+                }
                 record(rel, item.id, item.md5 ?: "", entry)
                 downloaded.incrementAndGet()
             } finally {
@@ -465,7 +478,7 @@ class SyncEngine(
                 upload(rel, item.id)
                 return
             }
-            val copy = synchronized(renaming) { conflictName(rel).takeIf { local.move(rel, it) } } ?: return
+            val copy = synchronized(fileLock) { conflictName(rel).takeIf { local.move(rel, it) } } ?: return
             conflicts += copy
             download(rel, item, null)
             upload(copy, null)
@@ -485,16 +498,22 @@ class SyncEngine(
                         localChanged && !remoteChanged -> upload(rel, r.id)
                         !localChanged && remoteChanged -> download(rel, r, l)
                         else -> {
-                            // 양쪽 다 새로 생겼거나 바뀜: 내용이 같으면 기억만
-                            if (localMd5(rel) == r.md5) record(rel, r.id, r.md5, local.stat(rel)!!)
+                            // 양쪽 다 새로 생겼거나 바뀜: 내용이 같으면 기억만 (시각은 비교하기 전에 잰 것)
+                            val before = local.stat(rel)
+                            if (before != null && localMd5(rel) == r.md5) record(rel, r.id, r.md5, before)
                             else conflict(rel, r, l)
                         }
                     }
                     l != null && r == null -> when {
                         b == null || localChanged || keepMissing -> upload(rel, null) // 새 파일, 또는 Drive 에서 지웠지만 휴대폰에서 고침 → 되살림
                         else -> {
-                            // Drive(PC)에서 지움 → 휴대폰에서도. 메모는 휴지통으로 (이름만 바꾼 · 옮긴 것은 그냥 지운다)
-                            if (removeLocal(rel, moved = remoteIds.contains(b.id))) deletedLocal.incrementAndGet()
+                            // Drive(PC)에서 지움 → 휴대폰에서도. 메모는 휴지통으로 (이름만 바꾼 · 옮긴 것은 그냥 지운다).
+                            //   둘러본 뒤 휴대폰에서 고쳤으면 지우지 않는다 (다음 차례에 되살림, PC 와 같음)
+                            val removed = synchronized(fileLock) {
+                                val now = local.stat(rel)
+                                if (now != null && (now.mtime != l.mtime || now.size != l.size)) null else removeLocal(rel, moved = remoteIds.contains(b.id))
+                            } ?: return
+                            if (removed) deletedLocal.incrementAndGet()
                             forget(rel)
                         }
                     }

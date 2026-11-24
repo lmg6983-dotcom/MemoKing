@@ -137,32 +137,33 @@ class Bridge(private val activity: MainActivity) {
         return value
     }
 
+    // 메모 파일을 쓰고 옮기고 지울 때는 Drive 동기화의 확인 · 바꿔치기와 한 줄로 (DriveSync.withFiles — 받는 파일이 방금 쓴 글을 덮어쓰지 않게)
     @JavascriptInterface
     fun writeText(rel: String, text: String): String = reply {
-        changed(storage().write(rel) { it.write(text.toByteArray(Charsets.UTF_8)) }.json())
+        changed(DriveSync.withFiles { storage().write(rel) { it.write(text.toByteArray(Charsets.UTF_8)) } }.json())
     }
 
     @JavascriptInterface
     fun writeBase64(rel: String, data: String): String = reply {
         val bytes = Base64.decode(data, Base64.DEFAULT)
-        changed(storage().write(rel) { it.write(bytes) }.json())
+        changed(DriveSync.withFiles { storage().write(rel) { it.write(bytes) } }.json())
     }
 
     @JavascriptInterface
     fun mkdirs(rel: String): String = reply { storage().mkdirs(rel) }
 
     @JavascriptInterface
-    fun move(from: String, to: String): String = reply { changed(storage().move(from, to)) }
+    fun move(from: String, to: String): String = reply { changed(DriveSync.withFiles { storage().move(from, to) }) }
 
     @JavascriptInterface
-    fun remove(rel: String): String = reply { changed(storage().delete(rel)) }
+    fun remove(rel: String): String = reply { changed(DriveSync.withFiles { storage().delete(rel) }) }
 
     // ---------- 임시 파일 (공유받은 파일·고른 파일·인터넷에서 받은 것) ----------
 
     @JavascriptInterface
     fun commitTemp(id: String, rel: String): String = reply {
         val file = Temp.file(ctx, id) ?: throw IllegalArgumentException("임시 파일이 없어요")
-        val entry = file.inputStream().use { input -> storage().write(rel) { input.copyTo(it) } }
+        val entry = DriveSync.withFiles { file.inputStream().use { input -> storage().write(rel) { input.copyTo(it) } } }
         file.delete()
         changed(entry.json())
     }

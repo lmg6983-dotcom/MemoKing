@@ -260,6 +260,7 @@ fn lanes(lanes: usize, count: usize, f: impl Fn(usize) -> io::Result<()> + Sync)
 }
 
 pub struct Options<'a> {
+    /// "지금 동기화": Drive 폴더를 처음부터 훑고, 엇갈린 메모가 많아도 멈추지 않고 사본으로 남긴다
     pub full: bool,
     pub local_clean: bool,
     pub conflict_tag: &'a str,
@@ -597,19 +598,17 @@ impl Engine<'_> {
         let tmp = dest.with_file_name(format!(".{}.{}.tmp", base_name(rel), hex6()));
         let swapped = (|| {
             self.remote.download(&item.id, &tmp)?;
-            let mut swapped = Ok(false); // 받는 사이 이 PC 에서 고쳤다 — 덮어쓰지 않고 다음 차례에
+            let mut swapped = Ok(None); // 받는 사이 이 PC 에서 고쳤다 — 덮어쓰지 않고 다음 차례에
             (self.opts.locked)(&mut || {
                 if untouched() {
-                    swapped = fs::rename(&tmp, &dest).map(|()| true);
+                    // 시각도 잠금 안에서 잰다 — 잠금을 기다리던 저장이 끼어들면 그 글을 "맞춘 것" 으로 적어 올리지 않게 된다
+                    swapped = fs::rename(&tmp, &dest).and_then(|()| self.stat(rel).ok_or(io::ErrorKind::NotFound.into())).map(Some);
                 }
             });
             swapped
         })();
         let _ = fs::remove_file(&tmp);
-        if !swapped? {
-            return Ok(());
-        }
-        let now = self.stat(rel).ok_or(io::ErrorKind::NotFound)?;
+        let Some(now) = swapped? else { return Ok(()) };
         self.record(rel, &item.id, item.md5.as_deref().unwrap_or_default(), now);
         self.result.lock().unwrap().downloaded += 1;
         Ok(())
@@ -666,9 +665,8 @@ impl Engine<'_> {
                 } else if !local_changed && remote_changed {
                     self.download(rel, r, Some(l))
                 } else if Some(md5_file(&self.abs(rel))?) == r.md5 {
-                    // 양쪽 같은 내용
-                    let now = self.stat(rel).ok_or(io::ErrorKind::NotFound)?;
-                    self.record(rel, &r.id, r.md5.as_deref().unwrap_or_default(), now);
+                    // 양쪽 같은 내용 — 둘러볼 때의 시각으로 적는다 (비교한 뒤 고쳤으면 다음 차례에 올리게)
+                    self.record(rel, &r.id, r.md5.as_deref().unwrap_or_default(), l);
                     Ok(())
                 } else {
                     self.conflict(rel, r)
@@ -788,22 +786,29 @@ impl Engine<'_> {
         };
         // 양쪽 다 새로 생겼거나 바뀐 파일은 내용을 한 번만 비교한다: 같으면 바로 기준에 적어(멈추더라도 다음 차례에 다시 비교하지 않게) 할 일에서 뺀다
         let clashes: Vec<&String> = paths.iter().copied().filter(|p| p.as_str() != MERGE_JSON && matches!(changed(p), (Some(_), Some(_), true, true))).collect();
+        let sums: Vec<Mutex<Option<String>>> = clashes.iter().map(|_| Mutex::default()).collect();
+        let checked = AtomicUsize::new(0);
+        lanes(self.opts.concurrency, clashes.len(), |i| {
+            *sums[i].lock().unwrap() = md5_file(&self.abs(clashes[i])).ok(); // 둘러보는 사이 없어진 파일은 None (다음 차례에)
+            (self.opts.on_progress)("compare", checked.fetch_add(1, Ordering::SeqCst) + 1, clashes.len());
+            Ok(())
+        })?;
         let (mut same, mut differ) = (HashSet::new(), vec![]);
-        for (i, rel) in clashes.iter().enumerate() {
+        for (rel, sum) in clashes.iter().zip(sums) {
             let r = &remote[*rel];
-            match md5_file(&self.abs(rel)) {
-                Ok(m) if Some(&m) == r.md5.as_ref() => {
+            match sum.into_inner().unwrap() {
+                Some(m) if Some(&m) == r.md5.as_ref() => {
                     self.record(rel, &r.id, &m, local[*rel]);
                     same.insert(*rel);
                 }
-                _ => differ.push(base_name(rel)), // 둘러보는 사이 없어진 파일도 (다음 차례에)
+                _ => differ.push(base_name(rel)),
             }
-            (self.opts.on_progress)("compare", i + 1, clashes.len());
         }
-        // 다르게 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
-        if differ.len() > MASS_CONFLICT_MAX {
+        // 다르게 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다).
+        //   "지금 동기화" 로 직접 맞추면 사본으로 남기고 맞춘다 — 기준을 잃고 양쪽에서 고친 것이면 그 밖에 빠져나갈 길이 없다
+        if differ.len() > MASS_CONFLICT_MAX && !self.opts.full {
             return Err(safety(format!(
-                "양쪽에서 엇갈린 메모가 {}개라 동기화를 멈췄어요 ({} 등). 사본이 계속 늘어나지 않게 {MASS_CONFLICT_MAX}개가 넘으면 맞추지 않아요. 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요.",
+                "양쪽에서 엇갈린 메모가 {}개라 동기화를 멈췄어요 ({} 등). 사본이 계속 늘어나지 않게 {MASS_CONFLICT_MAX}개가 넘으면 맞추지 않아요. 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요. 그렇지 않다면 \"지금 동기화\"를 누르면 엇갈린 메모는 사본으로 남기고 맞춰요.",
                 differ.len(),
                 differ[..3].join(", ")
             )));

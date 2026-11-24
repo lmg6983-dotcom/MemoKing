@@ -44,6 +44,11 @@ object DriveSync {
 
     private val worker = Executors.newSingleThreadScheduledExecutor()
 
+    /** 메모 파일을 쓸 때 잡는 잠금 — 앱(Bridge · 위젯)의 저장과 동기화의 "그대로인지 확인 → 바꿔치기" 가 서로 끼어들지 않게 (PC 의 메모 잠금과 같음) */
+    private val fileLock = Any()
+
+    fun <T> withFiles(f: () -> T): T = synchronized(fileLock, f)
+
     /** 안전장치로 멈추면 자동 동기화는 5분 쉰다 — 같은 모습이면 다시 해도 또 멈추며 폴더만 계속 훑는다 ("지금 동기화" · 폴더를 바꾸면 바로. PC drive.rs 와 같음) */
     @Volatile private var holdUntil = 0L
     private var pending: ScheduledFuture<*>? = null
@@ -123,7 +128,7 @@ object DriveSync {
         if (state.optString("scope") == "full" && scope == "file") state.put("keepMissing", true)
         state.put("scope", scope)
         val result = try {
-            SyncEngine(storage(ctx, folderId), DriveApi(ctx), folderId, state, ::onProgress).run(full)
+            SyncEngine(storage(ctx, folderId), DriveApi(ctx), folderId, state, fileLock, ::onProgress).run(full)
         } catch (e: Exception) {
             android.util.Log.w("MemoKing", "Drive 동기화 실패", e)
             saveState(file, state)
