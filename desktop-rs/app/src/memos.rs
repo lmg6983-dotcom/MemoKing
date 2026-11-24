@@ -53,7 +53,7 @@ pub fn start(app: &AppHandle) {
     // 다른 기기 · 탐색기에서 바뀐 메모 — 2초마다 다시 읽는다
     schedule_spare(app, 3000);
     // shortcut: 파일 감시(fs.watch)는 아직 — 다시 읽기는 파일 시각만 보므로 가볍다. 늦다는 말이 나오면 notify 로
-    let app = app.clone();
+    let (app, app2) = (app.clone(), app.clone());
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(2));
         rescan(&app);
@@ -61,6 +61,20 @@ pub fn start(app: &AppHandle) {
         crate::index::tick(&app);
         crate::windows::discard_tick(&app); // 오래 숨은 스택 탭 거두기 (30초마다 본다)
     });
+    // 휴지통 자동 비우기: 켜고 1분 뒤 · 6시간마다 (Electron purgeTrash)
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(60));
+        purge_trash(&app2);
+        std::thread::sleep(Duration::from_secs(6 * 60 * 60));
+    });
+}
+
+/// 설정의 날수(기본 30, 0 은 끔)보다 오래 휴지통에 있던 메모 · 첨부를 지운다 — 설정 화면이 "n일이 지나면 저절로 삭제돼요" 라고 알린다
+fn purge_trash(app: &AppHandle) {
+    let days = state(app).setting("trashDays").as_u64().map_or(Some(30), |d| u32::try_from(d).ok());
+    if let Some(days) = days.filter(|d| *d > 0) {
+        let _ = with_vault(app, |v| Ok(v.empty_trash(Some(days))));
+    }
 }
 
 /// 받은 메모 빈 칸(_memoking/받은 메모): AI 가 채운 칸을 메모로 옮긴다 (core vault/inbox.rs) — 빈 칸은 Drive 와 맞추는 동안만 만들어 둔다
