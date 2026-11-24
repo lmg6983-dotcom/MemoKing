@@ -1261,8 +1261,7 @@ el.fabMenu.addEventListener('click', (e) => {
   newMemo(b.dataset.new === 'voice' ? { record: true } : b.dataset.new === 'ink' ? { ink: true } : {});
 });
 el.settingsBtn.addEventListener('click', async () => {
-  await busyWhile(el.settingsBtn, loadSettings());
-  drivePanel?.refresh();
+  await busyWhile(el.settingsBtn, Promise.all([loadSettings(), drivePanel?.refresh()])); // 동기화 상태부터 — "폴더 바꾸기" 가 잠깐 보였다 사라지지 않게
   paintPhoneQr().catch((err) => console.warn('[휴대폰 앱 QR]', err));
   openPanelDialog(el.settings);
 });

@@ -300,18 +300,26 @@ impl Engine<'_> {
 
     // ---------- 양쪽 둘러보기 ----------
 
+    /// 이 PC 메모 폴더의 파일들. 못 읽은 하위 폴더(백신이 잠깐 붙잡음 · 권한) · 항목은 "지운 것" 이 아니다 —
+    ///   아는 기준 그대로(바뀌지 않음) 넣어, Drive 에서도 지우지 않게 (예전: 빠진 파일을 이 PC 에서 지운 것으로 보고 Drive 휴지통으로)
     fn walk_local(&self) -> BTreeMap<String, Stat> {
-        fn walk(dir: &Path, rel: &str, out: &mut BTreeMap<String, Stat>) {
-            let Ok(items) = fs::read_dir(dir) else { return };
+        fn walk(dir: &Path, rel: &str, out: &mut BTreeMap<String, Stat>, unread: &mut Vec<String>) {
+            let Ok(items) = fs::read_dir(dir) else {
+                unread.push(format!("{rel}/"));
+                return;
+            };
             for d in items.flatten() {
                 let name = d.file_name().to_string_lossy().into_owned();
                 if skip_name(&name) {
                     continue;
                 }
                 let r = if rel.is_empty() { name.clone() } else { format!("{rel}/{name}") };
-                let Ok(t) = d.file_type() else { continue };
+                let Ok(t) = d.file_type() else {
+                    unread.push(r);
+                    continue;
+                };
                 if t.is_dir() {
-                    walk(&d.path(), &r, out);
+                    walk(&d.path(), &r, out, unread);
                 } else if t.is_file() && !skip_path(&r) {
                     // 목록을 읽은 뒤 사라진 파일 — 없는 것으로 치고 다음 차례에
                     if let Some(st) = stat_of(&d.path()) {
@@ -320,8 +328,16 @@ impl Engine<'_> {
                 }
             }
         }
-        let mut out = BTreeMap::new();
-        walk(&self.root, "", &mut out);
+        let (mut out, mut unread) = (BTreeMap::new(), vec![]);
+        walk(&self.root, "", &mut out, &mut unread);
+        if unread.iter().any(|u| u == "/") {
+            return out; // 메모 폴더 자체를 못 읽음 — 아래 run 의 "메모 폴더가 비었다" 안전장치가 멈춘다
+        }
+        for (rel, b) in self.files.lock().unwrap().iter() {
+            if !out.contains_key(rel) && unread.iter().any(|u| rel.starts_with(u.as_str())) {
+                out.insert(rel.clone(), Stat { mtime: b.lmtime, size: b.lsize });
+            }
+        }
         out
     }
 

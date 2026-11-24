@@ -597,6 +597,32 @@ mod drive {
             .collect();
         super::report("drive_sync", fails, cases.len());
     }
+
+    // 못 읽은 하위 폴더(백신 · 권한)의 메모를 "이 PC 에서 지움" 으로 보고 Drive 에서 지우지 않는다
+    #[cfg(unix)]
+    #[test]
+    fn unreadable_folder_is_not_deleted() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("mk-drive-unread-{}", unique()));
+        std::fs::create_dir_all(root.join("업무")).unwrap();
+        std::fs::write(root.join("업무/회의.md"), "# 회의").unwrap();
+        std::fs::write(root.join("장보기.md"), "# 장보기").unwrap();
+        let remote = Fake::new(&Map::new(), None, 1_000);
+        let mut state = SyncState::default();
+        let opts = drive_sync::Options { full: true, local_clean: false, conflict_tag: "PC 충돌", now: &|| 1_000, on_progress: &|_, _, _| {}, concurrency: 1, locked: &|f| f() };
+        drive_sync::run(&root, &remote, "root0", &mut state, &opts).unwrap();
+        assert!(remote.tree().to_string().contains("회의.md"), "처음에 올라간다");
+        let dir = root.join("업무");
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let unreadable = std::fs::read_dir(&dir).is_err(); // root 로 돌면 권한이 막히지 않는다 — 그때는 볼 것이 없다
+        let r = drive_sync::run(&root, &remote, "root0", &mut state, &opts);
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+        if unreadable {
+            r.unwrap();
+            assert!(remote.tree().to_string().contains("회의.md"), "못 읽은 폴더의 메모는 Drive 에 그대로: {}", remote.tree());
+        }
+    }
 }
 
 // 숫자는 f64 로 맞춰 비교한다 (Rust 는 2.0, JS 는 2 로 적는다)

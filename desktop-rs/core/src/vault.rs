@@ -205,7 +205,10 @@ impl Vault {
                 continue;
             }
             let rel_path = if rel.is_empty() { name.clone() } else { format!("{rel}/{name}") };
-            let Ok(ty) = item.file_type() else { continue };
+            let Ok(ty) = item.file_type() else {
+                unread.push(rel_path); // 잠깐 못 읽은 항목 — 그 메모는 아는 그대로 (scan)
+                continue;
+            };
             if ty.is_dir() {
                 if self.list_files(&item.path(), &rel_path, out, unread).is_err() {
                     unread.push(format!("{rel_path}/")); // 하위 폴더 하나를 못 읽어도 나머지는 — 그 안의 메모는 아는 그대로 (scan)
@@ -234,7 +237,10 @@ impl Vault {
         let mut locked_now: Vec<String> = vec![];
         for file in files {
             let path = self.abs(&file);
-            let Ok(stamp) = stamp_of(&path) else { continue };
+            let Ok(stamp) = stamp_of(&path) else {
+                unread.push(file.clone()); // 목록을 읽은 뒤 잠깐 못 본 파일 — 지운 것이 아니다
+                continue;
+            };
             let prev = prev_by_file.get(&file).and_then(|id| old.get(id)).filter(|p| p.file.as_deref() == Some(file.as_str()));
             let keep = prev.is_some_and(|p| p.stamp == Some(stamp) && !next.contains_key(&p.id));
             let text = if keep { None } else { fs::read_to_string(&path).ok() };
@@ -1664,6 +1670,31 @@ mod tests {
         let d = std::env::temp_dir().join(format!("mk-vault-{}", uuid::Uuid::new_v4().simple()));
         fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    // 못 읽은 하위 폴더의 메모는 지운 것이 아니다 — 목록에 그대로 (Drive 데스크탑 앱 폴더 · 백신)
+    #[cfg(unix)]
+    #[test]
+    fn unreadable_folder_keeps_memos() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let a = v.create(None, None, "업무");
+        v.save(&a, "# 회의\n본문").unwrap();
+        let b = v.create(None, None, "");
+        v.save(&b, "# 장보기").unwrap();
+        v.scan();
+        let dir = root.join("업무");
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o000)).unwrap();
+        let unreadable = fs::read_dir(&dir).is_err(); // root 로 돌면 권한이 막히지 않는다
+        let changed = v.scan();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+        if unreadable {
+            assert!(v.entry(&a).is_some() && !changed.removed.contains(&a), "못 읽은 폴더의 메모는 그대로");
+        }
+        assert!(v.entry(&b).is_some());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
