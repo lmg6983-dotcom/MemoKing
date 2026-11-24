@@ -646,7 +646,11 @@ h2.sheet-title { font-size: 20px; }
 
 /* 알림 모을 앱 */
 .apps-list { margin: 10px 0 0; padding: 0; list-style: none; }
-.app-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.app-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.app-row:active { background: var(--hover); }
+/* 설정의 "줄 + 오른쪽 단추": 줄 어디를 눌러도 단추 (app.js) — 누른 줄이 보이게 */
+.nav-row { cursor: pointer; }
+.nav-row:active { background: var(--hover); }
 .app-row .avatar { width: 34px; height: 34px; }
 .app-row.off .avatar { filter: grayscale(1); opacity: 0.5; }
 .app-name { display: flex; flex-direction: column; flex: 1; min-width: 0; }

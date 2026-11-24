@@ -1520,7 +1520,8 @@ async function renderApps() {
   $('apps-empty').hidden = apps.length > 0;
   $('apps-list').replaceChildren(...apps.map((a) => {
     const li = document.createElement('li');
-    li.className = `app-row${a.blocked ? ' off' : ''}`;
+    const row = document.createElement('label'); // 줄 어디를 눌러도 스위치 (휴대폰과 같게)
+    row.className = `app-row${a.blocked ? ' off' : ''}`;
     const letter = document.createElement('span');
     letter.className = 'avatar letter';
     letter.textContent = (a.app || '?').trim().charAt(0).toUpperCase();
@@ -1546,7 +1547,8 @@ async function renderApps() {
       showBlockedCount();
       historyTab.refresh();
     });
-    li.append(letter, name, sw);
+    row.append(letter, name, sw);
+    li.append(row);
     return li;
   }));
 }
