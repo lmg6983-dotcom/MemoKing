@@ -120,6 +120,12 @@ pub fn set_open(app: &AppHandle, id: &str, open: bool) {
         list.retain(|x| x != id);
         if open {
             list.push(id.into());
+            // 목록의 "많이 본 순": 이 PC 에서 메모 창이 보인 횟수 (메모 파일에는 쓰지 않는다 — 열 때마다 동기화되지 않게)
+            let views = set.entry("viewCounts").or_insert_with(|| json!({}));
+            if !views.is_object() {
+                *views = json!({});
+            }
+            views[id] = (views[id].as_u64().unwrap_or(0) + 1).into();
         }
         set.insert("openNotes".into(), list.into());
     }
