@@ -291,14 +291,14 @@
     "id": "f4",
     "name": "가가가가가가가가가가가가가가가가가가가가",
     "url": "https://example.com/4.ics",
-    "color": "#ccb034",
+    "color": "#ffd43b",
     "on": true
    },
    {
     "id": "f5",
     "name": "가가가가가가가가가가가가가가가가가가가가가가가가가",
     "url": "https://example.com/5.ics",
-    "color": "#b8b0a3",
+    "color": "#c9ccd3",
     "on": true
    },
    {
