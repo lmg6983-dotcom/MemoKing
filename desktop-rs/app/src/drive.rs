@@ -666,7 +666,11 @@ fn config(app: &AppHandle) -> Option<(String, String, PathBuf)> {
 fn info(app: &AppHandle) -> Value {
     let st = app.state::<State>();
     let drive = st.setting("drive");
-    let root = st.vault.lock().unwrap().as_ref().map(|v| v.root.to_string_lossy().into_owned()).unwrap_or_default();
+    // 메모 폴더를 읽는 중이면 기다리지 않고 설정의 경로로 (동기화 칸 · 설정 창이 멈추지 않게)
+    let root = match st.vault.try_lock() {
+        Ok(g) => g.as_ref().map(|v| v.root.to_string_lossy().into_owned()).unwrap_or_default(),
+        Err(_) => st.setting("vaultPath").as_str().unwrap_or_default().to_string(),
+    };
     let dr = d();
     json!({
         "configured": dr.client().is_some(),

@@ -168,7 +168,8 @@ fn app_settings(app: &AppHandle) -> Value {
     let quick = status("quickMemo");
     json!({
         "trashDays": s("trashDays").as_u64().unwrap_or(30),
-        "trashCount": with_vault(app, |v| Ok(v.trash_list().len())).unwrap_or(0),
+        // 메모 폴더를 읽는 중이면(처음 여는 큰 폴더 · Drive 데스크탑 앱의 스트리밍 폴더) 기다리지 않는다 — 설정 창이 열리지 않던 것
+        "trashCount": st.vault.try_lock().ok().and_then(|g| g.as_ref().map(|v| v.trash_list().len())).unwrap_or(0),
         "autoStart": crate::files::auto_start(app),
         "historyEnabled": s("historyEnabled") == true,
         "quickMemo": { "enabled": not_false("quickMemo"), "registered": quick["registered"], "key": quick["label"] },
