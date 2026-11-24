@@ -7,11 +7,13 @@ on:
     paths:
       - 'android/**'
       - 'app/**'
+      - 'desktop-rs/core/tests/fixtures/drive_sync.json' # 휴대폰 동기화 엔진도 같은 시험 자료로 (SharedFixturesTest.kt)
       - '.github/workflows/android.yml'
   pull_request:
     paths:
       - 'android/**'
       - 'app/**'
+      - 'desktop-rs/core/tests/fixtures/drive_sync.json' # 휴대폰 동기화 엔진도 같은 시험 자료로 (SharedFixturesTest.kt)
       - '.github/workflows/android.yml'
   workflow_dispatch:
 
