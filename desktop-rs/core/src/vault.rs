@@ -195,17 +195,21 @@ impl Vault {
 
     // ---------- 폴더 읽기 ----------
 
-    fn list_files(&self, dir: &Path, rel: &str, out: &mut Vec<String>) -> io::Result<()> {
-        for item in fs::read_dir(dir)? {
-            let item = item?;
+    /// 메모 폴더의 .md 파일들. 읽을 수 없는 항목(받는 중 사라진 파일 · Drive 바로가기 · 권한이 다른 하위 폴더)은 건너뛴다
+    ///   — 예전에는 하나만 실패해도 이번 읽기를 통째로 버려, Google Drive 데스크탑 앱 폴더에서 새로 들어온 메모가 계속 안 보였다.
+    ///   메모 폴더 자체를 못 읽을 때만 실패
+    fn list_files(&self, dir: &Path, rel: &str, out: &mut Vec<String>, unread: &mut Vec<String>) -> io::Result<()> {
+        for item in fs::read_dir(dir)?.flatten() {
             let name = item.file_name().to_string_lossy().into_owned();
             if name.starts_with('.') || name.starts_with("~$") || (rel.is_empty() && (name == APP_DIR || name == ATTACH_DIR)) {
                 continue;
             }
             let rel_path = if rel.is_empty() { name.clone() } else { format!("{rel}/{name}") };
-            let ty = item.file_type()?;
+            let Ok(ty) = item.file_type() else { continue };
             if ty.is_dir() {
-                self.list_files(&item.path(), &rel_path, out)?;
+                if self.list_files(&item.path(), &rel_path, out, unread).is_err() {
+                    unread.push(format!("{rel_path}/")); // 하위 폴더 하나를 못 읽어도 나머지는 — 그 안의 메모는 아는 그대로 (scan)
+                }
             } else if ty.is_file() && name.to_lowercase().ends_with(".md") {
                 out.push(rel_path);
             }
@@ -215,8 +219,8 @@ impl Vault {
 
     /// 바뀐 파일만 다시 읽는다. 다른 기기에서 들어온 변경은 external 로
     pub fn scan(&mut self) -> Changed {
-        let mut files = vec![];
-        if self.list_files(&self.root.clone(), "", &mut files).is_err() {
+        let (mut files, mut unread) = (vec![], vec![]);
+        if self.list_files(&self.root.clone(), "", &mut files, &mut unread).is_err() {
             return Changed::default();
         }
         // 지금 것을 꺼내 바뀌지 않은 메모는 그대로 옮긴다 (2초마다 모든 본문을 복사하지 않게)
@@ -272,6 +276,13 @@ impl Vault {
             }
             next.insert(id.clone(), Entry { id: id.clone(), file: Some(file), folder: String::new(), disk_meta: Some(meta.clone()), meta, body, stamp: Some(stamp), id_saved, secret: None });
             changed.push(id);
+        }
+        // 이번에 못 읽은 하위 폴더의 메모는 지운 것이 아니다 — 아는 그대로 둔다
+        let keep: Vec<String> = old.values().filter(|e| !next.contains_key(&e.id) && e.file.as_ref().is_some_and(|f| unread.iter().any(|d| f.starts_with(d.as_str())))).map(|e| e.id.clone()).collect();
+        for id in keep {
+            if let Some(e) = old.remove(&id) {
+                next.insert(id, e);
+            }
         }
         let removed: Vec<String> = old.keys().filter(|id| !next.contains_key(*id)).cloned().collect();
         let now = SystemTime::now();
