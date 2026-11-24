@@ -6,6 +6,7 @@ import { icon } from '../../app/js/icons.js';
 import { installShareText } from '../../app/js/core/install-links.js';
 import { UI } from '../../app/js/core/ui-text.js';
 import { deviceSummary } from '../../app/js/core/devices.js';
+import { progressText, progressFraction } from '../../app/js/core/sync-progress.js';
 import { devices, myFile } from './device.js';
 
 const $ = (x) => document.getElementById(x);
@@ -231,10 +232,12 @@ export function renderStatus(s = drive.status()) {
   btn.classList.toggle('syncing', st.state === 'syncing');
   btn.classList.toggle('error', st.state === 'error' || (s.active && !s.connected));
   btn.replaceChildren(icon(st.state === 'error' || !s.connected ? 'cloud-alert' : 'cloud'));
-  // 받는 중: 단추 아래 가는 진행 줄 (PC 목록 창의 구름 단추와 같은 모양)
+  // 받는 중: 단추 아래 가는 진행 줄 (PC 목록 창의 구름 단추와 같은 모양) — 몇 개 중 몇 개인지 알면 채워 가고, 폴더를 살펴보는 동안은 오간다
   if (st.state === 'syncing') {
     const line = document.createElement('span');
-    line.className = 'sync-line scan';
+    const f = progressFraction(st.progress ?? { phase: 'scan' });
+    line.className = f == null ? 'sync-line scan' : 'sync-line';
+    line.style.setProperty('--p', String(f ?? 0));
     line.setAttribute('aria-hidden', 'true');
     line.append(document.createElement('i'));
     btn.append(line);
@@ -250,7 +253,7 @@ export function renderStatus(s = drive.status()) {
     $('drive-title').textContent = `내 드라이브의 ${s.folderName || '메모 폴더'}`;
     $('drive-sub').textContent = !s.connected
       ? '로그인이 끊겼어요. 연결하기를 눌러 다시 로그인해 주세요'
-      : st.state === 'syncing' ? [s.email, '동기화하는 중'].filter(Boolean).join(', ')
+      : st.state === 'syncing' ? progressText(st.progress) || [s.email, '동기화하는 중'].filter(Boolean).join(', ')
       : st.state === 'error' ? st.error
       : st.state === 'offline' ? '오프라인, 인터넷이 연결되면 맞춰요'
       : [s.email, st.lastSync ? `${ago(st.lastSync)} 동기화` : '곧 동기화해요'].filter(Boolean).join(', ');

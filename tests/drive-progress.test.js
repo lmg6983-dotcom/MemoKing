@@ -1,7 +1,8 @@
-// PC 동기화 진행 글 · 로그인 오류 판정 (app/js/drive-panel.js)
+// 동기화 진행 글 (app/js/core/sync-progress.js — PC · 휴대폰) · 로그인 오류 판정 (app/js/drive-panel.js)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { progressText, etaText, progressFraction, needsLogin } from '../app/js/drive-panel.js';
+import { progressText, etaText, progressFraction } from '../app/js/core/sync-progress.js';
+import { needsLogin } from '../app/js/drive-panel.js';
 
 test('진행 글: 살펴보기 → n/총 · 남은 시간', () => {
   assert.equal(progressText(null), '');

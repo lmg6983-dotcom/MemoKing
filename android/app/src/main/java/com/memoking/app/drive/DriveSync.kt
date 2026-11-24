@@ -36,9 +36,10 @@ object DriveSync {
         val error: String,
         val changed: Boolean = false,
         val conflicts: List<String> = emptyList(),
+        val progress: JSONObject? = null, // 동기화하는 동안 { phase, done, total, since } (PC drive.rs 와 같은 모양 — app/js/core/sync-progress.js)
     ) {
         fun json(): JSONObject = JSONObject().put("state", state).put("lastSync", lastSync).put("error", error)
-            .put("changed", changed).put("conflicts", org.json.JSONArray(conflicts))
+            .put("changed", changed).put("conflicts", org.json.JSONArray(conflicts)).put("progress", progress ?: JSONObject.NULL)
     }
 
     private val worker = Executors.newSingleThreadScheduledExecutor()
@@ -73,6 +74,26 @@ object DriveSync {
         listener?.invoke(next)
     }
 
+    private fun progress(phase: String, done: Int, total: Int, since: Long) =
+        JSONObject().put("phase", phase).put("done", done).put("total", total).put("since", since)
+
+    private var progressSent = 0L
+
+    /** 엔진의 진행 (여러 줄에서 온다): 처음 · 마지막 · 단계가 바뀔 때는 바로, 그 사이는 0.3초에 한 번만 화면에 (PC drive.rs 와 같음) */
+    @Synchronized
+    private fun onProgress(phase: String, done: Int, total: Int) {
+        val prev = status.progress
+        val now = System.currentTimeMillis()
+        val turned = prev?.optString("phase") != phase
+        val next = status.copy(progress = progress(phase, done, total, if (turned) now else prev!!.optLong("since", now))) // 남은 시간은 단계마다 따로
+        if (turned || done == 0 || done == total || now - progressSent >= 300) {
+            progressSent = now
+            publish(next)
+        } else {
+            status = next
+        }
+    }
+
     /** 동기화를 부탁한다 (delayMs 안에 또 부탁하면 한 번으로) */
     @Synchronized
     fun request(ctx: Context, delayMs: Long = 0) {
@@ -89,7 +110,7 @@ object DriveSync {
     private fun runNow(ctx: Context, full: Boolean = false): Status {
         val folderId = folderId(ctx) ?: return Status("off", 0, "").also(::publish)
         if (!GoogleAuth.connected(ctx)) return Status("error", status.lastSync, "Google Drive에 로그인해 주세요").also(::publish)
-        publish(status.copy(state = "syncing", changed = false, conflicts = emptyList()))
+        publish(status.copy(state = "syncing", changed = false, conflicts = emptyList(), progress = progress("scan", 0, 0, System.currentTimeMillis())))
         val file = stateFile(ctx, folderId)
         val state = try {
             JSONObject(file.readText())
@@ -102,7 +123,7 @@ object DriveSync {
         if (state.optString("scope") == "full" && scope == "file") state.put("keepMissing", true)
         state.put("scope", scope)
         val result = try {
-            SyncEngine(storage(ctx, folderId), DriveApi(ctx), folderId, state).run(full)
+            SyncEngine(storage(ctx, folderId), DriveApi(ctx), folderId, state, ::onProgress).run(full)
         } catch (e: Exception) {
             android.util.Log.w("MemoKing", "Drive 동기화 실패", e)
             saveState(file, state)
