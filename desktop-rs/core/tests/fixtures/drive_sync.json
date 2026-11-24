@@ -460,9 +460,12 @@
     "localChanged": true
    },
    "local": {
+    "_memoking/": "",
+    "_memoking/trash/": "",
+    "_memoking/trash/gone-remote (20261118-200640).md": "R",
+    "revive-remote.md": "V2",
     "keep.md": "K",
-    "revive-local.md": "L2",
-    "revive-remote.md": "V2"
+    "revive-local.md": "L2"
    },
    "remote": {
     "live": {
@@ -1877,7 +1880,10 @@
     "localChanged": true
    },
    "local": {
-    "b.md": "B"
+    "b.md": "B",
+    "_memoking/": "",
+    "_memoking/trash/": "",
+    "_memoking/trash/a (20261118-200640).md": "A"
    },
    "remote": {
     "live": {
@@ -1953,6 +1959,9 @@
     "localChanged": true
    },
    "local": {
+    "_memoking/": "",
+    "_memoking/trash/": "",
+    "_memoking/trash/a (20261118-200640).md": "A",
     "W/": ""
    },
    "remote": {

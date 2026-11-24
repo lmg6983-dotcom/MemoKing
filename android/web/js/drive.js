@@ -262,8 +262,9 @@ export function renderStatus(s = drive.status()) {
   }
   $('drive-sync-now').hidden = !(s.active && s.connected);
   $('drive-disconnect').hidden = !s.connected;
-  $('drive-connect').textContent = s.active && s.connected ? UI.changeFolder : '연결하기';
-  $('drive-connect').classList.toggle('primary', !(s.active && s.connected)); // 연결 전에는 PC처럼 주 단추
+  $('drive-connect').textContent = '연결하기';
+  $('drive-connect').hidden = Boolean(s.active && s.connected); // 연결 뒤에는 폴더를 바꾸는 단추를 두지 않는다 (PC 와 같게 — 폴더는 로그인하면 정해진다)
+  $('drive-connect').classList.add('primary');
 }
 
 let syncing = false; // 여러 번 눌러도 동기화는 한 번만

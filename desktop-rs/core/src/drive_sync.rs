@@ -262,6 +262,8 @@ struct Engine<'a> {
     root_id: String,
     files: Mutex<BTreeMap<String, Base>>,
     folder_ids: Mutex<BTreeMap<String, String>>,
+    /// 이번에 본 Drive 파일 id — 이 PC 에서 따라 지울 파일이 Drive 에 다른 이름으로 있으면(이름 바꾸기 · 옮기기) 휴지통에 넣지 않는다
+    remote_ids: Mutex<HashSet<String>>,
     // 만드는 중인 Drive 폴더 — 여러 줄이 한꺼번에 같은 폴더를 두 번 만들지 않게
     making: Mutex<()>,
     result: Mutex<SyncResult>,
@@ -276,6 +278,7 @@ pub fn run(root: &Path, remote: &dyn Remote, root_id: &str, state: &mut SyncStat
         root_id: root_id.into(),
         files: Mutex::new(std::mem::take(&mut state.files)),
         folder_ids: Mutex::new(BTreeMap::new()),
+        remote_ids: Mutex::new(HashSet::new()),
         making: Mutex::new(()),
         result: Mutex::new(SyncResult::default()),
         opts,
@@ -339,6 +342,22 @@ impl Engine<'_> {
             }
         }
         out
+    }
+
+    /// 다른 기기에서 지운 파일을 이 PC 에서도 — 메모(.md)는 바로 지우지 않고 메모킹 휴지통으로 (_memoking/trash/제목 (지운 시각).md,
+    ///   vault trash_path 와 같은 이름). 다른 앱이 파일을 새로 만들어 바꿔 Drive 에서 "지운 것" 으로 보였을 때도 되살리게 (SyncEngine.kt 와 같음)
+    fn remove_local(&self, rel: &str, moved: bool) -> io::Result<()> {
+        let from = self.abs(rel);
+        let name = rel.rsplit('/').next().unwrap_or(rel);
+        let Some(base) = name.strip_suffix(".md").filter(|_| !moved && !rel.starts_with("_memoking/")) else { return fs::remove_file(from) };
+        let stamp = chrono::DateTime::from_timestamp_millis((self.opts.now)()).unwrap_or_default().with_timezone(&chrono::Local).format("%Y%m%d-%H%M%S");
+        let dir = self.root.join("_memoking").join("trash");
+        fs::create_dir_all(&dir)?;
+        let to = (1..)
+            .map(|n| dir.join(format!("{base}{} ({stamp}).md", if n > 1 { format!(" ({n})") } else { String::new() })))
+            .find(|p| !p.exists())
+            .unwrap();
+        fs::rename(from, to)
     }
 
     /// 메모 폴더 맨 위의 사용자 폴더 이름들 (이 PC)
@@ -645,7 +664,7 @@ impl Engine<'_> {
                     (self.opts.locked)(&mut || {
                         removed = match self.stat(rel) {
                             Some(now) if now.mtime != l.mtime || now.size != l.size => Ok(false),
-                            _ => fs::remove_file(self.abs(rel)).or_else(|e| if e.kind() == io::ErrorKind::NotFound { Ok(()) } else { Err(e) }).map(|()| true),
+                            _ => self.remove_local(rel, b.as_ref().is_some_and(|b| self.remote_ids.lock().unwrap().contains(&b.id))).or_else(|e| if e.kind() == io::ErrorKind::NotFound { Ok(()) } else { Err(e) }).map(|()| true),
                         }
                     });
                     if !removed? {
@@ -725,6 +744,7 @@ impl Engine<'_> {
             Some(r) => r,
             None => self.walk_remote()?,
         };
+        *self.remote_ids.lock().unwrap() = remote.values().map(|r| r.id.clone()).collect();
         let paths: BTreeSet<&String> = local.keys().chain(remote.keys()).chain(files.keys()).collect();
 
         let gone_remote = paths.iter().filter(|p| files.contains_key(**p) && !remote.contains_key(**p) && local.contains_key(**p)).count();

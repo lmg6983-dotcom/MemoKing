@@ -28,7 +28,7 @@ const UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3";
 const FIELDS: &str = "id,name,mimeType,md5Checksum,modifiedTime,createdTime,size";
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const OFFLINE: &str = "인터넷에 연결되지 않아 동기화하지 못했어요";
-const DOUBLE_SYNC: &str = "메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). Drive 데스크탑 앱으로만 맞추려면 설정의 Google Drive 동기화에서 연결을 끊고, 메모킹으로 맞추려면 \"다른 Drive 폴더로 바꾸기\"로 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요";
+const DOUBLE_SYNC: &str = "메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (휴대폰에서 메모가 사라지지 않게). 설정의 Google Drive 동기화에서 \"연결 끊기\" 뒤 \"연결하기\"를 누르면 메모를 문서\\메모킹 으로 옮겨 맞춰요";
 // 주기: 쉬는 중 30초 · 메모킹 창을 쓰는 중 10초 · 파일이 오간 뒤 2분은 5초 (휴대폰과 주고받는 중일 때 빨리)
 const POLL_IDLE: Duration = Duration::from_secs(30);
 const POLL_ACTIVE: Duration = Duration::from_secs(10);
@@ -893,11 +893,12 @@ fn find_or_create_folder(parent: &str, name: &str) -> io::Result<(RemoteItem, bo
     Ok((drive_sync::Remote::create_folder(&Api, parent, name)?, false))
 }
 
-/// Drive 폴더를 고른다. 메모 폴더가 Google Drive 데스크탑 앱 폴더 안이면 문서\메모킹 으로 복사해 옮겨 맞춘다
+/// Drive 폴더를 고른다. 메모킹이 Drive 와 맞추는 동안 메모 폴더는 늘 문서\메모킹 — 다른 곳(Google Drive 데스크탑 앱의 G: · OneDrive 폴더 등)이면
+///   그 메모를 복사해 옮겨 맞춘다 (원래 폴더는 그대로). 두 동기화가 한 폴더를 함께 맞추면 휴대폰에서 메모가 사라졌다
 fn switch_folder(app: &AppHandle, folder_id: &str, folder_name: &str) -> Value {
     let st = app.state::<State>();
     let current = st.vault.lock().unwrap().as_ref().map(|v| v.root.clone());
-    let root = current.clone().filter(|r| !inside_drive_for_desktop(&r.to_string_lossy())).unwrap_or_else(|| State::suggested_vault(app));
+    let root = State::suggested_vault(app);
     let moving = current.as_ref() != Some(&root);
     if moving {
         // 옮기기 전에 쓰던 글부터 저장하고 메모 창을 닫는다 (마지막 글이 옛 폴더에만 남지 않게)

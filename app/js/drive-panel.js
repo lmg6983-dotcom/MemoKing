@@ -179,7 +179,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     $('drive-sync-now').disabled = st.state === 'syncing';
     $('drive-conflicts').hidden = !conflicts.length;
     $('drive-conflicts').textContent = `충돌 사본 ${conflicts.length}개 보기`;
-    $('drive-folder').hidden = !on;
+    $('drive-folder').hidden = true; // 폴더는 로그인하면 정해진다 ("메모킹 동기화" · 문서\메모킹) — 바꾸는 설정은 두지 않는다 (헷갈림)
     $('drive-disconnect').hidden = !info.connected;
     paintBar($('drive-bar'), sum);
     renderSyncStep(sum);

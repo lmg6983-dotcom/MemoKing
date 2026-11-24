@@ -124,6 +124,22 @@ class SyncEngine(
         return out
     }
 
+    /**
+     * 다른 기기에서 지운 파일을 휴대폰에서도 — 메모(.md)는 바로 지우지 않고 메모킹 휴지통으로 (_memoking/trash/제목 (지운 시각).md, vault.js trashPath 와 같은 이름).
+     * 다른 앱(Google Drive 데스크탑 앱 등)이 파일을 새로 만들어 바꿔 Drive 에서 "지운 것" 으로 보였을 때도 되살리게 (PC drive_sync.rs remove_local 과 같음)
+     */
+    private fun removeLocal(rel: String, moved: Boolean): Boolean {
+        val name = rel.substringAfterLast('/')
+        if (moved || !name.endsWith(".md") || rel.startsWith("_memoking/")) return local.delete(rel)
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date(now()))
+        val base = name.removeSuffix(".md")
+        local.mkdirs("_memoking/trash")
+        val to = generateSequence(1) { it + 1 }
+            .map { n -> "_memoking/trash/$base${if (n > 1) " ($n)" else ""} ($stamp).md" }
+            .first { local.stat(it) == null }
+        return local.move(rel, to)
+    }
+
     /** 메모 폴더 맨 위의 사용자 폴더 이름들 (휴대폰) */
     private fun localDirs(): List<String> = local.list("").filter { it.dir && userDir(it.name) }.map { it.name }
 
@@ -402,6 +418,7 @@ class SyncEngine(
             upload(copy, null)
         }
 
+        val remoteIds = remoteFiles.values.map { it.id }.toHashSet()
         for (rel in paths) {
             val l = localFiles[rel]
             val r = remoteFiles[rel]
@@ -423,8 +440,8 @@ class SyncEngine(
                     l != null && r == null -> when {
                         b == null || localChanged || keepMissing -> upload(rel, null) // 새 파일, 또는 Drive 에서 지웠지만 휴대폰에서 고침 → 되살림
                         else -> {
-                            // Drive(PC)에서 지움 → 휴대폰에서도
-                            if (local.delete(rel)) deletedLocal++
+                            // Drive(PC)에서 지움 → 휴대폰에서도. 메모는 휴지통으로 (이름만 바꾼 · 옮긴 것은 그냥 지운다)
+                            if (removeLocal(rel, moved = b != null && remoteIds.contains(b.id))) deletedLocal++
                             files.remove(rel)
                         }
                     }

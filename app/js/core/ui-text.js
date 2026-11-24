@@ -78,7 +78,6 @@ export const UI = Object.freeze({
   myDrive: '내 드라이브',
   notConnected: '연결 안 됨',
   reconnect: '다시 연결해 주세요',
-  changeFolder: '폴더 바꾸기',
   driveFirst: 'Google Drive를 먼저 연결해 주세요',
   driveUploading: 'Google Drive에 올리는 중',
   driveUnavailable: 'Google Drive를 쓸 수 없어요. 설정의 Google Drive 동기화에서 먼저 연결해 주세요',
