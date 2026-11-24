@@ -23,8 +23,9 @@ async function hash(s) {
 const latin1Bytes = (s) => Uint8Array.from(s, (c) => c.charCodeAt(0) & 0xff);
 
 // 사진 하나를 받아 임시 파일로 → 확장자를 정해 메모 폴더의 rel(확장자 제외) 에 저장. 저장한 경로를 돌려준다.
-async function downloadImage(url, limit, relWithoutExt) {
-  const res = await call('http', { url, accept: IMAGE_ACCEPT, limit, save: true });
+//   publicOnly: 저절로 받는 것(링크 미리보기) — 공유기 · NAS 같은 안 네트워크 주소는 받지 않는다 (Http.kt)
+async function downloadImage(url, limit, relWithoutExt, publicOnly = false) {
+  const res = await call('http', { url, accept: IMAGE_ACCEPT, limit, save: true, publicOnly });
   if (res.status < 200 || res.status > 299 || !res.temp) throw new Error(`HTTP ${res.status}`);
   const type = res.type ?? '';
   const ext = imageExtFromType(type) ?? (/icon/.test(type) || /\.ico(\?|$)/i.test(url) ? 'ico' : imageExtFromUrl(url));
@@ -126,7 +127,8 @@ export class LinkPreviews {
     if (!/^https?:$/.test(target.protocol)) throw new Error(UI.notUrl);
     const youtube = await this.#fetchYoutube(url).catch(() => null);
     if (youtube) return youtube;
-    const res = await call('http', { url: target.href, accept: 'text/html,application/xhtml+xml,*/*;q=0.8', limit: MAX_HTML, headOnly: true });
+    // 메모가 열리기만 해도 받으니 안 네트워크 주소는 넘겨받은 것까지 건드리지 않는다 (PC files.rs call_public 과 같음)
+    const res = await call('http', { url: target.href, accept: 'text/html,application/xhtml+xml,*/*;q=0.8', limit: MAX_HTML, headOnly: true, publicOnly: true });
     if (res.status < 200 || res.status > 299) throw new Error(`HTTP ${res.status}`);
     const type = (res.type ?? '').toLowerCase();
     const finalUrl = res.url || target.href;
@@ -184,6 +186,6 @@ export class LinkPreviews {
 
   async #saveImage(url, limit) {
     fs.mkdirs(DIR);
-    return downloadImage(url, limit, `${DIR}/${await hash(url)}`);
+    return downloadImage(url, limit, `${DIR}/${await hash(url)}`, true);
   }
 }

@@ -16,11 +16,28 @@ import java.util.concurrent.TimeUnit
  * 인터넷에서 받아 오기 — 링크 미리보기(페이지 제목·사진)와 붙여넣은 인터넷 사진 저장에 쓴다.
  * 화면(웹)에서 바로 받으면 다른 사이트의 CORS 에 막히므로 앱이 대신 받는다.
  *
- * 인자: url, accept, limit(바이트), headOnly(</head> 까지만), save(임시 파일로)
+ * 인자: url, accept, limit(바이트), headOnly(</head> 까지만), save(임시 파일로), publicOnly(안 네트워크 주소는 넘겨받은 것까지 받지 않음)
  * 결과: { status, url(최종 주소), type, text | temp, size }
  */
 object Http {
     private var userAgent: String? = null
+
+    /** 집 · 회사 안 네트워크(이 휴대폰 · 공유기 · NAS)의 주소인가 (PC files.rs local_ip 와 같음) */
+    fun localAddress(a: java.net.InetAddress): Boolean {
+        val b = a.address
+        val cgnat = b.size == 4 && (b[0].toInt() and 0xff) == 100 && (b[1].toInt() and 0xc0) == 64
+        val ula = b.size == 16 && (b[0].toInt() and 0xfe) == 0xfc
+        val zero = b.size == 4 && b[0].toInt() == 0
+        return a.isLoopbackAddress || a.isSiteLocalAddress || a.isLinkLocalAddress || a.isAnyLocalAddress || a.isMulticastAddress || cgnat || ula || zero
+    }
+
+    /** 인터넷 쪽 주소인가 — 이름이면 찾아 본 주소가 모두 밖이어야 (못 찾으면 아니다) */
+    fun publicHost(host: String): Boolean = try {
+        val all = java.net.InetAddress.getAllByName(host.trim('[', ']'))
+        all.isNotEmpty() && all.none(::localAddress)
+    } catch (e: Exception) {
+        false
+    }
 
     private fun agent(ctx: Context): String = userAgent ?: try {
         WebSettings.getDefaultUserAgent(ctx)
@@ -35,12 +52,14 @@ object Http {
         val headOnly = args.optBoolean("headOnly", false)
         val save = args.optBoolean("save", false)
         val timeout = args.optInt("timeout", 10_000)
+        val publicOnly = args.optBoolean("publicOnly", false)
 
         var conn: HttpURLConnection
         var hops = 0
         // 리디렉트를 직접 따라간다 (http ↔ https 를 넘나드는 경우까지)
         while (true) {
             if (url.protocol != "http" && url.protocol != "https") throw IOException("인터넷 주소가 아니에요")
+            if (publicOnly && !publicHost(url.host)) throw IOException("안 네트워크 주소는 미리 보지 않아요")
             conn = url.openConnection() as HttpURLConnection
             conn.instanceFollowRedirects = false
             conn.connectTimeout = timeout
