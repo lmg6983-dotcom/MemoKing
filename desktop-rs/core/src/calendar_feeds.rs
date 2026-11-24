@@ -58,7 +58,7 @@ fn normalize_cals(o: &Value) -> Option<Value> {
     (!out.is_empty()).then_some(Value::Object(out))
 }
 
-/// 저장해 둔 구독 목록을 안전한 모양으로 [{ id, name, url, color, on, user?, pass?, cals? }] (user · pass 는 CalDAV 계정)
+/// 저장해 둔 구독 목록을 안전한 모양으로 [{ id, name, url, color, on, picked?, user?, pass?, cals? }] (user · pass 는 CalDAV 계정)
 pub fn normalize_feeds(list: &Value) -> Vec<Value> {
     let mut seen = std::collections::HashSet::new();
     let mut out: Vec<Value> = vec![];
@@ -80,6 +80,9 @@ pub fn normalize_feeds(list: &Value) -> Vec<Value> {
             "color": if is_color(&f["color"]) { f["color"].clone() } else { FEED_COLORS[out.len() % FEED_COLORS.len()].into() },
             "on": f["on"] != false,
         });
+        if f["picked"] == true {
+            feed["picked"] = true.into(); // 사람이 고른 색 (memo-colors.js calendarColors)
+        }
         if !user.is_empty() {
             let pass = if f["pass"].is_null() { String::new() } else { js::string(&f["pass"]) };
             feed["user"] = user.into();

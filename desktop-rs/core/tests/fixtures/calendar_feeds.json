@@ -115,6 +115,38 @@
  {
   "list": [
    {
+    "id": "p1",
+    "url": "https://example.com/p.ics",
+    "color": "#61b9ff",
+    "picked": true
+   },
+   {
+    "id": "p2",
+    "url": "https://example.com/q.ics",
+    "picked": "yes"
+   }
+  ],
+  "feeds": [
+   {
+    "id": "p1",
+    "name": "example.com",
+    "url": "https://example.com/p.ics",
+    "color": "#61b9ff",
+    "on": true,
+    "picked": true
+   },
+   {
+    "id": "p2",
+    "name": "example.com",
+    "url": "https://example.com/q.ics",
+    "color": "#68ca80",
+    "on": true
+   }
+  ]
+ },
+ {
+  "list": [
+   {
     "id": "o1",
     "url": "https://outlook.office365.com/owa/calendar/x.ics",
     "color": "#123456",

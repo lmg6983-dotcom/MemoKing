@@ -50,7 +50,7 @@ export function normalizeCals(o) {
   return Object.keys(out).length ? out : null;
 }
 
-/** 저장해 둔 구독 목록을 안전한 모양으로 [{ id, name, url, color, on, user?, pass? }] (user · pass 는 CalDAV 계정) */
+/** 저장해 둔 구독 목록을 안전한 모양으로 [{ id, name, url, color, on, picked?, user?, pass? }] (user · pass 는 CalDAV 계정) */
 export function normalizeFeeds(list) {
   if (!Array.isArray(list)) return [];
   const seen = new Set();
@@ -67,6 +67,7 @@ export function normalizeFeeds(list) {
       url,
       color: /^#[0-9a-f]{6}$/i.test(f.color ?? '') ? f.color : FEED_COLORS[out.length % FEED_COLORS.length],
       on: f.on !== false,
+      ...(f.picked === true ? { picked: true } : {}), // 사람이 고른 색 — 아니면 달력은 캘린더 이름으로 색을 정한다 (memo-colors.js calendarColors)
       ...(user ? { user, pass: String(f.pass ?? '').slice(0, 200) } : {}),
       ...(normalizeCals(f.cals) ? { cals: normalizeCals(f.cals) } : {}),
     });

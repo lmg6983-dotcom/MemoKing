@@ -206,6 +206,7 @@ const feedLists = [
   [{ id: 'g1', url: ' webcal://calendar.google.com/calendar/ical/x/basic.ics ', name: '  내   일정  ' }, { id: 'g2', url: 'WEBCALS://p01-caldav.icloud.com/a b' }],
   [{ id: 'n1', url: 'https://caldav.calendar.naver.com/', user: '  me@naver.com ', pass: 12345, cals: { 내캘린더: { on: false, color: '#ABCDEF' }, '': {}, 회사: { color: 'red' }, 7: null } }],
   [{ id: 'n2', url: 'https://caldav.calendar.naver.com/', user: 'a' }, { id: 'n3', url: 'https://caldav.calendar.naver.com/', user: 'b', name: 5 }, { id: 'n4', url: 'https://caldav.calendar.naver.com', user: 'a' }],
+  [{ id: 'p1', url: 'https://example.com/p.ics', color: '#61b9ff', picked: true }, { id: 'p2', url: 'https://example.com/q.ics', picked: 'yes' }],
   [{ id: 'o1', url: 'https://outlook.office365.com/owa/calendar/x.ics', color: '#123456', on: false }, { id: 'w', url: 'http://www.example.com:8080/cal?x=1#h' }, { id: 'bad', url: 'ftp://example.com/a.ics' }, { id: 'bad2', url: 'not a url' }, { id: 'x', url: 'https://me.com/c' }, 'text', 3],
   Array.from({ length: 12 }, (_, i) => ({ id: `f${i}`, url: `https://example.com/${i}.ics`, name: '가'.repeat(i * 5) })),
   'not a list',
