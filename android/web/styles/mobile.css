@@ -656,6 +656,9 @@ h2.sheet-title { font-size: 20px; }
 
 /* ---------- Google Drive ---------- */
 .drive-box { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
+/* 이 Drive 폴더를 맞추는 기기들 (PC 설정의 Google Drive 칸과 같게) */
+.drive-devices { margin: -4px 4px 10px; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+.drive-devices li { padding: 2px 0; }
 .drive-box-icon { width: 26px; height: 26px; flex: none; color: var(--muted); }
 .drive-box.on .drive-box-icon { color: var(--text-strong); }
 .drive-box.error .drive-box-icon { color: var(--danger); }

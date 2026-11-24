@@ -57,9 +57,22 @@ pub fn start(app: &AppHandle) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(2));
         rescan(&app);
+        take_inbox(&app);
         crate::index::tick(&app);
         crate::windows::discard_tick(&app); // 오래 숨은 스택 탭 거두기 (30초마다 본다)
     });
+}
+
+/// 받은 메모 빈 칸(_memoking/받은 메모): AI 가 채운 칸을 메모로 옮긴다 (core vault/inbox.rs) — 빈 칸은 Drive 와 맞추는 동안만 만들어 둔다
+fn take_inbox(app: &AppHandle) {
+    let ensure = crate::drive::syncing_vault(app);
+    let root = with_vault(app, |v| Ok(v.root.clone())).ok();
+    let take = root.is_some_and(|r| !ensure || crate::devices::inbox_turn(app, &r)); // 맞추는 중이면 켜져 있는 기기 가운데 한 기기만
+    let made = with_vault(app, |v| Ok(v.take_inbox(ensure, take))).unwrap_or_default();
+    if !made.is_empty() {
+        push_list(app);
+        let _ = app.emit_to("list", "inbox:taken", [made.len()]); // "AI 비서가 보낸 새 메모 n개를 가져왔어요" (휴대폰과 같게)
+    }
 }
 
 pub fn rescan(app: &AppHandle) {
@@ -168,7 +181,8 @@ fn app_settings(app: &AppHandle) -> Value {
     let quick = status("quickMemo");
     json!({
         "trashDays": s("trashDays").as_u64().unwrap_or(30),
-        "trashCount": with_vault(app, |v| Ok(v.trash_list().len())).unwrap_or(0),
+        // 메모 폴더를 읽는 중이면(처음 여는 큰 폴더 · Drive 데스크탑 앱의 스트리밍 폴더) 기다리지 않는다 — 설정 창이 열리지 않던 것
+        "trashCount": st.vault.try_lock().ok().and_then(|g| g.as_ref().map(|v| v.trash_list().len())).unwrap_or(0),
         "autoStart": crate::files::auto_start(app),
         "historyEnabled": s("historyEnabled") == true,
         "quickMemo": { "enabled": not_false("quickMemo"), "registered": quick["registered"], "key": quick["label"] },
@@ -1081,6 +1095,10 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "trash:empty" => with_vault(app, |v| Ok(v.empty_trash(None))),
         "vault:choose" => {
             use tauri_plugin_dialog::DialogExt;
+            // 메모킹이 Drive 와 맞추는 중에는 메모 폴더를 바꾸지 않는다 (설정은 단추를 숨긴다 — 다른 길로 와도). 폴더를 잃었을 때는 고를 수 있게
+            if crate::drive::syncing_vault(app) && st.vault.lock().unwrap().is_some() {
+                return Some(Ok(st.vault_info(app)));
+            }
             let start = with_vault(app, |v| Ok(v.root.clone())).unwrap_or_else(|_| State::suggested_vault(app));
             let picked = app.dialog().file().set_title("메모를 저장할 폴더 선택").set_directory(start).blocking_pick_folder();
             if let Some(dir) = picked.and_then(|p| p.into_path().ok()) {

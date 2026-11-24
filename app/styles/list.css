@@ -759,6 +759,9 @@ body.is-dragging .card:hover { transform: none; }
 .path-row .path-box { flex: 1 1 160px; min-width: 0; margin: 0; padding: 0; border: 0; background: none; }
 .drive-actions .btn:not(.primary) { background: var(--surface-1); }
 .drive-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: -4px 4px 8px; }
+/* 이 Drive 폴더를 맞추는 기기들 — 상태 칸 아래 작은 줄 (마우스를 올리면 메모 폴더 · PC 다리 · 최근 오류) */
+.drive-devices { margin: 2px 4px 6px; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.drive-devices li { padding: 1px 0; }
 .drive-links:not(:has(> :not([hidden]))) { display: none; } /* 연결 전에는 줄 자체가 없게 */
 #settings-dialog > .app-box { padding: 16px 16px 16px 20px; border-radius: 24px; background: var(--surface-1); }
 .drive-box-icon { flex: none; width: 22px; height: 22px; color: var(--muted); }

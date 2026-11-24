@@ -73,6 +73,8 @@ pub struct Vault {
     /// 새 메모의 Work / Life
     pub default_mode: String,
     entries: HashMap<String, Entry>,
+    /// 받은 메모 빈 칸마다 마지막으로 본 (시각, 크기) — 바뀐 칸만 읽는다 (vault/inbox.rs)
+    inbox_seen: HashMap<usize, (SystemTime, u64)>,
     /// 다시 읽다 잠깐 사라진 메모의 머리말 (곧 같은 id 로 저장하면 그 머리말로)
     removed_meta: HashMap<String, (Meta, SystemTime)>,
     /// 이 기기가 되살린 파일 — "다른 기기에서 고침" 으로 알리지 않게
@@ -90,6 +92,7 @@ pub struct Vault {
     secret_alias: HashMap<String, (String, String)>,
 }
 
+mod inbox;
 mod secret_store;
 
 /// 목록 카드 · 찾기가 본문에서 쓰는 것
@@ -150,6 +153,7 @@ impl Vault {
             device: device.into(),
             default_mode: "life".into(),
             entries: HashMap::new(),
+            inbox_seen: HashMap::new(),
             removed_meta: HashMap::new(),
             own_files: HashSet::new(),
             seen_dirs: None,
@@ -195,17 +199,24 @@ impl Vault {
 
     // ---------- 폴더 읽기 ----------
 
-    fn list_files(&self, dir: &Path, rel: &str, out: &mut Vec<String>) -> io::Result<()> {
-        for item in fs::read_dir(dir)? {
-            let item = item?;
+    /// 메모 폴더의 .md 파일들. 읽을 수 없는 항목(받는 중 사라진 파일 · Drive 바로가기 · 권한이 다른 하위 폴더)은 건너뛴다
+    ///   — 예전에는 하나만 실패해도 이번 읽기를 통째로 버려, Google Drive 데스크탑 앱 폴더에서 새로 들어온 메모가 계속 안 보였다.
+    ///   메모 폴더 자체를 못 읽을 때만 실패
+    fn list_files(&self, dir: &Path, rel: &str, out: &mut Vec<String>, unread: &mut Vec<String>) -> io::Result<()> {
+        for item in fs::read_dir(dir)?.flatten() {
             let name = item.file_name().to_string_lossy().into_owned();
             if name.starts_with('.') || name.starts_with("~$") || (rel.is_empty() && (name == APP_DIR || name == ATTACH_DIR)) {
                 continue;
             }
             let rel_path = if rel.is_empty() { name.clone() } else { format!("{rel}/{name}") };
-            let ty = item.file_type()?;
+            let Ok(ty) = item.file_type() else {
+                unread.push(rel_path); // 잠깐 못 읽은 항목 — 그 메모는 아는 그대로 (scan)
+                continue;
+            };
             if ty.is_dir() {
-                self.list_files(&item.path(), &rel_path, out)?;
+                if self.list_files(&item.path(), &rel_path, out, unread).is_err() {
+                    unread.push(format!("{rel_path}/")); // 하위 폴더 하나를 못 읽어도 나머지는 — 그 안의 메모는 아는 그대로 (scan)
+                }
             } else if ty.is_file() && name.to_lowercase().ends_with(".md") {
                 out.push(rel_path);
             }
@@ -215,8 +226,8 @@ impl Vault {
 
     /// 바뀐 파일만 다시 읽는다. 다른 기기에서 들어온 변경은 external 로
     pub fn scan(&mut self) -> Changed {
-        let mut files = vec![];
-        if self.list_files(&self.root.clone(), "", &mut files).is_err() {
+        let (mut files, mut unread) = (vec![], vec![]);
+        if self.list_files(&self.root.clone(), "", &mut files, &mut unread).is_err() {
             return Changed::default();
         }
         // 지금 것을 꺼내 바뀌지 않은 메모는 그대로 옮긴다 (2초마다 모든 본문을 복사하지 않게)
@@ -230,7 +241,10 @@ impl Vault {
         let mut locked_now: Vec<String> = vec![];
         for file in files {
             let path = self.abs(&file);
-            let Ok(stamp) = stamp_of(&path) else { continue };
+            let Ok(stamp) = stamp_of(&path) else {
+                unread.push(file.clone()); // 목록을 읽은 뒤 잠깐 못 본 파일 — 지운 것이 아니다
+                continue;
+            };
             let prev = prev_by_file.get(&file).and_then(|id| old.get(id)).filter(|p| p.file.as_deref() == Some(file.as_str()));
             let keep = prev.is_some_and(|p| p.stamp == Some(stamp) && !next.contains_key(&p.id));
             let text = if keep { None } else { fs::read_to_string(&path).ok() };
@@ -272,6 +286,13 @@ impl Vault {
             }
             next.insert(id.clone(), Entry { id: id.clone(), file: Some(file), folder: String::new(), disk_meta: Some(meta.clone()), meta, body, stamp: Some(stamp), id_saved, secret: None });
             changed.push(id);
+        }
+        // 이번에 못 읽은 하위 폴더의 메모는 지운 것이 아니다 — 아는 그대로 둔다
+        let keep: Vec<String> = old.values().filter(|e| !next.contains_key(&e.id) && e.file.as_ref().is_some_and(|f| unread.iter().any(|d| f.starts_with(d.as_str())))).map(|e| e.id.clone()).collect();
+        for id in keep {
+            if let Some(e) = old.remove(&id) {
+                next.insert(id, e);
+            }
         }
         let removed: Vec<String> = old.keys().filter(|id| !next.contains_key(*id)).cloned().collect();
         let now = SystemTime::now();
@@ -1653,6 +1674,31 @@ mod tests {
         let d = std::env::temp_dir().join(format!("mk-vault-{}", uuid::Uuid::new_v4().simple()));
         fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    // 못 읽은 하위 폴더의 메모는 지운 것이 아니다 — 목록에 그대로 (Drive 데스크탑 앱 폴더 · 백신)
+    #[cfg(unix)]
+    #[test]
+    fn unreadable_folder_keeps_memos() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let a = v.create(None, None, "업무");
+        v.save(&a, "# 회의\n본문").unwrap();
+        let b = v.create(None, None, "");
+        v.save(&b, "# 장보기").unwrap();
+        v.scan();
+        let dir = root.join("업무");
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o000)).unwrap();
+        let unreadable = fs::read_dir(&dir).is_err(); // root 로 돌면 권한이 막히지 않는다
+        let changed = v.scan();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+        if unreadable {
+            assert!(v.entry(&a).is_some() && !changed.removed.contains(&a), "못 읽은 폴더의 메모는 그대로");
+        }
+        assert!(v.entry(&b).is_some());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

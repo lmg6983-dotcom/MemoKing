@@ -623,6 +623,20 @@ pub fn auto_start(app: &AppHandle) -> Value {
     json!({ "available": available, "enabled": available && app.autolaunch().is_enabled().unwrap_or(false) })
 }
 
+/// Google Drive 에 연결할 때: 자동 실행을 켠다 — PC 가 켜져 있는 동안 받은 메모 · PC 다리가 늘 돌게.
+///   사용자가 직접 끈 적이 있으면(autoStartSet) 그대로 둔다
+pub fn ensure_auto_start(app: &AppHandle) {
+    if auto_start(app)["available"] != true || state(app).setting("autoStartSet") == true {
+        return;
+    }
+    if let Err(err) = app.autolaunch().enable() {
+        elog!("자동 실행을 켜지 못했어요: {err}");
+        return;
+    }
+    state(app).set_setting("autoStartSet", true.into());
+    crate::os::refresh_tray(app);
+}
+
 pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let arg = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
     Some(match channel {

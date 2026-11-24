@@ -2,6 +2,7 @@
 // 연결: ① (처음 한 번) OAuth 클라이언트 붙여 넣기 ② 브라우저 로그인 ③ Drive 폴더 고르기 ④ 첫 동기화
 import { koClock, relativeDay, koMonthDay } from './core/time.js';
 import { UI } from './core/ui-text.js';
+import { deviceSummary } from './core/devices.js';
 
 const $ = (id) => document.getElementById(id);
 // 메모킹이 Drive 에 만드는 폴더 이름 (예전 "메모킹" 폴더는 Google Drive 데스크탑 앱이 만든 것이라 메모킹이 볼 수 없다)
@@ -161,6 +162,11 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     tidyConflicts();
     const sum = summary();
     const on = sum.on;
+    // 메모킹이 Drive 와 맞추는 동안은 메모 폴더를 바꾸지 않는다 (Drive 데스크탑 앱 폴더와 헷갈리지 않게) — 바꾸려면 연결 끊기
+    const changeVault = $('change-vault');
+    if (changeVault) changeVault.hidden = on;
+    const managed = $('vault-managed-note');
+    if (managed) managed.hidden = !on;
     box.classList.toggle('on', on);
     box.classList.toggle('error', sum.tone === 'error');
     $('drive-title').textContent = on ? (sum.tone === 'ok' ? `${info.email || 'Google 계정'}의 ${info.folderName || '메모킹'} 폴더` : sum.title) : sum.title;
@@ -174,7 +180,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     $('drive-sync-now').disabled = st.state === 'syncing';
     $('drive-conflicts').hidden = !conflicts.length;
     $('drive-conflicts').textContent = `충돌 사본 ${conflicts.length}개 보기`;
-    $('drive-folder').hidden = !on;
+    $('drive-folder').hidden = true; // 폴더는 로그인하면 정해진다 ("메모킹 동기화" · 문서\메모킹) — 바꾸는 설정은 두지 않는다 (헷갈림)
     $('drive-disconnect').hidden = !info.connected;
     paintBar($('drive-bar'), sum);
     renderSyncStep(sum);
@@ -322,6 +328,22 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     } catch {
       // 오래된 preload — 표시만 안 함
     }
+    renderDevices();
+  }
+
+  // 이 Drive 폴더를 맞추는 기기들 (기기 상태 파일 _memoking/기기 — core/devices.js): "제1 PC · PC · 3분 전 동기화"
+  async function renderDevices() {
+    const ul = $('drive-devices');
+    if (!ul || !api.drive.devices) return;
+    const list = info?.connected && info?.active ? await api.drive.devices().catch(() => []) : [];
+    const now = Date.now();
+    ul.replaceChildren(...list.map((d) => {
+      const li = document.createElement('li');
+      li.textContent = `${deviceSummary(d, now)}${d.me ? ' (이 PC)' : ''}`;
+      li.title = d.lines.join('\n'); // 메모 폴더 · PC 다리 · 최근 오류
+      return li;
+    }));
+    ul.hidden = !list.length;
   }
 
   // ---------- 연결 창 ----------

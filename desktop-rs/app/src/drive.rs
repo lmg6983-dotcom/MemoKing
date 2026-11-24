@@ -28,9 +28,9 @@ const UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3";
 const FIELDS: &str = "id,name,mimeType,md5Checksum,modifiedTime,createdTime,size";
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const OFFLINE: &str = "인터넷에 연결되지 않아 동기화하지 못했어요";
-const DOUBLE_SYNC: &str = "메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). 설정의 Google Drive 동기화에서 \"다른 Drive 폴더로 바꾸기\"로 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요";
-// 주기: 쉬는 중 30초 · 메모킹 창을 쓰는 중 10초 · 파일이 오간 뒤 2분은 5초 (휴대폰과 주고받는 중일 때 빨리)
-const POLL_IDLE: Duration = Duration::from_secs(30);
+const DOUBLE_SYNC: &str = "메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (휴대폰에서 메모가 사라지지 않게). 설정의 Google Drive 동기화에서 \"연결 끊기\" 뒤 \"연결하기\"를 누르면 메모를 문서\\메모킹 으로 옮겨 맞춰요";
+// 주기: 쉬는 중 · 메모킹 창을 쓰는 중 10초 · 파일이 오간 뒤 2분은 5초 (휴대폰과 주고받는 중일 때 빨리)
+const POLL_IDLE: Duration = Duration::from_secs(10); // 쉬는 중에도 10초 — 평소에는 "바뀐 것 있어?" 한 번만 묻는 가벼운 요청이라 (휴대폰 · Gemini 가 쓴 것이 빨리 오게)
 const POLL_ACTIVE: Duration = Duration::from_secs(10);
 const POLL_BURST: Duration = Duration::from_secs(5);
 const BURST_FOR: Duration = Duration::from_secs(120);
@@ -663,10 +663,19 @@ fn config(app: &AppHandle) -> Option<(String, String, PathBuf)> {
     Some((folder, drive["folderName"].as_str().unwrap_or_default().into(), root))
 }
 
+/// 메모킹이 Google Drive 와 메모 폴더를 맞추고 있나 (로그인했고 Drive 폴더를 골랐다) — 이 동안은 메모 폴더를 바꾸지 않는다
+pub fn syncing_vault(app: &AppHandle) -> bool {
+    d().connected() && config(app).is_some()
+}
+
 fn info(app: &AppHandle) -> Value {
     let st = app.state::<State>();
     let drive = st.setting("drive");
-    let root = st.vault.lock().unwrap().as_ref().map(|v| v.root.to_string_lossy().into_owned()).unwrap_or_default();
+    // 메모 폴더를 읽는 중이면 기다리지 않고 설정의 경로로 (동기화 칸 · 설정 창이 멈추지 않게)
+    let root = match st.vault.try_lock() {
+        Ok(g) => g.as_ref().map(|v| v.root.to_string_lossy().into_owned()).unwrap_or_default(),
+        Err(_) => st.setting("vaultPath").as_str().unwrap_or_default().to_string(),
+    };
     let dr = d();
     json!({
         "configured": dr.client().is_some(),
@@ -730,7 +739,7 @@ fn run(app: &AppHandle, full: bool) -> Value {
 
 fn run_once(app: &AppHandle, full: bool) {
     let dr = d();
-    let Some((folder_id, _, root)) = config(app) else { return };
+    let Some((folder_id, folder_name, root)) = config(app) else { return };
     if inside_drive_for_desktop(&root.to_string_lossy()) {
         return publish(app, json!({ "state": "error", "error": DOUBLE_SYNC }));
     }
@@ -790,9 +799,14 @@ fn run_once(app: &AppHandle, full: bool) {
             if r.local_changed {
                 crate::memos::rescan(app);
             }
+            crate::devices::write(app, &root, &folder_name, true, ""); // 기기 상태 파일 (다른 기기 · AI 가 본다)
+            // PC 다리: Drive 데스크탑 앱 폴더에 다른 앱(Gemini 등)이 새로 만든 메모를 가져온다 (drive_bridge.rs)
+            let known: std::collections::HashSet<String> = state.files.keys().cloned().collect();
+            crate::drive_bridge::run(app, &Api, &folder_id, &folder_name, &known);
         }
         Err(err) => {
             elog!("[Google Drive 동기화] {err}");
+            crate::devices::write(app, &root, &folder_name, false, &err.to_string());
             publish(app, json!({ "state": "error", "progress": null, "error": err.to_string() }));
         }
     }
@@ -884,11 +898,12 @@ fn find_or_create_folder(parent: &str, name: &str) -> io::Result<(RemoteItem, bo
     Ok((drive_sync::Remote::create_folder(&Api, parent, name)?, false))
 }
 
-/// Drive 폴더를 고른다. 메모 폴더가 Google Drive 데스크탑 앱 폴더 안이면 문서\메모킹 으로 복사해 옮겨 맞춘다
+/// Drive 폴더를 고른다. 메모킹이 Drive 와 맞추는 동안 메모 폴더는 늘 문서\메모킹 — 다른 곳(Google Drive 데스크탑 앱의 G: · OneDrive 폴더 등)이면
+///   그 메모를 복사해 옮겨 맞춘다 (원래 폴더는 그대로). 두 동기화가 한 폴더를 함께 맞추면 휴대폰에서 메모가 사라졌다
 fn switch_folder(app: &AppHandle, folder_id: &str, folder_name: &str) -> Value {
     let st = app.state::<State>();
     let current = st.vault.lock().unwrap().as_ref().map(|v| v.root.clone());
-    let root = current.clone().filter(|r| !inside_drive_for_desktop(&r.to_string_lossy())).unwrap_or_else(|| State::suggested_vault(app));
+    let root = State::suggested_vault(app);
     let moving = current.as_ref() != Some(&root);
     if moving {
         // 옮기기 전에 쓰던 글부터 저장하고 메모 창을 닫는다 (마지막 글이 옛 폴더에만 남지 않게)
@@ -910,6 +925,7 @@ fn switch_folder(app: &AppHandle, folder_id: &str, folder_name: &str) -> Value {
         }
     }
     st.set_setting("drive", json!({ "folderId": folder_id, "folderName": folder_name }));
+    crate::files::ensure_auto_start(app); // PC 가 켜져 있는 동안 늘 맞추게 (받은 메모 · PC 다리)
     if moving {
         st.open_vault(app, root);
         crate::memos::push_list(app);
@@ -964,6 +980,8 @@ pub fn handle(app: &AppHandle, _label: &str, channel: &str, args: &[Value]) -> O
         }
         // 단추: 다른 앱이 넣은 파일까지 보이게 폴더를 처음부터
         "drive:sync" => Ok(run(app, true)),
+        // 설정의 Google Drive 칸: 이 Drive 폴더를 맞추는 기기들 (기기 상태 파일)
+        "drive:devices" => Ok(config(app).map_or(json!([]), |(_, _, root)| crate::devices::list(app, &root))),
         "drive:disconnect" => {
             dr.sign_out();
             app.state::<State>().set_setting("drive", Value::Null);

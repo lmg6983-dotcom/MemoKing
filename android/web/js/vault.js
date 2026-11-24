@@ -13,6 +13,7 @@ import { isLiveCached } from '../../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles, diskCopy } from '../../app/js/core/vault-locks.js';
 import { installSecretMethods, isSecretFolder, secretFolderId } from './vault-secret.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
+import { INBOX_DIR, INBOX_SLOTS, SLOT_TEXT, slotName, slotMemo } from '../../app/js/core/inbox.js';
 import { folderOf, cleanFolderName, isFolderName, resolveMovedTwin, withoutId, PINNED_FOLDERS_FILE, parsePinned, pinFolder, renamePinned } from '../../app/js/core/folders.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
@@ -251,6 +252,43 @@ export class Vault extends EventTarget {
       this.emit('changed', { ids: [...changed], external, removed });
       this.scheduleIndex();
     }
+    if (!silent) this.takeInbox();
+  }
+
+  // 받은 메모 빈 칸 (_memoking/받은 메모 — core/inbox.js, PC 는 core/src/vault/inbox.rs): AI 가 채운 칸을 메모로 옮기고 다시 비운다.
+  //   빈 칸은 Drive 와 맞추는 동안만 만들어 둔다 (inboxEnsure — app.js). 바뀐 칸만 읽는다 (목록 한 번 · 시각 · 크기)
+  takeInbox() {
+    let list;
+    try {
+      list = fs.list(INBOX_DIR) ?? [];
+    } catch {
+      list = [];
+    }
+    const have = new Set(list.map((e) => e.name));
+    if (this.inboxEnsure?.() && Array.from({ length: INBOX_SLOTS }, (_, i) => slotName(i + 1)).some((n) => !have.has(n))) {
+      for (let n = 1; n <= INBOX_SLOTS; n++) if (!have.has(slotName(n))) fs.writeText(`${INBOX_DIR}/${slotName(n)}`, SLOT_TEXT);
+      return; // 만든 칸은 다음 차례에 본다
+    }
+    if (this.inboxEnsure?.() && this.inboxTurn && !this.inboxTurn()) return; // 켜져 있는 PC(없으면 이름 차례로 첫 휴대폰)가 옮긴다 — 두 기기가 같은 칸을 옮겨 겹치지 않게
+    this.inboxSeen ??= new Map();
+    const made = [];
+    for (const e of list) {
+      if (e.dir || !/^빈 메모 \d{3}\.md$/.test(e.name)) continue;
+      const seen = `${e.mtime}:${e.size}`;
+      if (this.inboxSeen.get(e.name) === seen) continue;
+      const rel = `${INBOX_DIR}/${e.name}`;
+      const memo = slotMemo(fs.readText(rel) ?? '');
+      if (memo) {
+        const have = [...this.entries.values()].some((x) => x.body.trim() === memo.body.trim()); // 다른 기기가 먼저 옮겼다
+        if (!have && !this.import({ body: memo.body, color: memo.color })) continue; // 못 옮겼으면 칸을 비우지 않는다
+        fs.writeText(rel, SLOT_TEXT);
+        this.inboxSeen.delete(e.name); // 비운 칸은 다음 차례에 시각을 다시 본다
+        if (!have) made.push(e.name);
+        continue;
+      }
+      this.inboxSeen.set(e.name, seen);
+    }
+    if (made.length) this.emit('inbox', { count: made.length });
   }
 
   // ---------- 조회 ----------

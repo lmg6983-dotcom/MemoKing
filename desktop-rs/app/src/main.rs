@@ -13,8 +13,10 @@ macro_rules! elog {
 mod ai;
 mod capture;
 mod clipboard;
+mod devices;
 mod files;
 mod drive;
+mod drive_bridge;
 mod history;
 mod index;
 mod ipc;

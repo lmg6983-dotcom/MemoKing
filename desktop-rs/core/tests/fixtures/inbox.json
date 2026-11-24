@@ -1,0 +1,72 @@
+[
+ {
+  "text": "<!-- 메모킹 빈 칸: AI 비서(Gemini 등)는 새 메모를 쓸 때 이 파일 전체를 새 메모 글로 덮어쓰세요. 메모킹이 메모로 옮기고 다시 비워요 -->\n",
+  "memo": null
+ },
+ {
+  "text": "",
+  "memo": null
+ },
+ {
+  "text": "  \n",
+  "memo": null
+ },
+ {
+  "text": "<!-- 메모킹 빈 칸: AI 비서(Gemini 등)는 새 메모를 쓸 때 이 파일 전체를 새 메모 글로 덮어쓰세요. 메모킹이 메모로 옮기고 다시 비워요 -->\n# 날씨\n맑음",
+  "memo": {
+   "body": "# 날씨\n맑음\n",
+   "color": "yellow"
+  }
+ },
+ {
+  "text": "# 회의\r\n본문 #업무",
+  "memo": {
+   "body": "# 회의\n본문 #업무\n",
+   "color": "yellow"
+  }
+ },
+ {
+  "text": "---\ncolor: blue\nid: x\n---\n# 회의\n본문",
+  "memo": {
+   "body": "# 회의\n본문\n",
+   "color": "blue"
+  }
+ },
+ {
+  "text": "---\ncolor: red\n---\n본문만",
+  "memo": {
+   "body": "본문만\n",
+   "color": "yellow"
+  }
+ },
+ {
+  "text": "---\n---\n",
+  "memo": {
+   "body": "---\n---\n",
+   "color": "yellow"
+  }
+ },
+ {
+  "text": "﻿# BOM 메모",
+  "memo": {
+   "body": "# BOM 메모\n",
+   "color": "yellow"
+  }
+ },
+ {
+  "text": "<!-- 메모킹 빈 칸: AI 비서(Gemini 등)는 새 메모를 쓸 때 이 파일 전체를 새 메모 글로 덮어쓰세요. 메모킹이 메모로 옮기고 다시 비워요 -->\n\n  ",
+  "memo": null
+ },
+ {
+  "n": 1,
+  "name": "빈 메모 001.md"
+ },
+ {
+  "n": 7,
+  "name": "빈 메모 007.md"
+ },
+ {
+  "n": 100,
+  "name": "빈 메모 100.md"
+ }
+]

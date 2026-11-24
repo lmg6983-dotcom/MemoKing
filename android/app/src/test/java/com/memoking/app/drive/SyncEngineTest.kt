@@ -238,6 +238,8 @@ class SyncEngineTest {
         drive.trash(drive.path("회의.md")!!.id)
         assertEquals(1, sync().deletedLocal)
         assertEquals(0, drive.calls) // 폴더 목록을 한 번도 묻지 않음
+        // 다른 기기에서 지운 메모는 바로 지우지 않고 휴지통으로 (되살릴 수 있게)
+        assertTrue(local.list("_memoking/trash").any { it.name.startsWith("회의 (") && it.name.endsWith(").md") })
         val f = drive.path("_memoking/versions/m1/1.md")!!
         f.name = "2.md"; drive.note(f.id) // 이름 바꾸기 → 다 훑어 맞춤
         sync()

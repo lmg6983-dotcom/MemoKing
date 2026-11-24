@@ -1,0 +1,301 @@
+[
+ {
+  "kind": "text",
+  "d": {
+   "name": "DESKTOP-AB12",
+   "kind": "pc",
+   "alive": 1794999940000,
+   "lastSync": 1794999880000,
+   "folder": "C:\\Users\\a\\Documents\\메모킹",
+   "bridge": "G:\\내 드라이브\\메모킹 동기화",
+   "error": ""
+  },
+  "id": "3f9c",
+  "file": "_memoking/기기/DESKTOP-AB12 (3f9c).md",
+  "text": "---\nkind: pc\nalive: 1794999940000\nlastSync: 1794999880000\n---\n# DESKTOP-AB12\n\n- 종류: PC\n- 마지막 동기화: 2026-11-18 20:04\n- 메모 폴더: C:\\Users\\a\\Documents\\메모킹\n- PC 다리: 켜짐 (G:\\내 드라이브\\메모킹 동기화)\n- 최근 오류: 없음\n"
+ },
+ {
+  "kind": "text",
+  "d": {
+   "name": "SM-S928N",
+   "kind": "phone",
+   "alive": 1795000000000,
+   "lastSync": 0,
+   "folder": "",
+   "bridge": "",
+   "error": "인터넷에 연결되지 않아 동기화하지 못했어요"
+  },
+  "id": "a1b2",
+  "file": "_memoking/기기/SM-S928N (a1b2).md",
+  "text": "---\nkind: phone\nalive: 1795000000000\nlastSync: 0\n---\n# SM-S928N\n\n- 종류: 휴대폰\n- 마지막 동기화: 아직 없음\n- 최근 오류: 인터넷에 연결되지 않아 동기화하지 못했어요\n"
+ },
+ {
+  "kind": "text",
+  "d": {
+   "name": "노트북: 2",
+   "kind": "pc",
+   "alive": 1794998800000,
+   "lastSync": 1794998800000
+  },
+  "id": "zz",
+  "file": "_memoking/기기/노트북 2 (zz).md",
+  "text": "---\nkind: pc\nalive: 1794998800000\nlastSync: 1794998800000\n---\n# 노트북: 2\n\n- 종류: PC\n- 마지막 동기화: 2026-11-18 19:46\n- PC 다리: 꺼짐 (Google Drive 데스크탑 앱 폴더를 찾지 못함)\n- 최근 오류: 없음\n"
+ },
+ {
+  "kind": "parse",
+  "text": "---\nkind: pc\nalive: 1794999940000\nlastSync: 1794999880000\n---\n# DESKTOP-AB12\n\n- 종류: PC\n- 마지막 동기화: 2026-11-18 20:04\n- 메모 폴더: C:\\Users\\a\\Documents\\메모킹\n- PC 다리: 켜짐 (G:\\내 드라이브\\메모킹 동기화)\n- 최근 오류: 없음\n",
+  "seen": {
+   "name": "DESKTOP-AB12",
+   "kind": "pc",
+   "alive": 1794999940000,
+   "lastSync": 1794999880000,
+   "lines": [
+    "종류: PC",
+    "마지막 동기화: 2026-11-18 20:04",
+    "메모 폴더: C:\\Users\\a\\Documents\\메모킹",
+    "PC 다리: 켜짐 (G:\\내 드라이브\\메모킹 동기화)",
+    "최근 오류: 없음"
+   ]
+  }
+ },
+ {
+  "kind": "parse",
+  "text": "---\nkind: phone\nalive: 1795000000000\nlastSync: 0\n---\n# SM-S928N\n\n- 종류: 휴대폰\n- 마지막 동기화: 아직 없음\n- 최근 오류: 인터넷에 연결되지 않아 동기화하지 못했어요\n",
+  "seen": {
+   "name": "SM-S928N",
+   "kind": "phone",
+   "alive": 1795000000000,
+   "lastSync": 0,
+   "lines": [
+    "종류: 휴대폰",
+    "마지막 동기화: 아직 없음",
+    "최근 오류: 인터넷에 연결되지 않아 동기화하지 못했어요"
+   ]
+  }
+ },
+ {
+  "kind": "parse",
+  "text": "---\nkind: pc\nalive: 1794998800000\nlastSync: 1794998800000\n---\n# 노트북: 2\n\n- 종류: PC\n- 마지막 동기화: 2026-11-18 19:46\n- PC 다리: 꺼짐 (Google Drive 데스크탑 앱 폴더를 찾지 못함)\n- 최근 오류: 없음\n",
+  "seen": {
+   "name": "노트북: 2",
+   "kind": "pc",
+   "alive": 1794998800000,
+   "lastSync": 1794998800000,
+   "lines": [
+    "종류: PC",
+    "마지막 동기화: 2026-11-18 19:46",
+    "PC 다리: 꺼짐 (Google Drive 데스크탑 앱 폴더를 찾지 못함)",
+    "최근 오류: 없음"
+   ]
+  }
+ },
+ {
+  "kind": "parse",
+  "text": "",
+  "seen": null
+ },
+ {
+  "kind": "parse",
+  "text": "no front",
+  "seen": null
+ },
+ {
+  "kind": "parse",
+  "text": "---\nkind: pc\nalive: 12a\n---\n# x",
+  "seen": null
+ },
+ {
+  "kind": "parse",
+  "text": "---\nalive: 5\n---\n#   \n",
+  "seen": null
+ },
+ {
+  "kind": "parse",
+  "text": "---\nalive: 5\nlastSync: 1e3\n---\n# 폰\n- a\n- b",
+  "seen": {
+   "name": "폰",
+   "kind": "phone",
+   "alive": 5,
+   "lastSync": 0,
+   "lines": [
+    "a",
+    "b"
+   ]
+  }
+ },
+ {
+  "kind": "parse",
+  "text": "---\r\nkind: pc\r\nalive: 7\r\n---\r\n# 윈도\r\n",
+  "seen": {
+   "name": "윈도",
+   "kind": "pc",
+   "alive": 7,
+   "lastSync": 0,
+   "lines": []
+  }
+ },
+ {
+  "kind": "leader",
+  "others": [],
+  "me": {
+   "file": "b",
+   "kind": "phone"
+  },
+  "leader": true
+ },
+ {
+  "kind": "leader",
+  "others": [
+   {
+    "file": "a",
+    "kind": "pc",
+    "alive": 1794999940000
+   }
+  ],
+  "me": {
+   "file": "b",
+   "kind": "phone"
+  },
+  "leader": false
+ },
+ {
+  "kind": "leader",
+  "others": [
+   {
+    "file": "a",
+    "kind": "pc",
+    "alive": 1794999040000
+   }
+  ],
+  "me": {
+   "file": "b",
+   "kind": "phone"
+  },
+  "leader": true
+ },
+ {
+  "kind": "leader",
+  "others": [
+   {
+    "file": "c",
+    "kind": "pc",
+    "alive": 1795000000000
+   }
+  ],
+  "me": {
+   "file": "b",
+   "kind": "pc"
+  },
+  "leader": true
+ },
+ {
+  "kind": "leader",
+  "others": [
+   {
+    "file": "a",
+    "kind": "phone",
+    "alive": 1795000000000
+   }
+  ],
+  "me": {
+   "file": "b",
+   "kind": "phone"
+  },
+  "leader": false
+ },
+ {
+  "kind": "leader",
+  "others": [
+   {
+    "file": "b",
+    "kind": "pc",
+    "alive": 0
+   },
+   {
+    "file": "가",
+    "kind": "pc",
+    "alive": 1795000000000
+   }
+  ],
+  "me": {
+   "file": "b",
+   "kind": "pc"
+  },
+  "leader": true
+ },
+ {
+  "kind": "write",
+  "prev": "---\nkind: pc\nalive: 1794999940000\nlastSync: 1794999880000\n---\n# DESKTOP-AB12\n\n- 종류: PC\n- 마지막 동기화: 2026-11-18 20:04\n- 메모 폴더: C:\\Users\\a\\Documents\\메모킹\n- PC 다리: 켜짐 (G:\\내 드라이브\\메모킹 동기화)\n- 최근 오류: 없음\n",
+  "next": {
+   "name": "DESKTOP-AB12",
+   "kind": "pc",
+   "alive": 1794999940000,
+   "lastSync": 1794999880000,
+   "folder": "C:\\Users\\a\\Documents\\메모킹",
+   "bridge": "G:\\내 드라이브\\메모킹 동기화",
+   "error": ""
+  },
+  "now": 1795000000000,
+  "write": false
+ },
+ {
+  "kind": "write",
+  "prev": "---\nkind: pc\nalive: 1794999940000\nlastSync: 1794999880000\n---\n# DESKTOP-AB12\n\n- 종류: PC\n- 마지막 동기화: 2026-11-18 20:04\n- 메모 폴더: C:\\Users\\a\\Documents\\메모킹\n- PC 다리: 켜짐 (G:\\내 드라이브\\메모킹 동기화)\n- 최근 오류: 없음\n",
+  "next": {
+   "name": "DESKTOP-AB12",
+   "kind": "pc",
+   "alive": 1794999940000,
+   "lastSync": 1794999880000,
+   "folder": "C:\\Users\\a\\Documents\\메모킹",
+   "bridge": "G:\\내 드라이브\\메모킹 동기화",
+   "error": ""
+  },
+  "now": 1795000360000,
+  "write": true
+ },
+ {
+  "kind": "write",
+  "prev": "---\nkind: pc\nalive: 1794999940000\nlastSync: 1794999880000\n---\n# DESKTOP-AB12\n\n- 종류: PC\n- 마지막 동기화: 2026-11-18 20:04\n- 메모 폴더: C:\\Users\\a\\Documents\\메모킹\n- PC 다리: 켜짐 (G:\\내 드라이브\\메모킹 동기화)\n- 최근 오류: 없음\n",
+  "next": {
+   "name": "DESKTOP-AB12",
+   "kind": "pc",
+   "alive": 1794999940000,
+   "lastSync": 1794999880000,
+   "folder": "C:\\Users\\a\\Documents\\메모킹",
+   "bridge": "G:\\내 드라이브\\메모킹 동기화",
+   "error": "새 오류"
+  },
+  "now": 1795000000000,
+  "write": true
+ },
+ {
+  "kind": "write",
+  "prev": "",
+  "next": {
+   "name": "SM-S928N",
+   "kind": "phone",
+   "alive": 1795000000000,
+   "lastSync": 0,
+   "folder": "",
+   "bridge": "",
+   "error": "인터넷에 연결되지 않아 동기화하지 못했어요"
+  },
+  "now": 1795000000000,
+  "write": true
+ },
+ {
+  "kind": "write",
+  "prev": "---\nkind: pc\nalive: 1794999940000\nlastSync: 1794999880000\n---\n# DESKTOP-AB12\n\n- 종류: PC\n- 마지막 동기화: 2026-11-18 20:04\n- 메모 폴더: C:\\Users\\a\\Documents\\메모킹\n- PC 다리: 켜짐 (G:\\내 드라이브\\메모킹 동기화)\n- 최근 오류: 없음\n",
+  "next": {
+   "name": "DESKTOP-AB12",
+   "kind": "pc",
+   "alive": 1794999940000,
+   "lastSync": 1795000000000,
+   "folder": "C:\\Users\\a\\Documents\\메모킹",
+   "bridge": "G:\\내 드라이브\\메모킹 동기화",
+   "error": ""
+  },
+  "now": 1795000060000,
+  "write": false
+ }
+]
