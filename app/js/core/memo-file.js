@@ -10,8 +10,6 @@ import { decodeEntities } from './entities.js';
 export const COLORS = ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal'];
 export const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 export const DEFAULT_COLOR = 'yellow';
-// 메모 색 점 (매직키 · 모두 찾기 결과 줄)
-export const COLOR_DOTS = { yellow: '#fee47c', green: '#b7f7c3', pink: '#ffd9e6', purple: '#e9deff', blue: '#cfe8ff', gray: '#e9e4db', charcoal: '#333333' };
 // 메모 바탕색 (화면 CSS 와 같은 값) — 창이 뜨는 순간의 배경 · 한 장으로 그림의 메모지
 export const NOTE_BG = {
   light: { yellow: '#ffefae', green: '#c9fed3', pink: '#ffe7ef', purple: '#f1ebff', blue: '#e1f1ff', gray: '#f2eee7', charcoal: '#191919' },
