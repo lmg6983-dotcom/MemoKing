@@ -452,6 +452,7 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     try {
       folders = await api.drive.folders(cur.id);
     } catch (err) {
+      if (path.at(-1) !== cur) return; // 그새 다른 폴더로 갔다 — 늦게 온 오류가 그 폴더 목록을 지우지 않게
       list.innerHTML = '';
       list.append(Object.assign(document.createElement('li'), { className: 'empty', textContent: cleanError(err) }));
       return;
