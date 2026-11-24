@@ -191,20 +191,23 @@ function withoutBrokenHeader(body) {
   return lines.length && lines.every((l) => /^([A-Za-z_][\w-]*\s*:|\s+\S|-\s)/.test(l)) ? body.slice(m[0].length) : body;
 }
 
+/** 앞 n 자 (UTF-16) — 그림 글자(😀)를 반만 남기지 않게 (Rust js::slice16 과 같게) */
+const cut16 = (s, n) => s.slice(0, n).replace(/[\uD800-\uDBFF]$/, '');
+
 export function extractTitle(body) {
   const first = plainLines(withoutBrokenHeader(body), 1)[0];
-  return first ? first.slice(0, 80) : UNTITLED;
+  return first ? cut16(first, 80) : UNTITLED;
 }
 
 // 제목(첫 줄)을 뺀 나머지로 만든 미리보기
 //   카드에서 읽기 좋게: 공유하기로 붙은 "출처: …" 줄은 빼고, 수식 표시($)는 걷어낸다
 export function extractPreview(body, maxLength = 160) {
-  return plainLines(withoutBrokenHeader(body))
+  const text = plainLines(withoutBrokenHeader(body))
     .slice(1)
     .filter((l) => !/^출처\s*[:：]/.test(l))
     .join(' ')
-    .replace(/\${1,2}([^$]+?)\${1,2}/g, '$1')
-    .slice(0, maxLength);
+    .replace(/\${1,2}([^$]+?)\${1,2}/g, '$1');
+  return cut16(text, maxLength);
 }
 
 export function extractHeadings(body) {
