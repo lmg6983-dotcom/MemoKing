@@ -2580,7 +2580,7 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .lock-screen .lock-bio { margin-top: 10px; width: 100%; }
 /* ---------- 앱 안 PDF 미리보기 (pdf-viewer.js) ---------- */
 .mk-pdf-view {
-  --pdf-bg: var(--ok-gray-900); --pdf-bar: color-mix(in oklab, var(--ok-gray-1000) 80%, transparent); --pdf-fg: var(--ok-gray-50); --pdf-muted: color-mix(in oklab, var(--ok-gray-0) 64%, transparent); --pdf-btn: color-mix(in oklab, var(--ok-gray-0) 8%, transparent); --pdf-btn-hover: color-mix(in oklab, var(--ok-gray-0) 16%, transparent);
+  --pdf-bg: var(--ok-gray-900); --pdf-bar: color-mix(in oklab, var(--ok-gray-1000) 80%, transparent); --pdf-fg: var(--ok-gray-50); --pdf-muted: color-mix(in oklab, var(--ok-gray-0) 64%, transparent); --pdf-btn-hover: color-mix(in oklab, var(--ok-gray-0) 16%, transparent);
   position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: var(--pdf-bg); color: var(--pdf-fg);
   animation: mk-pdf-in 0.18s ease-out; -webkit-app-region: no-drag; font-family: inherit;
 }

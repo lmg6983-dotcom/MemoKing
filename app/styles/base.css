@@ -35,11 +35,9 @@
      고른 탭 · 고른 줄 · 밑줄 · 포커스 · 스위치 · 체크 같은 "상태" 는 무채색으로 (노랑이 여기저기 흩어져 난잡하던 것) */
   --brand-yellow-soft: color-mix(in oklab, var(--ok-gray-1000) 8%, transparent); /* 고른 상태 바탕 (이름은 예전 그대로 — 이제 무채색) */
   --accent-line: color-mix(in oklab, var(--ok-gray-1000) 48%, transparent); /* 밑줄 · 입력 포커스 선 */
-  --on-dark-fill: var(--ok-gray-0);
   --on-brand-soft: var(--text-strong); /* 고른 상태 위 글자 */
   --brand-black: var(--ok-gray-950);
   --on-brand: var(--ok-gray-950);
-  --on-black: var(--ok-gray-0);
 
   /* 바탕 · 글씨 */
   --surface-0: var(--ok-gray-50); /* 바탕: 카카오톡 더보기 화면과 같은 무채색 옅은 회색 */
@@ -54,7 +52,6 @@
   --danger: var(--ok-red-600);
   --sat: var(--ok-blue-600); /* 달력 토요일 (흰 바탕 5.9:1) */
   --ok-text: var(--ok-green-700); /* 복사했어요 · 저장 같은 성공 글 */
-  --err-text: var(--ok-red-800); /* 실패 글 (빨강 바탕이 아닌 글자) */
   --on-danger: var(--ok-gray-0);
   --focus-ring: var(--ok-gray-950);
 
@@ -88,7 +85,6 @@
   --accent: var(--brand-yellow);
   --accent-strong: var(--brand-yellow-hover);
   --accent-text: var(--on-brand);
-  --shadow: var(--shadow-pop);
 
   /* 스티커 메모 7색: 바탕 / 윗막대 / 목록에서 보이는 색 칩 */
   --yellow-bg: var(--ok-paper-yellow); --yellow-bar: var(--ok-paper-yellow-bar); --yellow-chip: var(--ok-paper-yellow-chip); /* 또렷한 종이: OKLCH L.95 C.08 — 모든 색이 같은 밝기 · 채도 (노랑 1.35배, 회색 C.01) */
@@ -109,7 +105,6 @@
 
   /* 움직임 — 곡선은 여기서만 정한다 (Emil Kowalski 기준: 나타나고 사라지는 건 ease-out, 화면 안에서 옮겨 가는 건 ease-in-out) */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);     /* 강한 ease-out: 처음이 빨라 바로 반응하는 느낌 */
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* 화면 안에서 자리를 옮길 때 */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);  /* 아래에서 올라오는 시트 (iOS 서랍 곡선) */
   --ease-pop: cubic-bezier(0.2, 1.3, 0.4, 1);     /* 살짝 튀는 등장 — 드문 축하 순간에만 (튜토리얼 · 체크리스트 CLEAR 도장). 자주 보는 메뉴·창은 --ease-out */
   color-scheme: light;
@@ -135,7 +130,6 @@
     --danger: var(--ok-red-400);
     --sat: var(--ok-blue-400);
     --ok-text: var(--ok-green-200);
-    --err-text: var(--ok-red-400);
     --on-danger: var(--ok-gray-950);
     --focus-ring: var(--ok-gray-50);
     --shadow-card: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 48%, transparent);
