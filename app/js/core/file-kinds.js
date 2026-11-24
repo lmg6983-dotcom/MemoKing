@@ -5,6 +5,8 @@ const PROGRAM_EXT = new Set([
   'exe', 'msi', 'msix', 'appx', 'appxbundle', 'bat', 'cmd', 'com', 'scr', 'pif', 'cpl', 'msc',
   'ps1', 'psm1', 'vbs', 'vbe', 'js', 'jse', 'wsf', 'wsh', 'hta', 'lnk', 'url', 'reg', 'jar', 'application', 'appref-ms',
   'inf', 'sct', 'chm', 'gadget', 'ws', 'settingcontent-ms',
+  // 문제 해결사 · Excel 추가 기능 · 라이브러리 · 검색 바로가기 · 설치 패치 · Office 추가 기능 — 열면 코드가 돈다
+  'diagcab', 'xll', 'library-ms', 'search-ms', 'msp', 'mst', 'vsto',
 ]);
 
 const KINDS = [
@@ -20,7 +22,8 @@ const KINDS = [
 ];
 
 export function extOf(name) {
-  const base = String(name ?? '').split(/[\\/]/).pop().split(/[?#]/)[0];
+  // 끝의 점 · 빈칸은 뗀다 — Windows 는 "a.exe." 를 a.exe 로 연다 (그대로 보면 확장자가 없어 실행 경고를 건너뛰었다)
+  const base = String(name ?? '').split(/[\\/]/).pop().split(/[?#]/)[0].replace(/[. ]+$/, '');
   const dot = base.lastIndexOf('.');
   return dot > 0 ? base.slice(dot + 1).toLowerCase() : '';
 }

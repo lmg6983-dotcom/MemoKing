@@ -70,5 +70,49 @@
  {
   "name": "x.json",
   "program": false
+ },
+ {
+  "name": "a.exe.",
+  "program": true
+ },
+ {
+  "name": "a.exe ",
+  "program": true
+ },
+ {
+  "name": "a.EXE. .",
+  "program": true
+ },
+ {
+  "name": "doc.pdf.",
+  "program": false
+ },
+ {
+  "name": "x.diagcab",
+  "program": true
+ },
+ {
+  "name": "x.XLL",
+  "program": true
+ },
+ {
+  "name": "x.library-ms",
+  "program": true
+ },
+ {
+  "name": "x.search-ms",
+  "program": true
+ },
+ {
+  "name": "x.msp",
+  "program": true
+ },
+ {
+  "name": "x.mst",
+  "program": true
+ },
+ {
+  "name": "x.vsto",
+  "program": true
  }
 ]
