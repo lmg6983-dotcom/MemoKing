@@ -1214,14 +1214,6 @@ api.memo.handoff().then(showHandoff).catch(() => {});
 
 el.useSuggested.addEventListener('click', async () => applyInfo(await api.vault.use(state.info.suggestedPath)));
 el.chooseFolder.addEventListener('click', async () => applyInfo(await api.vault.choose()));
-// 설정 바로가기: 그 묶음으로 넘기기 (AI 도우미가 숨어 있으면 다른 AI 앱 연결로)
-document.querySelector('.set-jump')?.addEventListener('click', (e) => {
-  const a = e.target.closest('a[href^="#"]');
-  if (!a) return;
-  e.preventDefault();
-  const head = [a.getAttribute('href').slice(1), a.dataset.alt].map((id) => id && $(id)).find((h) => h && !h.closest('[hidden]'));
-  head?.closest('section')?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-});
 // 쓰던 폴더를 찾지 못했을 때: 옮긴 폴더 고르기 · 다시 찾아보기 · (확인 뒤) 새 빈 폴더
 $('lost-pick').addEventListener('click', async () => applyInfo(await api.vault.choose()));
 $('lost-retry').addEventListener('click', async () => {

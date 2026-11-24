@@ -405,26 +405,9 @@ body.drag-outside .drag-hint { background: var(--accent); color: var(--accent-te
 .setting-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 13.5px; cursor: pointer; }
 .setting-row small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); }
 /* 설정 창: 자주 보는 것(버전 · 업데이트)이 맨 위 카드, 나머지는 굵은 제목 + 가는 선으로 나눈 묶음 */
-.panel-dialog { width: min(440px, calc(100vw - 32px)); scroll-padding-top: 72px; } /* 위에 붙은 제목 줄 밑으로 포커스가 숨지 않게 */
-/* 설정 바로가기 — 제목 줄 밑에 붙어 있다 (가로로 넘김) */
-.set-jump {
-  position: sticky; top: 34px; z-index: 2;
-  display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
-  margin: 0 -24px; padding: 2px 24px 10px;
-  background: var(--surface-2);
-}
+.panel-dialog { width: min(440px, calc(100vw - 32px)); scroll-padding-top: 44px; } /* 위에 붙은 제목 줄 밑으로 포커스가 숨지 않게 */
 /* 설정 창: One UI 설정처럼 회색 바탕 위에 묶음마다 흰 카드 */
 .panel-dialog#settings-dialog { --surface-2: var(--surface-0); }
-#settings-dialog .set-jump a { background: var(--surface-1); }
-.set-jump::-webkit-scrollbar { display: none; }
-.set-jump a {
-  flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 10px;
-  border-radius: 999px; background: var(--fill-tab); color: var(--text);
-  font-size: 12.5px; font-weight: 600; text-decoration: none; white-space: nowrap;
-}
-.set-jump a:hover { background: var(--hover); }
-.set-jump a:focus-visible { outline: 2px solid var(--text-strong); outline-offset: 1px; }
-.panel-dialog .set-sec { scroll-margin-top: 80px; }
 #vault-path b { display: block; font-size: 13.5px; }
 #vault-path small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .set-sec { margin-top: 14px; padding: 18px 20px; border-radius: 24px; background: var(--surface-1); }
