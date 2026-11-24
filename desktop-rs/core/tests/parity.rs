@@ -1158,3 +1158,37 @@ fn inbox() {
         .collect();
     report("inbox", fails, cases.len());
 }
+
+#[test]
+fn devices() {
+    use memoking_core::devices::{device_file, device_text, inbox_leader, needs_write, parse_device, Device};
+    let dev = |d: &Value| Device {
+        name: d["name"].as_str().unwrap().into(),
+        kind: d["kind"].as_str().unwrap().into(),
+        alive: d["alive"].as_i64().unwrap(),
+        last_sync: d["lastSync"].as_i64().unwrap_or(0),
+        folder: d["folder"].as_str().unwrap_or("").into(),
+        bridge: d["bridge"].as_str().unwrap_or("").into(),
+        error: d["error"].as_str().unwrap_or("").into(),
+    };
+    let cases = fixtures("devices");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let (got, want) = match c["kind"].as_str().unwrap() {
+                "text" => (json!({ "file": device_file(c["d"]["name"].as_str().unwrap(), c["id"].as_str().unwrap()), "text": device_text(&dev(&c["d"])) }), json!({ "file": c["file"], "text": c["text"] })),
+                "parse" => (
+                    parse_device(c["text"].as_str().unwrap()).map_or(Value::Null, |s| json!({ "name": s.name, "kind": s.kind, "alive": s.alive, "lastSync": s.last_sync, "lines": s.lines })),
+                    c["seen"].clone(),
+                ),
+                "leader" => {
+                    let others: Vec<(String, String, i64)> = c["others"].as_array().unwrap().iter().map(|o| (o["file"].as_str().unwrap().into(), o["kind"].as_str().unwrap().into(), o["alive"].as_i64().unwrap())).collect();
+                    (json!(inbox_leader(&others, c["me"]["file"].as_str().unwrap(), c["me"]["kind"].as_str().unwrap(), 1_795_000_000_000)), c["leader"].clone())
+                }
+                _ => (json!(needs_write(Some(c["prev"].as_str().unwrap()).filter(|p| !p.is_empty()), &dev(&c["next"]), c["now"].as_i64().unwrap())), c["write"].clone()),
+            };
+            (got != want).then(|| format!("{}\n  JS  : {want}\n  Rust: {got}", c))
+        })
+        .collect();
+    report("devices", fails, cases.len());
+}

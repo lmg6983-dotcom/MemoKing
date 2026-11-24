@@ -66,7 +66,9 @@ pub fn start(app: &AppHandle) {
 /// 받은 메모 빈 칸(_memoking/받은 메모): AI 가 채운 칸을 메모로 옮긴다 (core vault/inbox.rs) — 빈 칸은 Drive 와 맞추는 동안만 만들어 둔다
 fn take_inbox(app: &AppHandle) {
     let ensure = crate::drive::syncing_vault(app);
-    let made = with_vault(app, |v| Ok(v.take_inbox(ensure))).unwrap_or_default();
+    let root = with_vault(app, |v| Ok(v.root.clone())).ok();
+    let take = root.is_some_and(|r| !ensure || crate::devices::inbox_turn(app, &r)); // 맞추는 중이면 켜져 있는 기기 가운데 한 기기만
+    let made = with_vault(app, |v| Ok(v.take_inbox(ensure, take))).unwrap_or_default();
     if !made.is_empty() {
         push_list(app);
         let _ = app.emit_to("list", "inbox:taken", [made.len()]); // "AI 비서가 보낸 새 메모 n개를 가져왔어요" (휴대폰과 같게)

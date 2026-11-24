@@ -14,7 +14,7 @@ const SETTLE: Duration = Duration::from_secs(30);
 
 /// 이 PC 에서 Google Drive 데스크탑 앱이 보여 주는 그 Drive 폴더 (내 드라이브 바로 아래만 — "메모킹 동기화" 가 거기 있다)
 ///   스트리밍 방식은 드라이브 문자(G:\내 드라이브), 미러링 방식은 사용자 폴더(C:\Users\…\내 드라이브)
-fn mirror_of(folder_name: &str) -> Option<PathBuf> {
+pub fn mirror_of(folder_name: &str) -> Option<PathBuf> {
     if !cfg!(windows) || folder_name.is_empty() {
         return None;
     }

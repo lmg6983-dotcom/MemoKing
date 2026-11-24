@@ -105,6 +105,7 @@ contextBridge.exposeInMainWorld('memoking', {
     auto: invoke('drive:auto'),
     sync: invoke('drive:sync'),
     disconnect: invoke('drive:disconnect'),
+    devices: invoke('drive:devices'),
   },
   settings: {
     get: invoke('app:settings'),

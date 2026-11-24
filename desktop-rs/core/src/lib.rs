@@ -4,6 +4,7 @@ pub mod agent;
 pub mod ai;
 pub mod ai_events;
 pub mod date_detect;
+pub mod devices;
 pub mod body;
 pub mod calendar_feeds;
 pub mod drive_sync;

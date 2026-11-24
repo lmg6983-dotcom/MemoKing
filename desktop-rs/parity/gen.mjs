@@ -30,6 +30,7 @@ import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibl
 import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
 import { chunkMemo, askedPeriod, buildIndex as ragBuildIndex, retrieve as ragRetrieve, expandMessages, expandResult, ragMessages, finishAnswer } from '../../app/js/core/rag.js';
 import * as inbox from '../../app/js/core/inbox.js';
+import * as dev from '../../app/js/core/devices.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -624,3 +625,26 @@ write('ai_events', aeBodies.flatMap((body) => aeNows.map((iso) => {
 // 받은 메모 빈 칸 — 칸 글 → 옮길 메모
 const slotTexts = [inbox.SLOT_TEXT, '', '  \n', `${inbox.SLOT_TEXT}# 날씨\n맑음`, '# 회의\r\n본문 #업무', '---\ncolor: blue\nid: x\n---\n# 회의\n본문', '---\ncolor: red\n---\n본문만', '---\n---\n', '\ufeff# BOM 메모', `${inbox.SLOT_TEXT.trim()}\n\n  `];
 write('inbox', [...slotTexts.map((text) => ({ text, memo: inbox.slotMemo(text) })), ...[1, 7, 100].map((n) => ({ n, name: inbox.slotName(n) }))]);
+
+// 기기 상태 파일 · 빈 칸 담당
+const devNow = 1_795_000_000_000;
+const devs = [
+  { name: 'DESKTOP-AB12', kind: 'pc', alive: devNow - 60_000, lastSync: devNow - 120_000, folder: 'C:\\Users\\a\\Documents\\메모킹', bridge: 'G:\\내 드라이브\\메모킹 동기화', error: '' },
+  { name: 'SM-S928N', kind: 'phone', alive: devNow, lastSync: 0, folder: '', bridge: '', error: '인터넷에 연결되지 않아 동기화하지 못했어요' },
+  { name: '노트북: 2', kind: 'pc', alive: devNow - 20 * 60_000, lastSync: devNow - 20 * 60_000 },
+];
+const devTexts = [...devs.map((d) => dev.deviceText(d)), '', 'no front', '---\nkind: pc\nalive: 12a\n---\n# x', '---\nalive: 5\n---\n#   \n', '---\nalive: 5\nlastSync: 1e3\n---\n# 폰\n- a\n- b', '---\r\nkind: pc\r\nalive: 7\r\n---\r\n# 윈도\r\n'];
+const leaderSets = [
+  [[], { file: 'b', kind: 'phone' }],
+  [[{ file: 'a', kind: 'pc', alive: devNow - 60_000 }], { file: 'b', kind: 'phone' }],
+  [[{ file: 'a', kind: 'pc', alive: devNow - 16 * 60_000 }], { file: 'b', kind: 'phone' }],
+  [[{ file: 'c', kind: 'pc', alive: devNow }], { file: 'b', kind: 'pc' }],
+  [[{ file: 'a', kind: 'phone', alive: devNow }], { file: 'b', kind: 'phone' }],
+  [[{ file: 'b', kind: 'pc', alive: 0 }, { file: '가', kind: 'pc', alive: devNow }], { file: 'b', kind: 'pc' }],
+];
+write('devices', [
+  ...devs.map((d, i) => ({ kind: 'text', d, id: ['3f9c', 'a1b2', 'zz'][i], file: dev.deviceFile(d.name, ['3f9c', 'a1b2', 'zz'][i]), text: dev.deviceText(d) })),
+  ...devTexts.map((text) => ({ kind: 'parse', text, seen: dev.parseDevice(text) })),
+  ...leaderSets.map(([others, me]) => ({ kind: 'leader', others, me, leader: dev.inboxLeader(others, me, devNow) })),
+  ...[[devTexts[0], devs[0], devNow], [devTexts[0], devs[0], devNow + 6 * 60_000], [devTexts[0], { ...devs[0], error: '새 오류' }, devNow], ['', devs[1], devNow]].map(([prev, next, now]) => ({ kind: 'write', prev, next, now, write: dev.needsWrite(prev, next, now) })),
+]);
