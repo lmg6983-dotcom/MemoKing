@@ -1785,6 +1785,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     }
   }
 
+  // 창 전체에 다는 귀는 편집기를 없앨 때 함께 뗀다 (휴대폰은 메모를 열 때마다 편집기를 새로 만든다)
+  const offWindow = new AbortController();
+  const windowOnly = { signal: offWindow.signal };
+
   // 파일 칩 우클릭 메뉴 › 그림으로 펼치기
   window.addEventListener('mk:expand-document-images', async (e) => {
     if (readOnly) return;
@@ -1797,7 +1801,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const insertAt = pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head;
       insertBlocks(insertAt, [album]);
     }
-  });
+  }, windowOnly);
 
   // 파일 칩 우클릭 메뉴 › PDF 짝 만들기 (예전에 파일로만 넣은 문서) — 칩 문단 끝에 줄바꿈 + PDF 첫 쪽 썸네일
   window.addEventListener('mk:expand-document-pdf', async (e) => {
@@ -1810,7 +1814,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
     const thumb = await trackDoc(documentPdfItem(item)); // 칩이 문단에 섞여 있지 않은 경우 (표 칸 등) — 칩 아래 새 줄에
     const v = view();
     if (thumb) insertBlocks(pos != null ? pos + (node?.nodeSize ?? 0) : v.state.selection.head, [thumb]);
-  });
+  }, windowOnly);
 
   // 파일 칩 우클릭 메뉴 › 텍스트로 본문에 풀기
   window.addEventListener('mk:expand-document-text', async (e) => {
@@ -1833,7 +1837,7 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       console.warn('텍스트 풀기 오류', err);
       onNotice?.(`${name}의 글을 읽지 못했어요`, true);
     }
-  });
+  }, windowOnly);
 
   // ---------- 붙여 넣은 인터넷 사진을 메모 폴더로 ----------
   // 글과 함께 붙여 넣은 사진은 먼저 인터넷 주소로 들어오고, 받아지는 대로 attachments/ 파일로 바뀐다.
@@ -3330,7 +3334,10 @@ export async function createNoteEditor(root, { markdown, onChange, onState, onEm
       const v = view();
       if (v.hasFocus()) v.dispatch(v.state.tr.scrollIntoView());
     },
-    destroy: () => editor.destroy(),
+    destroy: () => {
+      offWindow.abort();
+      editor.destroy();
+    },
   };
 }
 
