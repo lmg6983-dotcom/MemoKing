@@ -35,6 +35,8 @@ const POLL_ACTIVE: Duration = Duration::from_secs(10);
 const POLL_BURST: Duration = Duration::from_secs(5);
 const BURST_FOR: Duration = Duration::from_secs(120);
 const FOCUS_GAP: Duration = Duration::from_secs(5);
+// 이보다 작은 파일은 요청 한 번(multipart)으로 올린다 — 이어 올리기는 요청이 두 번이라 메모가 많으면 처음 동기화가 두 배 걸린다
+const SIMPLE_UPLOAD_MAX: usize = 5 << 20;
 // 진행 상황은 이만큼마다 한 번만 알린다 (파일마다 창에 보내면 목록이 바빠진다)
 const PROGRESS_MS: u128 = 300;
 
@@ -470,6 +472,15 @@ impl drive_sync::Remote for Api {
             Some(id) => ("PATCH", format!("{UPLOAD}/files/{}?uploadType=resumable&fields={fields}", q(id)), json!({})),
             None => ("POST", format!("{UPLOAD}/files?uploadType=resumable&fields={fields}"), json!({ "name": name, "parents": [parent] })),
         };
+        if data.len() <= SIMPLE_UPLOAD_MAX {
+            let boundary = format!("memoking{}", now_ms());
+            let mut body = format!("--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n--{boundary}\r\nContent-Type: application/octet-stream\r\n\r\n").into_bytes();
+            body.extend(data);
+            body.extend(format!("\r\n--{boundary}--").bytes());
+            let headers = [("Content-Type", format!("multipart/related; boundary={boundary}"))];
+            let mut res = self.request(method, &start.replace("uploadType=resumable", "uploadType=multipart"), &headers, Some(body))?;
+            return Ok(RemoteItem::from_json(&serde_json::from_str(&read_text(&mut res)).unwrap_or_default()));
+        }
         let headers = [("Content-Type", "application/json; charset=UTF-8".to_string()), ("X-Upload-Content-Length", data.len().to_string())];
         let res = self.request(method, &start, &headers, Some(meta.to_string().into_bytes()))?;
         let location = res.headers().get("location").and_then(|l| l.to_str().ok()).map(str::to_string);
