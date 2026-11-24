@@ -28,7 +28,7 @@ const UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3";
 const FIELDS: &str = "id,name,mimeType,md5Checksum,modifiedTime,createdTime,size";
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const OFFLINE: &str = "인터넷에 연결되지 않아 동기화하지 못했어요";
-const DOUBLE_SYNC: &str = "메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). 설정의 Google Drive 동기화에서 \"다른 Drive 폴더로 바꾸기\"로 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요";
+const DOUBLE_SYNC: &str = "메모 폴더를 Google Drive 데스크탑 앱도 동기화하고 있어서 메모킹 동기화를 멈췄어요 (같은 메모가 계속 늘어나지 않게). Drive 데스크탑 앱으로만 맞추려면 설정의 Google Drive 동기화에서 연결을 끊고, 메모킹으로 맞추려면 \"다른 Drive 폴더로 바꾸기\"로 폴더를 다시 고르면 메모를 문서\\메모킹 으로 옮겨 맞춰요";
 // 주기: 쉬는 중 30초 · 메모킹 창을 쓰는 중 10초 · 파일이 오간 뒤 2분은 5초 (휴대폰과 주고받는 중일 때 빨리)
 const POLL_IDLE: Duration = Duration::from_secs(30);
 const POLL_ACTIVE: Duration = Duration::from_secs(10);
@@ -661,6 +661,11 @@ fn config(app: &AppHandle) -> Option<(String, String, PathBuf)> {
     let folder = drive["folderId"].as_str().filter(|s| !s.is_empty())?.to_string();
     let root = st.vault.lock().unwrap().as_ref()?.root.clone();
     Some((folder, drive["folderName"].as_str().unwrap_or_default().into(), root))
+}
+
+/// 메모킹이 Google Drive 와 메모 폴더를 맞추고 있나 (로그인했고 Drive 폴더를 골랐다) — 이 동안은 메모 폴더를 바꾸지 않는다
+pub fn syncing_vault(app: &AppHandle) -> bool {
+    d().connected() && config(app).is_some()
 }
 
 fn info(app: &AppHandle) -> Value {

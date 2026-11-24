@@ -1082,6 +1082,10 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "trash:empty" => with_vault(app, |v| Ok(v.empty_trash(None))),
         "vault:choose" => {
             use tauri_plugin_dialog::DialogExt;
+            // 메모킹이 Drive 와 맞추는 중에는 메모 폴더를 바꾸지 않는다 (설정은 단추를 숨긴다 — 다른 길로 와도). 폴더를 잃었을 때는 고를 수 있게
+            if crate::drive::syncing_vault(app) && st.vault.lock().unwrap().is_some() {
+                return Some(Ok(st.vault_info(app)));
+            }
             let start = with_vault(app, |v| Ok(v.root.clone())).unwrap_or_else(|_| State::suggested_vault(app));
             let picked = app.dialog().file().set_title("메모를 저장할 폴더 선택").set_directory(start).blocking_pick_folder();
             if let Some(dir) = picked.and_then(|p| p.into_path().ok()) {

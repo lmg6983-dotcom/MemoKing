@@ -161,6 +161,11 @@ export function setupDrivePanel({ api, onVault, confirm, showFiles = () => {}, m
     tidyConflicts();
     const sum = summary();
     const on = sum.on;
+    // 메모킹이 Drive 와 맞추는 동안은 메모 폴더를 바꾸지 않는다 (Drive 데스크탑 앱 폴더와 헷갈리지 않게) — 바꾸려면 연결 끊기
+    const changeVault = $('change-vault');
+    if (changeVault) changeVault.hidden = on;
+    const managed = $('vault-managed-note');
+    if (managed) managed.hidden = !on;
     box.classList.toggle('on', on);
     box.classList.toggle('error', sum.tone === 'error');
     $('drive-title').textContent = on ? (sum.tone === 'ok' ? `${info.email || 'Google 계정'}의 ${info.folderName || '메모킹'} 폴더` : sum.title) : sum.title;
