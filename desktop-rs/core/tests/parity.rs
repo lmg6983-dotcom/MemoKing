@@ -1141,3 +1141,20 @@ fn ai_events() {
     }
     report("ai_events", fails, cases.len());
 }
+
+#[test]
+fn inbox() {
+    use memoking_core::inbox::{slot_memo, slot_name};
+    let cases = fixtures("inbox");
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let (got, want) = match c["n"].as_u64() {
+                Some(n) => (json!(slot_name(n as usize)), c["name"].clone()),
+                None => (json!(slot_memo(c["text"].as_str().unwrap()).map(|(body, color)| json!({ "body": body, "color": color }))), c["memo"].clone()),
+            };
+            (got != want).then(|| format!("{}\n  JS  : {want}\n  Rust: {got}", c))
+        })
+        .collect();
+    report("inbox", fails, cases.len());
+}

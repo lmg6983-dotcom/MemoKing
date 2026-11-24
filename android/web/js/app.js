@@ -1787,6 +1787,9 @@ function openVault() {
     showHandoff((detail.external ?? []).filter((id) => !detail.removed?.includes(id)));
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
+  // 받은 메모 빈 칸: Drive 와 맞추는 동안만 만들어 둔다 (AI 가 새 메모를 거기 써 넣는다 — core/inbox.js)
+  vault.inboxEnsure = () => Boolean(drive.status().connected && drive.status().active);
+  vault.on('inbox', ({ count }) => toast(`AI 비서가 보낸 새 메모 ${count}개를 가져왔어요`));
   $('setup').hidden = true;
   list.refresh();
   list.show();

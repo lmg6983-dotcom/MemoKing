@@ -29,6 +29,7 @@ import { noThink, sseText, engineError, chatBody } from '../../app/js/core/llama
 import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibleFix } from '../../app/js/core/ai-write.js';
 import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
 import { chunkMemo, askedPeriod, buildIndex as ragBuildIndex, retrieve as ragRetrieve, expandMessages, expandResult, ragMessages, finishAnswer } from '../../app/js/core/rag.js';
+import * as inbox from '../../app/js/core/inbox.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 
 const out = path.join(import.meta.dirname, '..', 'core', 'tests', 'fixtures');
@@ -619,3 +620,7 @@ write('ai_events', aeBodies.flatMap((body) => aeNows.map((iso) => {
     results, existing: ae.aiEventResult(aeAnswers[0], c, first.slice(0, 1), now).map(noId), later: ae.aiEventResult(aeAnswers[0], c, [], new Date(now.getTime() + 2 * 86_400_000)).map(noId), seen,
   };
 })));
+
+// 받은 메모 빈 칸 — 칸 글 → 옮길 메모
+const slotTexts = [inbox.SLOT_TEXT, '', '  \n', `${inbox.SLOT_TEXT}# 날씨\n맑음`, '# 회의\r\n본문 #업무', '---\ncolor: blue\nid: x\n---\n# 회의\n본문', '---\ncolor: red\n---\n본문만', '---\n---\n', '\ufeff# BOM 메모', `${inbox.SLOT_TEXT.trim()}\n\n  `];
+write('inbox', [...slotTexts.map((text) => ({ text, memo: inbox.slotMemo(text) })), ...[1, 7, 100].map((n) => ({ n, name: inbox.slotName(n) }))]);

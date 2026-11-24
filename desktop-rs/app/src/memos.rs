@@ -57,9 +57,20 @@ pub fn start(app: &AppHandle) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(2));
         rescan(&app);
+        take_inbox(&app);
         crate::index::tick(&app);
         crate::windows::discard_tick(&app); // 오래 숨은 스택 탭 거두기 (30초마다 본다)
     });
+}
+
+/// 받은 메모 빈 칸(_memoking/받은 메모): AI 가 채운 칸을 메모로 옮긴다 (core vault/inbox.rs) — 빈 칸은 Drive 와 맞추는 동안만 만들어 둔다
+fn take_inbox(app: &AppHandle) {
+    let ensure = crate::drive::syncing_vault(app);
+    let made = with_vault(app, |v| Ok(v.take_inbox(ensure))).unwrap_or_default();
+    if !made.is_empty() {
+        push_list(app);
+        let _ = app.emit_to("list", "inbox:taken", [made.len()]); // "AI 비서가 보낸 새 메모 n개를 가져왔어요" (휴대폰과 같게)
+    }
 }
 
 pub fn rescan(app: &AppHandle) {
