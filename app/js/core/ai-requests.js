@@ -213,20 +213,15 @@ export function applyOps(vault, ops) {
   const entries = () => vault.entries.values();
   const titleOf = (e) => (e ? extractTitle(e.body) || e.file || e.id : '');
   const keep = (e) => vault.keepVersion(e.id, e.body, { force: true });
-  // 저장이 거절되면(다른 기기가 막 옮기거나 지운 메모 등) 멈춘다 — 합치기가 받는 메모에 글을 못 넣고 보낸 메모만 지우지 않게
-  const save = (id, body) => {
-    if (vault.save(id, body)?.refused) throw new Error('지금은 저장하지 못했어요 (다른 기기에서 막 바뀐 메모) — 다시 요청해 주세요');
-  };
   return ops.map((op) => {
     const e = op.memo ? findMemo(entries(), op.memo) : null;
-    const title = titleOf(e); // 고치기 전 제목 (PC 와 같은 결과 글 — 두 기기가 다른 글을 써 Drive 충돌 사본이 생기지 않게)
-    const done = (status, note, memo = null) => resultLine({ op, title: memo ? titleOf(memo) : title, status, note });
+    const done = (status, note, memo = e) => resultLine({ op, title: titleOf(memo), status, note });
     if (op.error) return done('fail', op.error);
     try {
       if (op.do === 'create') {
         if ([...entries()].some((x) => x.body.trim() === op.text)) return done('same', '같은 메모가 이미 있어요');
         const id = vault.create({ color: op.color || undefined, folder: op.folder });
-        save(id, `${op.text}\n`);
+        vault.save(id, `${op.text}\n`);
         return done('ok', op.folder ? `${op.folder} 폴더에 만듦` : '만듦', vault.entries.get(id));
       }
       const why = editable(e);
@@ -235,7 +230,7 @@ export function applyOps(vault, ops) {
         const r = editBody(e.body, op);
         if (r.status === 'ok') {
           keep(e);
-          save(e.id, r.body);
+          vault.save(e.id, r.body);
         }
         return done(r.status, r.note);
       }
@@ -252,8 +247,9 @@ export function applyOps(vault, ops) {
         return done('ok', dir ? `${dir} 폴더로` : '맨 위로');
       }
       if (op.do === 'trash') {
+        const title = titleOf(e);
         vault.trash(e.id);
-        return done('ok', '휴지통으로');
+        return resultLine({ op, title, status: 'ok', note: '휴지통으로' });
       }
       if (op.do === 'merge') {
         const froms = op.from.map((ref) => findMemo(entries(), ref)).filter((x, i, all) => x && x !== e && !editable(x) && all.indexOf(x) === i);
@@ -261,7 +257,7 @@ export function applyOps(vault, ops) {
         const { body, added } = mergeBodies(e.body, froms.map((x) => x.body));
         if (added) {
           keep(e);
-          save(e.id, body);
+          vault.save(e.id, body);
         }
         for (const x of froms) vault.trash(x.id);
         return done('ok', `${froms.length}개를 합치고 휴지통으로`);
