@@ -6,6 +6,9 @@ import { progressText, etaText, progressFraction, needsLogin } from '../app/js/d
 test('진행 글: 살펴보기 → n/총 · 남은 시간', () => {
   assert.equal(progressText(null), '');
   assert.equal(progressText({ phase: 'scan' }), 'Drive 폴더 살펴보는 중');
+  assert.equal(progressText({ phase: 'scan', done: 3, total: 8 }), 'Drive 폴더 살펴보는 중, 폴더 3/8개');
+  assert.equal(progressText({ phase: 'compare', done: 120, total: 400, since: 0 }, 1000), '양쪽 파일 비교하는 중, 120/400개');
+  assert.equal(progressFraction({ phase: 'compare', done: 100, total: 400 }), 0.25);
   const since = 1_000_000;
   assert.equal(progressText({ phase: 'transfer', done: 1, total: 40, since }, since + 1000), '파일 1/40개 맞추는 중', '처음에는 남은 시간을 말하지 않는다');
   assert.equal(progressText({ phase: 'transfer', done: 10, total: 40, since }, since + 30_000), '파일 10/40개 맞추는 중, 약 2분 남음');

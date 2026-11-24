@@ -782,7 +782,7 @@ fn run_once(app: &AppHandle, full: bool) -> bool {
     let on_progress = |phase: &str, done: usize, total: usize| {
         let mut st = dr.status.lock().unwrap();
         let prev = st["progress"].clone();
-        let since = if phase == "transfer" && prev["phase"] != "transfer" { now_ms() } else { prev["since"].as_i64().unwrap_or_else(now_ms) };
+        let since = if prev["phase"] != phase { now_ms() } else { prev["since"].as_i64().unwrap_or_else(now_ms) }; // 남은 시간은 단계마다 따로
         st["progress"] = json!({ "phase": phase, "done": done, "total": total, "since": since });
         drop(st);
         // 처음 · 마지막 · 단계가 바뀔 때는 바로, 그 사이는 가끔

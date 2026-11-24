@@ -264,7 +264,7 @@ pub struct Options<'a> {
     pub local_clean: bool,
     pub conflict_tag: &'a str,
     pub now: &'a (dyn Fn() -> i64 + Sync),
-    /// 어디까지 했는지 (scan: Drive 폴더 살펴보는 중, transfer: 맞출 파일 total 개 중 done 개)
+    /// 어디까지 했는지 (scan: Drive 폴더 total 개 중 done 개 살펴봄, compare: 양쪽에 다 있는 파일 비교, transfer: 맞출 파일 total 개 중 done 개)
     pub on_progress: &'a (dyn Fn(&str, usize, usize) + Sync),
     pub concurrency: usize,
     /// 메모 파일을 바꿔치기 · 옮기기 · 지우는 순간을 앱의 메모 잠금 안에서 돌린다 —
@@ -387,10 +387,12 @@ impl Engine<'_> {
         let mut folder_ids = BTreeMap::from([(String::new(), self.root_id.clone())]);
         // 한 층씩, 그 층의 폴더들은 한꺼번에 훑는다
         let mut level = vec![(self.root_id.clone(), String::new())];
+        let (read, mut found) = (AtomicUsize::new(0), 1);
         while !level.is_empty() {
             let lists: Vec<Mutex<Vec<RemoteItem>>> = level.iter().map(|_| Mutex::default()).collect();
             lanes(self.opts.concurrency, level.len(), |i| {
                 *lists[i].lock().unwrap() = self.remote.list_children(&level[i].0)?;
+                (self.opts.on_progress)("scan", read.fetch_add(1, Ordering::SeqCst) + 1, found);
                 Ok(())
             })?;
             let mut next = vec![];
@@ -417,6 +419,7 @@ impl Engine<'_> {
                     }
                 }
             }
+            found += next.len();
             level = next;
         }
         *self.folder_ids.lock().unwrap() = folder_ids;
@@ -786,7 +789,7 @@ impl Engine<'_> {
         // 양쪽 다 새로 생겼거나 바뀐 파일은 내용을 한 번만 비교한다: 같으면 바로 기준에 적어(멈추더라도 다음 차례에 다시 비교하지 않게) 할 일에서 뺀다
         let clashes: Vec<&String> = paths.iter().copied().filter(|p| p.as_str() != MERGE_JSON && matches!(changed(p), (Some(_), Some(_), true, true))).collect();
         let (mut same, mut differ) = (HashSet::new(), vec![]);
-        for rel in &clashes {
+        for (i, rel) in clashes.iter().enumerate() {
             let r = &remote[*rel];
             match md5_file(&self.abs(rel)) {
                 Ok(m) if Some(&m) == r.md5.as_ref() => {
@@ -795,6 +798,7 @@ impl Engine<'_> {
                 }
                 _ => differ.push(base_name(rel)), // 둘러보는 사이 없어진 파일도 (다음 차례에)
             }
+            (self.opts.on_progress)("compare", i + 1, clashes.len());
         }
         // 다르게 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
         if differ.len() > MASS_CONFLICT_MAX {

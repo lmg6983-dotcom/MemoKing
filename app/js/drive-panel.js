@@ -49,13 +49,15 @@ const saveConflicts = (list) => saveList(CONFLICT_KEY, list);
 /** 로그인을 다시 해야 고쳐지는 오류인가 ("권한" 같은 말은 Drive 폴더 권한 오류에도 있어 넣지 않는다) */
 export const needsLogin = (msg) => /로그인해 주세요|로그인이 끊겼|다시 로그인|invalid_grant/i.test(msg ?? '');
 
-/** 동기화 진행 한 줄: "Drive 폴더 살펴보는 중" · "파일 12/40개 맞추는 중, 약 2분 남음" */
+/** 동기화 진행 한 줄: "Drive 폴더 살펴보는 중, 폴더 3/8개" · "양쪽 파일 비교하는 중, 120/400개" · "파일 12/40개 맞추는 중, 약 2분 남음" */
 export function progressText(p, now = Date.now()) {
   if (!p) return '';
-  if (p.phase === 'scan') return 'Drive 폴더 살펴보는 중';
+  // 폴더 수는 훑으며 늘어나니 남은 시간은 말하지 않는다
+  if (p.phase === 'scan') return `Drive 폴더 살펴보는 중${p.total ? `, 폴더 ${p.done}/${p.total}개` : ''}`;
   if (!p.total) return '바뀐 메모가 없어요, 마무리하는 중';
   const left = etaText(p, now);
-  return `파일 ${p.done}/${p.total}개 맞추는 중${left ? `, ${left}` : ''}`;
+  const what = p.phase === 'compare' ? '양쪽 파일 비교하는 중, ' : '파일 ';
+  return `${what}${p.done}/${p.total}개${p.phase === 'compare' ? '' : ' 맞추는 중'}${left ? `, ${left}` : ''}`;
 }
 
 /** 남은 시간 어림 — 처음 몇 개 · 몇 초는 들쭉날쭉하니 말하지 않는다 */
