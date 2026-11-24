@@ -11,7 +11,6 @@ macro_rules! elog {
 }
 
 mod ai;
-mod ai_requests;
 mod capture;
 mod clipboard;
 mod files;

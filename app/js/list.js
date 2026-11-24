@@ -1209,8 +1209,6 @@ function showHandoff(h) {
   handoffTimer = setTimeout(() => (bar.hidden = true), 120_000);
 }
 api.on('memo:handoff', showHandoff);
-// AI 비서(Gemini 등)가 _memoking/AI 요청.md 에 적은 요청을 반영했다 (desktop-rs/app/src/ai_requests.rs)
-api.on('ai:requests', ({ done, failed }) => (done || failed) && flashStatus(`AI 비서 요청 ${done}개를 반영했어요${failed ? ` · ${failed}개는 못 했어요` : ''}`));
 api.memo.handoff().then(showHandoff).catch(() => {});
 
 el.useSuggested.addEventListener('click', async () => applyInfo(await api.vault.use(state.info.suggestedPath)));

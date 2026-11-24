@@ -57,7 +57,6 @@ pub fn start(app: &AppHandle) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(2));
         rescan(&app);
-        crate::ai_requests::tick(&app);
         crate::index::tick(&app);
         crate::windows::discard_tick(&app); // 오래 숨은 스택 탭 거두기 (30초마다 본다)
     });

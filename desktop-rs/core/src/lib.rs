@@ -3,7 +3,6 @@ pub mod accelerators;
 pub mod agent;
 pub mod ai;
 pub mod ai_events;
-pub mod ai_requests;
 pub mod date_detect;
 pub mod body;
 pub mod calendar_feeds;
