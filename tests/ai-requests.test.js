@@ -74,3 +74,16 @@ test('결과를 적은 글은 다시 읽어도 할 일이 없다', () => {
   assert.deepEqual(parseRequests(requestsText(['- ✅ a'], '2026-11-23 17:04')), { ops: [], error: '' });
   assert.equal(findMemo([{ id: 'x', file: 'a/b.md' }, { id: 'y', file: 'c/b.md' }], 'b.md'), null, '이름이 둘이면 고르지 않는다');
 });
+
+test('저장이 거절되면 ⚠️ 로 적고, 합치기는 보낸 메모를 지우지 않는다', () => {
+  const v = fakeVault();
+  const a = v.create();
+  v.save(a, '# 받는 메모\n하나');
+  const b = v.create();
+  v.save(b, '# 보낼 메모\n둘');
+  v.save = () => ({ refused: true }); // 다른 기기가 막 옮긴 메모 — 파일이 잠깐 없어 저장을 미룬다
+  const [merge, tag] = applyOps(v, parseRequests(`\`\`\`json\n${JSON.stringify([{ do: 'merge', into: a, from: [b] }, { do: 'tag', memo: a, add: ['x'] }])}\n\`\`\``).ops);
+  assert.match(merge, /^- ⚠️ 합치기 · 받는 메모 — 지금은 저장하지 못했어요/);
+  assert.match(tag, /^- ⚠️ 태그/);
+  assert.ok(v.entries.has(b), '보낼 메모는 그대로');
+});

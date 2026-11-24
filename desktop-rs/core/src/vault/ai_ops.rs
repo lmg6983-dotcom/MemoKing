@@ -44,6 +44,15 @@ impl Vault {
         e.file.clone().unwrap_or_else(|| e.id.clone())
     }
 
+    /// 저장 — 거절되면(다른 기기가 막 옮기거나 지운 메모 등) 오류로: 합치기가 받는 메모에 글을 못 넣고 보낸 메모만 지우지 않게
+    fn ai_save(&mut self, id: &str, body: &str) -> Result<(), String> {
+        let (summary, _) = self.save(id, body).map_err(|e| e.to_string())?;
+        if summary["refused"] == true {
+            return Err("지금은 저장하지 못했어요 (다른 기기에서 막 바뀐 메모) — 다시 요청해 주세요".into());
+        }
+        Ok(())
+    }
+
     /// 요청들을 반영 → 결과 줄들
     pub fn apply_ai_ops(&mut self, ops: &[Value]) -> Vec<String> {
         ops.iter().map(|op| self.apply_ai_op(op)).collect()
@@ -64,9 +73,9 @@ impl Vault {
             }
             let (color, folder) = (s("color"), s("folder"));
             let new = self.create((!color.is_empty()).then_some(color.as_str()), None, &folder);
-            return match self.save(&new, &format!("{text}\n")) {
+            return match self.ai_save(&new, &format!("{text}\n")) {
                 Ok(_) => result_line(op, &self.title_of(Some(&new)), "ok", &if folder.is_empty() { "만듦".to_string() } else { format!("{folder} 폴더에 만듦") }),
-                Err(e) => done("fail", &e.to_string()),
+                Err(e) => done("fail", &e),
             };
         }
         let why = Self::not_editable(id.as_deref().and_then(|i| self.entries.get(i)));
@@ -83,8 +92,8 @@ impl Vault {
                 let (next, status, note) = edit_body(&body, op);
                 if status == "ok" {
                     self.keep_version(&id, &body, true);
-                    if let Err(e) = self.save(&id, &next) {
-                        return done("fail", &e.to_string());
+                    if let Err(e) = self.ai_save(&id, &next) {
+                        return done("fail", &e);
                     }
                 }
                 return done(status, &note);
@@ -121,8 +130,8 @@ impl Vault {
                 let (next, added) = merge_bodies(&body, &bodies);
                 if added > 0 {
                     self.keep_version(&id, &body, true);
-                    if let Err(e) = self.save(&id, &next) {
-                        return done("fail", &e.to_string());
+                    if let Err(e) = self.ai_save(&id, &next) {
+                        return done("fail", &e);
                     }
                 }
                 let mut err = None;
@@ -186,6 +195,13 @@ mod tests {
         // 다른 기기가 같은 요청을 또 반영해도: 이미 됨
         let again = v.apply_ai_ops(&ops[..5]);
         assert!(again.iter().all(|l| l.starts_with("- ➖")), "{again:#?}");
+        // 다른 기기가 막 옮겨 파일이 잠깐 없는 메모로 합치면: 저장이 거절되고, 보낼 메모는 그대로
+        let c = v.create(None, None, "");
+        v.save(&c, "# 보낼 메모\n셋째 글").unwrap();
+        std::fs::remove_file(root.join("프롬프트/OA 프롬프트.md")).unwrap();
+        let lines = v.apply_ai_ops(&[json!({ "do": "merge", "memo": a, "from": [c] })]);
+        assert!(lines[0].starts_with("- ⚠️ 합치기"), "{lines:#?}");
+        assert!(v.entry(&c).is_some(), "보낼 메모는 그대로");
         std::fs::remove_dir_all(root).unwrap();
     }
 }
