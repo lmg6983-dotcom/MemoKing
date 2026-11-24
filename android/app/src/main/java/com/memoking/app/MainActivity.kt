@@ -24,6 +24,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.webkit.ConsoleMessage
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -112,6 +113,14 @@ class MainActivity : Activity() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 if (request.url.host == WebServer.HOST) return false
                 launchView(request.url)
+                return true
+            }
+
+            // 웹 화면 프로세스가 죽으면(메모리가 모자라 시스템이 끔 등) 앱째 꺼지지 않게 화면을 새로 띄운다
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                root.removeView(view)
+                view.destroy()
+                recreate()
                 return true
             }
         }
@@ -851,6 +860,13 @@ class MainActivity : Activity() {
         var started = false
         pw.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? = server.handle(request)
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                // 앱째 꺼지지 않게 버린다 (만들던 PDF 는 시간 넘김 PDF_TIMEOUT_MS 이 인쇄 화면으로 이어 준다)
+                if (printWeb === view) printWeb = null
+                root.removeView(view)
+                view.destroy()
+                return true
+            }
             override fun onPageFinished(view: WebView, url: String?) {
                 if (started) return
                 started = true
