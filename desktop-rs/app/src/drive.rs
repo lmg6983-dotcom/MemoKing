@@ -35,6 +35,8 @@ const POLL_ACTIVE: Duration = Duration::from_secs(10);
 const POLL_BURST: Duration = Duration::from_secs(5);
 const BURST_FOR: Duration = Duration::from_secs(120);
 const FOCUS_GAP: Duration = Duration::from_secs(5);
+// 안전장치로 멈추면 자동 동기화는 이만큼 쉰다 — 같은 모습이면 다시 해도 또 멈추며 폴더만 계속 훑는다 ("지금 동기화" · 폴더를 바꾸면 바로)
+const SAFETY_HOLD: Duration = Duration::from_secs(5 * 60);
 // 이보다 작은 파일은 요청 한 번(multipart)으로 올린다 — 이어 올리기는 요청이 두 번이라 메모가 많으면 처음 동기화가 두 배 걸린다
 const SIMPLE_UPLOAD_MAX: usize = 5 << 20;
 // 진행 상황은 이만큼마다 한 번만 알린다 (파일마다 창에 보내면 목록이 바빠진다)
@@ -63,6 +65,7 @@ struct Sched {
     last_focus: Option<Instant>,
     focused: bool,
     config: String,
+    hold_until: Instant,
 }
 
 static DRIVE: OnceLock<Drive> = OnceLock::new();
@@ -719,7 +722,11 @@ pub fn request(delay_ms: u64) {
 /// 연결 · 메모 폴더가 바뀌었을 때 (drive-sync.js configure)
 fn configure(app: &AppHandle) {
     let cfg = config(app);
-    d().sched.lock().unwrap().config = format!("{cfg:?}");
+    {
+        let mut s = d().sched.lock().unwrap();
+        s.config = format!("{cfg:?}");
+        s.hold_until = Instant::now();
+    }
     match cfg {
         None => publish(app, json!({ "state": "off", "error": "" })),
         // 메모 폴더가 Google Drive 데스크탑 앱이 맞추는 폴더 안이면 멈춘다 — 두 동기화가 서로 올리고 받으며 사본이 끝없이 늘 수 있다
@@ -739,23 +746,27 @@ fn state_file(dir: &Path, folder_id: &str, root: &Path) -> PathBuf {
 fn run(app: &AppHandle, full: bool) -> Value {
     let dr = d();
     let running = dr.running.lock().unwrap();
-    run_once(app, full);
+    let stopped = run_once(app, full);
     drop(running);
     let mut s = dr.sched.lock().unwrap();
+    s.hold_until = Instant::now() + if stopped { SAFETY_HOLD } else { Duration::ZERO };
     let delay = if Instant::now() < s.burst_until { POLL_BURST } else if s.focused { POLL_ACTIVE } else { POLL_IDLE };
     s.next_poll = Instant::now() + delay;
     drop(s);
     dr.status.lock().unwrap().clone()
 }
 
-fn run_once(app: &AppHandle, full: bool) {
+/// → 안전장치로 멈췄나
+fn run_once(app: &AppHandle, full: bool) -> bool {
     let dr = d();
-    let Some((folder_id, folder_name, root)) = config(app) else { return };
+    let Some((folder_id, folder_name, root)) = config(app) else { return false };
     if inside_drive_for_desktop(&root.to_string_lossy()) {
-        return publish(app, json!({ "state": "error", "error": DOUBLE_SYNC }));
+        publish(app, json!({ "state": "error", "error": DOUBLE_SYNC }));
+        return false;
     }
     if !dr.connected() {
-        return publish(app, json!({ "state": "error", "error": "Google Drive에 로그인해 주세요" }));
+        publish(app, json!({ "state": "error", "error": "Google Drive에 로그인해 주세요" }));
+        return false;
     }
     let file = state_file(&dr.dir, &folder_id, &root);
     let mut state: SyncState = std::fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
@@ -814,11 +825,13 @@ fn run_once(app: &AppHandle, full: bool) {
             // PC 다리: Drive 데스크탑 앱 폴더에 다른 앱(Gemini 등)이 새로 만든 메모를 가져온다 (drive_bridge.rs)
             let known: std::collections::HashSet<String> = state.files.keys().cloned().collect();
             crate::drive_bridge::run(app, &Api, &folder_id, &folder_name, &known);
+            false
         }
         Err(err) => {
             elog!("[Google Drive 동기화] {err}");
             crate::devices::write(app, &root, &folder_name, false, &err.to_string());
             publish(app, json!({ "state": "error", "progress": null, "error": err.to_string() }));
+            drive_sync::is_safety_stop(&err)
         }
     }
 }
@@ -836,7 +849,7 @@ pub fn start(app: &AppHandle) {
         login_cancel: Mutex::new(None),
         status: Mutex::new(json!({ "state": "off", "lastSync": 0, "error": "", "changed": false, "conflicts": [], "progress": null })),
         running: Mutex::new(()),
-        sched: Mutex::new(Sched { due: None, next_poll: Instant::now(), burst_until: Instant::now(), last_focus: None, focused: false, config: String::new() }),
+        sched: Mutex::new(Sched { due: None, next_poll: Instant::now(), burst_until: Instant::now(), last_focus: None, focused: false, config: String::new(), hold_until: Instant::now() }),
         folder_busy: Mutex::new(()),
     });
     // 범위 표시가 없는 아주 예전 연결만: 다시 연결하게 하고, 구글 쪽 예전 권한은 돌려준다
@@ -887,7 +900,7 @@ pub fn start(app: &AppHandle) {
                 s.next_poll = now + if now < s.burst_until { POLL_BURST } else if focused { POLL_ACTIVE } else { POLL_IDLE };
                 s.due.get_or_insert(now);
             }
-            let go = s.due.is_some_and(|t| now >= t);
+            let go = s.due.is_some_and(|t| now >= t) && now >= s.hold_until;
             if go {
                 s.due = None;
             }

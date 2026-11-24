@@ -215,8 +215,24 @@ fn hex6() -> String {
     uuid::Uuid::new_v4().simple().to_string()[..6].to_string()
 }
 
+/// 안전장치로 멈춤 — 같은 모습이면 다시 해도 또 멈추니, 자동 동기화는 잠깐 쉰다 (app drive.rs)
+#[derive(Debug)]
+struct SafetyStop(String);
+
+impl std::fmt::Display for SafetyStop {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for SafetyStop {}
+
 fn safety(msg: String) -> io::Error {
-    io::Error::other(msg)
+    io::Error::other(SafetyStop(msg))
+}
+
+pub fn is_safety_stop(e: &io::Error) -> bool {
+    e.get_ref().is_some_and(|e| e.is::<SafetyStop>())
 }
 
 /// lanes 개의 줄이 0..count 를 나눠 한다. 한 줄이 실패하면 다른 줄은 지금 하는 것만 끝내고 멈춘다 (끝낸 파일의 기준은 남게)
@@ -767,11 +783,25 @@ impl Engine<'_> {
             let rc = r.is_some_and(|r| b.is_none_or(|b| Some(&b.md5) != r.md5.as_ref()));
             (l.copied(), r, lc, rc)
         };
-        // 양쪽에서 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
-        let clashes: Vec<&&String> = paths.iter().filter(|p| p.as_str() != MERGE_JSON && matches!(changed(p), (Some(_), Some(_), true, true))).collect();
-        if clashes.len() > MASS_CONFLICT_MAX && clashes.iter().filter(|p| md5_file(&self.abs(p)).ok() != remote[***p].md5).count() > MASS_CONFLICT_MAX {
+        // 양쪽 다 새로 생겼거나 바뀐 파일은 내용을 한 번만 비교한다: 같으면 바로 기준에 적어(멈추더라도 다음 차례에 다시 비교하지 않게) 할 일에서 뺀다
+        let clashes: Vec<&String> = paths.iter().copied().filter(|p| p.as_str() != MERGE_JSON && matches!(changed(p), (Some(_), Some(_), true, true))).collect();
+        let (mut same, mut differ) = (HashSet::new(), vec![]);
+        for rel in &clashes {
+            let r = &remote[*rel];
+            match md5_file(&self.abs(rel)) {
+                Ok(m) if Some(&m) == r.md5.as_ref() => {
+                    self.record(rel, &r.id, &m, local[*rel]);
+                    same.insert(*rel);
+                }
+                _ => differ.push(base_name(rel)), // 둘러보는 사이 없어진 파일도 (다음 차례에)
+            }
+        }
+        // 다르게 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
+        if differ.len() > MASS_CONFLICT_MAX {
             return Err(safety(format!(
-                "양쪽에서 엇갈린 메모가 {MASS_CONFLICT_MAX}개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요."
+                "양쪽에서 엇갈린 메모가 {}개라 동기화를 멈췄어요 ({} 등). 사본이 계속 늘어나지 않게 {MASS_CONFLICT_MAX}개가 넘으면 맞추지 않아요. 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요.",
+                differ.len(),
+                differ[..3].join(", ")
             )));
         }
 
@@ -783,6 +813,7 @@ impl Engine<'_> {
                     self.files.lock().unwrap().remove(rel); // 양쪽 다 지움
                 }
                 (Some(_), Some(_), false, false) => {}
+                _ if same.contains(&rel) => {}
                 (l, r, _, _) => work.push((rel, l, r)),
             }
         }

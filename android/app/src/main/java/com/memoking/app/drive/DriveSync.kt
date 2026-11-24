@@ -42,6 +42,9 @@ object DriveSync {
     }
 
     private val worker = Executors.newSingleThreadScheduledExecutor()
+
+    /** 안전장치로 멈추면 자동 동기화는 5분 쉰다 — 같은 모습이면 다시 해도 또 멈추며 폴더만 계속 훑는다 ("지금 동기화" · 폴더를 바꾸면 바로. PC drive.rs 와 같음) */
+    @Volatile private var holdUntil = 0L
     private var pending: ScheduledFuture<*>? = null
 
     /** 파일이 오간 뒤 이때까지는 화면이 보이는 동안 5초마다 (PC 와 주고받는 중일 때 빨리) */
@@ -73,7 +76,7 @@ object DriveSync {
     /** 동기화를 부탁한다 (delayMs 안에 또 부탁하면 한 번으로) */
     @Synchronized
     fun request(ctx: Context, delayMs: Long = 0) {
-        if (!active(ctx) || !GoogleAuth.connected(ctx)) return
+        if (!active(ctx) || !GoogleAuth.connected(ctx) || System.currentTimeMillis() < holdUntil) return
         val app = ctx.applicationContext
         pending?.cancel(false)
         pending = worker.schedule({ runNow(app) }, delayMs, TimeUnit.MILLISECONDS)
@@ -103,6 +106,7 @@ object DriveSync {
         } catch (e: Exception) {
             android.util.Log.w("MemoKing", "Drive 동기화 실패", e)
             saveState(file, state)
+            holdUntil = if (e is SyncEngine.SafetyStop) System.currentTimeMillis() + 5 * 60_000 else 0
             val message = when (e) {
                 is java.net.UnknownHostException, is java.net.ConnectException, is java.net.SocketTimeoutException -> "인터넷에 연결되지 않아 동기화하지 못했어요"
                 else -> e.message ?: "동기화하지 못했어요"
@@ -110,6 +114,7 @@ object DriveSync {
             return Status("error", status.lastSync, message).also(::publish)
         }
         saveState(file, state)
+        holdUntil = 0
         if (result.uploaded + result.downloaded + result.deletedLocal + result.deletedRemote > 0) burstUntil = System.currentTimeMillis() + 120_000
         if (result.downloaded > 0) {
             // 다른 기기에서 잠근 메모를 홈 화면 위젯에서 바로 숨김 — 위젯의 파일 일은 한 줄로(체크·내용 보내기와 서로 덮어쓰지 않게),
@@ -142,6 +147,7 @@ object DriveSync {
         Vaults.prefs(ctx).edit().putString(KEY_FOLDER_NAME, name).apply()
         if (importFrom != null) copyAll(importFrom, FileStorage(mirror, ""))
         Vaults.use(ctx, PREFIX + folderId)
+        holdUntil = 0
         if (!wait) {
             schedule(ctx)
             publish(status.copy(state = "syncing", changed = false, conflicts = emptyList()))

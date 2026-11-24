@@ -321,7 +321,7 @@ class SyncEngine(
         if (goneLocal >= MASS_DELETE_MIN && goneLocal * 2 > known.size) {
             throw SafetyStop("휴대폰 메모 폴더에서 파일 ${goneLocal}개가 한꺼번에 사라져서 동기화를 멈췄어요.")
         }
-        // 양쪽에서 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
+        // 양쪽 다 새로 생겼거나 바뀐 파일은 내용을 한 번만 비교한다: 같으면 바로 기준에 적어(멈추더라도 다음 차례에 다시 비교하지 않게) 할 일에서 뺀다 (PC drive_sync.rs 와 같음)
         val clashes = paths.filter { p ->
             val l = localFiles[p]
             val r = remoteFiles[p]
@@ -329,14 +329,16 @@ class SyncEngine(
             p != MERGE_JSON && l != null && r != null &&
                 (b == null || b.lmtime != l.mtime || b.lsize != l.size) && (b == null || b.md5 != r.md5)
         }
-        if (clashes.size > MASS_CONFLICT_MAX) {
-            val differ = clashes.count { p ->
-                val m = try { local.openRead(p).use(::md5) } catch (e: Exception) { null } // 둘러보는 사이 없어진 파일
-                m != remoteFiles[p]?.md5
-            }
-            if (differ > MASS_CONFLICT_MAX) {
-                throw SafetyStop("양쪽에서 엇갈린 메모가 ${MASS_CONFLICT_MAX}개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 다른 동기화 앱도 맞추고 있는지 확인해 주세요.")
-            }
+        val differ = ArrayList<String>()
+        for (p in clashes) {
+            val r = remoteFiles.getValue(p)
+            val m = try { local.openRead(p).use(::md5) } catch (e: Exception) { null } // 둘러보는 사이 없어진 파일
+            val now = local.stat(p)
+            if (m != null && m == r.md5 && now != null) record(p, r.id, m, now) else differ += p.substringAfterLast('/')
+        }
+        // 다르게 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
+        if (differ.size > MASS_CONFLICT_MAX) {
+            throw SafetyStop("양쪽에서 엇갈린 메모가 ${differ.size}개라 동기화를 멈췄어요 (${differ.take(3).joinToString(", ")} 등). 사본이 계속 늘어나지 않게 ${MASS_CONFLICT_MAX}개가 넘으면 맞추지 않아요. 메모 폴더를 다른 동기화 앱도 맞추고 있는지 확인해 주세요.")
         }
 
         var uploaded = 0
