@@ -11,7 +11,4 @@
     <color name="widget_charcoal">#FF191919</color>
     <color name="widget_text">#FF242424</color>
     <color name="widget_muted">#8A242424</color>
-    <!-- 검정 메모 위 글자 (밝은 화면 · 어두운 화면 모두) -->
-    <color name="widget_text_on_dark">#FFF5F5F5</color>
-    <color name="widget_muted_on_dark">#94F5F5F5</color>
 </resources>
