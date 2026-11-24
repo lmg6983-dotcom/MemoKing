@@ -112,13 +112,17 @@ fn remember(app: &AppHandle, label: &str, id: Option<&str>) {
 }
 
 pub fn set_open(app: &AppHandle, id: &str, open: bool) {
-    let st = state(app);
-    let mut list = st.setting("openNotes").as_array().cloned().unwrap_or_default();
-    list.retain(|x| x != id);
-    if open {
-        list.push(id.into());
+    {
+        // 읽고 고쳐 쓰기를 한 잠금 안에서 — 다른 스레드(창 닫기 · 열기)가 그사이 고친 것을 덮지 않게
+        let st = state(app);
+        let mut set = st.settings.lock().unwrap();
+        let mut list = set.get("openNotes").and_then(Value::as_array).cloned().unwrap_or_default();
+        list.retain(|x| x != id);
+        if open {
+            list.push(id.into());
+        }
+        set.insert("openNotes".into(), list.into());
     }
-    st.settings.lock().unwrap().insert("openNotes".into(), list.into());
     save_soon(app); // 메모 창을 닫을 때(메인 스레드) 설정 파일 쓰기를 기다리지 않게
 }
 
