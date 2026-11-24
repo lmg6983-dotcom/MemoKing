@@ -27,8 +27,10 @@ pub const FULL_SCAN_MS: i64 = 15 * 60_000;
 pub const CONCURRENCY: usize = 4;
 const JUNK: [&str; 3] = ["desktop.ini", "thumbs.db", ".ds_store"];
 
+/// 맞추지 않는 이름. / \ : 가 든 이름도 — Drive 에서는 쓸 수 있어, 그대로 경로로 이으면 메모 폴더 밖(x/../../a, C:\…)에 쓰게 된다
+///   (메모킹이 만드는 이름에는 없다 — title_to_file_name)
 pub fn skip_name(name: &str) -> bool {
-    name.starts_with('.') || name.starts_with("~$") || name.ends_with(".tmp") || name == "desktop.ini" || name == "Thumbs.db"
+    name.starts_with('.') || name.starts_with("~$") || name.ends_with(".tmp") || name == "desktop.ini" || name == "Thumbs.db" || name.contains(['/', '\\', ':'])
 }
 
 pub fn skip_path(rel: &str) -> bool {
@@ -891,6 +893,14 @@ pub fn copy_vault(from: &Path, to: &Path) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_that_leave_the_memo_folder_are_skipped() {
+        for bad in ["x/../../evil.md", r"C:\Users\a\Startup\evil.bat", r"..\evil.md", "a:b.md", ".."] {
+            assert!(skip_name(bad), "{bad}");
+        }
+        assert!(skip_path("업무/x:y.md") && !skip_path("업무/회의 3시.md") && !user_dir(r"C:\evil"));
+    }
 
     #[test]
     fn drive_for_desktop_folders() {

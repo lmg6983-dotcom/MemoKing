@@ -84,7 +84,9 @@ class SyncEngine(
         // 한꺼번에 주고받는 파일 수 — 하나씩이면 메모가 많을 때 너무 느리다 (PC drive_sync.rs CONCURRENCY 와 같음)
         private const val CONCURRENCY = 4
 
-        fun skipName(name: String) = name.startsWith(".") || name.startsWith("~$") || name.endsWith(".tmp") || name == "desktop.ini" || name == "Thumbs.db"
+        // / \ : 가 든 이름도 — Drive 에서는 쓸 수 있어, 그대로 경로로 이으면 메모 폴더 밖을 가리킨다 (PC drive_sync.rs skip_name 과 같음)
+        fun skipName(name: String) = name.startsWith(".") || name.startsWith("~$") || name.endsWith(".tmp") || name == "desktop.ini" || name == "Thumbs.db" ||
+            name.any { it == '/' || it == '\\' || it == ':' }
         fun skipPath(rel: String) = rel in LOCAL_ONLY || rel.split('/').any(::skipName)
 
         // 메모 폴더 맨 위의 사용자 폴더 (메모킹의 폴더 목록) — 앱이 쓰는 폴더는 빼고. 빈 폴더도 만들기 · 지우기를 서로 맞춘다 (PC 와 같음)
