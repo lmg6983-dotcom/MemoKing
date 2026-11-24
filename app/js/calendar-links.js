@@ -93,7 +93,7 @@ function subRow({ name, sub = '', color, on, onToggle, onColor }) {
  * @param {{ calendars: any, notify: (text: string, isError?: boolean) => void, feedTexts: Map<string, { at: number, error?: string }> }} o
  * @returns {Promise<void>} 창을 닫으면
  */
-export function openCalendarLinks({ calendars, notify, feedTexts }) {
+export function openCalendarLinks({ calendars, notify, feedTexts, autoColor = () => MEMO_DOT.blue }) {
   return new Promise((resolve) => {
     let feeds = [];
     const dialog = el('dialog', 'dialog cal-links');
@@ -147,7 +147,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
       deviceCals.replaceChildren(...cals.map((c) => subRow({
         name: c.name || '캘린더',
         sub: c.account && c.account !== c.name ? c.account : '',
-        color: prefs[c.id]?.color || c.color,
+        color: prefs[c.id]?.color || autoColor(c.name || '휴대폰 캘린더'), // 고르지 않았으면 달력과 같게 이름으로
         on: prefs[c.id]?.on !== false,
         onToggle: (on) => save(c.id, { on }),
         onColor: (color) => save(c.id, { color }),
@@ -158,7 +158,9 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
 
     function feedRow(f) {
       const li = el('li', 'feed-row');
-      li.style.setProperty('--ext-color', shown(f.color));
+      const subNames = feedCalendars(feedTexts.get(f.id)?.text);
+      const feedColor = f.picked ? f.color : autoColor(subNames.length === 1 ? subNames[0] : f.name); // 고르지 않았으면 달력과 같게 이름으로
+      li.style.setProperty('--ext-color', shown(feedColor));
       const saveFeed = async (patch) => {
         try {
           feeds = await calendars.setFeeds(feeds.map((x) => (x.id === f.id ? patch(x) : x)));
@@ -168,7 +170,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
         }
       };
       // 색 점을 누르면 색 고르기 줄이 열린다
-      const [dot, palette] = colorPicker(f.name, f.color, (color) => saveFeed((x) => ({ ...x, color })));
+      const [dot, palette] = colorPicker(f.name, feedColor, (color) => saveFeed((x) => ({ ...x, color, picked: true })));
       const text = el('span', 'feed-text');
       const got = feedTexts.get(f.id);
       const sub = got?.error ? got.error : got?.at ? `${feedLabel(f.url)}, ${receivedAt(got.at)} 받음` : feedLabel(f.url);
@@ -207,7 +209,7 @@ export function openCalendarLinks({ calendars, notify, feedTexts }) {
         const saveCal = (name, next) => saveFeed((x) => ({ ...x, cals: { ...x.cals, [name]: { ...x.cals?.[name], ...next } } }));
         subs.append(...names.map((name) => subRow({
           name,
-          color: f.cals?.[name]?.color || f.color,
+          color: f.cals?.[name]?.color || (f.picked ? f.color : autoColor(name)),
           on: f.cals?.[name]?.on !== false,
           onToggle: (on) => saveCal(name, { on }),
           onColor: (color) => saveCal(name, { color }),

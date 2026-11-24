@@ -1787,6 +1787,8 @@ function openVault() {
     showHandoff((detail.external ?? []).filter((id) => !detail.removed?.includes(id)));
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
+  // AI 비서(Gemini 등)가 _memoking/AI 요청.md 에 적은 요청을 반영했다
+  vault.on('ai-requests', ({ done, failed }) => (done || failed) && toast(`AI 비서 요청 ${done}개를 반영했어요${failed ? ` · ${failed}개는 못 했어요` : ''}`));
   $('setup').hidden = true;
   list.refresh();
   list.show();

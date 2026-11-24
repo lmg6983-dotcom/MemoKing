@@ -13,6 +13,7 @@ import { isLiveCached } from '../../app/js/core/reminders.js';
 import { installLockMethods, lockedFiles, diskCopy } from '../../app/js/core/vault-locks.js';
 import { installSecretMethods, isSecretFolder, secretFolderId } from './vault-secret.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
+import { REQUESTS_FILE, parseRequests, applyOps, requestsText } from '../../app/js/core/ai-requests.js';
 import { folderOf, cleanFolderName, isFolderName, resolveMovedTwin, withoutId, PINNED_FOLDERS_FILE, parsePinned, pinFolder, renamePinned } from '../../app/js/core/folders.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
@@ -251,6 +252,33 @@ export class Vault extends EventTarget {
       this.emit('changed', { ids: [...changed], external, removed });
       this.scheduleIndex();
     }
+    if (!silent) this.aiRequests();
+  }
+
+  // AI 요청 메모 (_memoking/AI 요청.md) — AI 비서가 적은 요청으로 메모를 고치고, 결과를 적고 비운다 (core/ai-requests.js)
+  //   파일이 바뀌었을 때만 읽는다. 없으면 만들어 둔다 (메모킹이 만든 파일이어야 Drive 에서 AI 가 고친 것이 보인다)
+  aiRequests() {
+    const st = fs.stat(REQUESTS_FILE);
+    if (!st) {
+      fs.writeText(REQUESTS_FILE, requestsText());
+      return;
+    }
+    const seen = `${st.mtimeMs}:${st.size}`;
+    if (seen === this.requestsSeen) return;
+    this.requestsSeen = seen;
+    const { ops, error } = parseRequests(fs.readText(REQUESTS_FILE) ?? '');
+    if (!ops.length && !error) return;
+    const snap = () => new Map([...this.entries.values()].map((e) => [e.id, `${e.file}\n${e.body}`]));
+    const before = snap();
+    const lines = [...(error ? [`- ⚠️ ${error}`] : []), ...applyOps(this, ops)];
+    const after = snap();
+    // 고친 메모를 열어 둔 화면은 다른 기기에서 바뀐 것처럼 새 글을 받는다 (쓰던 글이 AI 가 고친 글을 덮지 않게)
+    const touched = [...new Set([...before.keys(), ...after.keys()])].filter((id) => before.get(id) !== after.get(id));
+    if (touched.length) this.emit('changed', { ids: touched, external: touched.filter((id) => after.has(id)), removed: touched.filter((id) => !after.has(id)) });
+    fs.writeText(REQUESTS_FILE, requestsText(lines, toLocalIso().slice(0, 16).replace('T', ' ')));
+    this.requestsSeen = null;
+    const done = lines.filter((l) => l.startsWith('- ✅')).length;
+    this.emit('ai-requests', { done, failed: lines.filter((l) => l.startsWith('- ⚠️')).length });
   }
 
   // ---------- 조회 ----------

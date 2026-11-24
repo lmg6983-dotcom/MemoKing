@@ -4,12 +4,12 @@
 // 이미 고른 날을 한 번 더 눌러도 같다. 한 번짜리 일정은 달력에서 끌어 다른 날·시각으로 옮긴다.
 // 다른 캘린더: Google 캘린더 등 .ics 구독 · 휴대폰 캘린더(삼성 캘린더) 일정도 함께 보인다 — 읽기만 ("메모로 가져오기"는 메모킹 안에서)
 //   (calendar-links.js · core/calendar-feeds.js)
-import { MEMO_DOT, nearestMemoColor } from './core/memo-colors.js';
+import { MEMO_DOT, nearestMemoColor, calendarColors, calendarColorOf } from './core/memo-colors.js';
 import { icon } from './icons.js';
 import { attachSlider } from './seg-slider.js';
 import { describeReminder, describeTask, describeAlerts, nextLabel, nextTime, isDone, isEvent, isLive, reenable, occurrencesBetween, occurrenceEnd, pendingAlerts, fallbackAlert, DEFAULT_ALERTS } from './core/reminders.js';
 import { koClock, koFullDate, relativeDay, startOfDay, addDays, sameDay, toLocalIso } from './core/time.js';
-import { feedEvents, prepareFeed, fromDeviceEvent, reminderFromExternal, importedEventBody, googleEventUrl, mergeDuplicateEvents, eventKey } from './core/calendar-feeds.js';
+import { feedEvents, prepareFeed, feedCalendars, fromDeviceEvent, reminderFromExternal, importedEventBody, googleEventUrl, mergeDuplicateEvents, eventKey } from './core/calendar-feeds.js';
 import { findDates, guessTitle } from './core/date-detect.js';
 import { parseScheduleText } from './core/schedule-parse.js';
 import { remembered } from './event-editor.js';
@@ -108,10 +108,28 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   const prepared = new Map(); // id → { at, data } — 받은 .ics 를 한 번만 풀어 둔다
   const parsed = new Map(); // `${id}|${at}|${from}|${to}` → 일정 (같은 범위를 다시 펼치지 않게)
   let device = { on: false, from: 0, to: 0, events: [], loading: null };
+  let deviceNames = []; // 이 휴대폰의 캘린더 이름 (보는 달에 일정이 없는 캘린더도 — 색을 정하는 데 씀)
+
+  // 다른 캘린더 색: 사람이 고른 색이 없으면 캘린더 이름으로 (같은 이름은 PC · 휴대폰이 같은 색, 이 기기의 캘린더끼리는 겹치지 않게)
+  const subNames = new Map(); // 구독 id → { at, subs } — 받은 글이 같으면 다시 훑지 않는다 (글이 수백 KB 일 수 있다)
+  function autoColors() {
+    const names = [...deviceNames];
+    for (const f of feeds) {
+      const got = feedTexts.get(f.id);
+      let hit = subNames.get(f.id);
+      if (!hit || hit.at !== got?.at) subNames.set(f.id, (hit = { at: got?.at, subs: feedCalendars(got?.text) }));
+      names.push(...(hit.subs.length ? hit.subs : [f.name]));
+    }
+    for (const e of device.events) names.push(e.calendar);
+    return calendarColors(names);
+  }
+  /** 이 캘린더의 색 (설정 › 다른 캘린더의 점도 같은 것) */
+  const autoColor = (name) => calendarColorOf(name, autoColors());
 
   /** [from, to) 사이의 다른 캘린더 일정 [{ ext: true, source, title, start, end, allDay, color, ... }] */
   function externalBetween(from, to) {
     const out = [];
+    const auto = autoColors();
     for (const f of feeds) {
       if (!f.on) continue;
       const got = feedTexts.get(f.id);
@@ -137,7 +155,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       for (const e of list) {
         const pref = e.cal ? f.cals?.[e.cal] : null; // 네이버 캘린더: 캘린더별 켜기 · 색
         if (pref?.on === false) continue;
-        out.push({ ...e, ext: true, source: e.cal || f.name, color: pref?.color || f.color, feedId: f.id, link: googleEventUrl(f.url, e) });
+        const source = e.cal || f.name;
+        out.push({ ...e, ext: true, source, color: pref?.color || (f.picked ? f.color : calendarColorOf(source, auto)), feedId: f.id, link: googleEventUrl(f.url, e) });
       }
     }
     if (device.on) {
@@ -146,7 +165,8 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
       for (const e of device.events) {
         const pref = prefs[e.calendarId];
         if (pref?.on === false || !(e.end > from && e.start < to) || e.calendar === '메모킹') continue;
-        out.push({ ...e, ext: true, source: e.calendar || '휴대폰 캘린더', device: true, ...(pref?.color ? { color: pref.color } : {}) });
+        const source = e.calendar || '휴대폰 캘린더';
+        out.push({ ...e, ext: true, source, device: true, color: pref?.color || calendarColorOf(source, auto) });
       }
     }
     // 같은 일정이 여러 캘린더에 있으면 하나로 (캘린더 이름은 모두 적는다), 메모킹 일정의 사본은 빼고
@@ -180,6 +200,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     }
     device.on = Boolean(calendars.device?.enabled());
     device.loading = null; // 껐다 켰으면 받는 중이던 것은 버린다
+    deviceNames = device.on && calendars.device?.list ? (await calendars.device.list().catch(() => [])).map((c) => c.name).filter((n) => n && n !== '메모킹') : [];
     await Promise.all(feeds.filter((f) => f.on).map(async (f) => {
       try {
         const got = await calendars.fetch(f.id, force);
@@ -1346,7 +1367,7 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
 
   // 다른 캘린더 잇기 창 — 닫으면 바뀐 것을 다시 받아 그린다
   async function openLinks() {
-    await openCalendarLinks({ calendars, notify, feedTexts });
+    await openCalendarLinks({ calendars, notify, feedTexts, autoColor });
     await loadFeeds();
   }
 

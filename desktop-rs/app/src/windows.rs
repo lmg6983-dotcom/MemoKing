@@ -27,6 +27,9 @@ struct Hover {
     target: Option<String>,
     armed: bool,
     gen: u64,
+    /// 끌기를 시작할 때 이미 커서 밑에 있던 메모 창 — 그 창에서 한 번 벗어났다가 다시 올라가야 합친다
+    ///   (다른 메모 창과 겹친 창의 윗줄을 잡고 잠깐 멈추기만 해도 그 창의 탭으로 들어가 창이 사라지던 것)
+    skip: Option<String>,
 }
 
 /// 합칠 메모를 찾는 손: 목록에서 끌기 · 메모 창 끌기 · 탭 떼어 끌기
@@ -726,12 +729,15 @@ fn moving(app: &AppHandle, id: &str, label: &str, moved: bool) {
     // shortcut: Tauri 에는 Electron 의 will-move · moved(끌기 시작 · 끝)가 없어 포커스와 300ms 멈춤으로 가린다 — 틀리는 때가 보이면 WM_ENTERSIZEMOVE 를 windows-rs 로
     if moved && w.is_focused().unwrap_or(false) && !wm().inking.contains(label) {
         if let Some(p) = cursor(app) {
+            // 시작할 때 밑에 있던 창 (wm() 을 잡기 전에 — stack_target_at 도 wm() 을 잡는다)
+            let starting = wm().window_drag.as_ref().is_none_or(|(i, _)| i != id);
+            let skip = if starting { stack_target_at(app, p, id) } else { None };
             let old = {
                 let mut g = wm();
                 if g.window_drag.as_ref().is_some_and(|(i, _)| i == id) {
                     None
                 } else {
-                    g.window_drag.replace((id.to_string(), Hover::default()))
+                    g.window_drag.replace((id.to_string(), Hover { skip, ..Hover::default() }))
                 }
             };
             if let Some((_, h)) = old {
@@ -835,16 +841,21 @@ fn on_armed(app: &AppHandle, who: Who, armed: bool) {
 }
 
 fn track_hover(app: &AppHandle, who: Who, p: (f64, f64), exclude: &str) {
-    let target = stack_target_at(app, p, exclude);
+    let found = stack_target_at(app, p, exclude);
     let gen = next_seq();
-    let (old, was_armed) = {
+    let (old, was_armed, target) = {
         let mut g = wm();
         let Some(h) = hover(&mut g, who) else { return };
+        // 시작할 때 밑에 있던 창은 벗어날 때까지 없는 것으로
+        if h.skip.is_some() && h.skip != found {
+            h.skip = None;
+        }
+        let target = if h.skip.is_some() { None } else { found };
         if h.target == target {
             return;
         }
         h.gen = gen;
-        (std::mem::replace(&mut h.target, target.clone()), std::mem::take(&mut h.armed))
+        (std::mem::replace(&mut h.target, target.clone()), std::mem::take(&mut h.armed), target)
     };
     set_stack_hover(app, old.as_ref(), false);
     if was_armed {

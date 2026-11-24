@@ -1115,3 +1115,34 @@ fn ai_events() {
     }
     report("ai_events", fails, cases.len());
 }
+
+#[test]
+fn ai_requests() {
+    use memoking_core::ai_requests::{edit_body, merge_bodies, normalize_op, parse_requests, requests_text, result_line};
+    let cases = fixtures("ai_requests");
+    let strs = |v: &Value| v.as_array().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let fails = cases
+        .iter()
+        .filter_map(|c| {
+            let (got, want) = match c["kind"].as_str().unwrap() {
+                "op" => (normalize_op(&c["raw"]), c["op"].clone()),
+                "parse" => {
+                    let (ops, note) = parse_requests(c["text"].as_str().unwrap());
+                    (json!({ "ops": ops, "error": !note.is_empty() }), json!({ "ops": c["ops"], "error": c["error"] }))
+                }
+                "edit" => {
+                    let (body, status, note) = edit_body(c["body"].as_str().unwrap(), &c["op"]);
+                    (json!({ "body": body, "status": status, "note": note }), c["out"].clone())
+                }
+                "merge" => {
+                    let (body, added) = merge_bodies(c["into"].as_str().unwrap(), &strs(&c["froms"]));
+                    (json!({ "body": body, "added": added }), c["out"].clone())
+                }
+                "line" => (json!(result_line(&c["op"], c["title"].as_str().unwrap(), c["status"].as_str().unwrap(), c["note"].as_str().unwrap())), c["line"].clone()),
+                _ => (json!(requests_text(&strs(&c["lines"]), c["stamp"].as_str().unwrap())), c["text"].clone()),
+            };
+            (got != want).then(|| format!("{}\n  JS  : {want}\n  Rust: {got}", c))
+        })
+        .collect();
+    report("ai_requests", fails, cases.len());
+}

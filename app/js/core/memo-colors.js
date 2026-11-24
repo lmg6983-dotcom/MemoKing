@@ -32,3 +32,27 @@ export function nearestMemoColor(hex) {
   }
   return best;
 }
+
+// 다른 캘린더 색 — 사람이 고르지 않았으면 캘린더 이름으로 정한다: 같은 이름은 PC · 휴대폰 어디서나 같은 색,
+//   이 기기의 캘린더끼리는 겹치지 않게 (6개가 넘으면 다시 돈다). 이름 차례 · 해시만 쓰므로 캘린더가 같으면 기기가 달라도 같은 답
+const AUTO = ['blue', 'green', 'purple', 'pink', 'yellow', 'gray'];
+const hash = (s) => {
+  let h = 2166136261;
+  for (const ch of s) h = Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0;
+  return h;
+};
+/** 캘린더 이름들 → Map(이름 → 메모 색 점 "#rrggbb") */
+export function calendarColors(names) {
+  const out = new Map();
+  const used = new Set();
+  for (const name of [...new Set(names)].filter(Boolean).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
+    if (used.size >= AUTO.length) used.clear();
+    const start = hash(name) % AUTO.length;
+    const pick = AUTO.map((_, k) => AUTO[(start + k) % AUTO.length]).find((c) => !used.has(c));
+    used.add(pick);
+    out.set(name, MEMO_DOT[pick]);
+  }
+  return out;
+}
+/** 목록에 없던 이름 (한 캘린더뿐일 때 등) — 이름만으로 */
+export const calendarColorOf = (name, colors) => colors?.get(name) ?? MEMO_DOT[AUTO[hash(String(name ?? '')) % AUTO.length]];
