@@ -23,7 +23,7 @@ Release v<버전> (최신): MemoKing-Setup-<버전>.exe · MemoKing-Setup.exe ·
 - 휴대폰: `.github/workflows/android.yml` 이 main 에서 APK 를 만들면 사전 배포 `android` 에 `MemoKing-android.apk` · `android-latest.json` 을 올리고, 앱은 그것을 봐요.
 - Secrets: `MEMOKING_GOOGLE_CLIENT_ID` · `MEMOKING_GOOGLE_CLIENT_SECRET` (Google 로그인 연결 정보) · `TAURI_SIGNING_PRIVATE_KEY` (업데이트 서명)
 - AI 엔진(llama-server)은 설치 파일에 넣지 않아요. AI를 처음 쓸 때 앱이 llama.cpp 릴리스에서 받아 설정 폴더 `ai\engine` 에 둬요 (`desktop-rs/app/src/ai.rs` 의 `LLAMA_TAG`). 받아쓰기 엔진은 실행 파일 안에 있어요.
-- AI 비서 연결(MCP)은 Rust 판에 없어요. Gemini 같은 AI 는 Google Drive 의 메모킹 동기화 폴더를 직접 읽고 써요.
+- AI 비서 연결(MCP)은 Rust 판에 없어요. Gemini 같은 AI 는 Google Drive 의 메모킹 동기화 폴더를 직접 읽고 고치고, 새 메모는 `_memoking/받은 메모` 빈 칸에 써요 ([Gem 지침](../docs/gemini-gem.md)).
 
 **Electron 판 · Rust 베타에서 갈아타기** (`desktop-rs/app/installer-hooks.nsh`)
 

@@ -15,6 +15,7 @@ mod capture;
 mod clipboard;
 mod files;
 mod drive;
+mod drive_bridge;
 mod history;
 mod index;
 mod ipc;

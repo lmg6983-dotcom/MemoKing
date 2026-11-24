@@ -739,7 +739,7 @@ fn run(app: &AppHandle, full: bool) -> Value {
 
 fn run_once(app: &AppHandle, full: bool) {
     let dr = d();
-    let Some((folder_id, _, root)) = config(app) else { return };
+    let Some((folder_id, folder_name, root)) = config(app) else { return };
     if inside_drive_for_desktop(&root.to_string_lossy()) {
         return publish(app, json!({ "state": "error", "error": DOUBLE_SYNC }));
     }
@@ -799,6 +799,9 @@ fn run_once(app: &AppHandle, full: bool) {
             if r.local_changed {
                 crate::memos::rescan(app);
             }
+            // PC 다리: Drive 데스크탑 앱 폴더에 다른 앱(Gemini 등)이 새로 만든 메모를 가져온다 (drive_bridge.rs)
+            let known: std::collections::HashSet<String> = state.files.keys().cloned().collect();
+            crate::drive_bridge::run(app, &Api, &folder_id, &folder_name, &known);
         }
         Err(err) => {
             elog!("[Google Drive 동기화] {err}");
@@ -920,6 +923,7 @@ fn switch_folder(app: &AppHandle, folder_id: &str, folder_name: &str) -> Value {
         }
     }
     st.set_setting("drive", json!({ "folderId": folder_id, "folderName": folder_name }));
+    crate::files::ensure_auto_start(app); // PC 가 켜져 있는 동안 늘 맞추게 (받은 메모 · PC 다리)
     if moving {
         st.open_vault(app, root);
         crate::memos::push_list(app);
