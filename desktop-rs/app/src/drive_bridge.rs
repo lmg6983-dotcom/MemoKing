@@ -1,7 +1,8 @@
 // PC 다리 — Google Drive 데스크탑 앱이 받아 둔 메모킹 동기화 폴더(G:\내 드라이브\메모킹 동기화)에서,
 //   메모킹이 Drive 에서 볼 수 없는 메모(Gemini 등 다른 앱이 새로 만든 .md)를 찾아 메모킹 메모로 가져오고 원래 파일은 지운다(Drive 휴지통).
 //   메모킹은 drive.file 권한이라 다른 앱이 만든 파일이 보이지 않는다 — 받은 메모 빈 칸(core/inbox.rs)을 쓰지 않고 AI 가 새 파일을 만든 때의 안전망.
-//   잘못 지우지 않게: ① 동기화 기록에 없고 ② 방금 Drive 에 물어 메모킹 눈에 없고 ③ 같은 id 의 메모가 없을 때만, 다 받은 지 30초 지난 것만
+//   잘못 지우지 않게: ① 동기화 기록에 없고 ② 방금 Drive 에 물어 메모킹 눈에 없는 것만, 다 받은 지 30초 지난 것만.
+//   머리말 id 가 메모킹 메모와 같으면 새 메모가 아니라 그 메모를 고친 것 — 그 메모에 이어 쓴다 (휴지통에 갔으면 되살려)
 use crate::memos::{push_list, with_vault};
 use memoking_core::drive_sync::{skip_path, Remote};
 use memoking_core::memo_file::{folder_of, parse_memo_file};
@@ -92,10 +93,13 @@ pub fn run(app: &AppHandle, remote: &dyn Remote, folder_id: &str, folder_name: &
         }
         let folder = if rel.starts_with("_memoking/") { String::new() } else { folder_of(&rel).to_string() }; // 받은 메모 폴더의 것은 맨 위로
         let done = with_vault(app, |v| {
-            // 같은 id 의 메모가 있으면 메모킹 메모다 (옮기는 중 등) — 건드리지 않는다. 같은 글이 이미 있으면 가져온 것으로
-            if meta.id.as_ref().is_some_and(|id| v.entry(id).is_some()) {
-                return Ok(false);
+            // 같은 id 의 메모가 있으면(다른 앱이 지우고 새로 만들어 고쳤다) 그 메모에 이어 쓴다 — 휴지통에 갔으면 되살려서 (vault/inbox.rs relink)
+            if let Some(id) = meta.id.as_deref() {
+                if v.relink(id, &body).map_err(|e| e.to_string())?.is_some() {
+                    return Ok(true);
+                }
             }
+            // 같은 글이 이미 있으면 가져온 것으로
             if v.files().any(|e| e.body.trim() == body.trim()) {
                 return Ok(true);
             }
