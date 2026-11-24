@@ -560,16 +560,31 @@ export class Vault extends EventTarget {
   }
 
   // known: 파일에 있다고 알고 있는 본문 (save 가 바꾸기 전 것을 넘긴다)
-  write(entry, known = entry.body, { copy = true } = {}) {
+  write(entry, known = entry.body, { copy = true, retried = false } = {}) {
     if (entry.secret) return this.writeSecret(entry); // 비밀 메모는 늘 잠가서 _memoking/secret 으로 (vault-secret.js)
     // 그사이 다른 기기가 이 메모를 잠갔다면 덮어쓰지 않는다 (잠금이 풀리거나 비밀번호가 되돌아가지 않게)
+    let checked = null;
     if (entry.file) {
+      this.checkedStat = null;
       const kept = this.keepChangedOnDisk(entry, known, { copy });
       if (kept === 'locked' || kept === 'copied' || kept === 'skipped') return kept;
+      checked = this.checkedStat; // 확인할 때 본 파일 모습 (readDiskIfChanged)
     }
     if (!entry.file) entry.file = this.uniqueFile(titleToFileName(extractTitle(entry.body)), entry.folder ?? '');
     entry.meta.id = entry.id;
-    const stat = fs.writeText(entry.file, serializeMemoFile(entry.meta, entry.body));
+    const text = serializeMemoFile(entry.meta, entry.body);
+    // 확인한 모습 그대로일 때만 쓴다 (Bridge.writeTextIf — Drive 동기화 잠금 안에서 확인 + 쓰기). 그사이 동기화가 받은 파일로
+    //   바꿔치기했으면 덮어쓰지 않고 한 번 더 확인한다 — 다른 기기의 글은 보통 때처럼 사본 · 버전으로 (PC vault.rs 는 메모 잠금 안에서 한 번에)
+    if (checked && !retried) {
+      const r = fs.writeTextIf(entry.file, text, checked.mtime, checked.size);
+      if (r?.changed) return this.write(entry, known, { copy, retried: true });
+      return this.wrote(entry, r);
+    }
+    return this.wrote(entry, fs.writeText(entry.file, text));
+  }
+
+  /** 쓴 뒤: 파일 모습을 기억 */
+  wrote(entry, stat) {
     entry.mtimeMs = stat?.mtime ?? Date.now();
     entry.size = stat?.size ?? 0;
     entry.idSaved = true;
@@ -586,6 +601,7 @@ export class Vault extends EventTarget {
   readDiskIfChanged(entry) {
     try {
       const st = fs.stat(entry.file);
+      this.checkedStat = st; // write 가 확인한 모습 그대로일 때만 쓰게 (writeTextIf)
       if (!st) return 'missing';
       if (st.mtime === entry.mtimeMs && st.size === entry.size) return null;
       return parseMemoFile(fs.readText(entry.file) ?? '');

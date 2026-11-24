@@ -143,6 +143,21 @@ class Bridge(private val activity: MainActivity) {
         changed(DriveSync.withFiles { storage().write(rel) { it.write(text.toByteArray(Charsets.UTF_8)) } }.json())
     }
 
+    /**
+     * 확인한 모습(고친 시각 · 크기) 그대로일 때만 쓴다 — 아니면 { changed: true } 만 (vault.js write).
+     *   확인과 쓰기를 동기화 잠금 안에서 한 번에: 따로 부르면 그 사이 동기화가 받은 파일로 바꿔치기한 것을 덮어썼다
+     *   (숫자는 JS 에서 double 로 온다 — 밀리초 시각은 그대로 담긴다)
+     */
+    @JavascriptInterface
+    fun writeTextIf(rel: String, text: String, mtime: Double, size: Double): String = reply {
+        val wrote = DriveSync.withFiles {
+            val st = storage().stat(rel)
+            if (st == null || st.mtime.toDouble() != mtime || st.size.toDouble() != size) null
+            else storage().write(rel) { it.write(text.toByteArray(Charsets.UTF_8)) }
+        }
+        if (wrote == null) JSONObject().put("changed", true) else changed(wrote.json())
+    }
+
     @JavascriptInterface
     fun writeBase64(rel: String, data: String): String = reply {
         val bytes = Base64.decode(data, Base64.DEFAULT)
