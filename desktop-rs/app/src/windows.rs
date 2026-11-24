@@ -2320,7 +2320,6 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         "stack:new-tab" => new_tab_after(app, &arg(0)),
         "stack:remove" => remove_from_stack(app, &arg(0), "close").into(),
         "stack:remove-hidden" => remove_from_stack(app, &arg(0), "hide").into(),
-        "stack:detach" => remove_from_stack(app, &arg(0), "detach").into(),
         "stack:tear-start" => at(2).is_some_and(|p| tear_start(app, &arg(0), args.get(1).unwrap_or(&Value::Null), p)).into(),
         "stack:tear-move" => {
             if let Some(p) = at(0) {

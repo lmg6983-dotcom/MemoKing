@@ -1070,7 +1070,6 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             r.map(|x| x.unwrap_or(Value::Null))
         }
         "memo:versions" => with_vault(app, |v| Ok(json!(v.versions(&arg_str(args, 0))))),
-        "memo:version" => with_vault(app, |v| Ok(v.version(&arg_str(args, 0), &arg_str(args, 1)).map_or(Value::Null, Value::from))),
         "memo:restore-version" => {
             let id = arg_str(args, 0);
             let r = with_vault(app, |v| v.restore_version(&id, &arg_str(args, 1)).map_err(|e| e.to_string()));
