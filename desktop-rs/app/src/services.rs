@@ -289,10 +289,13 @@ $ErrorActionPreference = 'Stop'
 $src = $env:MK_SRC; $out = $env:MK_OUT; $probe = $env:MK_PROBE -eq '1'
 $comments = $env:MK_COMMENTS -eq '1'; $notes = $env:MK_NOTES -eq '1'
 $none = [Type]::Missing
+# 매크로는 늘 끈다 (3 = msoAutomationSecurityForceDisable) — 프로그램으로 연 문서는 Office 가 기본으로 매크로를 묻지 않고 돌린다.
+#   다른 기기 · 사람이 넣은 첨부일 수 있다. 끄지 못하면 여기서 멈춘다 (화면이 직접 그린다)
 if ($src -match '\.pptx?$') {
   $running = [bool](Get-Process POWERPNT -ErrorAction SilentlyContinue)
   $app = New-Object -ComObject PowerPoint.Application
   try {
+    $app.AutomationSecurity = 3
     $doc = $app.Presentations.Open($src, -1, 0, 0)
     try {
       if ($probe) {
@@ -312,15 +315,17 @@ if ($src -match '\.pptx?$') {
   } finally { if (-not $running -and $app.Presentations.Count -eq 0) { $app.Quit() } }
 } elseif ($src -match '\.xlsx?$') {
   $app = New-Object -ComObject Excel.Application
-  $app.Visible = $false; $app.DisplayAlerts = $false
   try {
+    $app.AutomationSecurity = 3; $app.EnableEvents = $false
+    $app.Visible = $false; $app.DisplayAlerts = $false
     $book = $app.Workbooks.Open($src, 0, $true, $none, 'mk-no-password')
     try { $book.ExportAsFixedFormat(0, $out) } finally { $book.Close($false) }
   } finally { $app.Quit() }
 } else {
   $app = New-Object -ComObject Word.Application
-  $app.Visible = $false; $app.DisplayAlerts = 0
   try {
+    $app.AutomationSecurity = 3
+    $app.Visible = $false; $app.DisplayAlerts = 0
     $doc = $app.Documents.Open($src, $false, $true, $false, 'mk-no-password')
     try {
       if ($probe -and $doc.Comments.Count) { "ASK comments=$($doc.Comments.Count) notes=0"; return }
