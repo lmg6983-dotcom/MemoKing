@@ -1314,12 +1314,18 @@ impl Vault {
         let path = self.abs(&file);
         let Ok(text) = fs::read_to_string(&path) else { return };
         let (mut meta, b) = memo_file::parse_memo_file(&text);
+        // 디스크에 아직 못 읽은 다른 기기 글이 있으면 시각을 적지 않는다 — 다음 다시 읽기가 읽게 (적으면 그 글을 덮어쓴다)
+        let known = self.entries.get(id).is_some_and(|e| e.disk_meta.as_ref() == Some(&meta) && body::same_body(&b, &e.body));
         let moved = time::now_iso();
         meta.extra.insert("moved".into(), moved.clone().into());
         if write_atomic(&path, memo_file::serialize_memo_file(&meta, &b).as_bytes()).is_ok() {
             let e = self.entries.get_mut(id).unwrap();
             e.meta.extra.insert("moved".into(), moved.into());
-            e.stamp = stamp_of(&path).ok();
+            e.stamp = None;
+            if known {
+                e.stamp = stamp_of(&path).ok();
+                e.disk_meta = Some(meta);
+            }
         }
     }
 
@@ -2011,6 +2017,25 @@ mod tests {
         assert!(text.contains("휴대폰 글") && text.contains("color: blue") && text.contains("pinned: true"));
         assert_eq!(v.list().len(), 1, "사본을 만들지 않는다");
         assert_eq!(v.scan().external, vec![id], "열린 화면에 알린다");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn move_keeps_other_device_text() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let id = v.create(None, None, "");
+        v.save(&id, "# 메모\n처음").unwrap();
+        assert!(v.move_to_folder(&id, "보관").unwrap());
+        assert!(v.scan().external.is_empty(), "이 기기가 옮긴 것만으로는 알리지 않는다");
+        // 휴대폰이 글을 고쳤는데 아직 다시 읽기 전에 PC 에서 폴더로 옮김
+        let file = root.join("보관/메모.md");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(&file, fs::read_to_string(&file).unwrap().replace("처음", "휴대폰 글")).unwrap();
+        assert!(v.move_to_folder(&id, "업무").unwrap());
+        assert_eq!(v.scan().external, vec![id.clone()], "옮긴 파일의 바뀐 글을 다시 읽는다");
+        assert_eq!(v.get(&id).unwrap()["body"].as_str().unwrap().trim_end(), "# 메모\n휴대폰 글");
         fs::remove_dir_all(root).unwrap();
     }
 
