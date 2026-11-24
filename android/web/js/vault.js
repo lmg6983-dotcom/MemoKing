@@ -264,8 +264,8 @@ export class Vault extends EventTarget {
     } catch {
       list = [];
     }
-    if (this.inboxEnsure?.() && list.length < INBOX_SLOTS) {
-      const have = new Set(list.map((e) => e.name));
+    const have = new Set(list.map((e) => e.name));
+    if (this.inboxEnsure?.() && Array.from({ length: INBOX_SLOTS }, (_, i) => slotName(i + 1)).some((n) => !have.has(n))) {
       for (let n = 1; n <= INBOX_SLOTS; n++) if (!have.has(slotName(n))) fs.writeText(`${INBOX_DIR}/${slotName(n)}`, SLOT_TEXT);
       return; // 만든 칸은 다음 차례에 본다
     }

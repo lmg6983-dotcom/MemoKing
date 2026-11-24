@@ -1292,9 +1292,14 @@ let settingsSeq = 0;
 function fillSettingsFromPhone() {
   const info = native.info();
   $('vault-path').textContent = info.vault?.label || '(없음)';
-  $('use-internal-2').hidden = Boolean(info.vault?.internal);
+  // Google Drive 와 맞추는 동안은 메모 폴더를 바꾸지 않는다 (PC 와 같게 — 폴더는 로그인하면 정해진다, 헷갈리지 않게)
+  const ds = drive.status();
+  const synced = Boolean(ds.connected && ds.active);
+  $('use-internal-2').hidden = synced || Boolean(info.vault?.internal);
+  $('change-vault').hidden = synced;
   $('change-vault').textContent = info.vault?.drive ? '휴대폰 폴더 선택' : '위치 변경';
-  $('vault-hint').hidden = Boolean(info.vault?.drive);
+  $('vault-hint').textContent = synced ? 'Google Drive 동기화가 이 폴더를 맞추고 있어요. 다른 폴더를 쓰려면 먼저 연결을 끊어 주세요.' : 'PC와 함께 쓰려면 Google Drive를 연결해 주세요.';
+  $('vault-hint').hidden = !synced && Boolean(info.vault?.drive);
   $('version').textContent = `메모킹 ${info.version}`;
   refreshUpdateRow(info.version);
   const n = app.vault?.trashCount() ?? 0;

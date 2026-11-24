@@ -13,13 +13,16 @@ use tauri::{AppHandle, Emitter};
 const SETTLE: Duration = Duration::from_secs(30);
 
 /// 이 PC 에서 Google Drive 데스크탑 앱이 보여 주는 그 Drive 폴더 (내 드라이브 바로 아래만 — "메모킹 동기화" 가 거기 있다)
+///   스트리밍 방식은 드라이브 문자(G:\내 드라이브), 미러링 방식은 사용자 폴더(C:\Users\…\내 드라이브)
 fn mirror_of(folder_name: &str) -> Option<PathBuf> {
     if !cfg!(windows) || folder_name.is_empty() {
         return None;
     }
-    ('A'..='Z')
-        .flat_map(|l| ["내 드라이브", "My Drive"].map(|d| PathBuf::from(format!("{l}:\\{d}\\{folder_name}"))))
-        .find(|p| p.is_dir())
+    let mut roots: Vec<PathBuf> = ('A'..='Z').map(|l| PathBuf::from(format!("{l}:\\"))).collect();
+    if let Some(home) = std::env::var_os("USERPROFILE") {
+        roots.push(PathBuf::from(home));
+    }
+    roots.iter().flat_map(|r| ["내 드라이브", "My Drive"].map(|d| r.join(d).join(folder_name))).find(|p| p.is_dir())
 }
 
 /// 폴더 안의 .md (메모킹 폴더 기준 경로 · 고친 때) — _memoking · 첨부 · 임시 파일은 빼고
@@ -65,6 +68,12 @@ pub fn run(app: &AppHandle, remote: &dyn Remote, folder_id: &str, folder_name: &
     let Some(mirror) = mirror_of(folder_name) else { return };
     let mut found = vec![];
     mirror_memos(&mirror, "", &mut found);
+    // 받은 메모 폴더에 빈 칸을 덮어쓰지 않고 새로 만든 파일("빈 메모 007 (1).md" 등)도 — 빈 칸 이름 그대로인 것은 메모킹 칸
+    let inbox = format!("{}/", memoking_core::inbox::INBOX_DIR);
+    let mut extra = vec![];
+    mirror_memos(&mirror.join(memoking_core::inbox::INBOX_DIR.replace('/', "\\")), memoking_core::inbox::INBOX_DIR, &mut extra);
+    let slot = |rel: &str| rel.strip_prefix(inbox.as_str()).is_some_and(|n| (1..=memoking_core::inbox::INBOX_SLOTS).any(|i| memoking_core::inbox::slot_name(i) == n));
+    found.extend(extra.into_iter().filter(|(rel, _)| !slot(rel)));
     let picks = candidates(&found, known, SystemTime::now());
     if picks.is_empty() {
         return;
@@ -81,7 +90,7 @@ pub fn run(app: &AppHandle, remote: &dyn Remote, folder_id: &str, folder_name: &
         if body.trim().is_empty() {
             continue;
         }
-        let folder = folder_of(&rel).to_string();
+        let folder = if rel.starts_with("_memoking/") { String::new() } else { folder_of(&rel).to_string() }; // 받은 메모 폴더의 것은 맨 위로
         let done = with_vault(app, |v| {
             // 같은 id 의 메모가 있으면 메모킹 메모다 (옮기는 중 등) — 건드리지 않는다. 같은 글이 이미 있으면 가져온 것으로
             if meta.id.as_ref().is_some_and(|id| v.entry(id).is_some()) {
