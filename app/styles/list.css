@@ -532,7 +532,6 @@ body.is-dragging .folder-side .mf-more, body.is-dragging .folder-side .mf-new { 
 }
 .folder-side .mf-new:hover { background: color-mix(in srgb, var(--text) 6%, var(--bg)); color: var(--text); }
 .folder-side .mf-new:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.memos-col > .folder-chips { margin: 0 12px 6px; }
 .toolbar .folder-btn[hidden] { display: none; }
 .toolbar .folder-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); }
 /* 펴져 있을 때는 그림만 진하게 (큰 회색 바탕은 옆 단추들보다 무거웠다) */

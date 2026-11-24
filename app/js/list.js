@@ -77,7 +77,6 @@ const el = {
   tagFilter: $('tag-filter'),
   folderSide: $('folder-side'),
   folderBtn: $('folder-btn'),
-  folderChips: $('folder-chips'),
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
 };
