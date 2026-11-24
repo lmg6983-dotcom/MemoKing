@@ -350,6 +350,7 @@ export function titleToFileName(title) {
     .replace(/^[.\s]+|[.\s]+$/g, '')
     .replace(/^(~\$\s*)+/, '') // ~$ 로 시작하는 파일은 오피스 임시 파일로 보고 목록에서 빼므로
     .slice(0, 60)
+    .replace(/[\uD800-\uDBFF]$/, '') // 그림 글자(😀)를 반만 자르지 않게 — Rust slice16 과 같게
     .trim();
   if (!name) name = UNTITLED;
   // 윈도우는 점 뒤가 있어도(con.txt) 장치 이름으로 본다 → 만들 수 없는 파일
