@@ -111,11 +111,14 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
   let deviceNames = []; // 이 휴대폰의 캘린더 이름 (보는 달에 일정이 없는 캘린더도 — 색을 정하는 데 씀)
 
   // 다른 캘린더 색: 사람이 고른 색이 없으면 캘린더 이름으로 (같은 이름은 PC · 휴대폰이 같은 색, 이 기기의 캘린더끼리는 겹치지 않게)
+  const subNames = new Map(); // 구독 id → { at, subs } — 받은 글이 같으면 다시 훑지 않는다 (글이 수백 KB 일 수 있다)
   function autoColors() {
     const names = [...deviceNames];
     for (const f of feeds) {
-      const subs = feedCalendars(feedTexts.get(f.id)?.text);
-      names.push(...(subs.length ? subs : [f.name]));
+      const got = feedTexts.get(f.id);
+      let hit = subNames.get(f.id);
+      if (!hit || hit.at !== got?.at) subNames.set(f.id, (hit = { at: got?.at, subs: feedCalendars(got?.text) }));
+      names.push(...(hit.subs.length ? hit.subs : [f.name]));
     }
     for (const e of device.events) names.push(e.calendar);
     return calendarColors(names);
