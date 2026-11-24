@@ -778,6 +778,15 @@ fn recovered_files(app: &AppHandle) -> Vec<PathBuf> {
     std::fs::read_dir(dir).map_or(vec![], |rd| rd.flatten().map(|d| d.path()).filter(|p| p.extension().is_some_and(|e| e == "md")).collect())
 }
 
+/// 저장하지 못한 글을 dir/<시각>.md 로 (recovered_files 가 읽는다)
+fn keep_recovered(dir: &Path, body: &str) -> std::io::Result<PathBuf> {
+    std::fs::create_dir_all(dir)?;
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+    let file = dir.join(format!("{}-{:09}.md", now.as_secs(), now.subsec_nanos()));
+    std::fs::write(&file, body)?;
+    Ok(file)
+}
+
 /// 메모 창에 할 일을 보낸다 — 열려 있으면 바로, 아니면 열면서 (memo:get 의 command)
 fn note_command(app: &AppHandle, id: &str, command: Value) -> Result<Value, String> {
     let open = state(app).note_labels.lock().unwrap().contains_key(id);
@@ -913,6 +922,17 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
                 Ok(())
             });
             push_list_soon(app);
+            // 창을 닫는 마지막 저장이라 다시 할 수 없다 — 쓴 글을 설정 폴더 recovered/ 에 남긴다 (다음에 켜면 목록이 되살리기를 묻는다).
+            //   잠긴 메모 · 비밀 메모는 풀린 글을 파일로 남기지 않는다 (디스크 가득 참 · 드라이브 빠짐 · 메모 폴더 없음)
+            if let Err(e) = &r {
+                let locked = args.get(2).is_some_and(|o| o["locked"] == true) || memoking_core::secret::is_secret_id(&id);
+                if !locked && !memoking_core::body::is_blank_body(&body) {
+                    match keep_recovered(&st.settings_dir.join("recovered"), &body) {
+                        Ok(f) => elog!("[저장 실패] {e} — 따로 남김: {}", f.display()),
+                        Err(e2) => elog!("[저장 실패] {e} — 따로 남기기도 실패: {e2}"),
+                    }
+                }
+            }
             r.map(|()| true.into())
         }
         // 잠그기 · 열기: 열쇠 만들기(PBKDF2)는 일부러 느리다 — 메모 폴더를 붙잡지 않고 먼저 만든다
@@ -1167,7 +1187,16 @@ pub fn serve_vault(app: &AppHandle, rel: &str) -> Option<(PathBuf, &'static str)
 
 #[cfg(test)]
 mod tests {
-    use super::original_file_of;
+    use super::{keep_recovered, original_file_of};
+
+    #[test]
+    fn unsaved_text_is_kept_as_md() {
+        let dir = std::env::temp_dir().join(format!("memoking-recovered-test-{}", std::process::id()));
+        let (a, b) = (keep_recovered(&dir, "# 가\n본문").unwrap(), keep_recovered(&dir, "둘").unwrap());
+        assert!(a != b && a.extension().is_some_and(|e| e == "md"));
+        assert_eq!(std::fs::read_to_string(&a).unwrap(), "# 가\n본문");
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn conflict_copy_names() {
