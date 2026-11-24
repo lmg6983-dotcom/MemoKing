@@ -269,6 +269,7 @@ export class Vault extends EventTarget {
       for (let n = 1; n <= INBOX_SLOTS; n++) if (!have.has(slotName(n))) fs.writeText(`${INBOX_DIR}/${slotName(n)}`, SLOT_TEXT);
       return; // 만든 칸은 다음 차례에 본다
     }
+    if (this.inboxEnsure?.() && this.inboxTurn && !this.inboxTurn()) return; // 켜져 있는 PC(없으면 이름 차례로 첫 휴대폰)가 옮긴다 — 두 기기가 같은 칸을 옮겨 겹치지 않게
     this.inboxSeen ??= new Map();
     const made = [];
     for (const e of list) {

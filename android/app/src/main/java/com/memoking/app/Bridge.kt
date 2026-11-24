@@ -57,6 +57,7 @@ class Bridge(private val activity: MainActivity) {
         JSONObject()
             .put("version", BuildConfig.VERSION_NAME)
             .put("sdk", android.os.Build.VERSION.SDK_INT)
+            .put("model", android.os.Build.MODEL ?: "") // 기기 상태 파일의 이름 (web/js/device.js)
             .put("vault", vaultInfo() ?: JSONObject.NULL)
             .put("exactAlarms", Alarms.exactAllowed(ctx))
             // 녹음은 모든 버전, 받아쓰기는 휴대폰의 Google 음성 인식(안드로이드 13+)

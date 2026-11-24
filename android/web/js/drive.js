@@ -5,6 +5,8 @@ import { openSheet, closeSheet, toast, promptName } from './ui.js';
 import { icon } from '../../app/js/icons.js';
 import { installShareText } from '../../app/js/core/install-links.js';
 import { UI } from '../../app/js/core/ui-text.js';
+import { deviceSummary } from '../../app/js/core/devices.js';
+import { devices, myFile } from './device.js';
 
 const $ = (x) => document.getElementById(x);
 const sheet = $('drive-sheet');
@@ -265,6 +267,24 @@ export function renderStatus(s = drive.status()) {
   $('drive-connect').textContent = '연결하기';
   $('drive-connect').hidden = Boolean(s.active && s.connected); // 연결 뒤에는 폴더를 바꾸는 단추를 두지 않는다 (PC 와 같게 — 폴더는 로그인하면 정해진다)
   $('drive-connect').classList.add('primary');
+  renderDevices(s.active && s.connected);
+}
+
+// 이 Drive 폴더를 맞추는 기기들 (_memoking/기기 — device.js): "제1 PC · PC · 3분 전 동기화"
+function renderDevices(on) {
+  const ul = $('drive-devices');
+  const list = on ? devices() : [];
+  ul.hidden = !list.length; // PC 설정과 같게: 이 휴대폰만 있어도 보인다 (최근 오류를 볼 수 있게)
+  if (ul.hidden) return ul.replaceChildren();
+  const me = myFile();
+  const now = Date.now();
+  list.sort((a, b) => (b.file === me) - (a.file === me) || a.name.localeCompare(b.name));
+  ul.replaceChildren(...list.map((d) => {
+    const li = document.createElement('li');
+    li.textContent = deviceSummary(d, now) + (d.file === me ? ' (이 휴대폰)' : '');
+    li.title = d.lines.join('\n');
+    return li;
+  }));
 }
 
 let syncing = false; // 여러 번 눌러도 동기화는 한 번만

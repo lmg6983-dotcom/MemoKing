@@ -70,12 +70,14 @@ export function inboxLeader(devices, me, now) {
   return first.file === me.file;
 }
 
-/** 다시 적을 때인가: 사람이 읽는 내용이 바뀌었거나 HEARTBEAT_MS 지났다 */
+/** 다시 적을 때인가: HEARTBEAT_MS 지났거나 사람이 읽는 내용이 바뀌었다 — 마지막 동기화 시각은 빼고
+ *   (동기화마다 적으면 그 파일을 올리느라 또 동기화하고, 기기마다 1분에 한 번씩 파일이 오간다) */
 export function needsWrite(prevText, next, now) {
   const prev = parseDevice(prevText);
   if (!prev) return true;
   const draft = parseDevice(deviceText({ ...next, alive: now }));
-  return now - prev.alive >= HEARTBEAT_MS || prev.name !== draft.name || prev.lines.join('\n') !== draft.lines.join('\n');
+  const keep = (lines) => lines.filter((l) => !l.startsWith('마지막 동기화')).join('\n');
+  return now - prev.alive >= HEARTBEAT_MS || prev.name !== draft.name || keep(prev.lines) !== keep(draft.lines);
 }
 
 /** 화면에 한 줄: "제1 PC · PC · 3분 전 동기화" (꺼진 지 오래면 "꺼짐") */

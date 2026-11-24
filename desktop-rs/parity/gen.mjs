@@ -646,5 +646,5 @@ write('devices', [
   ...devs.map((d, i) => ({ kind: 'text', d, id: ['3f9c', 'a1b2', 'zz'][i], file: dev.deviceFile(d.name, ['3f9c', 'a1b2', 'zz'][i]), text: dev.deviceText(d) })),
   ...devTexts.map((text) => ({ kind: 'parse', text, seen: dev.parseDevice(text) })),
   ...leaderSets.map(([others, me]) => ({ kind: 'leader', others, me, leader: dev.inboxLeader(others, me, devNow) })),
-  ...[[devTexts[0], devs[0], devNow], [devTexts[0], devs[0], devNow + 6 * 60_000], [devTexts[0], { ...devs[0], error: '새 오류' }, devNow], ['', devs[1], devNow]].map(([prev, next, now]) => ({ kind: 'write', prev, next, now, write: dev.needsWrite(prev, next, now) })),
+  ...[[devTexts[0], devs[0], devNow], [devTexts[0], devs[0], devNow + 6 * 60_000], [devTexts[0], { ...devs[0], error: '새 오류' }, devNow], ['', devs[1], devNow], [devTexts[0], { ...devs[0], lastSync: devNow }, devNow + 60_000]].map(([prev, next, now]) => ({ kind: 'write', prev, next, now, write: dev.needsWrite(prev, next, now) })),
 ]);

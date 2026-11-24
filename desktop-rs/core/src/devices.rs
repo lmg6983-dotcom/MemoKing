@@ -83,9 +83,11 @@ pub fn inbox_leader(others: &[(String, String, i64)], me_file: &str, me_kind: &s
     pool.iter().map(|(f, _)| *f).min() == Some(me_file)
 }
 
-/// 다시 적을 때인가: 사람이 읽는 내용이 바뀌었거나 HEARTBEAT_MS 지났다
+/// 다시 적을 때인가: HEARTBEAT_MS 지났거나 사람이 읽는 내용이 바뀌었다 — 마지막 동기화 시각은 빼고
+///   (동기화마다 적으면 그 파일을 올리느라 또 동기화하고, 기기마다 1분에 한 번씩 파일이 오간다)
 pub fn needs_write(prev_text: Option<&str>, next: &Device, now: i64) -> bool {
     let Some(prev) = prev_text.and_then(parse_device) else { return true };
     let Some(draft) = parse_device(&device_text(&Device { alive: now, ..next.clone() })) else { return true };
-    now - prev.alive >= HEARTBEAT_MS || prev.name != draft.name || prev.lines != draft.lines
+    let keep = |l: &Vec<String>| l.iter().filter(|x| !x.starts_with("마지막 동기화")).cloned().collect::<Vec<_>>();
+    now - prev.alive >= HEARTBEAT_MS || prev.name != draft.name || keep(&prev.lines) != keep(&draft.lines)
 }

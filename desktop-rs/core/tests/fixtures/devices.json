@@ -282,5 +282,20 @@
   },
   "now": 1795000000000,
   "write": true
+ },
+ {
+  "kind": "write",
+  "prev": "---\nkind: pc\nalive: 1794999940000\nlastSync: 1794999880000\n---\n# DESKTOP-AB12\n\n- 종류: PC\n- 마지막 동기화: 2026-11-18 20:04\n- 메모 폴더: C:\\Users\\a\\Documents\\메모킹\n- PC 다리: 켜짐 (G:\\내 드라이브\\메모킹 동기화)\n- 최근 오류: 없음\n",
+  "next": {
+   "name": "DESKTOP-AB12",
+   "kind": "pc",
+   "alive": 1794999940000,
+   "lastSync": 1795000000000,
+   "folder": "C:\\Users\\a\\Documents\\메모킹",
+   "bridge": "G:\\내 드라이브\\메모킹 동기화",
+   "error": ""
+  },
+  "now": 1795000060000,
+  "write": false
  }
 ]
