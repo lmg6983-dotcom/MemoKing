@@ -16,6 +16,7 @@ import java.security.MessageDigest
 
 /** 동기화 엔진: 가짜 Google Drive + 실제 파일 폴더로 PC·휴대폰 사이 상황을 차례로 확인한다 */
 class SyncEngineTest {
+    // 엔진이 여러 줄에서 한꺼번에 부르니 가짜도 한 번에 하나씩 (@Synchronized)
     class FakeDrive : Remote {
         data class F(val id: String, var name: String, var parent: String, val folder: Boolean, var data: ByteArray = ByteArray(0), var modified: Long = 0, var trashed: Boolean = false)
         val files = LinkedHashMap<String, F>()
@@ -39,20 +40,20 @@ class SyncEngineTest {
             note(f.id)
         }
         fun text(rel: String) = path(rel)?.data?.toString(Charsets.UTF_8)
-        override fun listChildren(folderId: String) = files.values.filter { it.parent == folderId && !it.trashed }.map(::item).also { calls++ }
-        override fun download(id: String, out: OutputStream) { out.write(files[id]!!.data) }
-        override fun upload(parentId: String, name: String, existingId: String?, size: Long, open: () -> InputStream): Remote.Item {
+        @Synchronized override fun listChildren(folderId: String) = files.values.filter { it.parent == folderId && !it.trashed }.map(::item).also { calls++ }
+        @Synchronized override fun download(id: String, out: OutputStream) { out.write(files[id]!!.data) }
+        @Synchronized override fun upload(parentId: String, name: String, existingId: String?, size: Long, open: () -> InputStream): Remote.Item {
             val f = existingId?.let { files[it] } ?: F("f${++seq}", name, parentId, false).also { files[it.id] = it }
             f.data = open().use { it.readBytes() }; f.modified = System.currentTimeMillis()
             note(f.id)
             return item(f)
         }
-        override fun createFolder(parentId: String, name: String): Remote.Item { val f = F("d${++seq}", name, parentId, true); files[f.id] = f; note(f.id); return item(f) }
-        override fun trash(id: String) { files[id]!!.trashed = true; note(id) }
+        @Synchronized override fun createFolder(parentId: String, name: String): Remote.Item { val f = F("d${++seq}", name, parentId, true); files[f.id] = f; note(f.id); return item(f) }
+        @Synchronized override fun trash(id: String) { files[id]!!.trashed = true; note(id) }
         // log 를 켜면 실제 Drive 처럼 바뀐 것 목록(items)을 준다
         var log: MutableList<String>? = null
-        fun note(id: String) { log?.add(id) }
-        override fun changesSince(token: String?, knownIds: Set<String>): Remote.Changes {
+        @Synchronized fun note(id: String) { log?.add(id) }
+        @Synchronized override fun changesSince(token: String?, knownIds: Set<String>): Remote.Changes {
             val l = log
             if (l == null || token == null) { val c = changed || token == null; changed = false; return Remote.Changes(c, "t") }
             val items = l.distinct().map { id -> files[id]!!.let { Remote.Change(id, it.trashed, listOf(it.parent), item(it)) } }
@@ -86,6 +87,53 @@ class SyncEngineTest {
         drive.put("_memoking/README.md", "guide")
         val r = sync()
         assertEquals(3, r.downloaded)
+    }
+
+    @Test
+    fun manyFilesGoBothWaysInLanesWithProgress() {
+        // 여러 줄로 한꺼번에 주고받아도 하나도 빠지지 않고, 진행은 끝에 "다 했음" 까지 온다
+        for (i in 1..30) lw("폰 $i.md", "# 폰 $i")
+        for (i in 1..30) drive.put("PC 폴더 ${i % 3}/PC $i.md", "# PC $i")
+        val seen = java.util.Collections.synchronizedList(ArrayList<Triple<String, Int, Int>>())
+        val r = SyncEngine(local, drive, "ROOT", state, onProgress = { phase, done, total -> seen += Triple(phase, done, total) }).run()
+        assertEquals(30, r.uploaded)
+        assertEquals(30, r.downloaded)
+        for (i in 1..30) {
+            assertEquals("# 폰 $i", drive.text("폰 $i.md"))
+            assertEquals("# PC $i", lt("PC 폴더 ${i % 3}/PC $i.md"))
+        }
+        assertEquals(Triple("transfer", 60, 60), seen.last())
+        assertTrue("폴더를 살펴본 만큼", seen.any { it.first == "scan" && it.second == 4 && it.third == 4 })
+        assertNull("받다 남은 임시 파일 없음", File(dir, "_memoking").listFiles()?.firstOrNull { it.name.endsWith(".tmp") })
+        assertTrue("다시 돌리면 할 일 없음", sync().let { it.uploaded + it.downloaded == 0 })
+    }
+
+    @Test
+    fun massConflictKeepsSameFilesAndManualSyncGoesOn() {
+        // 기준 없이 양쪽에 다 있는 파일: 같은 것은 멈추더라도 기준에 남고, 엇갈린 것이 많으면 자동은 멈추고 "지금 동기화"(full) 는 사본으로 맞춘다 (PC 와 같음)
+        for (i in 0 until 25) { lw("같음$i.md", "same"); drive.put("같음$i.md", "same") }
+        for (i in 0 until 21) { lw("다름$i.md", "mine"); drive.put("다름$i.md", "theirs") }
+        val stop = assertThrows(SyncEngine.SafetyStop::class.java) { sync() }
+        assertTrue(stop.message!!, stop.message!!.contains("21개"))
+        val kept = state.getJSONObject("files").keys().asSequence().toList()
+        assertEquals("같은 파일은 멈춰도 기준에 남는다", 25, kept.size)
+        assertTrue(kept.all { it.startsWith("같음") })
+        val r = SyncEngine(local, drive, "ROOT", state).run(full = true)
+        assertEquals("지금 동기화는 엇갈린 것을 사본으로 남기고 맞춘다", 21, r.conflicts.size)
+        assertEquals("theirs", lt("다름0.md"))
+    }
+
+    @Test
+    fun driveNamesThatLeaveTheMemoFolderAreSkipped() {
+        // Drive 에서 이름을 x/../../a 나 C:\… 로 바꾼 파일: 메모 폴더 밖에 쓰지 않고, 동기화도 멈추지 않는다 (PC 와 같음)
+        for ((i, bad) in listOf("x/../../evil.md", "C:\\evil.md", "a:b.md").withIndex()) {
+            drive.files["bad$i"] = FakeDrive.F("bad$i", bad, "ROOT", false, "bad".toByteArray())
+        }
+        drive.put("좋은.md", "# 좋은")
+        val r = sync()
+        assertEquals(1, r.downloaded)
+        assertEquals("# 좋은", lt("좋은.md"))
+        assertNull("메모 폴더 밖에 쓰지 않음", File(dir.parentFile, "evil.md").takeIf { it.exists() })
     }
 
     @Test

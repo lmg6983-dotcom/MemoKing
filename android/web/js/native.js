@@ -36,6 +36,7 @@ export const fs = {
   stat: sync('stat'),
   readText: sync('readText'),
   writeText: sync('writeText'),
+  writeTextIf: sync('writeTextIf'),
   writeBase64: sync('writeBase64'),
   mkdirs: sync('mkdirs'),
   move: sync('move'),

@@ -598,6 +598,32 @@ mod drive {
         super::report("drive_sync", fails, cases.len());
     }
 
+    // 기준 없이 양쪽에 다 있는 파일: 같은 것은 멈추더라도 기준에 남고, 엇갈린 것이 많으면 자동은 멈추고 "지금 동기화" 는 사본으로 맞춘다
+    #[test]
+    fn mass_conflict_keeps_same_files_and_manual_sync_goes_on() {
+        let root = std::env::temp_dir().join(format!("mk-drive-clash-{}", unique()));
+        std::fs::create_dir_all(&root).unwrap();
+        let mut remote_files = Map::new();
+        for i in 0..25 {
+            std::fs::write(root.join(format!("같음{i}.md")), "same").unwrap();
+            remote_files.insert(format!("같음{i}.md"), json!("same"));
+        }
+        for i in 0..21 {
+            std::fs::write(root.join(format!("다름{i}.md")), "mine").unwrap();
+            remote_files.insert(format!("다름{i}.md"), json!("theirs"));
+        }
+        let remote = Fake::new(&remote_files, None, 1_000);
+        let mut state = SyncState::default();
+        let opts = |full| drive_sync::Options { full, local_clean: false, conflict_tag: "PC 충돌", now: &|| 1_000, on_progress: &|_, _, _| {}, concurrency: drive_sync::CONCURRENCY, locked: &|f| f() };
+        let err = drive_sync::run(&root, &remote, "root0", &mut state, &opts(false)).unwrap_err();
+        assert!(drive_sync::is_safety_stop(&err) && err.to_string().contains("21개"), "{err}");
+        assert_eq!(state.files.len(), 25, "같은 파일은 멈춰도 기준에 남는다");
+        assert!(state.files.keys().all(|k| k.starts_with("같음")));
+        let r = drive_sync::run(&root, &remote, "root0", &mut state, &opts(true)).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(r.conflicts.len(), 21, "지금 동기화는 엇갈린 것을 사본으로 남기고 맞춘다");
+    }
+
     // 못 읽은 하위 폴더(백신 · 권한)의 메모를 "이 PC 에서 지움" 으로 보고 Drive 에서 지우지 않는다
     #[cfg(unix)]
     #[test]

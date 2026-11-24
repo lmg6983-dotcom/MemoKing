@@ -143,6 +143,15 @@ class DriveApi(private val ctx: Context) : Remote {
         val meta = if (existingId == null) JSONObject().put("name", name).put("parents", JSONArray().put(parentId)) else JSONObject()
         val start = if (existingId == null) "$UPLOAD/files?uploadType=resumable&fields=${enc(FIELDS)}"
         else "$UPLOAD/files/${enc(existingId)}?uploadType=resumable&fields=${enc(FIELDS)}"
+        // 작은 파일은 요청 한 번(multipart)으로 — 이어 올리기는 요청이 두 번이라 메모가 많으면 처음 동기화가 두 배 걸린다 (PC drive.rs 와 같음)
+        if (size <= 5L shl 20) {
+            val boundary = "memoking${System.currentTimeMillis()}"
+            val body = java.io.ByteArrayOutputStream()
+            body.write("--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$meta\r\n--$boundary\r\nContent-Type: application/octet-stream\r\n\r\n".toByteArray())
+            open().use { it.copyTo(body) }
+            body.write("\r\n--$boundary--".toByteArray())
+            return request(if (existingId == null) "POST" else "PATCH", start.replace("uploadType=resumable", "uploadType=multipart"), "multipart/related; boundary=$boundary", body.toByteArray()) { item(json(it)) }
+        }
         val location = request(if (existingId == null) "POST" else "PATCH", start, body = meta.toString().toByteArray()) { conn ->
             conn.getHeaderField("Location") ?: throw IOException("Google Drive가 올릴 주소를 주지 않았어요. 잠시 뒤 다시 해 주세요")
         }

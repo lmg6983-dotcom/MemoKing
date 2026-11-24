@@ -27,8 +27,10 @@ pub const FULL_SCAN_MS: i64 = 15 * 60_000;
 pub const CONCURRENCY: usize = 4;
 const JUNK: [&str; 3] = ["desktop.ini", "thumbs.db", ".ds_store"];
 
+/// 맞추지 않는 이름. / \ : 가 든 이름도 — Drive 에서는 쓸 수 있어, 그대로 경로로 이으면 메모 폴더 밖(x/../../a, C:\…)에 쓰게 된다
+///   (메모킹이 만드는 이름에는 없다 — title_to_file_name)
 pub fn skip_name(name: &str) -> bool {
-    name.starts_with('.') || name.starts_with("~$") || name.ends_with(".tmp") || name == "desktop.ini" || name == "Thumbs.db"
+    name.starts_with('.') || name.starts_with("~$") || name.ends_with(".tmp") || name == "desktop.ini" || name == "Thumbs.db" || name.contains(['/', '\\', ':'])
 }
 
 pub fn skip_path(rel: &str) -> bool {
@@ -215,8 +217,24 @@ fn hex6() -> String {
     uuid::Uuid::new_v4().simple().to_string()[..6].to_string()
 }
 
+/// 안전장치로 멈춤 — 같은 모습이면 다시 해도 또 멈추니, 자동 동기화는 잠깐 쉰다 (app drive.rs)
+#[derive(Debug)]
+struct SafetyStop(String);
+
+impl std::fmt::Display for SafetyStop {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for SafetyStop {}
+
 fn safety(msg: String) -> io::Error {
-    io::Error::other(msg)
+    io::Error::other(SafetyStop(msg))
+}
+
+pub fn is_safety_stop(e: &io::Error) -> bool {
+    e.get_ref().is_some_and(|e| e.is::<SafetyStop>())
 }
 
 /// lanes 개의 줄이 0..count 를 나눠 한다. 한 줄이 실패하면 다른 줄은 지금 하는 것만 끝내고 멈춘다 (끝낸 파일의 기준은 남게)
@@ -244,11 +262,12 @@ fn lanes(lanes: usize, count: usize, f: impl Fn(usize) -> io::Result<()> + Sync)
 }
 
 pub struct Options<'a> {
+    /// "지금 동기화": Drive 폴더를 처음부터 훑고, 엇갈린 메모가 많아도 멈추지 않고 사본으로 남긴다
     pub full: bool,
     pub local_clean: bool,
     pub conflict_tag: &'a str,
     pub now: &'a (dyn Fn() -> i64 + Sync),
-    /// 어디까지 했는지 (scan: Drive 폴더 살펴보는 중, transfer: 맞출 파일 total 개 중 done 개)
+    /// 어디까지 했는지 (scan: Drive 폴더 total 개 중 done 개 살펴봄, compare: 양쪽에 다 있는 파일 비교, transfer: 맞출 파일 total 개 중 done 개)
     pub on_progress: &'a (dyn Fn(&str, usize, usize) + Sync),
     pub concurrency: usize,
     /// 메모 파일을 바꿔치기 · 옮기기 · 지우는 순간을 앱의 메모 잠금 안에서 돌린다 —
@@ -371,10 +390,12 @@ impl Engine<'_> {
         let mut folder_ids = BTreeMap::from([(String::new(), self.root_id.clone())]);
         // 한 층씩, 그 층의 폴더들은 한꺼번에 훑는다
         let mut level = vec![(self.root_id.clone(), String::new())];
+        let (read, mut found) = (AtomicUsize::new(0), 1);
         while !level.is_empty() {
             let lists: Vec<Mutex<Vec<RemoteItem>>> = level.iter().map(|_| Mutex::default()).collect();
             lanes(self.opts.concurrency, level.len(), |i| {
                 *lists[i].lock().unwrap() = self.remote.list_children(&level[i].0)?;
+                (self.opts.on_progress)("scan", read.fetch_add(1, Ordering::SeqCst) + 1, found);
                 Ok(())
             })?;
             let mut next = vec![];
@@ -401,6 +422,7 @@ impl Engine<'_> {
                     }
                 }
             }
+            found += next.len();
             level = next;
         }
         *self.folder_ids.lock().unwrap() = folder_ids;
@@ -578,19 +600,17 @@ impl Engine<'_> {
         let tmp = dest.with_file_name(format!(".{}.{}.tmp", base_name(rel), hex6()));
         let swapped = (|| {
             self.remote.download(&item.id, &tmp)?;
-            let mut swapped = Ok(false); // 받는 사이 이 PC 에서 고쳤다 — 덮어쓰지 않고 다음 차례에
+            let mut swapped = Ok(None); // 받는 사이 이 PC 에서 고쳤다 — 덮어쓰지 않고 다음 차례에
             (self.opts.locked)(&mut || {
                 if untouched() {
-                    swapped = fs::rename(&tmp, &dest).map(|()| true);
+                    // 시각도 잠금 안에서 잰다 — 잠금을 기다리던 저장이 끼어들면 그 글을 "맞춘 것" 으로 적어 올리지 않게 된다
+                    swapped = fs::rename(&tmp, &dest).and_then(|()| self.stat(rel).ok_or(io::ErrorKind::NotFound.into())).map(Some);
                 }
             });
             swapped
         })();
         let _ = fs::remove_file(&tmp);
-        if !swapped? {
-            return Ok(());
-        }
-        let now = self.stat(rel).ok_or(io::ErrorKind::NotFound)?;
+        let Some(now) = swapped? else { return Ok(()) };
         self.record(rel, &item.id, item.md5.as_deref().unwrap_or_default(), now);
         self.result.lock().unwrap().downloaded += 1;
         Ok(())
@@ -647,9 +667,8 @@ impl Engine<'_> {
                 } else if !local_changed && remote_changed {
                     self.download(rel, r, Some(l))
                 } else if Some(md5_file(&self.abs(rel))?) == r.md5 {
-                    // 양쪽 같은 내용
-                    let now = self.stat(rel).ok_or(io::ErrorKind::NotFound)?;
-                    self.record(rel, &r.id, r.md5.as_deref().unwrap_or_default(), now);
+                    // 양쪽 같은 내용 — 둘러볼 때의 시각으로 적는다 (비교한 뒤 고쳤으면 다음 차례에 올리게)
+                    self.record(rel, &r.id, r.md5.as_deref().unwrap_or_default(), l);
                     Ok(())
                 } else {
                     self.conflict(rel, r)
@@ -767,11 +786,33 @@ impl Engine<'_> {
             let rc = r.is_some_and(|r| b.is_none_or(|b| Some(&b.md5) != r.md5.as_ref()));
             (l.copied(), r, lc, rc)
         };
-        // 양쪽에서 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다)
-        let clashes: Vec<&&String> = paths.iter().filter(|p| p.as_str() != MERGE_JSON && matches!(changed(p), (Some(_), Some(_), true, true))).collect();
-        if clashes.len() > MASS_CONFLICT_MAX && clashes.iter().filter(|p| md5_file(&self.abs(p)).ok() != remote[***p].md5).count() > MASS_CONFLICT_MAX {
+        // 양쪽 다 새로 생겼거나 바뀐 파일은 내용을 한 번만 비교한다: 같으면 바로 기준에 적어(멈추더라도 다음 차례에 다시 비교하지 않게) 할 일에서 뺀다
+        let clashes: Vec<&String> = paths.iter().copied().filter(|p| p.as_str() != MERGE_JSON && matches!(changed(p), (Some(_), Some(_), true, true))).collect();
+        let sums: Vec<Mutex<Option<String>>> = clashes.iter().map(|_| Mutex::default()).collect();
+        let checked = AtomicUsize::new(0);
+        lanes(self.opts.concurrency, clashes.len(), |i| {
+            *sums[i].lock().unwrap() = md5_file(&self.abs(clashes[i])).ok(); // 둘러보는 사이 없어진 파일은 None (다음 차례에)
+            (self.opts.on_progress)("compare", checked.fetch_add(1, Ordering::SeqCst) + 1, clashes.len());
+            Ok(())
+        })?;
+        let (mut same, mut differ) = (HashSet::new(), vec![]);
+        for (rel, sum) in clashes.iter().zip(sums) {
+            let r = &remote[*rel];
+            match sum.into_inner().unwrap() {
+                Some(m) if Some(&m) == r.md5.as_ref() => {
+                    self.record(rel, &r.id, &m, local[*rel]);
+                    same.insert(*rel);
+                }
+                _ => differ.push(base_name(rel)),
+            }
+        }
+        // 다르게 엇갈린 파일이 너무 많으면 아무것도 건드리기 전에 멈춘다 (도중에 멈추면 다음 차례마다 사본이 또 생긴다).
+        //   "지금 동기화" 로 직접 맞추면 사본으로 남기고 맞춘다 — 기준을 잃고 양쪽에서 고친 것이면 그 밖에 빠져나갈 길이 없다
+        if differ.len() > MASS_CONFLICT_MAX && !self.opts.full {
             return Err(safety(format!(
-                "양쪽에서 엇갈린 메모가 {MASS_CONFLICT_MAX}개를 넘어 동기화를 멈췄어요 (사본이 계속 늘어나지 않게). 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요."
+                "양쪽에서 엇갈린 메모가 {}개라 동기화를 멈췄어요 ({} 등). 사본이 계속 늘어나지 않게 {MASS_CONFLICT_MAX}개가 넘으면 맞추지 않아요. 메모 폴더를 Google Drive 데스크탑 앱 등 다른 동기화도 맞추고 있는지 확인해 주세요. 그렇지 않다면 \"지금 동기화\"를 누르면 엇갈린 메모는 사본으로 남기고 맞춰요.",
+                differ.len(),
+                differ[..3].join(", ")
             )));
         }
 
@@ -783,6 +824,7 @@ impl Engine<'_> {
                     self.files.lock().unwrap().remove(rel); // 양쪽 다 지움
                 }
                 (Some(_), Some(_), false, false) => {}
+                _ if same.contains(&rel) => {}
                 (l, r, _, _) => work.push((rel, l, r)),
             }
         }
@@ -851,6 +893,14 @@ pub fn copy_vault(from: &Path, to: &Path) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_that_leave_the_memo_folder_are_skipped() {
+        for bad in ["x/../../evil.md", r"C:\Users\a\Startup\evil.bat", r"..\evil.md", "a:b.md", ".."] {
+            assert!(skip_name(bad), "{bad}");
+        }
+        assert!(skip_path("업무/x:y.md") && !skip_path("업무/회의 3시.md") && !user_dir(r"C:\evil"));
+    }
 
     #[test]
     fn drive_for_desktop_folders() {

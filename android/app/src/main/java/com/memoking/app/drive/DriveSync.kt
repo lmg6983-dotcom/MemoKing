@@ -36,12 +36,21 @@ object DriveSync {
         val error: String,
         val changed: Boolean = false,
         val conflicts: List<String> = emptyList(),
+        val progress: JSONObject? = null, // 동기화하는 동안 { phase, done, total, since } (PC drive.rs 와 같은 모양 — app/js/core/sync-progress.js)
     ) {
         fun json(): JSONObject = JSONObject().put("state", state).put("lastSync", lastSync).put("error", error)
-            .put("changed", changed).put("conflicts", org.json.JSONArray(conflicts))
+            .put("changed", changed).put("conflicts", org.json.JSONArray(conflicts)).put("progress", progress ?: JSONObject.NULL)
     }
 
     private val worker = Executors.newSingleThreadScheduledExecutor()
+
+    /** 메모 파일을 쓸 때 잡는 잠금 — 앱(Bridge · 위젯)의 저장과 동기화의 "그대로인지 확인 → 바꿔치기" 가 서로 끼어들지 않게 (PC 의 메모 잠금과 같음) */
+    private val fileLock = Any()
+
+    fun <T> withFiles(f: () -> T): T = synchronized(fileLock, f)
+
+    /** 안전장치로 멈추면 자동 동기화는 5분 쉰다 — 같은 모습이면 다시 해도 또 멈추며 폴더만 계속 훑는다 ("지금 동기화" · 폴더를 바꾸면 바로. PC drive.rs 와 같음) */
+    @Volatile private var holdUntil = 0L
     private var pending: ScheduledFuture<*>? = null
 
     /** 파일이 오간 뒤 이때까지는 화면이 보이는 동안 5초마다 (PC 와 주고받는 중일 때 빨리) */
@@ -70,10 +79,30 @@ object DriveSync {
         listener?.invoke(next)
     }
 
+    private fun progress(phase: String, done: Int, total: Int, since: Long) =
+        JSONObject().put("phase", phase).put("done", done).put("total", total).put("since", since)
+
+    private var progressSent = 0L
+
+    /** 엔진의 진행 (여러 줄에서 온다): 처음 · 마지막 · 단계가 바뀔 때는 바로, 그 사이는 0.3초에 한 번만 화면에 (PC drive.rs 와 같음) */
+    @Synchronized
+    private fun onProgress(phase: String, done: Int, total: Int) {
+        val prev = status.progress
+        val now = System.currentTimeMillis()
+        val turned = prev?.optString("phase") != phase
+        val next = status.copy(progress = progress(phase, done, total, if (turned) now else prev!!.optLong("since", now))) // 남은 시간은 단계마다 따로
+        if (turned || done == 0 || done == total || now - progressSent >= 300) {
+            progressSent = now
+            publish(next)
+        } else {
+            status = next
+        }
+    }
+
     /** 동기화를 부탁한다 (delayMs 안에 또 부탁하면 한 번으로) */
     @Synchronized
     fun request(ctx: Context, delayMs: Long = 0) {
-        if (!active(ctx) || !GoogleAuth.connected(ctx)) return
+        if (!active(ctx) || !GoogleAuth.connected(ctx) || System.currentTimeMillis() < holdUntil) return
         val app = ctx.applicationContext
         pending?.cancel(false)
         pending = worker.schedule({ runNow(app) }, delayMs, TimeUnit.MILLISECONDS)
@@ -86,7 +115,7 @@ object DriveSync {
     private fun runNow(ctx: Context, full: Boolean = false): Status {
         val folderId = folderId(ctx) ?: return Status("off", 0, "").also(::publish)
         if (!GoogleAuth.connected(ctx)) return Status("error", status.lastSync, "Google Drive에 로그인해 주세요").also(::publish)
-        publish(status.copy(state = "syncing", changed = false, conflicts = emptyList()))
+        publish(status.copy(state = "syncing", changed = false, conflicts = emptyList(), progress = progress("scan", 0, 0, System.currentTimeMillis())))
         val file = stateFile(ctx, folderId)
         val state = try {
             JSONObject(file.readText())
@@ -99,10 +128,11 @@ object DriveSync {
         if (state.optString("scope") == "full" && scope == "file") state.put("keepMissing", true)
         state.put("scope", scope)
         val result = try {
-            SyncEngine(storage(ctx, folderId), DriveApi(ctx), folderId, state).run(full)
+            SyncEngine(storage(ctx, folderId), DriveApi(ctx), folderId, state, fileLock, ::onProgress).run(full)
         } catch (e: Exception) {
             android.util.Log.w("MemoKing", "Drive 동기화 실패", e)
             saveState(file, state)
+            holdUntil = if (e is SyncEngine.SafetyStop) System.currentTimeMillis() + 5 * 60_000 else 0
             val message = when (e) {
                 is java.net.UnknownHostException, is java.net.ConnectException, is java.net.SocketTimeoutException -> "인터넷에 연결되지 않아 동기화하지 못했어요"
                 else -> e.message ?: "동기화하지 못했어요"
@@ -110,6 +140,7 @@ object DriveSync {
             return Status("error", status.lastSync, message).also(::publish)
         }
         saveState(file, state)
+        holdUntil = 0
         if (result.uploaded + result.downloaded + result.deletedLocal + result.deletedRemote > 0) burstUntil = System.currentTimeMillis() + 120_000
         if (result.downloaded > 0) {
             // 다른 기기에서 잠근 메모를 홈 화면 위젯에서 바로 숨김 — 위젯의 파일 일은 한 줄로(체크·내용 보내기와 서로 덮어쓰지 않게),
@@ -142,6 +173,7 @@ object DriveSync {
         Vaults.prefs(ctx).edit().putString(KEY_FOLDER_NAME, name).apply()
         if (importFrom != null) copyAll(importFrom, FileStorage(mirror, ""))
         Vaults.use(ctx, PREFIX + folderId)
+        holdUntil = 0
         if (!wait) {
             schedule(ctx)
             publish(status.copy(state = "syncing", changed = false, conflicts = emptyList()))

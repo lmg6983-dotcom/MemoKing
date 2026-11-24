@@ -476,10 +476,26 @@ class MainActivity : Activity() {
         return out.toList()
     }
 
+    /**
+     * 메모킹 자신의 비공개 폴더(로그인 정보 · 설정 등)를 가리키는 file:// 주소인가 — 다른 앱이 이런 주소를 "공유" 로 보내면
+     *   메모킹은 자기 파일이라 읽을 수 있어, 그 내용이 메모가 되어 메모 폴더 · Drive 로 새어 나갔다
+     */
+    private fun ownPrivateFile(uri: Uri): Boolean {
+        if (uri.scheme != "file") return false
+        val path = uri.path ?: return true
+        val canonical = try { java.io.File(path).canonicalPath } catch (e: Exception) { return true }
+        val roots = listOfNotNull(applicationInfo.dataDir, createDeviceProtectedStorageContext().dataDir?.path, filesDir.parent, cacheDir.parent)
+        return roots.any { root -> val r = try { java.io.File(root).canonicalPath } catch (e: Exception) { root }; canonical == r || canonical.startsWith("$r/") }
+    }
+
     /** 다른 앱의 파일을 앱 임시 폴더로 복사: [{ temp, name, mime, size }] (클립보드의 그림 붙여넣기도) */
     fun copyToTemp(uris: List<Uri>): JSONArray {
         val out = JSONArray()
         for (uri in uris) {
+            if (ownPrivateFile(uri)) {
+                android.util.Log.w("MemoKing", "메모킹 비공개 파일을 가리키는 주소는 읽지 않아요: $uri")
+                continue
+            }
             try {
                 var name = ""
                 var size = -1L

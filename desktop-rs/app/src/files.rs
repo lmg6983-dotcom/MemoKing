@@ -40,11 +40,62 @@ pub(crate) fn web_config() -> ureq::config::ConfigBuilder<ureq::typestate::Agent
 type Response = ureq::http::Response<ureq::Body>;
 
 fn call(url: &str, accept: &str, timeout_secs: u64) -> Result<Response, String> {
-    let req = agent().get(url).config().timeout_global(Some(Duration::from_secs(timeout_secs))).build();
+    get(url, accept, timeout_secs, 10)
+}
+
+fn get(url: &str, accept: &str, timeout_secs: u64, redirects: u32) -> Result<Response, String> {
+    let req = agent().get(url).config().timeout_global(Some(Duration::from_secs(timeout_secs))).max_redirects(redirects).build();
     req.header("Accept", accept).header("Accept-Language", "ko-KR,ko;q=0.9,en;q=0.8").call().map_err(|e| match e {
         ureq::Error::StatusCode(code) => format!("HTTP {code}"),
         e => e.to_string(),
     })
+}
+
+/// 집 · 회사 안 네트워크(이 PC · 공유기 · NAS)의 주소인가
+fn local_ip(ip: std::net::IpAddr) -> bool {
+    use std::net::IpAddr;
+    match ip {
+        IpAddr::V4(v) => {
+            let [a, b, ..] = v.octets();
+            v.is_private() || v.is_loopback() || v.is_link_local() || v.is_unspecified() || v.is_broadcast() || a == 0 || a >= 224 || (a == 100 && (64..128).contains(&b))
+        }
+        IpAddr::V6(v) => {
+            let s = v.segments()[0];
+            v.is_loopback() || v.is_unspecified() || v.is_multicast() || (s & 0xfe00) == 0xfc00 || (s & 0xffc0) == 0xfe80 || v.to_ipv4_mapped().is_some_and(|m| local_ip(IpAddr::V4(m)))
+        }
+    }
+}
+
+/// 인터넷 쪽 주소인가 — 이름이면 찾아 본 주소가 모두 밖이어야 (못 찾으면 아니다)
+fn public_host(u: &Url) -> bool {
+    use std::net::ToSocketAddrs;
+    let port = u.port_or_known_default().unwrap_or(80);
+    let Some(host) = u.host_str() else { return false };
+    if let Ok(ip) = host.trim_start_matches('[').trim_end_matches(']').parse::<std::net::IpAddr>() {
+        return !local_ip(ip);
+    }
+    (host, port).to_socket_addrs().is_ok_and(|a| {
+        let all: Vec<_> = a.collect();
+        !all.is_empty() && all.iter().all(|s| !local_ip(s.ip()))
+    })
+}
+
+/// 메모 속 링크를 저절로 받을 때(링크 미리보기): 안 네트워크 주소는 넘겨받은 주소(redirect)까지 건드리지 않는다 —
+///   동기화로 들어온 메모가 열리기만 해도 공유기 · NAS 같은 기기에 요청을 보내게 하지 않게
+fn call_public(url: &str, accept: &str, timeout_secs: u64) -> Result<Response, String> {
+    let mut target = Url::parse(url).map_err(|_| "인터넷 주소가 아니에요".to_string())?;
+    for _ in 0..6 {
+        if !matches!(target.scheme(), "http" | "https") || !public_host(&target) {
+            return Err("안 네트워크 주소는 미리 보지 않아요".into());
+        }
+        let res = get(target.as_str(), accept, timeout_secs, 0)?;
+        if !res.status().is_redirection() {
+            return Ok(res);
+        }
+        let Some(next) = res.headers().get("location").and_then(|v| v.to_str().ok()).and_then(|l| target.join(l).ok()) else { return Ok(res) };
+        target = next;
+    }
+    Err("넘겨주는 주소가 너무 많아요".into())
 }
 
 fn content_type(res: &Response) -> String {
@@ -140,7 +191,7 @@ fn now_iso() -> String {
 /// 사진을 _memoking/link-previews/<주소 해시>.<확장자> 로 → 메모 폴더 기준 경로
 fn save_image(dir: &Path, url: &str, limit: u64) -> Result<String, String> {
     use sha1::Digest;
-    let mut res = call(url, IMAGE_ACCEPT, 10)?;
+    let mut res = call_public(url, IMAGE_ACCEPT, 10)?;
     let ty = content_type(&res).to_lowercase();
     let bytes = read(&mut res, limit, false, "너무 큰 파일")?;
     if bytes.is_empty() {
@@ -174,7 +225,7 @@ fn fetch_preview(dir: &Path, url: &str) -> Result<Value, String> {
     if let Some(entry) = fetch_youtube(dir, url) {
         return Ok(entry);
     }
-    let mut res = call(target.as_str(), "text/html,application/xhtml+xml,*/*;q=0.8", 10)?;
+    let mut res = call_public(target.as_str(), "text/html,application/xhtml+xml,*/*;q=0.8", 10)?;
     let ty = content_type(&res).to_lowercase();
     let final_url = ureq::ResponseExt::get_uri(&res).to_string();
     let body = read(&mut res, MAX_HTML, true, "너무 큰 파일")?;
@@ -744,6 +795,15 @@ mod tests {
         assert_eq!(png_name(None, " 회의:  메모\n둘 "), "회의 메모 둘.png");
         assert_eq!(png_name(None, "???"), "메모.png");
         assert_eq!(png_name(None, &"가".repeat(90)).chars().count(), 84);
+    }
+
+    #[test]
+    fn previews_stay_off_the_local_network() {
+        for local in ["http://192.168.0.1/reboot", "http://127.0.0.1:8080", "http://10.1.2.3", "http://169.254.169.254/latest", "http://[::1]/", "http://[fd00::1]/", "http://100.64.0.1", "http://0.0.0.0", "http://[::ffff:192.168.0.1]/"] {
+            assert!(!public_host(&Url::parse(local).unwrap()), "{local}");
+        }
+        assert!(public_host(&Url::parse("https://8.8.8.8/").unwrap()) && public_host(&Url::parse("http://[2606:4700::1111]/").unwrap()));
+        assert!(call_public("http://localhost/", "*/*", 1).is_err() && call_public("file:///C:/x", "*/*", 1).is_err());
     }
 
     #[test]

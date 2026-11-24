@@ -100,6 +100,11 @@ const sync = {
     fs.writeFileSync(p, text);
     return entry(path.basename(p), fs.statSync(p));
   },
+  writeTextIf: (rel, text, mtime, size) => {
+    const st = fs.statSync(vaultPath(rel), { throwIfNoEntry: false });
+    if (!st || Math.floor(st.mtimeMs) !== mtime || st.size !== size) return { changed: true };
+    return sync.writeText(rel, text);
+  },
   writeBase64: (rel, data) => {
     const p = vaultPath(rel);
     fs.mkdirSync(path.dirname(p), { recursive: true });

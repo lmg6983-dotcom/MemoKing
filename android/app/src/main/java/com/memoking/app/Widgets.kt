@@ -452,12 +452,16 @@ object Widgets {
         val memo = memo(ctx, memoId) ?: return false
         val file = memo.optString("file").ifEmpty { return false }
         val storage = Vaults.current(ctx) ?: return false
-        val text = storage.openRead(file).use { it.readBytes().toString(Charsets.UTF_8) }
-        val next = toggleTaskText(text, index, taskText, shownDone) ?: return false
-        if (next != text) {
-            val stamped = stampEdit(next, nowIso())
-            storage.write(file) { it.write(stamped.toByteArray(Charsets.UTF_8)) }
-        }
+        // 읽고 고쳐 쓰는 사이에 동기화가 받은 파일로 바꾸지 않게 (DriveSync.withFiles)
+        val next = DriveSync.withFiles {
+            val text = storage.openRead(file).use { it.readBytes().toString(Charsets.UTF_8) }
+            val next = toggleTaskText(text, index, taskText, shownDone) ?: return@withFiles null
+            if (next != text) {
+                val stamped = stampEdit(next, nowIso())
+                storage.write(file) { it.write(stamped.toByteArray(Charsets.UTF_8)) }
+            }
+            next
+        } ?: return false
         DriveSync.request(ctx, 1000)
         // 위젯도 바로 그 모양으로 — 파일에서 글로 찾아 고쳤으면 위젯에서도 같은 글의 줄을 (번호가 아니라)
         val lines = memo.optJSONArray("lines") ?: JSONArray()
