@@ -40,7 +40,7 @@ const LIST_UNDOCK_MS = 220; // 창을 옮기거나 늘이는 손을 멈춘 뒤 �
 const STICKERS = { crown: { width: 64, height: 52 }, tape: { width: 96, height: 30 } };
 const LOST_REOPEN_MS = 3000;
 const GHOST_MARGIN = 24;
-const STACK_DWELL_MS = 100;
+const STACK_DWELL_MS = 400; // 다른 메모 위에 이만큼 머물러야 합친다 (스쳐 지나가며 합쳐지지 않게)
 const TEAR_OPACITY = 0.9;
 const TEAR_ARMED_OPACITY = 0.55;
 const UNSEEN_CAPTURE_MS = 3 * 60_000;
@@ -1083,9 +1083,14 @@ export class WindowManager {
     if (w && this.inkingWins.has(w)) return;
     if (this.windowDrag?.id !== id) {
       this.clearStackTarget(this.windowDrag);
-      this.windowDrag = { id, target: null, armed: false, timer: null };
+      // 잡은 자리 밑에 이미 있던 메모(겹쳐 둔 창)는 합칠 곳이 아니다 — 커서가 한 번 벗어난 뒤부터 센다.
+      //   창 크기만 보고 앞뒤를 보지 않아, 겹친 메모를 옮기려고 윗줄을 잡으면 뒤 메모에 탭으로 합쳐져 창이 사라졌다
+      this.windowDrag = { id, target: null, armed: false, timer: null, under: this.stackTargetAt(point, id) };
     }
-    this.trackStackTarget(this.windowDrag, point, id);
+    const d = this.windowDrag;
+    if (d.under && this.stackTargetAt(point, id) === d.under) return;
+    d.under = null;
+    this.trackStackTarget(d, point, id);
   }
 
   endWindowDrag(id) {

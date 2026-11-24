@@ -1338,6 +1338,7 @@ export async function runSmoke({ getVault, showMagic, getMagic, getFinder, useFi
       windowManager.setNoteLayer(tb, 'bottom');
       const ab = wa.getBounds();
       const overA = { x: ab.x + Math.round(ab.width / 2), y: ab.y + Math.round(ab.height / 2) };
+      windowManager.trackWindowDrag(tb, { x: -9999, y: -9999 }); // 빈 자리에서 끌기 시작해 그 메모 위로
       windowManager.trackWindowDrag(tb, overA);
       await wait(500);
       windowManager.endWindowDrag(tb);

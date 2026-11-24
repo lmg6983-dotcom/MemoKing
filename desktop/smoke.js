@@ -1067,12 +1067,21 @@ export async function runSmoke({
     const listOpen = await until(() => lj(`(() => { const a = document.querySelector('.card[data-id="${sA.id}"]'); const c = document.querySelector('.card[data-id="${sC.id}"]'); return a.classList.contains('open') && !c.classList.contains('open') && a.querySelector('.card-badge.stack')?.textContent; })()`), '목록 표시').catch(() => null);
     check('목록: 보이는 탭만 "열림", 카드에 스택 표시(탭 수)', listOpen === '2', listOpen);
 
+    // 겹쳐 둔 창: 다른 메모 위에서 윗줄을 잡아 옮기면 (잡은 자리 밑의 메모) 머물러도 합치지 않는다
+    const away = { x: -9999, y: -9999 }; // 메모 창이 없는 자리
+    trackWindowDrag(sB.id, overA);
+    await wait(600);
+    endWindowDrag(sB.id);
+    await wait(300);
+    check('겹친 메모 위에서 잡아 옮기면 합치지 않음 (창이 사라지지 않음)', !stacks.stackOf(sB.id) && tabShown(sB.id));
     // 창을 끌어 다른 메모 위에: 머물면 합쳐지고, 스치기만 하면 안 합쳐짐
+    trackWindowDrag(sB.id, away);
     trackWindowDrag(sB.id, overA);
     await wait(80);
     endWindowDrag(sB.id);
     await wait(300);
     check('창을 스치듯 지나가면 합치지 않음', !stacks.stackOf(sB.id) && tabShown(sB.id));
+    trackWindowDrag(sB.id, away);
     trackWindowDrag(sB.id, overA);
     await wait(500);
     const hoverShown = await js(sA.win, `!document.getElementById('stack-drop').hidden`);

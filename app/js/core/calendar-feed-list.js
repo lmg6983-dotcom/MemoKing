@@ -3,8 +3,8 @@
 import { UI } from './ui-text.js';
 export const MAX_FEED_BYTES = 5 * 1024 * 1024;
 export const MAX_FEEDS = 10;
-// 구독 캘린더 색 (메모 색과 겹치지 않는 진한 색 — 달력에서 "다른 캘린더" 로 보이게)
-export const FEED_COLORS = ['#4285f4', '#0b8043', '#8e24aa', '#f4511e', '#039be5', '#616161'];
+// 구독 캘린더 색 (메모 색과 겹치지 않는 진한 색 — 달력에서 "다른 캘린더" 로 보이게). 구독 수 상한(MAX_FEEDS)만큼 있어 캘린더마다 다른 색
+export const FEED_COLORS = ['#4285f4', '#0b8043', '#8e24aa', '#f4511e', '#039be5', '#616161', '#3f51b5', '#009688', '#795548', '#e67c73'];
 
 /**
  * 붙여 넣은 캘린더 주소 → 받을 수 있는 주소 (webcal:// 은 https:// 로). 아니면 null
@@ -48,10 +48,21 @@ export function normalizeFeeds(list) {
       id: typeof f.id === 'string' && /^[\w-]{1,40}$/.test(f.id) ? f.id : `c${Math.random().toString(36).slice(2, 8)}`,
       name: String(f.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40) || feedLabel(url),
       url,
-      color: /^#[0-9a-f]{6}$/i.test(f.color ?? '') ? f.color : FEED_COLORS[out.length % FEED_COLORS.length],
+      color: /^#[0-9a-f]{6}$/i.test(f.color ?? '') ? f.color : null,
       on: f.on !== false,
     });
     if (out.length >= MAX_FEEDS) break;
+  }
+  // 캘린더마다 다른 색: 앞의 캘린더와 같은 색(지웠다 다시 넣으면 생겼다)이나 색이 없으면 아직 안 쓴 색으로
+  const used = new Set();
+  for (const f of out) {
+    if (f.color && !used.has(f.color.toLowerCase())) used.add(f.color.toLowerCase());
+    else f.color = null;
+  }
+  for (const [i, f] of out.entries()) {
+    if (f.color) continue;
+    f.color = FEED_COLORS.find((c) => !used.has(c)) ?? FEED_COLORS[i % FEED_COLORS.length];
+    used.add(f.color);
   }
   return out;
 }

@@ -75,6 +75,18 @@ test('구독 목록 정리: 같은 주소 하나만, 이름 · 색 기본값, �
   assert.deepEqual({ id: list[1].id, on: list[1].on, color: list[1].color, name: list[1].name }, { id: 'mine', on: false, color: '#123456', name: 'example.com' });
   const many = normalizeFeeds(Array.from({ length: 30 }, (_, i) => ({ url: `https://e.com/${i}.ics` })));
   assert.equal(many.length, MAX_FEEDS);
+  assert.equal(new Set(many.map((f) => f.color)).size, MAX_FEEDS, '구독 상한까지 캘린더마다 다른 색');
+});
+
+test('구독 색: 캘린더마다 다르게 — 겹친 색(지웠다 다시 넣은 것)은 안 쓴 색으로, 정한 색은 그대로', () => {
+  const list = normalizeFeeds([
+    { url: 'https://a.com/1.ics', color: '#0b8043' },
+    { url: 'https://b.com/2.ics', color: '#0B8043' }, // 앞과 같은 색
+    { url: 'https://c.com/3.ics' },
+  ]);
+  assert.equal(list[0].color, '#0b8043');
+  assert.equal(new Set(list.map((f) => f.color.toLowerCase())).size, 3, JSON.stringify(list.map((f) => f.color)));
+  assert.deepEqual(normalizeFeeds(list).map((f) => f.color), list.map((f) => f.color), '다시 정리해도 그대로');
 });
 
 test('.ics 이름 · 진짜 iCal 인지', () => {
