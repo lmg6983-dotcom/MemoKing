@@ -10,6 +10,7 @@ pub mod calendar_feeds;
 pub mod drive_sync;
 pub mod handoff;
 pub mod inbox;
+pub mod sheet_inbox;
 pub mod indexer;
 pub mod js;
 pub mod link_preview;

@@ -14,6 +14,7 @@ import { installLockMethods, lockedFiles, diskCopy } from '../../app/js/core/vau
 import { installSecretMethods, isSecretFolder, secretFolderId } from './vault-secret.js';
 import { textMatcher } from '../../app/js/core/text-match.js';
 import { INBOX_DIR, INBOX_SLOTS, SLOT_TEXT, slotName, slotMemo } from '../../app/js/core/inbox.js';
+import { appendText, replaceOnce } from '../../app/js/core/sheet-inbox.js';
 import { folderOf, cleanFolderName, isFolderName, resolveMovedTwin, withoutId, PINNED_FOLDERS_FILE, parsePinned, pinFolder, renamePinned } from '../../app/js/core/folders.js';
 import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
@@ -289,6 +290,36 @@ export class Vault extends EventTarget {
       this.inboxSeen.set(e.name, seen);
     }
     if (made.length) this.emit('inbox', { count: made.length });
+  }
+
+  /**
+   * AI 받은함 시트의 요청 하나 (core/sheet-inbox.js runSheet 가 부른다) → { id } | { error } — PC core/src/vault/sheet_inbox.rs 와 같은 규칙.
+   *   고치기 전 글은 버전으로 남기고, 잠긴 메모 · 비밀 폴더 메모 · 없는 메모는 건드리지 않는다
+   */
+  applySheetJob(job) {
+    if (job.action === 'create') {
+      if (isLockedBody(job.body)) return { error: '잠금 형식 글은 만들 수 없어요' };
+      const id = this.create({ folder: job.folder });
+      if (this.save(id, job.body)?.refused) {
+        this.entries.delete(id);
+        return { error: '저장하지 못했어요' };
+      }
+      return { id };
+    }
+    const entry = this.entries.get(job.memoId);
+    if (!entry) return { error: '그런 memo_id 의 메모가 없어요' };
+    if (entry.secret || isLockedBody(entry.body)) return { error: '잠긴 메모는 고칠 수 없어요' };
+    if (job.action === 'trash') return this.trash(job.memoId) ? { id: job.memoId } : { error: '휴지통으로 옮기지 못했어요' };
+    const old = entry.body;
+    let next = appendText(old, job.body);
+    if (job.action === 'replace') {
+      const r = replaceOnce(old, job.find, job.body);
+      if (r.error) return r;
+      next = r.text;
+    }
+    this.keepVersion(job.memoId, old, { force: true });
+    if (this.save(job.memoId, next)?.refused) return { error: '그사이 다른 기기가 고쳐 저장하지 못했어요. 다시 보내 주세요' };
+    return { id: job.memoId };
   }
 
   // ---------- 조회 ----------

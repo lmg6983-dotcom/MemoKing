@@ -93,6 +93,7 @@ pub struct Vault {
 }
 
 mod inbox;
+mod sheet_inbox;
 mod secret_store;
 
 /// 목록 카드 · 찾기가 본문에서 쓰는 것
@@ -1637,7 +1638,7 @@ fn has_web_link(body: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn tmp() -> PathBuf {
+    pub(crate) fn tmp() -> PathBuf {
         let d = std::env::temp_dir().join(format!("mk-vault-{}", uuid::Uuid::new_v4().simple()));
         fs::create_dir_all(&d).unwrap();
         d

@@ -30,6 +30,7 @@ import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibl
 import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
 import { chunkMemo, askedPeriod, buildIndex as ragBuildIndex, retrieve as ragRetrieve, expandMessages, expandResult, ragMessages, finishAnswer } from '../../app/js/core/rag.js';
 import * as inbox from '../../app/js/core/inbox.js';
+import * as sheet from '../../app/js/core/sheet-inbox.js';
 import * as dev from '../../app/js/core/devices.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
 
@@ -625,6 +626,32 @@ write('ai_events', aeBodies.flatMap((body) => aeNows.map((iso) => {
 // 받은 메모 빈 칸 — 칸 글 → 옮길 메모
 const slotTexts = [inbox.SLOT_TEXT, '', '  \n', `${inbox.SLOT_TEXT}# 날씨\n맑음`, '# 회의\r\n본문 #업무', '---\ncolor: blue\nid: x\n---\n# 회의\n본문', '---\ncolor: red\n---\n본문만', '---\n---\n', '\ufeff# BOM 메모', `${inbox.SLOT_TEXT.trim()}\n\n  `];
 write('inbox', [...slotTexts.map((text) => ({ text, memo: inbox.slotMemo(text) })), ...[1, 7, 100].map((n) => ({ n, name: inbox.slotName(n) }))]);
+
+// AI 받은함 시트 — CSV 읽기 · 쓰기, 처리할 줄 고르기, 결과 적기 · 오래된 줄 정리, 한 번만 바꾸기 · 덧붙이기
+const sheetCsvs = [
+  '', 'req_id,action,memo_id,folder,body,find,status\r\n', '﻿req_id,action\r\n1,create\r\n',
+  'req_id,action,memo_id,folder,body,find,status\r\n1,create,,업무,"# 회의\n여러 줄, 쉼표 ""따옴표""",,pending\r\n2,append,m1,,더,,done (m1)\r\n',
+  'status,body,req_id,action,extra\n pending ,"# 순서가 다른 열",9,CREATE,x\n,,,,\n',
+  '1,trash,m2,,,,pending', 'a,"b\r\nc",d\r\n"e""",f', '"끝 따옴표 없음,a\nb',
+];
+const sheetRows = (n, extra = []) => [...Array.from({ length: n }, (_, i) => ({ req_id: `d${i}`, action: 'create', memo_id: '', folder: '', body: '# x', find: '', status: `done (m${i})` })), ...extra];
+const srow = (req_id, action, memo_id = '', folder = '', body = '', find = '', status = 'pending') => ({ req_id, action, memo_id, folder, body, find, status });
+const planSets = [
+  [srow('1', 'create', '', '업무', '# 새 메모'), srow('2', 'create', '', '../밖', '# x'), srow('3', 'create', '', '_MemoKing', '# x'), srow('4', 'create', '', 'con', '# x'), srow('5', 'create', '', '', '   ')],
+  [srow('6', 'append', '', '', '더'), srow('7', 'append', 'm1', '', ''), srow('8', 'append', 'a/../b', '', 'x'), srow('9', 'append', ' m1 ', '', ' 더 ')],
+  [srow('10', 'replace', 'm1', '', '새', ''), srow('11', 'replace', 'm1', '', '', ' 옛 '), srow('12', 'trash', ''), srow('13', 'trash', 'm1'), srow('14', 'Dance', 'm1'), srow('15', '')],
+  [srow('', 'create', '', '', '# x'), srow('1', 'create', '', '', '# a'), srow('1', 'create', '', '', '# b'), srow('2', 'trash', 'm2', '', '', '', 'error: 잠긴 메모'), srow('2', 'trash', 'm2'), srow('3', 'trash', 'm3', '', '', '', ' Pending ')],
+  Array.from({ length: 25 }, (_, i) => srow(`b${i}`, 'trash', `m${i}`)),
+];
+write('sheet_inbox', [
+  ...sheetCsvs.map((csv) => ({ kind: 'csv', csv, cells: sheet.parseCsv(csv), rows: sheet.rowsFromCsv(csv) })),
+  ...[[['a,b', 'say "hi"', '줄\n바꿈', ' 앞', '']], [['', '']], [['req_id']]].map((cells) => ({ kind: 'write', cells, csv: sheet.toCsv(cells) })),
+  ...planSets.map((rows) => ({ kind: 'plan', rows, plan: sheet.plan(rows), csv: sheet.rowsToCsv(rows) })),
+  ...[[sheetRows(25, [srow('p1', 'trash', 'm1'), srow('p2', 'trash', 'm2')]), [{ index: 25, id: 'm1' }, { index: 26, error: '잠긴 메모는 고칠 수 없어요' }]], [sheetRows(3, [srow('p', 'create')]), [{ index: 3, id: 'new' }]]]
+    .map(([rows, results]) => ({ kind: 'finish', rows, results, out: sheet.finish(rows, results) })),
+  ...[['가 나 다', '나', '라'], ['가 나 나', '나', '라'], ['가', '나', '라'], ['$1 값', '$1', '$&$$'], ['abab', 'aba', 'x']].map(([text, find, to]) => ({ kind: 'replace', text, find, to, out: sheet.replaceOnce(text, find, to) })),
+  ...[['# 제목\n본문\n\n', '  더  '], ['', '첫 줄'], ['본문', '']].map(([body, add]) => ({ kind: 'append', body, add, out: sheet.appendText(body, add) })),
+]);
 
 // 기기 상태 파일 · 빈 칸 담당
 const devNow = 1_795_000_000_000;
