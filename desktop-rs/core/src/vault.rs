@@ -660,7 +660,9 @@ impl Vault {
         if Some(stamp) == e.stamp {
             return Ok(None);
         }
-        let Ok(text) = fs::read_to_string(&path) else { return Ok(None) };
+        // UTF-8 이 아닌 글(다른 프로그램이 CP949 로 저장 등)도 읽은 만큼 — 못 읽는다고 그냥 덮어쓰면 그 글이 사본 없이 사라졌다
+        let Ok(bytes) = fs::read(&path) else { return Ok(None) };
+        let text = String::from_utf8_lossy(&bytes);
         let (their_meta, theirs) = memo_file::parse_memo_file(&text);
         if body::same_body(&theirs, known) || body::same_body(&theirs, &e.body) || body::is_blank_body(&theirs) {
             return Ok(None);
@@ -1714,6 +1716,23 @@ mod tests {
         assert_eq!(copies.len(), 1, "들어온 글은 사본 메모로");
         assert!(copies[0]["title"].as_str().unwrap().starts_with("메모 (다른 기기 "));
         assert!(v.get(copies[0]["id"].as_str().unwrap()).unwrap()["body"].as_str().unwrap().contains("휴대폰에서 고침"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn non_utf8_change_on_disk_is_kept_as_copy() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let id = v.create(None, None, "");
+        v.save(&id, "# 메모\n처음").unwrap();
+        let path = root.join("메모.md");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(&path, b"# \xb8\xde\xb8\xf0\nother app text").unwrap(); // CP949 로 저장한 글
+        v.save(&id, "# 메모\nPC 에서 고침").unwrap();
+        let copies: Vec<Value> = v.list().into_iter().filter(|m| m["id"] != json!(id)).collect();
+        assert_eq!(copies.len(), 1, "읽지 못한 글자가 섞여도 사본으로 남긴다");
+        assert!(v.get(copies[0]["id"].as_str().unwrap()).unwrap()["body"].as_str().unwrap().contains("other app text"));
         fs::remove_dir_all(root).unwrap();
     }
 
