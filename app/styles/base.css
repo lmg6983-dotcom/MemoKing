@@ -1725,21 +1725,12 @@ dialog.quick-event[open] {
 .mf-name-form { display: grid; gap: 8px; min-width: 0; }
 .mf-name-input { box-sizing: border-box; width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; }
 .mf-name-input:focus { outline: none; border-color: var(--focus-ring); box-shadow: 0 0 0 1px var(--focus-ring); } /* 포커스 테두리는 3:1 넘게 (노랑은 흰 바탕에서 1.5:1) */
-/* 폴더 목록: 누른 단추 바로 아래에 펼쳐지는 판 (folder-ui.js openFolderSheet) */
-dialog.folder-pop {
-  position: fixed; inset: auto; margin: 0; padding: 0; overflow: hidden auto; box-sizing: border-box;
-  border: 1px solid var(--line); border-radius: 16px; background: var(--surface-1, var(--ok-gray-0)); color: var(--text);
-  box-shadow: 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 24%, transparent), 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
-}
-dialog.folder-pop::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 16%, transparent); }
-.folder-pop-body { padding: 8px; }
-.folder-pop .mf-new { margin: 6px 0 2px 8px; }
 /* 새 폴더: 목록 맨 아래 그 자리에서 이름 칸 + 만들기 */
 .mf-inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-top: 6px; padding: 3px; }
 .mf-inline .btn { height: 44px; }
 .mf-inline .mf-name-note { grid-column: 1 / -1; margin: 0; }
 .mf-inline .mf-name-note:empty { display: none; }
-.dialog p.mf-name-note, .folder-pop p.mf-name-note { min-height: 1.2em; margin: 0; font-size: 12.5px; color: var(--danger); }
+.dialog p.mf-name-note { min-height: 1.2em; margin: 0; font-size: 12.5px; color: var(--danger); }
 .mf-name-form .btn { justify-self: end; }
 @media (pointer: coarse) { .mf-item { min-height: 44px; font-size: 15px; } }
 /* 휴대폰: 아래에서 올라오는 시트 */
