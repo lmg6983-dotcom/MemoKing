@@ -3,7 +3,6 @@
 //   Ctrl·Alt·Win 중 하나는 꼭 함께 (Shift 만 또는 글자 하나만은 글을 쓸 때 눌리므로 안 됨), 흔한 편집 단축키는 막는다
 
 export const DEFAULT_SHORTCUTS = { quickMemo: 'Control+Alt+C', magic: 'Control+Alt+Space', list: 'Control+Alt+`' };
-export const SHORTCUT_NAMES = { quickMemo: '매직 카피', magic: '매직키', list: '메모 목록' };
 
 const PUNCT = {
   Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'",

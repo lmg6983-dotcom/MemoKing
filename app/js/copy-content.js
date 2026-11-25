@@ -246,7 +246,8 @@ export function handleImageCopy(view, event) {
 const SAFE_NAME = /[\\/:*?"<>|\u0000-\u001f]+/g;
 /** 파일 이름으로 쓸 글 (앞 30자, 못 쓰는 글자는 빈칸) */
 export function fileNameOf(text, fallback = '메모 내용') {
-  const t = plainAlt(text) // 사진 설명 끝의 크기 표시(|50%)는 이름이 아니다.replace(SAFE_NAME, ' ').replace(/\s+/g, ' ').trim().slice(0, 30).trim();
+  // 사진 설명 끝의 크기 표시(|50%)는 이름이 아니다
+  const t = plainAlt(text).replace(SAFE_NAME, ' ').replace(/\s+/g, ' ').trim().slice(0, 30).trim();
   return t || fallback;
 }
 

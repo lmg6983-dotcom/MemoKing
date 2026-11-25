@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { punctuate, joinTranscript, labelSpeakers, tokensToText, SpeechConditioner } from '../app/js/core/transcript-lines.js';
+import { punctuate, joinTranscript, labelSpeakers, SpeechConditioner } from '../app/js/core/transcript-lines.js';
 
 test('문장부호: 묻는 말은 ?, 맺는 말은 ., 이미 있으면 그대로 (휴대폰과 같은 규칙)', () => {
   assert.equal(punctuate('내일 회의 몇 시에 할까요'), '내일 회의 몇 시에 할까요?');
@@ -20,11 +20,6 @@ test('말한 사람 붙이기: 시간이 가장 많이 겹친 사람, 번호는 
   const lines = [{ text: 'a', start: 0.5, end: 3 }, { text: 'b', start: 4, end: 6 }, { text: 'c', start: 7, end: 9 }, { text: 'd', start: 20, end: 21 }];
   const segs = [{ start: 0.4, end: 3.1, speaker: 5 }, { start: 3.9, end: 6.2, speaker: 0 }, { start: 6.9, end: 7.5, speaker: 0 }, { start: 7.5, end: 9, speaker: 5 }];
   assert.deepEqual(labelSpeakers(lines, segs).map((l) => l.speaker), [1, 2, 1, 1]);
-});
-
-test('낱말 조각 → 띄어쓴 글 (▁ 가 낱말 경계)', () => {
-  assert.equal(tokensToText(['▁주민', '등록', '증을', '▁보여', '▁주', '시겠어요', '?']), '주민등록증을 보여 주시겠어요?');
-  assert.equal(tokensToText([], '그대로'), '그대로');
 });
 
 test('소리 다듬기: 낮은 웅웅 소리는 줄이고, 작은 목소리는 키우되 넘치지 않음', () => {
