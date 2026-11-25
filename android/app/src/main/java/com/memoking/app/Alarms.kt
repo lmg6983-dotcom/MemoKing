@@ -129,7 +129,7 @@ class BootReceiver : BroadcastReceiver() {
 object UpdateRestart {
     private const val PREFS = "memoking_update"
     private const val KEY = "restart_at"
-    private const val NOTE_ID = 7_301
+    private const val NOTE_ID = 7_311 // 녹음 알림(RecorderService 7301)과 다른 번호 — 켤 때마다 지우는 이 알림이 녹음 알림을 지우지 않게
     private const val WINDOW_MS = 30 * 60_000L // 업데이트를 시작하고 이 안에 깔린 것만 (다른 경로의 업데이트로 켜지지 않게)
 
     fun mark(ctx: Context) {
