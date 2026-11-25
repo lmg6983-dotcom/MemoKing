@@ -19,6 +19,8 @@ class DriveApi(private val ctx: Context) : Remote {
         private const val API = "https://www.googleapis.com/drive/v3"
         private const val UPLOAD = "https://www.googleapis.com/upload/drive/v3"
         private const val FIELDS = "id,name,mimeType,md5Checksum,modifiedTime,size"
+        private const val SHEET = "application/vnd.google-apps.spreadsheet"
+        private const val SHEET_NAME = "AI 받은함" // app/js/core/sheet-inbox.js SHEET_NAME
     }
 
     class HttpError(val code: Int, message: String) : IOException(message)
@@ -133,6 +135,29 @@ class DriveApi(private val ctx: Context) : Remote {
         query("'${parent.replace("'", "\\'")}' in parents and mimeType = '${SyncEngine.FOLDER}' and trashed = false", "name,createdTime").map(::item)
 
     fun folderName(id: String): String = get("$API/files/${enc(id)}?fields=name").optString("name")
+
+    // ---------- AI 받은함 시트 (drive.file 권한만: 메모킹이 만든 시트라 읽고 덮어쓸 수 있다 — PC drive.rs 와 같음) ----------
+
+    /** _memoking 폴더의 AI 받은함 시트 id — 없으면 머리 줄만 든 CSV 를 시트로 바꿔 만든다 (같은 이름이 여럿이면 먼저 만든 것) */
+    fun ensureSheet(parent: String): String {
+        val q = "'${parent.replace("'", "\\'")}' in parents and name = '$SHEET_NAME' and mimeType = '$SHEET' and trashed = false"
+        query(q, "createdTime").firstOrNull()?.let { return it.getString("id") }
+        val boundary = "memoking${System.currentTimeMillis()}"
+        val meta = JSONObject().put("name", SHEET_NAME).put("parents", JSONArray().put(parent)).put("mimeType", SHEET)
+        val body = "--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$meta\r\n--$boundary\r\nContent-Type: text/csv; charset=utf-8\r\n\r\n" +
+            "req_id,action,memo_id,folder,body,find,status\r\n\r\n--$boundary--"
+        return request("POST", "$UPLOAD/files?uploadType=multipart&fields=id", "multipart/related; boundary=$boundary", body.toByteArray()) { json(it).getString("id") }
+    }
+
+    /** 시트가 바뀌었는지 알아보는 값 (version — 고칠 때마다 커진다) */
+    fun fileStamp(id: String): String = get("$API/files/${enc(id)}?fields=version,modifiedTime").let { "${it.optString("version")}:${it.optString("modifiedTime")}" }
+
+    fun exportCsv(id: String): String =
+        request("GET", "$API/files/${enc(id)}/export?mimeType=text%2Fcsv") { conn -> conn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) } }
+
+    fun updateCsv(id: String, csv: String) {
+        request("PATCH", "$UPLOAD/files/${enc(id)}?uploadType=media&fields=id", "text/csv; charset=utf-8", csv.toByteArray(Charsets.UTF_8)) { }
+    }
 
     override fun download(id: String, out: OutputStream) {
         request("GET", "$API/files/${enc(id)}?alt=media") { conn -> conn.inputStream.use { it.copyTo(out) } }

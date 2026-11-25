@@ -397,6 +397,7 @@ const calls = {
     fakeDrive.status = { ...fakeDrive.status, state: 'idle', lastSync: Date.now() };
     return fakeDrive.status;
   },
+  sheetInbox: async () => ({}), // AI 받은함 시트: 미리보기에는 Drive 가 없다 (아직 맞추지 않은 것처럼)
   exactAlarmSettings: async () => true,
   micPermission: async () => true,
   speakerModel: async (a) => {

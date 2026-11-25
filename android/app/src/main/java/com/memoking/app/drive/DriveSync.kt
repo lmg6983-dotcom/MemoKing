@@ -71,6 +71,40 @@ object DriveSync {
     fun mirrorDir(ctx: Context, folderId: String) = File(File(ctx.filesDir, "drive"), folderId)
     private fun stateFile(ctx: Context, folderId: String) = File(File(ctx.filesDir, "drive"), "$folderId.state.json")
 
+    /**
+     * AI 받은함 시트 (화면 android/web/js/sheet-inbox.js 가 처리를 맡는다 — 받은 메모 담당 기기일 때만):
+     *   fetch: 시트가 since 그대로면 { id, stamp }, 바뀌었으면 CSV 까지 { id, stamp, csv } (시트가 없으면 만든다)
+     *   update: 읽은 뒤 시트가 그대로(stamp)일 때만 csv 로 덮어쓴다 → { ok } | { changed } (바뀌었으면 다음 차례에)
+     */
+    fun sheetInbox(ctx: Context, a: JSONObject): JSONObject {
+        val folderId = folderId(ctx) ?: throw IllegalStateException("Google Drive 와 맞추고 있지 않아요")
+        val api = DriveApi(ctx)
+        return when (a.optString("op")) {
+            "fetch" -> {
+                val memoking = try { JSONObject(stateFile(ctx, folderId).readText()).optJSONObject("folders")?.optString("_memoking") } catch (e: Exception) { null }
+                    ?.takeIf { it.isNotEmpty() } ?: return JSONObject() // 아직 한 번도 맞추지 않았다 (_memoking 폴더를 모름)
+                var id = a.optString("id").ifEmpty { api.ensureSheet(memoking) }
+                val stamp = try {
+                    api.fileStamp(id)
+                } catch (e: DriveApi.HttpError) {
+                    if (e.code != 404) throw e
+                    id = api.ensureSheet(memoking) // 시트를 지웠다 — 다시 찾거나 만든다
+                    api.fileStamp(id)
+                }
+                val out = JSONObject().put("id", id).put("stamp", stamp)
+                if (stamp != a.optString("since")) out.put("csv", api.exportCsv(id))
+                out
+            }
+            "update" -> {
+                val id = a.getString("id")
+                if (api.fileStamp(id) != a.getString("stamp")) return JSONObject().put("changed", true)
+                api.updateCsv(id, a.getString("csv"))
+                JSONObject().put("ok", true)
+            }
+            else -> throw IllegalArgumentException("모르는 일이에요")
+        }
+    }
+
     fun storage(ctx: Context, folderId: String): Storage =
         FileStorage(mirrorDir(ctx, folderId), "Google Drive › ${folderName(ctx).ifEmpty { "메모 폴더" }}", VaultFileProvider.driveRoot(folderId))
 

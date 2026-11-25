@@ -205,14 +205,15 @@ pub fn finish(mut rows: Vec<Row>, results: &[(usize, Result<String, String>)]) -
     rows
 }
 
-/// 시트 CSV 한 번 처리: 처리할 줄마다 apply(job) → memo_id | 까닭 을 부르고 결과를 적은 새 CSV · 해낸 수 (처리할 것이 없으면 None)
-pub fn run(csv: &str, mut apply: impl FnMut(&Job) -> Result<String, String>) -> Option<(String, usize)> {
+/// 시트 CSV 한 번 처리: 처리할 줄마다 apply(req_id, job) → memo_id | 까닭 을 부르고 결과를 적은 새 CSV · 해낸 수 (처리할 것이 없으면 None)
+///   req_id 를 넘기는 까닭: 결과를 시트에 적지 못한 차례(그사이 시트가 바뀜)의 요청을 다음 차례에 다시 적용하지 않게 부르는 쪽이 기억한다
+pub fn run(csv: &str, mut apply: impl FnMut(&str, &Job) -> Result<String, String>) -> Option<(String, usize)> {
     let rows = rows_from_csv(csv);
     let todo = plan(&rows);
     if todo.is_empty() {
         return None;
     }
-    let results: Vec<(usize, Result<String, String>)> = todo.into_iter().map(|(i, job)| (i, job.and_then(|j| apply(&j)))).collect();
+    let results: Vec<(usize, Result<String, String>)> = todo.into_iter().map(|(i, job)| (i, job.and_then(|j| apply(js::trim(&rows[i].req_id), &j)))).collect();
     let done = results.iter().filter(|(_, r)| r.is_ok()).count();
     Some((rows_to_csv(&finish(rows, &results)), done))
 }
@@ -284,7 +285,7 @@ mod tests {
     fn run_writes_results_and_never_twice() {
         let csv = "req_id,action,memo_id,folder,body,find,status\r\n1,create,,,# 새,,pending\r\n2,trash,m9,,,,pending\r\n";
         let mut calls = 0;
-        let (out, done) = run(csv, |job| {
+        let (out, done) = run(csv, |_, job| {
             calls += 1;
             match job {
                 Job::Create { .. } => Ok("new1".into()),
@@ -295,7 +296,7 @@ mod tests {
         assert_eq!((calls, done), (2, 1));
         let status: Vec<String> = rows_from_csv(&out).into_iter().map(|r| r.status).collect();
         assert_eq!(status, vec!["done (new1)", "error: 그런 memo_id 의 메모가 없어요"]);
-        assert!(run(&out, |_| panic!("다시 처리하지 않는다")).is_none());
+        assert!(run(&out, |_, _| panic!("다시 처리하지 않는다")).is_none());
     }
 
     #[test]

@@ -157,7 +157,8 @@ export function replaceOnce(text, find, replacement) {
 export const appendText = (body, add) => `${body.trim()}\n${add.trim()}`;
 
 /**
- * 시트 CSV 한 번 처리: 처리할 줄마다 apply(job) → { id } | { error } 를 부르고 결과를 적은 새 CSV (처리할 것이 없으면 null)
+ * 시트 CSV 한 번 처리: 처리할 줄마다 apply(job, reqId) → { id } | { error } 를 부르고 결과를 적은 새 CSV (처리할 것이 없으면 null)
+ *   reqId 를 넘기는 까닭: 결과를 시트에 적지 못한 차례(그사이 시트가 바뀜)의 요청을 다음 차례에 다시 적용하지 않게 부르는 쪽이 기억한다
  *   apply 가 던지면 그 줄만 error 로 (나머지는 그대로 처리) — PC 는 core/src/sheet_inbox.rs run
  */
 export function runSheet(csv, apply) {
@@ -167,7 +168,7 @@ export function runSheet(csv, apply) {
   const results = todo.map(({ index, job, error }) => {
     if (error) return { index, error };
     try {
-      const r = apply(job);
+      const r = apply(job, rows[index].req_id.trim());
       return r?.error ? { index, error: r.error } : { index, id: r.id };
     } catch (err) {
       return { index, error: `처리하지 못했어요 (${err?.message ?? err})` };
