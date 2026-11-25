@@ -1151,52 +1151,6 @@ impl Vault {
         Ok(ok.then_some(saved))
     }
 
-    /// AI 가 단 태그: 본문과 머리말 aiTags (vault-locks.js setAiTags) — 고친 시각 · 기기는 그대로
-    ///   (모든 메모를 한 번에 태그해도 목록 순서가 바뀌거나 휴대폰에 "방금 고친 메모" 가 뜨지 않게). 쓰지 못했으면 되돌리고 None
-    pub fn set_ai_tags(&mut self, id: &str, body: &str, names: &[String]) -> io::Result<Option<Value>> {
-        let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
-        if e.file.is_none() || body::is_locked_body(&e.body) {
-            self.entries.insert(id.into(), e);
-            return Ok(None);
-        }
-        let (prev, known) = (e.meta.clone(), e.body.clone());
-        e.body = body.into();
-        e.meta.extra.insert("aiTags".into(), json!(names));
-        if body != known {
-            self.keep_version(id, &known, false);
-        }
-        // 다른 기기가 고친 글이 디스크에 있으면 쓰지 않는다 — 사본을 만들면 옛 글이 진짜 메모로 남는다. 다시 읽은 뒤 다음에 태그
-        let wrote = self.write(&mut e, &known, false);
-        let ok = matches!(wrote, Ok(Wrote::Yes));
-        if !ok {
-            e.meta = prev;
-            e.body = known;
-        }
-        self.entries.insert(id.into(), e);
-        wrote?;
-        Ok(if ok { self.get(id) } else { None })
-    }
-
-    /// AI 가 글에서 찾아 넣은 일정과 본 줄 aiEvents (vault-locks.js addAiEvents) — 고친 시각은 그대로. 쓰지 못했으면 되돌리고 None
-    pub fn add_ai_events(&mut self, id: &str, events: &[Value], seen: &[String]) -> io::Result<Option<Value>> {
-        let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
-        if e.file.is_none() || body::is_locked_body(&e.body) {
-            self.entries.insert(id.into(), e);
-            return Ok(None);
-        }
-        let (prev, known) = (e.meta.clone(), e.body.clone());
-        e.meta.reminders.extend_from_slice(events);
-        e.meta.extra.insert("aiEvents".into(), json!(seen));
-        let wrote = self.write(&mut e, &known, true);
-        let ok = matches!(wrote, Ok(Wrote::Yes));
-        if !ok {
-            e.meta = prev;
-        }
-        self.entries.insert(id.into(), e);
-        wrote?;
-        Ok(if ok { self.get(id) } else { None })
-    }
-
     /// 연결한 메모 · 나를 연결한 메모
     pub fn links(&self, id: &str) -> Value {
         let Some(e) = self.entries.get(id) else { return json!({ "links": [], "backlinks": [], "suggestions": [] }) };
@@ -1739,55 +1693,6 @@ mod tests {
         let name = v2.trash(&id).unwrap().unwrap();
         assert!(name.starts_with("주간 회의 (") && root.join("_memoking/trash").join(&name).exists());
         assert!(v2.list().is_empty());
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn ai_events_add_reminders_and_seen_lines() {
-        let root = tmp();
-        let mut v = Vault::new(&root, "pc");
-        v.open().unwrap();
-        let id = v.create(None, None, "");
-        assert!(v.add_ai_events(&id, &[], &[]).unwrap().is_none(), "파일이 없는 메모는 아니다");
-        v.save(&id, "# 메모\n내일 3시 치과").unwrap();
-        let updated = v.get(&id).unwrap()["updated"].clone();
-        let r = json!({ "id": "r1", "kind": "at", "action": "notify", "enabled": true, "created": "2026-10-24T10:00:00+09:00", "at": "2026-10-25T15:00:00+09:00", "alerts": [10] });
-        let m = v.add_ai_events(&id, std::slice::from_ref(&r), &["내일 3시 치과".into()]).unwrap().unwrap();
-        assert_eq!((m["reminders"][0]["id"].clone(), m["aiEvents"].clone(), m["updated"].clone()), (json!("r1"), json!(["내일 3시 치과"]), updated));
-        let text = fs::read_to_string(root.join("메모.md")).unwrap();
-        assert!(text.contains("aiEvents:") && text.contains("id: r1"), "{text}");
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn ai_tags_write_body_and_meta_but_never_over_another_device() {
-        let root = tmp();
-        let mut v = Vault::new(&root, "pc");
-        v.open().unwrap();
-        let id = v.create(None, None, "");
-        v.save(&id, "# 메모\n치과 예약").unwrap();
-        let updated = v.get(&id).unwrap()["updated"].clone();
-        let m = v.set_ai_tags(&id, "# 메모\n치과 예약\n\n#병원", &["병원".into()]).unwrap().unwrap();
-        assert_eq!((m["aiTags"].clone(), m["updated"].clone()), (json!(["병원"]), updated));
-        let path = root.join("메모.md");
-        let text = fs::read_to_string(&path).unwrap();
-        assert!(text.contains("aiTags:") && text.contains("#병원"), "{text}");
-        assert!(!v.versions(&id).is_empty(), "태그 달기 전 글을 버전으로");
-        // 휴대폰에서 고친 글이 내려왔는데 아직 다시 읽기 전 — 사본을 만들지 않고 쓰지 않는다
-        let theirs = text.replace("치과 예약", "휴대폰에서 고침");
-        std::thread::sleep(std::time::Duration::from_millis(20));
-        fs::write(&path, &theirs).unwrap();
-        assert!(v.set_ai_tags(&id, "# 메모\n치과 예약\n\n#병원 #예약", &["병원".into(), "예약".into()]).unwrap().is_none());
-        assert_eq!(fs::read_to_string(&path).unwrap(), theirs);
-        assert_eq!(v.list().len(), 1, "사본 메모 없음");
-        assert_eq!(v.get(&id).unwrap()["aiTags"], json!(["병원"]), "되돌림");
-        // 잠긴 메모는 손대지 않는다
-        let locked = "---\nid: lk\ncolor: yellow\n---\n# 비밀\n\n<!-- memoking-lock v1 n=310000 s=AAAA i=BBBB c=CCCC== -->\n";
-        fs::write(root.join("비밀.md"), locked).unwrap();
-        let mut v = Vault::new(&root, "pc");
-        v.open().unwrap();
-        assert!(v.set_ai_tags("lk", "# 비밀\n\n#태그", &["태그".into()]).unwrap().is_none());
-        assert_eq!(fs::read_to_string(root.join("비밀.md")).unwrap(), locked);
         fs::remove_dir_all(root).unwrap();
     }
 
