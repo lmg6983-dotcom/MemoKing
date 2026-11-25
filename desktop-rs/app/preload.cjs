@@ -63,7 +63,6 @@ contextBridge.exposeInMainWorld('memoking', {
     links: invoke('memo:links'),
     link: invoke('memo:link'),
     versions: invoke('memo:versions'),
-    version: invoke('memo:version'),
     restoreVersion: invoke('memo:restore-version'),
   },
   // 예약 알림
@@ -132,7 +131,6 @@ contextBridge.exposeInMainWorld('memoking', {
     reset: invoke('keymap:reset'),
     openWindow: invoke('keymap:open-window'),
   },
-  // 휴지통 (지운 메모)
   // 창을 닫으며 저장하지 못해 따로 남긴 글 (ipc-handlers memo:save-sync) — 몇 개인지 · 메모로 되살리기 → 되살린 수
   recovered: { count: invoke('recovered:count'), restore: invoke('recovered:restore') },
   // 비밀 폴더 (desktop-rs/app/src/secret.rs) — 열쇠는 메모킹이 메모리에만, 목록을 닫거나 5분 쉬면 잠긴다
@@ -149,6 +147,7 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   // 충돌 사본 비교: get(사본 id) → { copy, original } | null · resolve(사본 id, 'copy' | 'original') → { ok, message }
   conflict: { get: invoke('conflict:get'), resolve: invoke('conflict:resolve') },
+  // 휴지통 (지운 메모)
   trash: {
     list: invoke('trash:list'),
     restore: invoke('trash:restore'),
@@ -193,7 +192,6 @@ contextBridge.exposeInMainWorld('memoking', {
     try: invoke('ai:try'),
     write: invoke('ai:write'), // { id, task: 'spell' | 'style' | 'draft', … } — 조각은 ai:token · ai:progress 로
     cancel: invoke('ai:cancel'),
-    ask: invoke('ai:ask'), // { id, question } → { text, sources: [{ id, title, via }] } — 조각은 ai:token, 색인은 ai:progress
     agent: invoke('ai:agent'), // 매직 에이전트 { id, text } → 답 { kind: 'answer' | 'summary', … } | 확인 카드 { kind: 'confirm', action }
     agentRun: invoke('ai:agent-run'), // 확인한 일 실행 (action) → { ok, id, message }
   },
@@ -220,22 +218,19 @@ contextBridge.exposeInMainWorld('memoking', {
     preview: invoke('link:preview'),
     open: invoke('link:open'),
   },
-  // 메모를 PDF 로
-  // 메모를 그림 카드로: copy(base64) · save(메모 id, base64) → { file, name } | { cancelled }
   // 메모킹 Work / Life: 지금 모드 정하기 (읽기는 settings.get().mode)
   mode: { set: invoke('mode:set'), setHours: invoke('mode:hours'), setWorkLife: invoke('mode:work-life') },
+  // 메모를 그림 카드로: copy(base64) · save(메모 id, base64) → { file, name } | { cancelled }
   image: {
     copy: invoke('image:copy'),
     save: invoke('image:save'),
   },
+  // 메모를 PDF 로
   pdf: {
     open: invoke('pdf:open'),
     memo: invoke('pdf:memo'),
     save: invoke('pdf:save'),
   },
-  // 왕관 스티커 창: 왕관 위 마우스, 눌러서 떼기
-
-
   // 영역 캡처 오버레이 (Ctrl+Alt+C 두 번)
   capture: {
     done: invoke('capture:done'),
@@ -255,7 +250,6 @@ contextBridge.exposeInMainWorld('memoking', {
     newTab: invoke('stack:new-tab'),
     remove: invoke('stack:remove'),
     removeHidden: invoke('stack:remove-hidden'), // 탭 닫기: 옆 탭을 보이고 이 창은 숨긴다 (저장을 마치면 win:close)
-    detach: invoke('stack:detach'),
     tearStart: invoke('stack:tear-start'),
     tearMove: (x, y) => ipcRenderer.send('stack:tear-move', { x, y }),
     tearEnd: (x, y) => ipcRenderer.invoke('stack:tear-end', x == null ? null : { x, y }),

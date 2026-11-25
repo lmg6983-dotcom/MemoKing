@@ -53,7 +53,7 @@ pub fn start(app: &AppHandle) {
     // 다른 기기 · 탐색기에서 바뀐 메모 — 2초마다 다시 읽는다
     schedule_spare(app, 3000);
     // shortcut: 파일 감시(fs.watch)는 아직 — 다시 읽기는 파일 시각만 보므로 가볍다. 늦다는 말이 나오면 notify 로
-    let app = app.clone();
+    let (app, app2) = (app.clone(), app.clone());
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(2));
         rescan(&app);
@@ -61,6 +61,20 @@ pub fn start(app: &AppHandle) {
         crate::index::tick(&app);
         crate::windows::discard_tick(&app); // 오래 숨은 스택 탭 거두기 (30초마다 본다)
     });
+    // 휴지통 자동 비우기: 켜고 1분 뒤 · 6시간마다 (Electron purgeTrash)
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(60));
+        purge_trash(&app2);
+        std::thread::sleep(Duration::from_secs(6 * 60 * 60));
+    });
+}
+
+/// 설정의 날수(기본 30, 0 은 끔)보다 오래 휴지통에 있던 메모 · 첨부를 지운다 — 설정 화면이 "n일이 지나면 저절로 삭제돼요" 라고 알린다
+fn purge_trash(app: &AppHandle) {
+    let days = state(app).setting("trashDays").as_u64().map_or(Some(30), |d| u32::try_from(d).ok());
+    if let Some(days) = days.filter(|d| *d > 0) {
+        let _ = with_vault(app, |v| Ok(v.empty_trash(Some(days))));
+    }
 }
 
 /// 받은 메모 빈 칸(_memoking/받은 메모): AI 가 채운 칸을 메모로 옮긴다 (core vault/inbox.rs) — 빈 칸은 Drive 와 맞추는 동안만 만들어 둔다
@@ -778,6 +792,15 @@ fn recovered_files(app: &AppHandle) -> Vec<PathBuf> {
     std::fs::read_dir(dir).map_or(vec![], |rd| rd.flatten().map(|d| d.path()).filter(|p| p.extension().is_some_and(|e| e == "md")).collect())
 }
 
+/// 저장하지 못한 글을 dir/<시각>.md 로 (recovered_files 가 읽는다)
+fn keep_recovered(dir: &Path, body: &str) -> std::io::Result<PathBuf> {
+    std::fs::create_dir_all(dir)?;
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+    let file = dir.join(format!("{}-{:09}.md", now.as_secs(), now.subsec_nanos()));
+    std::fs::write(&file, body)?;
+    Ok(file)
+}
+
 /// 메모 창에 할 일을 보낸다 — 열려 있으면 바로, 아니면 열면서 (memo:get 의 command)
 fn note_command(app: &AppHandle, id: &str, command: Value) -> Result<Value, String> {
     let open = state(app).note_labels.lock().unwrap().contains_key(id);
@@ -845,7 +868,7 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             let (layer, stack) = (crate::windows::layer_state(app, &arg_str(args, 0)), crate::windows::stack_state(app, &arg_str(args, 0)));
             with_vault(app, |v| {
                 let Some(mut m) = v.get(&arg_str(args, 0)) else { return Ok(Value::Null) };
-                                let o = m.as_object_mut().unwrap();
+                let o = m.as_object_mut().unwrap();
                 let insert = st.inserts.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
                 o.insert("insert".into(), insert);
                 let command = st.commands.lock().unwrap().remove(o["id"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
@@ -913,6 +936,17 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
                 Ok(())
             });
             push_list_soon(app);
+            // 창을 닫는 마지막 저장이라 다시 할 수 없다 — 쓴 글을 설정 폴더 recovered/ 에 남긴다 (다음에 켜면 목록이 되살리기를 묻는다).
+            //   잠긴 메모 · 비밀 메모는 풀린 글을 파일로 남기지 않는다 (디스크 가득 참 · 드라이브 빠짐 · 메모 폴더 없음)
+            if let Err(e) = &r {
+                let locked = args.get(2).is_some_and(|o| o["locked"] == true) || memoking_core::secret::is_secret_id(&id);
+                if !locked && !memoking_core::body::is_blank_body(&body) {
+                    match keep_recovered(&st.settings_dir.join("recovered"), &body) {
+                        Ok(f) => elog!("[저장 실패] {e} — 따로 남김: {}", f.display()),
+                        Err(e2) => elog!("[저장 실패] {e} — 따로 남기기도 실패: {e2}"),
+                    }
+                }
+            }
             r.map(|()| true.into())
         }
         // 잠그기 · 열기: 열쇠 만들기(PBKDF2)는 일부러 느리다 — 메모 폴더를 붙잡지 않고 먼저 만든다
@@ -1070,7 +1104,6 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             r.map(|x| x.unwrap_or(Value::Null))
         }
         "memo:versions" => with_vault(app, |v| Ok(json!(v.versions(&arg_str(args, 0))))),
-        "memo:version" => with_vault(app, |v| Ok(v.version(&arg_str(args, 0), &arg_str(args, 1)).map_or(Value::Null, Value::from))),
         "memo:restore-version" => {
             let id = arg_str(args, 0);
             let r = with_vault(app, |v| v.restore_version(&id, &arg_str(args, 1)).map_err(|e| e.to_string()));
@@ -1168,7 +1201,16 @@ pub fn serve_vault(app: &AppHandle, rel: &str) -> Option<(PathBuf, &'static str)
 
 #[cfg(test)]
 mod tests {
-    use super::original_file_of;
+    use super::{keep_recovered, original_file_of};
+
+    #[test]
+    fn unsaved_text_is_kept_as_md() {
+        let dir = std::env::temp_dir().join(format!("memoking-recovered-test-{}", std::process::id()));
+        let (a, b) = (keep_recovered(&dir, "# 가\n본문").unwrap(), keep_recovered(&dir, "둘").unwrap());
+        assert!(a != b && a.extension().is_some_and(|e| e == "md"));
+        assert_eq!(std::fs::read_to_string(&a).unwrap(), "# 가\n본문");
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn conflict_copy_names() {

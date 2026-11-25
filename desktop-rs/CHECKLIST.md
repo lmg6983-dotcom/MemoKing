@@ -2,8 +2,8 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **188 / 188**
-- 이벤트 (Rust → 화면): **60 / 60**
+- 채널 (화면 → Rust): **186 / 186**
+- 이벤트 (Rust → 화면): **61 / 61**
 
 ➖ 는 Rust 판에 일부러 두지 않은 것 (AI 비서 연결 MCP: AI 는 Google Drive 의 메모 폴더를 직접 읽고 쓴다)
 
@@ -13,7 +13,6 @@
 |---|---|
 | ✅ | `ai:agent` |
 | ✅ | `ai:agent-run` |
-| ✅ | `ai:ask` |
 | ✅ | `ai:cancel` |
 | ✅ | `ai:cancel-download` |
 | ✅ | `ai:download-default` |
@@ -64,6 +63,7 @@
 | ✅ | `drive:auto` |
 | ✅ | `drive:cancel-login` |
 | ✅ | `drive:create-folder` |
+| ✅ | `drive:devices` |
 | ✅ | `drive:disconnect` |
 | ✅ | `drive:folders` |
 | ✅ | `drive:login` |
@@ -117,7 +117,6 @@
 | ✅ | `memo:save-sync` |
 | ✅ | `memo:set` |
 | ✅ | `memo:unlock` |
-| ✅ | `memo:version` |
 | ✅ | `memo:versions` |
 | ✅ | `memos:folders` |
 | ✅ | `memos:list` |
@@ -151,7 +150,6 @@
 | ✅ | `shortcuts:set` |
 | ✅ | `stack:activate` |
 | ✅ | `stack:cycle` |
-| ✅ | `stack:detach` |
 | ✅ | `stack:join-menu` |
 | ✅ | `stack:menu` |
 | ✅ | `stack:new-tab` |
@@ -224,6 +222,7 @@
 | ✅ | `history:changed` |
 | ✅ | `hud:hide` |
 | ✅ | `hud:show` |
+| ✅ | `inbox:taken` |
 | ✅ | `keymap:changed` |
 | ✅ | `list:crown-docked` |
 | ✅ | `list:on-top` |
