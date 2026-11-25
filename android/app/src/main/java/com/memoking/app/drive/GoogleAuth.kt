@@ -54,7 +54,6 @@ object GoogleAuth {
     fun clientSecret(ctx: Context): String = prefs(ctx).getString(KEY_SECRET, null)?.takeIf { it.isNotBlank() } ?: BuildConfig.GOOGLE_CLIENT_SECRET
     fun configured(ctx: Context) = NativeAuth.available(ctx) || clientId(ctx).isNotBlank()
     fun native(ctx: Context) = prefs(ctx).getBoolean(KEY_NATIVE, false)
-    fun builtIn() = BuildConfig.GOOGLE_CLIENT_ID.isNotBlank()
 
     fun setClient(ctx: Context, id: String, secret: String) {
         prefs(ctx).edit().putString(KEY_ID, id.trim()).putString(KEY_SECRET, secret.trim()).apply()
