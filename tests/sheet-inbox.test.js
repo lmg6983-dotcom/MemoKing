@@ -43,26 +43,34 @@ test('네 가지 요청을 적용하고 잠긴 메모 · 없는 메모 · 겹친
   vault.open();
   try {
     const csv = [
-      'req_id,action,memo_id,folder,body,find,status',
-      '1,create,,업무,"# 새 메모\n첫 줄",,pending',
-      '2,append,m1,,화요일,,pending',
-      '3,replace,m1,,수요일,화요일,pending',
-      '4,replace,m1,,x,없는 글,pending',
-      '5,append,lk,,몰래,,pending',
-      '6,trash,없는-id,,,,pending',
-      '7,create,,../밖,# x,,pending',
+      'req_id,action,memo_id,folder,color,body,find,status',
+      '1,create,,업무,,"# 새 메모\n첫 줄",,pending',
+      '1b,create,,업무,blue,"# 파란 메모\n본문",,pending',
+      '1c,create,,,rainbow,"# 이상한 색",,pending',
+      '2,append,m1,,,화요일,,pending',
+      '3,replace,m1,,,수요일,화요일,pending',
+      '4,replace,m1,,,x,없는 글,pending',
+      '5,append,lk,,,몰래,,pending',
+      '6,trash,없는-id,,,,,pending',
+      '7,create,,../밖,,# x,,pending',
     ].join('\r\n');
     const out = runSheet(csv, (job) => vault.applySheetJob(job));
     const status = rowsFromCsv(out.csv).map((r) => r.status);
-    assert.equal(out.done, 3);
+    assert.equal(out.done, 4);
     assert.match(status[0], /^done \(.+\)$/);
-    assert.deepEqual(status.slice(1), ['done (m1)', 'done (m1)', 'error: find 가 본문에 없어요', 'error: 잠긴 메모는 고칠 수 없어요', 'error: 그런 memo_id 의 메모가 없어요', 'error: 쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)']);
+    assert.match(status[1], /^done \(.+\)$/);
+    assert.deepEqual(status.slice(2), [
+      'error: 쓸 수 없는 color 예요 (yellow · green · pink · purple · blue · gray · charcoal 중 하나)',
+      'done (m1)', 'done (m1)', 'error: find 가 본문에 없어요', 'error: 잠긴 메모는 고칠 수 없어요', 'error: 그런 memo_id 의 메모가 없어요', 'error: 쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)',
+    ]);
+    assert.match(files.get('업무/새 메모.md').text, /color: yellow/, 'color 를 비우면 기본값 노란색(yellow)');
     assert.match(files.get('업무/새 메모.md').text, /# 새 메모\n첫 줄/, '폴더 안에 첫 줄 제목으로');
+    assert.match(files.get('업무/파란 메모.md').text, /color: blue/, '지정한 색(blue)으로 생성');
     assert.match(files.get('회의.md').text, /# 회의\n월요일\n수요일/);
     assert.ok([...files.keys()].some((r) => r.startsWith('_memoking/versions/m1/')), '고치기 전 글은 버전으로');
     assert.match(files.get('비밀.md').text, /memoking-lock/, '잠긴 메모는 그대로');
     assert.equal(runSheet(out.csv, () => assert.fail('다시 처리하지 않는다')), null, '처리한 줄은 다시 하지 않는다');
-    const trash = runSheet(`${out.csv}8,trash,m1,,,,pending\r\n`, (job) => vault.applySheetJob(job));
+    const trash = runSheet(`${out.csv}8,trash,m1,,,,,pending\r\n`, (job) => vault.applySheetJob(job));
     assert.equal(rowsFromCsv(trash.csv).at(-1).status, 'done (m1)');
     assert.ok(!files.has('회의.md') && [...files.keys()].some((r) => r.startsWith('_memoking/trash/회의')), '휴지통으로');
   } finally {

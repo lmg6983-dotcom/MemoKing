@@ -42,3 +42,13 @@ test('상단 고정 묶음: 나중에 고정한 것이 위, 고정한 때를 모
   assert.deepEqual(sortMemos(list, 'updated').map((m) => m.id), ['p2', 'p1', 'old1', 'old2', 'n']);
   assert.deepEqual(sortMemos(list, 'title').map((m) => m.id), ['p2', 'p1', 'old2', 'old1', 'n'], '고정 묶음 순서는 정렬과 상관없이 고정한 때');
 });
+
+test('정렬: 시각이 완전히 같아도 입력 순서에 따라 흔들리지 않는다 (id 순)', () => {
+  const same = [
+    { id: 'c', title: '가', updated: '2026-11-23T16:56:00+09:00' },
+    { id: 'a', title: '가', updated: '2026-11-23T16:56:00+09:00' },
+    { id: 'b', title: '가', updated: '2026-11-23T16:56:00+09:00' },
+  ];
+  assert.deepEqual(sortMemos(same, 'updated').map((m) => m.id), ['a', 'b', 'c']);
+  assert.deepEqual(sortMemos([...same].reverse(), 'updated').map((m) => m.id), ['a', 'b', 'c']);
+});

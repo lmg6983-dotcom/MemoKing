@@ -625,15 +625,16 @@ write('ai_events', aeBodies.flatMap((body) => aeNows.map((iso) => {
 
 // AI 받은함 시트 — CSV 읽기 · 쓰기, 처리할 줄 고르기, 결과 적기 · 오래된 줄 정리, 한 번만 바꾸기 · 덧붙이기
 const sheetCsvs = [
-  '', 'req_id,action,memo_id,folder,body,find,status\r\n', '﻿req_id,action\r\n1,create\r\n',
-  'req_id,action,memo_id,folder,body,find,status\r\n1,create,,업무,"# 회의\n여러 줄, 쉼표 ""따옴표""",,pending\r\n2,append,m1,,더,,done (m1)\r\n',
+  '', 'req_id,action,memo_id,folder,color,body,find,status\r\n', '﻿req_id,action\r\n1,create\r\n',
+  'req_id,action,memo_id,folder,color,body,find,status\r\n1,create,,업무,blue,"# 회의\n여러 줄, 쉼표 ""따옴표""",,pending\r\n2,append,m1,,,더,,done (m1)\r\n',
+  'req_id,action,memo_id,folder,body,find,status\r\n1,create,,업무,# 예전 7열 시트,,pending\r\n',
   'status,body,req_id,action,extra\n pending ,"# 순서가 다른 열",9,CREATE,x\n,,,,\n',
-  '1,trash,m2,,,,pending', 'a,"b\r\nc",d\r\n"e""",f', '"끝 따옴표 없음,a\nb',
+  '1,trash,m2,,,,,pending', 'a,"b\r\nc",d\r\n"e""",f', '"끝 따옴표 없음,a\nb',
 ];
-const sheetRows = (n, extra = []) => [...Array.from({ length: n }, (_, i) => ({ req_id: `d${i}`, action: 'create', memo_id: '', folder: '', body: '# x', find: '', status: `done (m${i})` })), ...extra];
-const srow = (req_id, action, memo_id = '', folder = '', body = '', find = '', status = 'pending') => ({ req_id, action, memo_id, folder, body, find, status });
+const sheetRows = (n, extra = []) => [...Array.from({ length: n }, (_, i) => ({ req_id: `d${i}`, action: 'create', memo_id: '', folder: '', color: '', body: '# x', find: '', status: `done (m${i})` })), ...extra];
+const srow = (req_id, action, memo_id = '', folder = '', body = '', find = '', status = 'pending', color = '') => ({ req_id, action, memo_id, folder, color, body, find, status });
 const planSets = [
-  [srow('1', 'create', '', '업무', '# 새 메모'), srow('2', 'create', '', '../밖', '# x'), srow('3', 'create', '', '_MemoKing', '# x'), srow('4', 'create', '', 'con', '# x'), srow('5', 'create', '', '', '   ')],
+  [srow('1', 'create', '', '업무', '# 새 메모'), srow('1c', 'create', '', '업무', '# 파랑 메모', '', 'pending', ' Blue '), srow('1bad', 'create', '', '', '# 이상한 색', '', 'pending', 'rainbow'), srow('2', 'create', '', '../밖', '# x'), srow('3', 'create', '', '_MemoKing', '# x'), srow('4', 'create', '', 'con', '# x'), srow('5', 'create', '', '', '   ')],
   [srow('6', 'append', '', '', '더'), srow('7', 'append', 'm1', '', ''), srow('8', 'append', 'a/../b', '', 'x'), srow('9', 'append', ' m1 ', '', ' 더 ')],
   [srow('10', 'replace', 'm1', '', '새', ''), srow('11', 'replace', 'm1', '', '', ' 옛 '), srow('12', 'trash', ''), srow('13', 'trash', 'm1'), srow('14', 'Dance', 'm1'), srow('15', '')],
   [srow('', 'create', '', '', '# x'), srow('1', 'create', '', '', '# a'), srow('1', 'create', '', '', '# b'), srow('2', 'trash', 'm2', '', '', '', 'error: 잠긴 메모'), srow('2', 'trash', 'm2'), srow('3', 'trash', 'm3', '', '', '', ' Pending ')],
