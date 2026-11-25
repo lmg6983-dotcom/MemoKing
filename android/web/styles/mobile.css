@@ -646,7 +646,11 @@ h2.sheet-title { font-size: 20px; }
 
 /* 알림 모을 앱 */
 .apps-list { margin: 10px 0 0; padding: 0; list-style: none; }
-.app-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.app-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.app-row:active { background: var(--hover); }
+/* 설정의 "줄 + 오른쪽 단추": 줄 어디를 눌러도 단추 (app.js) — 누른 줄이 보이게 */
+.nav-row { cursor: pointer; }
+.nav-row:active { background: var(--hover); }
 .app-row .avatar { width: 34px; height: 34px; }
 .app-row.off .avatar { filter: grayscale(1); opacity: 0.5; }
 .app-name { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -887,16 +891,7 @@ body[data-note-color="charcoal"] .clear-stamp { color: var(--rec-on-dark); borde
 .tag-suggest-bar .link-btn { color: var(--note-text); }
 .tag-suggest-bar .icon-btn { width: 36px; height: 36px; flex: none; }
 
-/* ---------- 연결: 태그로 이어진 메모 ---------- */
-.link-tag-groups { display: flex; flex-direction: column; gap: 10px; margin-bottom: 6px; }
-.link-tag-group { padding: 8px; border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line); }
-.link-tag-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
-.link-tag-hint { font-size: 12px; color: var(--muted); }
-.link-tag-group .link-list { margin: 0; }
-.link-tag-suggest { margin: 4px 0 8px; }
-.link-tag-suggest:empty { display: none; }
-.link-borrow { display: flex; gap: 6px; width: 100%; padding: 0 0 6px 30px; }
-.link-borrow .tag-chip { height: 28px; font-size: 12.5px; }
+/* ---------- 연결 패널 ---------- */
 .links-panel .link-item { flex-wrap: wrap; }
 /* 연결 패널의 + · ✕ 는 PC(26px) 크기 그대로면 손가락으로 누르기 어렵다 */
 :is(.links-panel .link-item, .rem-item) .icon-btn { width: var(--tap); height: var(--tap); }
@@ -1199,11 +1194,11 @@ body.two-pane .toast { left: calc(var(--L) + (100vw - var(--L)) / 2); }
 @media (max-width: 360px) { :root { --tap: 44px; } }
 :is(.color-filter button, .chip, .tag-chip, .tabs button, .seg button, .rec-btn, .note-screen .banner-btn,
   .note-screen .format-bar button, .note-screen .table-bar button, .palette-swatch, .sheet .swatch, .toast-action,
-  .crumbs button, .trash-item .btn, .sheet .btn.small, .sheet .chips button, .link-btn, .tag-suggest-bar .icon-btn, .fchip,
+  .crumbs button, .trash-item .btn, .sheet .btn.small, .sheet .chips button, .link-btn, .tag-suggest-bar .icon-btn,
   .note-screen .bar #undo-btn, .note-screen .bar #redo-btn, .switch) { position: relative; }
 :is(.color-filter button, .chip, .tag-chip, .tabs button, .seg button, .rec-btn, .note-screen .banner-btn,
   .note-screen .format-bar button, .note-screen .table-bar button, .palette-swatch, .sheet .swatch, .toast-action,
-  .crumbs button, .trash-item .btn, .sheet .btn.small, .sheet .chips button, .link-btn, .tag-suggest-bar .icon-btn, .fchip,
+  .crumbs button, .trash-item .btn, .sheet .btn.small, .sheet .chips button, .link-btn, .tag-suggest-bar .icon-btn,
   .note-screen .bar #undo-btn, .note-screen .bar #redo-btn, .switch)::before {
   content: "";
   position: absolute;
@@ -1364,7 +1359,6 @@ button.noti-text { display: block; padding: 0; border: 0; background: none; colo
 .mk-find-swatch { width: 34px; height: 34px; }
 .mk-find-item { min-height: 40px; }
 
-/* 메모킹 폴더 칩 줄: 칩은 화면 끝까지 넘겨 보고, 처음 · 끝 자리만 16px 들여 둔다 (folder-ui.js renderFolderChips) */
 /* 여러 장 고르기 막대: 아래 탭 막대 위에 */
 .pick-bar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .pick-bar .btn { min-height: 44px; }

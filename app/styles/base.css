@@ -35,11 +35,9 @@
      고른 탭 · 고른 줄 · 밑줄 · 포커스 · 스위치 · 체크 같은 "상태" 는 무채색으로 (노랑이 여기저기 흩어져 난잡하던 것) */
   --brand-yellow-soft: color-mix(in oklab, var(--ok-gray-1000) 8%, transparent); /* 고른 상태 바탕 (이름은 예전 그대로 — 이제 무채색) */
   --accent-line: color-mix(in oklab, var(--ok-gray-1000) 48%, transparent); /* 밑줄 · 입력 포커스 선 */
-  --on-dark-fill: var(--ok-gray-0);
   --on-brand-soft: var(--text-strong); /* 고른 상태 위 글자 */
   --brand-black: var(--ok-gray-950);
   --on-brand: var(--ok-gray-950);
-  --on-black: var(--ok-gray-0);
 
   /* 바탕 · 글씨 */
   --surface-0: var(--ok-gray-50); /* 바탕: 카카오톡 더보기 화면과 같은 무채색 옅은 회색 */
@@ -54,7 +52,6 @@
   --danger: var(--ok-red-600);
   --sat: var(--ok-blue-600); /* 달력 토요일 (흰 바탕 5.9:1) */
   --ok-text: var(--ok-green-700); /* 복사했어요 · 저장 같은 성공 글 */
-  --err-text: var(--ok-red-800); /* 실패 글 (빨강 바탕이 아닌 글자) */
   --on-danger: var(--ok-gray-0);
   --focus-ring: var(--ok-gray-950);
 
@@ -88,7 +85,6 @@
   --accent: var(--brand-yellow);
   --accent-strong: var(--brand-yellow-hover);
   --accent-text: var(--on-brand);
-  --shadow: var(--shadow-pop);
 
   /* 스티커 메모 7색: 바탕 / 윗막대 / 목록에서 보이는 색 칩 */
   --yellow-bg: var(--ok-paper-yellow); --yellow-bar: var(--ok-paper-yellow-bar); --yellow-chip: var(--ok-paper-yellow-chip); /* 또렷한 종이: OKLCH L.95 C.08 — 모든 색이 같은 밝기 · 채도 (노랑 1.35배, 회색 C.01) */
@@ -109,7 +105,6 @@
 
   /* 움직임 — 곡선은 여기서만 정한다 (Emil Kowalski 기준: 나타나고 사라지는 건 ease-out, 화면 안에서 옮겨 가는 건 ease-in-out) */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);     /* 강한 ease-out: 처음이 빨라 바로 반응하는 느낌 */
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* 화면 안에서 자리를 옮길 때 */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);  /* 아래에서 올라오는 시트 (iOS 서랍 곡선) */
   --ease-pop: cubic-bezier(0.2, 1.3, 0.4, 1);     /* 살짝 튀는 등장 — 드문 축하 순간에만 (튜토리얼 · 체크리스트 CLEAR 도장). 자주 보는 메뉴·창은 --ease-out */
   color-scheme: light;
@@ -135,7 +130,6 @@
     --danger: var(--ok-red-400);
     --sat: var(--ok-blue-400);
     --ok-text: var(--ok-green-200);
-    --err-text: var(--ok-red-400);
     --on-danger: var(--ok-gray-950);
     --focus-ring: var(--ok-gray-50);
     --shadow-card: 0 1px 2px color-mix(in oklab, var(--ok-gray-1000) 48%, transparent);
@@ -640,9 +634,6 @@ dialog.dialog::backdrop { transition: background-color 0.18s ease-out, overlay 0
 }
 .flow-footer .btn { width: 100%; min-height: 40px; font-weight: 700; }
 .flow-footer .btn.primary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flow-progress { margin: 0 0 4px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--muted); font-variant-numeric: tabular-nums; }
-.flow-progress:empty { display: none; }
-.date-picker.all-day .dp-time-box, .date-picker.all-day .dp-summary { display: none; }
 /* 일정 탭 달력에서 바로 만들기 (quick-event.js) */
 .quick-event .qe-name {
   width: 100%; min-height: 40px; margin-bottom: 6px; padding: 8px 14px;
@@ -1681,10 +1672,10 @@ dialog.quick-event[open] {
 .mode-tag[hidden] { display: none; }
 
 /* 복사 아이콘 버튼 완료 피드백: 앱 전체 초록색 체크 표시 통일 */
-:is(.icon-btn, .act-btn, .mk-ctx-ic, .op-copy, .op-copy-biblio).done {
+:is(.icon-btn, .mk-ctx-ic).done {
   color: var(--ok-text, var(--ok-green-500)) !important;
 }
-:is(.icon-btn, .act-btn, .mk-ctx-ic).done svg {
+:is(.icon-btn, .mk-ctx-ic).done svg {
   color: var(--ok-text, var(--ok-green-500)) !important;
 }
 
@@ -1734,21 +1725,12 @@ dialog.quick-event[open] {
 .mf-name-form { display: grid; gap: 8px; min-width: 0; }
 .mf-name-input { box-sizing: border-box; width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text-strong); font: inherit; }
 .mf-name-input:focus { outline: none; border-color: var(--focus-ring); box-shadow: 0 0 0 1px var(--focus-ring); } /* 포커스 테두리는 3:1 넘게 (노랑은 흰 바탕에서 1.5:1) */
-/* 폴더 목록: 누른 단추 바로 아래에 펼쳐지는 판 (folder-ui.js openFolderSheet) */
-dialog.folder-pop {
-  position: fixed; inset: auto; margin: 0; padding: 0; overflow: hidden auto; box-sizing: border-box;
-  border: 1px solid var(--line); border-radius: 16px; background: var(--surface-1, var(--ok-gray-0)); color: var(--text);
-  box-shadow: 0 12px 32px color-mix(in oklab, var(--ok-gray-1000) 24%, transparent), 0 2px 6px color-mix(in oklab, var(--ok-gray-1000) 8%, transparent);
-}
-dialog.folder-pop::backdrop { background: color-mix(in oklab, var(--ok-gray-1000) 16%, transparent); }
-.folder-pop-body { padding: 8px; }
-.folder-pop .mf-new { margin: 6px 0 2px 8px; }
 /* 새 폴더: 목록 맨 아래 그 자리에서 이름 칸 + 만들기 */
 .mf-inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-top: 6px; padding: 3px; }
 .mf-inline .btn { height: 44px; }
 .mf-inline .mf-name-note { grid-column: 1 / -1; margin: 0; }
 .mf-inline .mf-name-note:empty { display: none; }
-.dialog p.mf-name-note, .folder-pop p.mf-name-note { min-height: 1.2em; margin: 0; font-size: 12.5px; color: var(--danger); }
+.dialog p.mf-name-note { min-height: 1.2em; margin: 0; font-size: 12.5px; color: var(--danger); }
 .mf-name-form .btn { justify-self: end; }
 @media (pointer: coarse) { .mf-item { min-height: 44px; font-size: 15px; } }
 /* 휴대폰: 아래에서 올라오는 시트 */
@@ -1796,56 +1778,6 @@ body.picking .card.picked::after {
 }
 .pick-bar[hidden] { display: none; }
 
-/* 폴더 칩 줄 (휴대폰 · 좁은 PC 창, folder-ui.js renderFolderChips): 한 번 누르면 그 폴더로, 옆으로 넘겨 본다 */
-.folder-chips { display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; }
-.folder-chips[hidden] { display: none; }
-.fchip-row {
-  display: flex; gap: 6px; flex: 1; min-width: 0; padding: 3px 2px; overflow-x: auto;
-  scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding-inline: 12px;
-}
-/* 넘치는 쪽 끝은 살짝 흐리게 — 옆으로 더 있다는 표시 (넘겨 본 뒤에는 왼쪽도) */
-.fchip-row.fade-end { mask-image: linear-gradient(to right, var(--ok-gray-1000) calc(100% - 24px), transparent); }
-.fchip-row.fade-start { mask-image: linear-gradient(to right, transparent, var(--ok-gray-1000) 24px); }
-.fchip-row.fade-start.fade-end { mask-image: linear-gradient(to right, transparent, var(--ok-gray-1000) 24px, var(--ok-gray-1000) calc(100% - 24px), transparent); }
-.fchip-row::-webkit-scrollbar { display: none; }
-.fchip {
-  display: inline-flex; align-items: center; gap: 5px; flex: none; height: 30px; padding: 0 12px;
-  border: 1px solid var(--line); border-radius: 999px; background: var(--surface-1, var(--ok-gray-0)); color: var(--text);
-  font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
-  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-  transition: background-color 0.15s ease-out, border-color 0.15s ease-out, transform 0.1s ease-out;
-}
-.fchip svg { flex: none; width: 15px; height: 15px; color: var(--muted); }
-.fchip-name { max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
-.fchip-count { font-size: 12px; font-weight: 500; color: var(--muted); }
-@media (prefers-reduced-motion: no-preference) { .fchip:active { transform: scale(0.96); } }
-@media (hover: hover) and (pointer: fine) { .fchip:hover { background: var(--hover); } }
-.fchip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-/* 고른 것: 옅은 노랑 바탕 + 노랑 테두리 (일정 창의 고른 칸과 같게). 꽉 찬 노랑은 ＋ 같은 주요 동작에만 */
-.fchip[aria-pressed="true"] { border-color: var(--text-strong); background: var(--brand-yellow-soft); color: var(--text-strong); font-weight: 800; }
-.fchip[aria-pressed="true"] svg, .fchip[aria-pressed="true"] .fchip-count { color: inherit; }
-/* ＋ 새 폴더: 점선 — 폴더가 아니라 만드는 단추로 읽히게 */
-.fchip-add { border-style: dashed; color: var(--muted); }
-/* 폴더 목록: 폴더 칩이 아닌 "단추" 로 읽히게 — 테두리 없는 그림 단추, 앞에 얇은 구분선 */
-.fchip-all { position: relative; display: inline-flex; align-items: center; gap: 1px; flex: none; width: auto; height: 30px; padding: 0 8px 0 12px; border-radius: 999px; color: var(--muted); }
-.fchip-all::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 1px; background: var(--line); }
-.fchip-all svg { width: 17px; height: 17px; }
-.fchip-all svg:last-child { width: 13px; height: 13px; }
-.fchip-all[aria-expanded="true"] { color: var(--text-strong); background: var(--hover); }
-.fchip-all[hidden] { display: none; }
-.fchip-cancel { flex: none; width: 30px; height: 30px; }
-.fchip-cancel svg { width: 16px; height: 16px; }
-.fchip-new { display: flex; gap: 6px; flex: none; }
-.fchip-input {
-  box-sizing: border-box; width: 150px; height: 30px; padding: 0 12px; border: 1px solid var(--brand-yellow); border-radius: 999px;
-  background: var(--bg); color: var(--text-strong); font: inherit; font-size: 13px; outline: none; box-shadow: 0 0 0 1px var(--brand-yellow);
-}
-.fchip-input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
-.fchip-ok { border-color: transparent; background: var(--text-strong); color: var(--surface-1); font-weight: 800; }
-@media (pointer: coarse) {
-  .fchip, .fchip-input { height: 36px; font-size: 13.5px; } /* 보기 패널의 칩과 같은 크기 (누르는 자리는 mobile.css 가 48px 로 넓힌다) */
-  .fchip-all, .fchip-cancel { height: 44px; min-width: 44px; }
-}
 
 /* 메모 목록의 카드: 화면 밖의 것은 모양 · 자리 계산과 그리기를 건너뛴다 (메모 수백 개에서 검색 · 다시 그리기가 멈칫하던 것)
    - 자리 크기는 dom.js stackCards 가 잰 높이로 (contain-intrinsic-block-size), 잴 때는 .mk-measure 로 잠깐 다 그린다

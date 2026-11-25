@@ -132,11 +132,16 @@ class RecorderService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                ensureChannel(this)
                 val s = session ?: run {
-                    stopSelf()
+                    // 시작하자마자 멈춤이 먼저 왔다: startForegroundService 로 띄운 서비스는 앞에 한 번 나와야 한다
+                    //   (안 그러면 "did not then call startForeground" 로 앱이 꺼진다) — 잠깐 나왔다가 바로 끝낸다
+                    val n = Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_stat_crown).setContentTitle("녹음 끝").build()
+                    if (Build.VERSION.SDK_INT >= 30) startForeground(NOTIFY_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                    else startForeground(NOTIFY_ID, n)
+                    finishService()
                     return START_NOT_STICKY
                 }
-                ensureChannel(this)
                 val n = notification(s)
                 if (Build.VERSION.SDK_INT >= 30) startForeground(NOTIFY_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                 else startForeground(NOTIFY_ID, n)

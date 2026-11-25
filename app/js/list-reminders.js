@@ -467,10 +467,6 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     }
   }
 
-  function toggleInline(open) {
-    setExpanded(open);
-  }
-
   const syncScroll = () => {
     backdrop.scrollLeft = qInput.scrollLeft;
   };
@@ -969,12 +965,6 @@ export function setupRemindersTab({ api, container, countEl, notify = defaultNot
     if (fcView(was) !== id) calendar?.changeView(id, selected); // 회상 → 월 은 같은 보기를 다시 보이기만 (크기는 달력이 스스로 다시 잰다)
     fitSize();
     render();
-  }
-
-  /** 그날 보이는 일정이 있는가 (메모킹 일정 · 다른 캘린더) */
-  function busyOn(d) {
-    const end = addDays(d, 1);
-    return occurrences(d, end).length > 0 || externalBetween(d, end).length > 0;
   }
 
   // 날 누르기: 처음 누르면 그날을 고르고 하단 "N월 N일에 추가 ＋" 바에 표시, 이미 고른 날을 한 번 더 누르면 인라인 입력 창 확장

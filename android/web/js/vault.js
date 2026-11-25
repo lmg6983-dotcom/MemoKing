@@ -19,8 +19,8 @@ import {
   VERSIONS_DIR, VERSION_GAP_MS, versionName, versionTime, safeVersionId, isVersionName, shouldKeepVersion, versionsToPrune,
   describeVersions } from '../../app/js/core/versions.js';
 
-export const APP_DIR = '_memoking';
-export const ATTACH_DIR = 'attachments';
+const APP_DIR = '_memoking';
+const ATTACH_DIR = 'attachments';
 const TRASH_DIR = `${APP_DIR}/trash`;
 const INDEX_FILE = `${APP_DIR}/index.json`;
 const SCAN_INTERVAL = 4000;
@@ -42,7 +42,7 @@ export function stamp(date = new Date()) {
 const randomHex = (bytes) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${randomHex(4)}-${randomHex(2)}-4${randomHex(2).slice(1)}-${randomHex(2)}-${randomHex(6)}`);
 
-export const safeExt = (ext) => String(ext ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'bin';
+const safeExt = (ext) => String(ext ?? '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'bin';
 
 export class Vault extends EventTarget {
   constructor({ orphanDelay = ORPHAN_DELAY } = {}) {

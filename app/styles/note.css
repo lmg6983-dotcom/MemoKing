@@ -1663,8 +1663,6 @@ body[data-color="charcoal"] :is(.mk-cut-btn, .mk-copy-btn, .mk-save-btn, .mk-sha
 .tag-suggest-bar .tag-chip.new { outline: 1px dashed color-mix(in srgb, var(--note-text) 35%, transparent); outline-offset: -1px; }
 .tag-suggest-bar .link-btn { flex: none; white-space: nowrap; border: 0; background: none; color: var(--note-text); font-size: 12px; font-weight: 600; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--note-text) 60%, transparent); text-underline-offset: 3px; cursor: pointer; padding: 3px 6px; border-radius: 6px; } /* 휴대폰처럼 밑줄 링크 (모두 달기 · AI로 고르기) */
 .tag-suggest-bar .icon-btn { flex: none; width: 26px; height: 26px; }
-.ai-notice-bar .ai-notice-text { flex: 1; min-width: 0; font-size: 12px; color: var(--note-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ai-notice-bar #ai-notice-undo { color: var(--note-text); font-weight: 700; }
 .tag-suggest-bar .icon-btn svg { width: 14px; height: 14px; }
 @media print { .tag-suggest-bar { display: none !important; } }
 
@@ -2132,16 +2130,11 @@ body.annotating #undo-btn, body.annotating #redo-btn { visibility: hidden; }
 .lock-screen .dialog-actions .btn { width: 100%; min-height: 40px; }
 @media (pointer: coarse) { .lock-field input { min-height: 48px; font-size: 16px; } }
 /* 비밀번호를 넣기 전: 서식 막대·+ 는 숨김 */
-.memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob, .memo-locked #tag-bar,
+.memo-locked #format-bar, .memo-locked #add-btn, .memo-locked .mode-knob,
 .memo-locked #bell-btn, .memo-locked #event-btn, .memo-locked #tag-suggest-bar, .memo-locked #kb-btn, .memo-locked #move-bar, .memo-locked #mode-guide, .memo-locked #hotkey-menu-btn, .memo-locked #menu-btn, .memo-locked #new-btn, .memo-locked #undo-btn, .memo-locked #redo-btn { display: none !important; }
 .lock-dialog h2 { margin-bottom: 8px; }
 .lock-dialog .lock-note { margin-bottom: 14px; line-height: 1.5; }
 .lock-hide-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 4px 0; font-size: 13px; color: var(--muted); }
-
-/* 일정과 알림 패널: 이름 · 하루 종일 · 미리 알림 (reminder-panel.js) */
-.rem-title-row input { flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-0); color: var(--text); font: inherit; }
-.rem-allday-row { justify-content: space-between; }
-.rem-alerts button[aria-pressed="true"]::before { content: '✓ '; }
 
 .reminder-panel { --flow-bg: var(--surface-2); }
 
@@ -2585,7 +2578,7 @@ body.mk-block-dragging .mk-doc p.mk-block-lift > .mk-image.mk-sized { box-shadow
 .lock-screen .lock-bio { margin-top: 10px; width: 100%; }
 /* ---------- 앱 안 PDF 미리보기 (pdf-viewer.js) ---------- */
 .mk-pdf-view {
-  --pdf-bg: var(--ok-gray-900); --pdf-bar: color-mix(in oklab, var(--ok-gray-1000) 80%, transparent); --pdf-fg: var(--ok-gray-50); --pdf-muted: color-mix(in oklab, var(--ok-gray-0) 64%, transparent); --pdf-btn: color-mix(in oklab, var(--ok-gray-0) 8%, transparent); --pdf-btn-hover: color-mix(in oklab, var(--ok-gray-0) 16%, transparent);
+  --pdf-bg: var(--ok-gray-900); --pdf-bar: color-mix(in oklab, var(--ok-gray-1000) 80%, transparent); --pdf-fg: var(--ok-gray-50); --pdf-muted: color-mix(in oklab, var(--ok-gray-0) 64%, transparent); --pdf-btn-hover: color-mix(in oklab, var(--ok-gray-0) 16%, transparent);
   position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: var(--pdf-bg); color: var(--pdf-fg);
   animation: mk-pdf-in 0.18s ease-out; -webkit-app-region: no-drag; font-family: inherit;
 }

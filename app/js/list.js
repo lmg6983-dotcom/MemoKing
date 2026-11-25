@@ -38,7 +38,7 @@ import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT, slideSide, busyWhile, busyUntilBlur } from './dom.js';
 import { UI } from './core/ui-text.js';
-import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet, pinItem } from './folder-ui.js';
+import { renderFolderList, askFolderName, pickFolder, createPickBar, pinItem } from './folder-ui.js';
 import { askSecretPassword, askNewSecretPassword, pickSecretFolder } from './secret-ui.js';
 import { folderList, movedText, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
 
@@ -77,7 +77,6 @@ const el = {
   tagFilter: $('tag-filter'),
   folderSide: $('folder-side'),
   folderBtn: $('folder-btn'),
-  folderChips: $('folder-chips'),
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
 };
@@ -446,14 +445,6 @@ function applyFolderSide() {
   el.folderBtn.hidden = (document.body.dataset.tab ?? 'memos') !== 'memos'; // 폴더는 메모에만 (일정 · 보관함에는 쓸 데가 없다)
   el.folderBtn.setAttribute('aria-pressed', String(sideWanted));
   el.folderBtn.title = sideWanted ? '폴더 목록 접기' : '폴더 목록 펴기';
-}
-
-// anchor: 누른 단추 (그 바로 아래에 폴더 목록)
-async function openFolderPicker(anchor = el.folderBtn) {
-  const picked = await openFolderSheet({ folders: [...withUnfiled(currentFolders(), modeMemos()), ...secretFolders()], current: state.folder, onMenu: folderMenu, anchor });
-  if (picked == null) return;
-  if (typeof picked === 'object') return createAndOpenFolder(picked.create);
-  setFolder(picked);
 }
 
 // 접고 펼 때 목록이 옆에서 미끄러져 나오고 들어간다 (카드 자리도 함께 밀린다 — 툭 바뀌지 않게)
@@ -1520,7 +1511,8 @@ async function renderApps() {
   $('apps-empty').hidden = apps.length > 0;
   $('apps-list').replaceChildren(...apps.map((a) => {
     const li = document.createElement('li');
-    li.className = `app-row${a.blocked ? ' off' : ''}`;
+    const row = document.createElement('label'); // 줄 어디를 눌러도 스위치 (휴대폰과 같게)
+    row.className = `app-row${a.blocked ? ' off' : ''}`;
     const letter = document.createElement('span');
     letter.className = 'avatar letter';
     letter.textContent = (a.app || '?').trim().charAt(0).toUpperCase();
@@ -1546,7 +1538,8 @@ async function renderApps() {
       showBlockedCount();
       historyTab.refresh();
     });
-    li.append(letter, name, sw);
+    row.append(letter, name, sw);
+    li.append(row);
     return li;
   }));
 }
@@ -2415,17 +2408,6 @@ Promise.all([api.win.listOnTop(), api.win.listCrownDocked?.() ?? false]).then(([
   crownDocked = Boolean(docked);
   showListTop(on, false);
 });
-// 대화 상자·튜토리얼이 떠 있으면 창 버튼 줄도 어둡게 (Windows 가 그리는 줄이라 화면의 막이 닿지 않는다)
-let dimLevel = false;
-function syncTitlebarDim() {
-  const level = el.settings.open || el.confirm.open || $('trash-dialog').open || $('apps-dialog').open || $('drive-dialog')?.open || document.querySelector('body > :is(.mem-album, .mem-preview):not(.closing)') ? 'dialog' : document.body.classList.contains('coaching') ? 'coach' : false;
-  if (level === dimLevel) return;
-  dimLevel = level;
-  api.win.dimTitlebar(level);
-}
-const dimWatcher = new MutationObserver(syncTitlebarDim);
-for (const d of [el.settings, el.confirm, $('trash-dialog'), $('apps-dialog'), $('drive-dialog')].filter(Boolean)) dimWatcher.observe(d, { attributes: true, attributeFilter: ['open'] });
-dimWatcher.observe(document.body, { attributes: true, attributeFilter: ['class'], childList: true }); // 회상 달력의 그날의 기록도 (body 에 붙었다 떨어짐)
 // ---------- 휴지통 ----------
 const trashEl = {
   dialog: $('trash-dialog'), list: $('trash-list'), empty: $('trash-empty'), note: $('trash-note'), clear: $('trash-clear'),

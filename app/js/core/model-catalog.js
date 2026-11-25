@@ -11,15 +11,3 @@ export const DEFAULT_MODEL = {
   license: 'Kanana Open License',
   licenseUrl: 'https://huggingface.co/kakaocorp/kanana-2-3b-instruct/raw/main/LICENSE',
 };
-
-/** 저장소의 파일 목록 (파일마다 크기 · SHA-256) */
-export const modelInfoUrl = (m) => `https://huggingface.co/api/models/${m.repo}?blobs=true`;
-
-/** 목록 → 받을 것 { name, url, size, sha256 } — 보조 파일(mtp 초안 · mmproj 그림)은 빼고, 목록을 받은 그 커밋으로 고정 */
-export function pickModelFile(m, info) {
-  const f = (info?.siblings ?? []).find((s) => m.file.test(s.rfilename) && !/mtp|mmproj/i.test(s.rfilename));
-  const sha256 = f?.lfs?.sha256 ?? '';
-  if (!f || !/^[0-9a-f]{64}$/.test(sha256)) throw new Error('받을 모델 파일을 찾지 못했어요. 잠시 뒤 다시 해 주세요');
-  const path = f.rfilename.split('/').map(encodeURIComponent).join('/');
-  return { name: f.rfilename.split('/').pop(), url: `https://huggingface.co/${m.repo}/resolve/${info.sha ?? 'main'}/${path}`, size: f.lfs.size ?? f.size ?? 0, sha256 };
-}

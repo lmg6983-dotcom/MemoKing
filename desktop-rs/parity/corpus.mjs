@@ -66,6 +66,8 @@ export function corpus() {
     '---\nid: trail\n---   \n본문 앞 빈칸',
     '---\nid: "x: y"\ncolor: yellow\nnote: "#태그 같은 값"\n---\n',
     '---\nid: multi\nmemo: |\n  여러 줄\n  값\n---\n본문\n\n\n',
+    // 자르는 자리에 그림 글자(UTF-16 둘)가 걸린 제목 · 미리보기 — 반쪽을 남기지 않는다 (JS cut16 · Rust slice16)
+    `# ${'가'.repeat(79)}😀 끝\n${'나'.repeat(1199)}😀 끝`,
   ];
   // 본문만 — 줄마다 따로 (제목 · 미리보기 규칙을 촘촘히)
   const lines = sample.split('\n').filter((l) => l.trim());

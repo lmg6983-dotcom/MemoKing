@@ -59,7 +59,6 @@ export function tokenize(text) {
 }
 
 // 제목을 뺀 본문 앞부분을 문장 단위로 잘라 요약으로 쓴다 (추출 요약).
-export const summarize = (body) => summaryOf(plainLines(body));
 function summaryOf(plain) {
   let summary = '';
   for (const line of plain.slice(1)) {

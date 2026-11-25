@@ -233,9 +233,16 @@ class SyncJobService : JobService() {
         GoogleAuth.upgradeScope(this)
         if (!DriveSync.active(this) || !GoogleAuth.connected(this)) return false
         Thread {
-            val status = DriveSync.syncBlocking(this)
+            // 동기화 밖에서 난 오류(기록 저장 실패 등)로 배경 스레드가 죽으면 앱이 꺼진다 — 잡고 다음 차례에 다시
+            val retry = try {
+                val status = DriveSync.syncBlocking(this)
+                status.state == "error" && status.error.contains("인터넷")
+            } catch (e: Exception) {
+                android.util.Log.w("MemoKing", "배경 동기화 실패", e)
+                true
+            }
             // 내려받은 메모에 알림이 바뀌었을 수 있다 — 다음에 앱을 열면 화면이 다시 계산해 맡긴다
-            jobFinished(params, status.state == "error" && status.error.contains("인터넷"))
+            jobFinished(params, retry)
         }.start()
         return true
     }

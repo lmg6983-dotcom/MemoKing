@@ -292,7 +292,8 @@ function renderApps() {
   $('apps-list').replaceChildren(...rows.map((a) => {
     const off = Boolean(blocked?.[a.appId]);
     const li = document.createElement('li');
-    li.className = `app-row${off ? ' off' : ''}`;
+    const row = document.createElement('label'); // 줄 어디를 눌러도 스위치 (스위치만 누르기에는 작다)
+    row.className = `app-row${off ? ' off' : ''}`;
     const img = document.createElement('img');
     img.className = 'avatar';
     img.alt = '';
@@ -327,7 +328,8 @@ function renderApps() {
       refreshHistoryRow();
       list.refreshHistory();
     });
-    li.append(img, name, sw);
+    row.append(img, name, sw);
+    li.append(row);
     return li;
   }));
 }
@@ -338,6 +340,13 @@ function openAppsSheet() {
 }
 $('history-apps').addEventListener('click', openAppsSheet);
 $('history-apps-2').addEventListener('click', openAppsSheet);
+// 설정의 "줄 + 오른쪽 단추"(모을 앱 · 휴지통 · 사용법 · 나눠 주기): 줄 어디를 눌러도 그 단추 (단추만 누르기에는 작다)
+document.addEventListener('click', (e) => {
+  const row = e.target.closest?.('.nav-row');
+  const act = row?.querySelector('.nav-act');
+  if (!act || act.disabled || e.target.closest('button, a, input, select')) return;
+  act.click();
+});
 
 function refreshHistoryRow() {
   const { enabled, granted } = history.all();

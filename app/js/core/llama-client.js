@@ -1,5 +1,4 @@
-// llama-server(OpenAI 모양) 와 말하는 법 (PC desktop-rs/app/src/ai.rs · 휴대폰 android/web/js/local-ai.js 가 함께) — 순수 함수
-//   주고받는 길(HTTP · 네이티브)만 기기마다 다르다
+// llama-server(OpenAI 모양) 와 말하는 법 — 순수 함수. PC 는 Rust(desktop-rs core/src/ai.rs)가 같은 규칙으로 하고, 이 파일은 그 기준(parity/gen.mjs)
 
 /** 다 오기 전의 생각 블록도 뗀다 (Qwen3 계열) */
 export const noThink = (text) => String(text ?? '').replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
@@ -29,30 +28,4 @@ export function engineError(log, code) {
   if (arch) return `이 엔진이 모르는 모델 구조예요 (${arch}). 같은 모델을 엔진이 아는 구조로 바꾼 GGUF를 넣어 주세요`;
   if (/out of memory|failed to allocate|bad_alloc/i.test(log)) return '메모리가 모자라요. 더 작은 모델을 넣거나 다른 앱을 닫아 주세요';
   return `모델이 멈췄어요 (${code})`;
-}
-
-/** 한 번에 받은 답 → 글 */
-export const replyText = (data) => noThink(data.choices?.[0]?.message?.content);
-
-/**
- * 주고받는 길만 받아 chat 을 만든다
- * @param {(role: 'chat', route: string, body: object, o: { signal?: AbortSignal, onLine?: (line: string) => void }) => Promise<any>} request
- *   onLine 을 주면 스트리밍 답을 줄마다 넘기고, 아니면 답 JSON 을 돌려준다
- */
-export function llamaClient(request) {
-  return {
-    /** 글 모델에 묻기 → 답 글. schema: 그 JSON 모양으로만 답 · onToken: 지금까지 온 글을 조각마다 · signal: 멈추기 */
-    async chat(messages, { onToken, signal, ...o } = {}) {
-      if (!onToken) return replyText(await request('chat', '/v1/chat/completions', chatBody(messages, o), { signal }));
-      let text = '';
-      await request('chat', '/v1/chat/completions', chatBody(messages, { ...o, stream: true }), {
-        signal,
-        onLine: (line) => {
-          const piece = sseText(line);
-          if (piece) onToken(noThink((text += piece)));
-        },
-      });
-      return noThink(text);
-    },
-  };
 }

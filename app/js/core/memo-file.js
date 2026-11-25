@@ -10,8 +10,6 @@ import { decodeEntities } from './entities.js';
 export const COLORS = ['yellow', 'green', 'pink', 'purple', 'blue', 'gray', 'charcoal'];
 export const COLOR_NAMES = { yellow: '노랑', green: '초록', pink: '분홍', purple: '보라', blue: '파랑', gray: '회색', charcoal: '검정' };
 export const DEFAULT_COLOR = 'yellow';
-// 메모 색 점 (매직키 · 모두 찾기 결과 줄)
-export const COLOR_DOTS = { yellow: '#fee47c', green: '#b7f7c3', pink: '#ffd9e6', purple: '#e9deff', blue: '#cfe8ff', gray: '#e9e4db', charcoal: '#333333' };
 // 메모 바탕색 (화면 CSS 와 같은 값) — 창이 뜨는 순간의 배경 · 한 장으로 그림의 메모지
 export const NOTE_BG = {
   light: { yellow: '#ffefae', green: '#c9fed3', pink: '#ffe7ef', purple: '#f1ebff', blue: '#e1f1ff', gray: '#f2eee7', charcoal: '#191919' },
@@ -193,20 +191,23 @@ function withoutBrokenHeader(body) {
   return lines.length && lines.every((l) => /^([A-Za-z_][\w-]*\s*:|\s+\S|-\s)/.test(l)) ? body.slice(m[0].length) : body;
 }
 
+/** 앞 n 자 (UTF-16) — 그림 글자(😀)를 반만 남기지 않게 (Rust js::slice16 과 같게) */
+const cut16 = (s, n) => s.slice(0, n).replace(/[\uD800-\uDBFF]$/, '');
+
 export function extractTitle(body) {
   const first = plainLines(withoutBrokenHeader(body), 1)[0];
-  return first ? first.slice(0, 80) : UNTITLED;
+  return first ? cut16(first, 80) : UNTITLED;
 }
 
 // 제목(첫 줄)을 뺀 나머지로 만든 미리보기
 //   카드에서 읽기 좋게: 공유하기로 붙은 "출처: …" 줄은 빼고, 수식 표시($)는 걷어낸다
 export function extractPreview(body, maxLength = 160) {
-  return plainLines(withoutBrokenHeader(body))
+  const text = plainLines(withoutBrokenHeader(body))
     .slice(1)
     .filter((l) => !/^출처\s*[:：]/.test(l))
     .join(' ')
-    .replace(/\${1,2}([^$]+?)\${1,2}/g, '$1')
-    .slice(0, maxLength);
+    .replace(/\${1,2}([^$]+?)\${1,2}/g, '$1');
+  return cut16(text, maxLength);
 }
 
 export function extractHeadings(body) {
@@ -350,6 +351,7 @@ export function titleToFileName(title) {
     .replace(/^[.\s]+|[.\s]+$/g, '')
     .replace(/^(~\$\s*)+/, '') // ~$ 로 시작하는 파일은 오피스 임시 파일로 보고 목록에서 빼므로
     .slice(0, 60)
+    .replace(/[\uD800-\uDBFF]$/, '') // 그림 글자(😀)를 반만 자르지 않게 — Rust slice16 과 같게
     .trim();
   if (!name) name = UNTITLED;
   // 윈도우는 점 뒤가 있어도(con.txt) 장치 이름으로 본다 → 만들 수 없는 파일

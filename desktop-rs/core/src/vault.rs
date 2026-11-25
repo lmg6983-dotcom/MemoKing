@@ -660,7 +660,9 @@ impl Vault {
         if Some(stamp) == e.stamp {
             return Ok(None);
         }
-        let Ok(text) = fs::read_to_string(&path) else { return Ok(None) };
+        // UTF-8 이 아닌 글(다른 프로그램이 CP949 로 저장 등)도 읽은 만큼 — 못 읽는다고 그냥 덮어쓰면 그 글이 사본 없이 사라졌다
+        let Ok(bytes) = fs::read(&path) else { return Ok(None) };
+        let text = String::from_utf8_lossy(&bytes);
         let (their_meta, theirs) = memo_file::parse_memo_file(&text);
         if body::same_body(&theirs, known) || body::same_body(&theirs, &e.body) || body::is_blank_body(&theirs) {
             return Ok(None);
@@ -1151,52 +1153,6 @@ impl Vault {
         Ok(ok.then_some(saved))
     }
 
-    /// AI 가 단 태그: 본문과 머리말 aiTags (vault-locks.js setAiTags) — 고친 시각 · 기기는 그대로
-    ///   (모든 메모를 한 번에 태그해도 목록 순서가 바뀌거나 휴대폰에 "방금 고친 메모" 가 뜨지 않게). 쓰지 못했으면 되돌리고 None
-    pub fn set_ai_tags(&mut self, id: &str, body: &str, names: &[String]) -> io::Result<Option<Value>> {
-        let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
-        if e.file.is_none() || body::is_locked_body(&e.body) {
-            self.entries.insert(id.into(), e);
-            return Ok(None);
-        }
-        let (prev, known) = (e.meta.clone(), e.body.clone());
-        e.body = body.into();
-        e.meta.extra.insert("aiTags".into(), json!(names));
-        if body != known {
-            self.keep_version(id, &known, false);
-        }
-        // 다른 기기가 고친 글이 디스크에 있으면 쓰지 않는다 — 사본을 만들면 옛 글이 진짜 메모로 남는다. 다시 읽은 뒤 다음에 태그
-        let wrote = self.write(&mut e, &known, false);
-        let ok = matches!(wrote, Ok(Wrote::Yes));
-        if !ok {
-            e.meta = prev;
-            e.body = known;
-        }
-        self.entries.insert(id.into(), e);
-        wrote?;
-        Ok(if ok { self.get(id) } else { None })
-    }
-
-    /// AI 가 글에서 찾아 넣은 일정과 본 줄 aiEvents (vault-locks.js addAiEvents) — 고친 시각은 그대로. 쓰지 못했으면 되돌리고 None
-    pub fn add_ai_events(&mut self, id: &str, events: &[Value], seen: &[String]) -> io::Result<Option<Value>> {
-        let Some(mut e) = self.entries.remove(id) else { return Ok(None) };
-        if e.file.is_none() || body::is_locked_body(&e.body) {
-            self.entries.insert(id.into(), e);
-            return Ok(None);
-        }
-        let (prev, known) = (e.meta.clone(), e.body.clone());
-        e.meta.reminders.extend_from_slice(events);
-        e.meta.extra.insert("aiEvents".into(), json!(seen));
-        let wrote = self.write(&mut e, &known, true);
-        let ok = matches!(wrote, Ok(Wrote::Yes));
-        if !ok {
-            e.meta = prev;
-        }
-        self.entries.insert(id.into(), e);
-        wrote?;
-        Ok(if ok { self.get(id) } else { None })
-    }
-
     /// 연결한 메모 · 나를 연결한 메모
     pub fn links(&self, id: &str) -> Value {
         let Some(e) = self.entries.get(id) else { return json!({ "links": [], "backlinks": [], "suggestions": [] }) };
@@ -1314,12 +1270,18 @@ impl Vault {
         let path = self.abs(&file);
         let Ok(text) = fs::read_to_string(&path) else { return };
         let (mut meta, b) = memo_file::parse_memo_file(&text);
+        // 디스크에 아직 못 읽은 다른 기기 글이 있으면 시각을 적지 않는다 — 다음 다시 읽기가 읽게 (적으면 그 글을 덮어쓴다)
+        let known = self.entries.get(id).is_some_and(|e| e.disk_meta.as_ref() == Some(&meta) && body::same_body(&b, &e.body));
         let moved = time::now_iso();
         meta.extra.insert("moved".into(), moved.clone().into());
         if write_atomic(&path, memo_file::serialize_memo_file(&meta, &b).as_bytes()).is_ok() {
             let e = self.entries.get_mut(id).unwrap();
             e.meta.extra.insert("moved".into(), moved.into());
-            e.stamp = stamp_of(&path).ok();
+            e.stamp = None;
+            if known {
+                e.stamp = stamp_of(&path).ok();
+                e.disk_meta = Some(meta);
+            }
         }
     }
 
@@ -1598,11 +1560,13 @@ impl Vault {
 
 /// 실행하면 프로그램이 도는 파일 (열기 전에 묻는다) — file-kinds.js isProgramFile
 pub fn is_program_file(name: &str) -> bool {
-    const PROGRAM_EXT: [&str; 40] = [
+    const PROGRAM_EXT: [&str; 51] = [
         "exe", "msi", "msix", "appx", "appxbundle", "bat", "cmd", "com", "scr", "pif", "cpl", "msc", "ps1", "psm1", "vbs", "vbe", "js", "jse", "wsf", "wsh", "hta", "lnk", "url", "reg", "jar",
         "application", "appref-ms", "inf", "sct", "chm", "gadget", "ws", "settingcontent-ms",
         // 문제 해결사 · Excel 추가 기능 · 라이브러리 · 검색 바로가기 · 설치 패치 · Office 추가 기능 — 열면 코드가 돈다
         "diagcab", "xll", "library-ms", "search-ms", "msp", "mst", "vsto",
+        // 디스크 그림(열면 드라이브로 붙어 안의 파일이 인터넷 표시 없이 열린다) · 앱 설치 · 스크립트 · 바로가기
+        "iso", "img", "vhd", "vhdx", "appinstaller", "msixbundle", "py", "pyw", "wsc", "scf", "jnlp",
     ];
     // 끝의 점 · 빈칸은 뗀다 — Windows 는 "a.exe." 를 a.exe 로 연다 (그대로 보면 확장자가 없어 실행 경고를 건너뛰었다)
     let base = name.rsplit(['/', '\\']).next().unwrap_or("").split(['?', '#']).next().unwrap_or("").trim_end_matches(['.', ' ']);
@@ -1737,55 +1701,6 @@ mod tests {
     }
 
     #[test]
-    fn ai_events_add_reminders_and_seen_lines() {
-        let root = tmp();
-        let mut v = Vault::new(&root, "pc");
-        v.open().unwrap();
-        let id = v.create(None, None, "");
-        assert!(v.add_ai_events(&id, &[], &[]).unwrap().is_none(), "파일이 없는 메모는 아니다");
-        v.save(&id, "# 메모\n내일 3시 치과").unwrap();
-        let updated = v.get(&id).unwrap()["updated"].clone();
-        let r = json!({ "id": "r1", "kind": "at", "action": "notify", "enabled": true, "created": "2026-10-24T10:00:00+09:00", "at": "2026-10-25T15:00:00+09:00", "alerts": [10] });
-        let m = v.add_ai_events(&id, std::slice::from_ref(&r), &["내일 3시 치과".into()]).unwrap().unwrap();
-        assert_eq!((m["reminders"][0]["id"].clone(), m["aiEvents"].clone(), m["updated"].clone()), (json!("r1"), json!(["내일 3시 치과"]), updated));
-        let text = fs::read_to_string(root.join("메모.md")).unwrap();
-        assert!(text.contains("aiEvents:") && text.contains("id: r1"), "{text}");
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn ai_tags_write_body_and_meta_but_never_over_another_device() {
-        let root = tmp();
-        let mut v = Vault::new(&root, "pc");
-        v.open().unwrap();
-        let id = v.create(None, None, "");
-        v.save(&id, "# 메모\n치과 예약").unwrap();
-        let updated = v.get(&id).unwrap()["updated"].clone();
-        let m = v.set_ai_tags(&id, "# 메모\n치과 예약\n\n#병원", &["병원".into()]).unwrap().unwrap();
-        assert_eq!((m["aiTags"].clone(), m["updated"].clone()), (json!(["병원"]), updated));
-        let path = root.join("메모.md");
-        let text = fs::read_to_string(&path).unwrap();
-        assert!(text.contains("aiTags:") && text.contains("#병원"), "{text}");
-        assert!(!v.versions(&id).is_empty(), "태그 달기 전 글을 버전으로");
-        // 휴대폰에서 고친 글이 내려왔는데 아직 다시 읽기 전 — 사본을 만들지 않고 쓰지 않는다
-        let theirs = text.replace("치과 예약", "휴대폰에서 고침");
-        std::thread::sleep(std::time::Duration::from_millis(20));
-        fs::write(&path, &theirs).unwrap();
-        assert!(v.set_ai_tags(&id, "# 메모\n치과 예약\n\n#병원 #예약", &["병원".into(), "예약".into()]).unwrap().is_none());
-        assert_eq!(fs::read_to_string(&path).unwrap(), theirs);
-        assert_eq!(v.list().len(), 1, "사본 메모 없음");
-        assert_eq!(v.get(&id).unwrap()["aiTags"], json!(["병원"]), "되돌림");
-        // 잠긴 메모는 손대지 않는다
-        let locked = "---\nid: lk\ncolor: yellow\n---\n# 비밀\n\n<!-- memoking-lock v1 n=310000 s=AAAA i=BBBB c=CCCC== -->\n";
-        fs::write(root.join("비밀.md"), locked).unwrap();
-        let mut v = Vault::new(&root, "pc");
-        v.open().unwrap();
-        assert!(v.set_ai_tags("lk", "# 비밀\n\n#태그", &["태그".into()]).unwrap().is_none());
-        assert_eq!(fs::read_to_string(root.join("비밀.md")).unwrap(), locked);
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
     fn conflict_from_other_device_keeps_both() {
         let root = tmp();
         let mut v = Vault::new(&root, "pc");
@@ -1803,6 +1718,23 @@ mod tests {
         assert_eq!(copies.len(), 1, "들어온 글은 사본 메모로");
         assert!(copies[0]["title"].as_str().unwrap().starts_with("메모 (다른 기기 "));
         assert!(v.get(copies[0]["id"].as_str().unwrap()).unwrap()["body"].as_str().unwrap().contains("휴대폰에서 고침"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn non_utf8_change_on_disk_is_kept_as_copy() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let id = v.create(None, None, "");
+        v.save(&id, "# 메모\n처음").unwrap();
+        let path = root.join("메모.md");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(&path, b"# \xb8\xde\xb8\xf0\nother app text").unwrap(); // CP949 로 저장한 글
+        v.save(&id, "# 메모\nPC 에서 고침").unwrap();
+        let copies: Vec<Value> = v.list().into_iter().filter(|m| m["id"] != json!(id)).collect();
+        assert_eq!(copies.len(), 1, "읽지 못한 글자가 섞여도 사본으로 남긴다");
+        assert!(v.get(copies[0]["id"].as_str().unwrap()).unwrap()["body"].as_str().unwrap().contains("other app text"));
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -2011,6 +1943,25 @@ mod tests {
         assert!(text.contains("휴대폰 글") && text.contains("color: blue") && text.contains("pinned: true"));
         assert_eq!(v.list().len(), 1, "사본을 만들지 않는다");
         assert_eq!(v.scan().external, vec![id], "열린 화면에 알린다");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn move_keeps_other_device_text() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let id = v.create(None, None, "");
+        v.save(&id, "# 메모\n처음").unwrap();
+        assert!(v.move_to_folder(&id, "보관").unwrap());
+        assert!(v.scan().external.is_empty(), "이 기기가 옮긴 것만으로는 알리지 않는다");
+        // 휴대폰이 글을 고쳤는데 아직 다시 읽기 전에 PC 에서 폴더로 옮김
+        let file = root.join("보관/메모.md");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(&file, fs::read_to_string(&file).unwrap().replace("처음", "휴대폰 글")).unwrap();
+        assert!(v.move_to_folder(&id, "업무").unwrap());
+        assert_eq!(v.scan().external, vec![id.clone()], "옮긴 파일의 바뀐 글을 다시 읽는다");
+        assert_eq!(v.get(&id).unwrap()["body"].as_str().unwrap().trim_end(), "# 메모\n휴대폰 글");
         fs::remove_dir_all(root).unwrap();
     }
 

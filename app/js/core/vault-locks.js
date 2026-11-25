@@ -101,42 +101,6 @@ class LockMethods {
     return this.summary(entry);
   }
 
-  /**
-   * AI 가 뒤에서 단 태그 — 본문과 머리말 aiTags(단 태그, 없으면 [] = 이미 봄)를 쓴다. 쓰지 못했으면 되돌리고 null.
-   *   고친 시각 · 기기는 그대로 (모든 메모를 한 번에 태그해도 목록 순서가 바뀌거나 휴대폰에 "방금 고친 메모" 가 뜨지 않게)
-   */
-  setAiTags(id, body, names) {
-    const entry = this.entries.get(id);
-    if (!entry?.file || isLockedBody(entry.body)) return null;
-    const prev = metaSnapshot(entry.meta);
-    const known = entry.body;
-    entry.body = body;
-    entry.meta.extra = { ...entry.meta.extra, aiTags: names };
-    if (body !== known) this.keepVersion(id, known);
-    if (this.write(entry, known) !== true) {
-      entry.meta = prev;
-      entry.body = known;
-      return null;
-    }
-    this.changed([id]);
-    return this.get(id);
-  }
-
-  /** AI 가 글에서 찾은 일정을 더하고 본 줄(aiEvents)을 남긴다 — 머리말만, 고친 시각 그대로. 쓰지 못했으면 되돌리고 null */
-  addAiEvents(id, events, seen) {
-    const entry = this.entries.get(id);
-    if (!entry?.file || isLockedBody(entry.body)) return null;
-    const prev = metaSnapshot(entry.meta);
-    entry.meta.reminders = [...entry.meta.reminders, ...events];
-    entry.meta.extra = { ...entry.meta.extra, aiEvents: seen };
-    if (this.write(entry) !== true) {
-      entry.meta = prev;
-      return null;
-    }
-    this.changed([id]);
-    return this.get(id);
-  }
-
   /** 색·고정·표 크기·그림 — 머리말만 쓴다. 쓰지 못했으면 되돌리고 null */
   setMeta(id, patch) {
     const entry = this.entries.get(id);

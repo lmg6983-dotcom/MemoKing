@@ -185,7 +185,6 @@ fn kept_share(a: &str, b: &str) -> f64 {
 
 // ---------- ai-tags.js ----------
 
-pub const MIN_AI_TEXT: usize = 20; // 이보다 짧은 메모(인사 · 한 줄 대답)에는 저절로 달지 않는다 (글자 수, 빈칸 빼고)
 const VAGUE: &[&str] = &["메모", "기타", "일반", "내용", "정리", "확인", "공지", "참고", "질문", "답변", "대화", "인사"];
 
 pub struct TagRequest {

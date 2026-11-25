@@ -39,7 +39,7 @@ setCopyHost({
   share: async (f) => ((await call('shareContent', f)) ? 'shared' : 'cancelled'),
 });
 import { fetchRemoteImage } from './web-fetch.js';
-import { openSheet, closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
+import { closeSheet, adoptSheet, releaseSheet, toast, matchChrome, isTwoPane } from './ui.js';
 import * as recorder from './recorder.js';
 import { setupAnnotation } from '../../app/js/ink-annotate.js';
 import { autoTagsFor } from '../../app/js/core/auto-tags.js';
@@ -886,7 +886,7 @@ export function setKeyboard(open) {
 }
 
 // 키보드 단추 (펜을 쓰는 기기, 글 고치기): S펜으로 쓰는 중에도 키보드로 치고 싶을 때. 한 번 더 누르면 넣는다
-export function toggleKeyboard() {
+function toggleKeyboard() {
   if (!editor) return;
   if (el.screen.classList.contains('keyboard')) {
     native.showKeyboard?.(false);

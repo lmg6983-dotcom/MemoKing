@@ -15,12 +15,6 @@ export function punctuate(part) {
   return t;
 }
 
-/** 받아쓰기 엔진의 낱말 조각 → 글: ▁ 가 낱말 경계 (sherpa-onnx WebAssembly 판의 text 는 띄어쓰기가 빠진다) */
-export function tokensToText(tokens, fallback = '') {
-  if (!tokens?.length) return String(fallback ?? '').trim();
-  return tokens.join('').replace(/▁/g, ' ').replace(/\s+([.?!,])/g, '$1').replace(/\s+/g, ' ').trim();
-}
-
 /** @param {{ text: string, speaker?: number }[]} lines → "화자 1: …\n…" */
 export function joinTranscript(lines) {
   const list = (lines ?? []).filter((l) => String(l?.text ?? '').trim());

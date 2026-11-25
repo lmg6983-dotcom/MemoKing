@@ -27,10 +27,15 @@ pub const FULL_SCAN_MS: i64 = 15 * 60_000;
 pub const CONCURRENCY: usize = 4;
 const JUNK: [&str; 3] = ["desktop.ini", "thumbs.db", ".ds_store"];
 
-/// 맞추지 않는 이름. / \ : 가 든 이름도 — Drive 에서는 쓸 수 있어, 그대로 경로로 이으면 메모 폴더 밖(x/../../a, C:\…)에 쓰게 된다
+/// 맞추지 않는 이름. / \ : 가 든 이름도 — Drive 에서는 쓸 수 있어, 그대로 경로로 이으면 메모 폴더 밖(x/../../a, C:\…)에 쓰게 된다.
+///   Windows 에서 못 쓰는 이름(? " * < > | · 끝의 점 · 빈칸 · con 같은 장치 이름)도 — 내려받다 실패하면 그 차례 동기화가 통째로 멈췄다
 ///   (메모킹이 만드는 이름에는 없다 — title_to_file_name)
 pub fn skip_name(name: &str) -> bool {
-    name.starts_with('.') || name.starts_with("~$") || name.ends_with(".tmp") || name == "desktop.ini" || name == "Thumbs.db" || name.contains(['/', '\\', ':'])
+    let lower = name.to_lowercase();
+    let stem = lower.split('.').next().unwrap_or_default().trim_end();
+    let device = matches!(stem, "con" | "prn" | "aux" | "nul") || ((stem.starts_with("com") || stem.starts_with("lpt")) && stem.len() == 4 && stem.as_bytes()[3].is_ascii_digit());
+    name.starts_with('.') || name.starts_with("~$") || name.ends_with(".tmp") || lower == "desktop.ini" || lower == "thumbs.db" || device || name.ends_with(['.', ' '])
+        || name.chars().any(|c| matches!(c, '/' | '\\' | ':' | '?' | '"' | '*' | '<' | '>' | '|') || c.is_control())
 }
 
 pub fn skip_path(rel: &str) -> bool {
@@ -896,8 +901,11 @@ mod tests {
 
     #[test]
     fn names_that_leave_the_memo_folder_are_skipped() {
-        for bad in ["x/../../evil.md", r"C:\Users\a\Startup\evil.bat", r"..\evil.md", "a:b.md", ".."] {
+        for bad in ["x/../../evil.md", r"C:\Users\a\Startup\evil.bat", r"..\evil.md", "a:b.md", "..", "a?b.md", "x\"y.md", "con.md", "COM1.txt", "끝 점.", "끝 빈칸 ", "THUMBS.DB", "a\tb.md"] {
             assert!(skip_name(bad), "{bad}");
+        }
+        for ok in ["회의 3시.md", "console.md", "com.md", "comma.md", "a.b.c.md"] {
+            assert!(!skip_name(ok), "{ok}");
         }
         assert!(skip_path("업무/x:y.md") && !skip_path("업무/회의 3시.md") && !user_dir(r"C:\evil"));
     }

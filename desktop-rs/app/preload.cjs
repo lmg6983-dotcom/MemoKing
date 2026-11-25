@@ -8,7 +8,7 @@ const EVENTS = [
   'drag:state', 'ghost:data', 'ghost:visible', 'ghost:drop',
   'reminders:changed', 'memo:reminders', 'memo:alarm', 'history:changed', 'list:tab', 'memo:highlight',
   'stack:state', 'stack:hover', 'memo:handoff', 'inbox:taken', 'drive:status', 'ghost:mode', 'tutorial:step', 'tutorial:finished', 'capture:image', 'memo:layer', 'sticker:hover', 'list:on-top', 'list:crown-docked',
-  'stt:status', 'ai:status', 'ai:notice', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
+  'stt:status', 'ai:status', 'ai:token', 'ai:progress', 'stt:line', 'stt:speaking', 'stt:speakers', 'hud:show', 'hud:hide', 'keymap:changed', 'stack:activating', 'stack:leaving', 'update:state', 'update:available', 'update:ready', 'mode:changed',
   'bubble:show', 'bubble:hide', 'status-bubble:gone', 'memo:command', 'edit:paste-plain', 'edit:clear-format',
   'media:converting', 'media:ready',
   'secret:changed', 'secret:ask', // 비밀 폴더: 연 폴더 · 그 안 메모 카드 (desktop-rs/app/src/secret.rs) // PC Rust 판만 보낸다: HEVC 영상의 H.264 사본 (desktop-rs/app/src/video.rs)
@@ -63,7 +63,6 @@ contextBridge.exposeInMainWorld('memoking', {
     links: invoke('memo:links'),
     link: invoke('memo:link'),
     versions: invoke('memo:versions'),
-    version: invoke('memo:version'),
     restoreVersion: invoke('memo:restore-version'),
   },
   // 예약 알림
@@ -132,7 +131,6 @@ contextBridge.exposeInMainWorld('memoking', {
     reset: invoke('keymap:reset'),
     openWindow: invoke('keymap:open-window'),
   },
-  // 휴지통 (지운 메모)
   // 창을 닫으며 저장하지 못해 따로 남긴 글 (ipc-handlers memo:save-sync) — 몇 개인지 · 메모로 되살리기 → 되살린 수
   recovered: { count: invoke('recovered:count'), restore: invoke('recovered:restore') },
   // 비밀 폴더 (desktop-rs/app/src/secret.rs) — 열쇠는 메모킹이 메모리에만, 목록을 닫거나 5분 쉬면 잠긴다
@@ -149,6 +147,7 @@ contextBridge.exposeInMainWorld('memoking', {
   },
   // 충돌 사본 비교: get(사본 id) → { copy, original } | null · resolve(사본 id, 'copy' | 'original') → { ok, message }
   conflict: { get: invoke('conflict:get'), resolve: invoke('conflict:resolve') },
+  // 휴지통 (지운 메모)
   trash: {
     list: invoke('trash:list'),
     restore: invoke('trash:restore'),
@@ -186,14 +185,10 @@ contextBridge.exposeInMainWorld('memoking', {
     importModel: invoke('ai:import'),
     downloadDefault: invoke('ai:download-default'), // 기본 모델(core/model-catalog.js) 받기 — 진행은 ai:status 의 progress
     cancelDownload: invoke('ai:cancel-download'), // 받기 멈추기 (받던 것은 버림)
-    notice: invoke('ai:notice'), // 메모에 AI 가 뒤에서 한 일 { text } | null (매직키 다듬기 · 일정 자동 등록)
-    noticeUndo: invoke('ai:notice-undo'), // → { ok, message }
-    noticeDismiss: invoke('ai:notice-dismiss'),
     remove: invoke('ai:remove'),
     try: invoke('ai:try'),
     write: invoke('ai:write'), // { id, task: 'spell' | 'style' | 'draft', … } — 조각은 ai:token · ai:progress 로
     cancel: invoke('ai:cancel'),
-    ask: invoke('ai:ask'), // { id, question } → { text, sources: [{ id, title, via }] } — 조각은 ai:token, 색인은 ai:progress
     agent: invoke('ai:agent'), // 매직 에이전트 { id, text } → 답 { kind: 'answer' | 'summary', … } | 확인 카드 { kind: 'confirm', action }
     agentRun: invoke('ai:agent-run'), // 확인한 일 실행 (action) → { ok, id, message }
   },
@@ -220,22 +215,19 @@ contextBridge.exposeInMainWorld('memoking', {
     preview: invoke('link:preview'),
     open: invoke('link:open'),
   },
-  // 메모를 PDF 로
-  // 메모를 그림 카드로: copy(base64) · save(메모 id, base64) → { file, name } | { cancelled }
   // 메모킹 Work / Life: 지금 모드 정하기 (읽기는 settings.get().mode)
   mode: { set: invoke('mode:set'), setHours: invoke('mode:hours'), setWorkLife: invoke('mode:work-life') },
+  // 메모를 그림 카드로: copy(base64) · save(메모 id, base64) → { file, name } | { cancelled }
   image: {
     copy: invoke('image:copy'),
     save: invoke('image:save'),
   },
+  // 메모를 PDF 로
   pdf: {
     open: invoke('pdf:open'),
     memo: invoke('pdf:memo'),
     save: invoke('pdf:save'),
   },
-  // 왕관 스티커 창: 왕관 위 마우스, 눌러서 떼기
-
-
   // 영역 캡처 오버레이 (Ctrl+Alt+C 두 번)
   capture: {
     done: invoke('capture:done'),
@@ -255,7 +247,6 @@ contextBridge.exposeInMainWorld('memoking', {
     newTab: invoke('stack:new-tab'),
     remove: invoke('stack:remove'),
     removeHidden: invoke('stack:remove-hidden'), // 탭 닫기: 옆 탭을 보이고 이 창은 숨긴다 (저장을 마치면 win:close)
-    detach: invoke('stack:detach'),
     tearStart: invoke('stack:tear-start'),
     tearMove: (x, y) => ipcRenderer.send('stack:tear-move', { x, y }),
     tearEnd: (x, y) => ipcRenderer.invoke('stack:tear-end', x == null ? null : { x, y }),
@@ -284,7 +275,6 @@ contextBridge.exposeInMainWorld('memoking', {
     // 닫는 중인데 문서를 PDF 로 바꾸느라 숨은 채 기다린다 — 그사이 같은 메모를 열면 이 창을 다시 보인다 (close:cancel)
     closeBusy: invoke('win:close-busy'),
     hideForClose: invoke('win:hide-closing'), // 닫기 전에 창(스택이면 탭 모두)부터 숨긴다
-    dimTitlebar: invoke('win:dim-titlebar'),
     toggleListTop: invoke('list:toggle-top'),
     listOnTop: invoke('list:on-top'),
     listCrownDocked: invoke('list:crown-docked'), // 왕관이 스티커 대신 제목 줄 작은 왕관으로 들어가 있는가

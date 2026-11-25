@@ -126,7 +126,7 @@ class SyncEngineTest {
     @Test
     fun driveNamesThatLeaveTheMemoFolderAreSkipped() {
         // Drive 에서 이름을 x/../../a 나 C:\… 로 바꾼 파일: 메모 폴더 밖에 쓰지 않고, 동기화도 멈추지 않는다 (PC 와 같음)
-        for ((i, bad) in listOf("x/../../evil.md", "C:\\evil.md", "a:b.md").withIndex()) {
+        for ((i, bad) in listOf("x/../../evil.md", "C:\\evil.md", "a:b.md", "a?b.md", "con.md", "끝 점.").withIndex()) {
             drive.files["bad$i"] = FakeDrive.F("bad$i", bad, "ROOT", false, "bad".toByteArray())
         }
         drive.put("좋은.md", "# 좋은")
