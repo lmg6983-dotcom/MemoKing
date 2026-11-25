@@ -1,11 +1,12 @@
 // AI 받은함 (_memoking/AI 받은함 Google 시트) — AI(Gemini 등)가 메모를 만들고 고치는 단 하나의 창구.
 //   desktop-rs/core/src/sheet_inbox.rs 와 같은 규칙 (tests/parity.rs sheet_inbox). 시트는 CSV 로 내려받고 CSV 로 덮어쓴다 (drive.file 권한만)
-//   7열: req_id · action(create · append · replace · trash) · memo_id · folder · body · find · status
+//   8열: req_id · action(create · append · replace · trash) · memo_id · folder · color · body · find · status
 //   AI 가 status 를 pending 으로 적으면, 켜져 있는 기기 한 대(devices.js inboxLeader)가 처리하고 done (<memo_id>) · error: <까닭> 으로 바꾼다
 import { cleanFolderName } from './folders.js';
+import { COLORS, DEFAULT_COLOR } from './memo-file.js';
 
 export const SHEET_NAME = 'AI 받은함';
-export const COLUMNS = ['req_id', 'action', 'memo_id', 'folder', 'body', 'find', 'status'];
+export const COLUMNS = ['req_id', 'action', 'memo_id', 'folder', 'color', 'body', 'find', 'status'];
 export const BATCH = 20; // 한 차례에 처리하는 요청 수
 export const KEEP_DONE = 20; // 처리를 마친 줄은 최근 이만큼만
 
@@ -55,7 +56,7 @@ export function toCsv(rows) {
   return rows.map((r) => `${r.map(cell).join(',')}\r\n`).join('');
 }
 
-/** 시트 CSV → 줄들 { req_id … status }. 첫 줄에 req_id 가 있으면 머리 줄로 보고 열 이름으로(열 차례가 바뀌어도), 아니면 7열 차례대로 (모르는 열은 버린다) */
+/** 시트 CSV → 줄들 { req_id … status }. 첫 줄에 req_id 가 있으면 머리 줄로 보고 열 이름으로(열 차례가 바뀌어도), 아니면 8열 차례대로 (모르는 열은 버린다) */
 export function rowsFromCsv(text) {
   const cells = parseCsv(text);
   const header = (cells[0] ?? []).map((c) => c.trim().toLowerCase());
@@ -75,7 +76,7 @@ const isPending = (r) => r.status.trim().toLowerCase() === 'pending';
 /**
  * 처리할 줄 (최대 BATCH 개): [{ index, job } | { index, error }]
  *   status 가 pending 인 줄만. 이미 처리한(또는 이번에 앞에서 본) req_id 는 거절해 같은 요청을 두 번 하지 않는다
- *   job: { action: 'create', folder, body } | { action: 'append', memoId, body } | { action: 'replace', memoId, find, body } | { action: 'trash', memoId }
+ *   job: { action: 'create', folder, color, body } | { action: 'append', memoId, body } | { action: 'replace', memoId, find, body } | { action: 'trash', memoId }
  */
 export function plan(rows) {
   const seen = new Set(rows.filter((r) => !isPending(r)).map((r) => r.req_id.trim()));
@@ -104,7 +105,10 @@ function jobOf(r) {
     const raw = r.folder.trim();
     const folder = cleanFolderName(raw);
     if (/[/\\]|\.\./.test(raw) || raw.toLowerCase().includes('_memoking') || (raw && !folder)) return { error: '쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)' };
-    return { job: { action, folder, body } };
+    const rawColor = String(r.color ?? '').trim().toLowerCase();
+    if (rawColor && !COLORS.includes(rawColor)) return { error: `쓸 수 없는 color 예요 (${COLORS.join(' · ')} 중 하나)` };
+    const color = rawColor || DEFAULT_COLOR;
+    return { job: { action, folder, color, body } };
   }
   if (action === 'append') {
     const bad = needMemo();

@@ -261,7 +261,7 @@ export class Vault extends EventTarget {
   applySheetJob(job) {
     if (job.action === 'create') {
       if (isLockedBody(job.body)) return { error: '잠금 형식 글은 만들 수 없어요' };
-      const id = this.create({ folder: job.folder });
+      const id = this.create({ folder: job.folder, color: job.color });
       if (this.save(id, job.body)?.refused) {
         this.entries.delete(id);
         return { error: '저장하지 못했어요' };
@@ -337,7 +337,7 @@ export class Vault extends EventTarget {
     return [...this.entries.values()]
       .filter((e) => e.file)
       .map((e) => this.summary(e))
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0));
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || (a.pinned && b.pinned ? (Date.parse(b.pinnedAt) || 0) - (Date.parse(a.pinnedAt) || 0) : 0) || (Date.parse(b.updated) || 0) - (Date.parse(a.updated) || 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 
   search(query, excludeId = null) {

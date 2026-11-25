@@ -290,6 +290,8 @@ body:has(#note-screen:not([hidden])) .hint-bubble.bottom { bottom: calc(150px + 
 .card-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; }
 .card-badge svg { width: 13px; height: 13px; }
 .card-preview {
+  flex: none;
+  width: 100%;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;

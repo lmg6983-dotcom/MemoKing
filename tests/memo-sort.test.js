@@ -58,3 +58,13 @@ test('정렬: 수정 시각이 같으면 늦게 만든 메모가 앞', () => {
   ];
   assert.equal(sortMemos(same).map((m) => m.id).join(''), 'ba');
 });
+
+test('정렬: 시각이 완전히 같아도 입력 순서에 따라 흔들리지 않는다 (id 순)', () => {
+  const same = [
+    { id: 'c', title: '가', updated: '2026-11-23T16:56:00+09:00' },
+    { id: 'a', title: '가', updated: '2026-11-23T16:56:00+09:00' },
+    { id: 'b', title: '가', updated: '2026-11-23T16:56:00+09:00' },
+  ];
+  assert.deepEqual(sortMemos(same, 'updated').map((m) => m.id), ['a', 'b', 'c']);
+  assert.deepEqual(sortMemos([...same].reverse(), 'updated').map((m) => m.id), ['a', 'b', 'c']);
+});
