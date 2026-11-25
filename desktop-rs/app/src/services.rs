@@ -531,7 +531,8 @@ fn download_update(app: &AppHandle) {
 
 /// 지금 재시작: 쓰던 메모를 저장하고 설치 → 다시 켬
 fn install_update(app: &AppHandle) -> bool {
-    let Some((up, bytes)) = updates(|u| if u.state["status"] == "ready" { u.update.clone().zip(u.bytes.clone()) } else { None }) else { return false };
+    // 받은 설치 파일은 먼저 부른 쪽이 가져간다 — 받은 뒤 저절로 하는 설치와 "지금 재시작" 이 겹쳐 설치를 두 번 띄우지 않게
+    let Some((up, bytes)) = updates(|u| if u.state["status"] == "ready" { u.update.clone().filter(|_| u.bytes.is_some()).map(|up| (up, u.bytes.take().unwrap())) } else { None }) else { return false };
     let labels: Vec<String> = state(app).note_labels.lock().unwrap().values().cloned().collect();
     for l in labels {
         if let Some(w) = app.get_webview_window(&l) {

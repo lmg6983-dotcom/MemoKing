@@ -15,15 +15,24 @@ const SETTLE: Duration = Duration::from_secs(30);
 
 /// 이 PC 에서 Google Drive 데스크탑 앱이 보여 주는 그 Drive 폴더 (내 드라이브 바로 아래만 — "메모킹 동기화" 가 거기 있다)
 ///   스트리밍 방식은 드라이브 문자(G:\내 드라이브), 미러링 방식은 사용자 폴더(C:\Users\…\내 드라이브)
+///   찾은 답은 5분 기억한다 — 동기화(10초마다)마다 A: ~ Z: 를 훑으면 끊긴 네트워크 드라이브에서 몇 초씩 멈춘다
 pub fn mirror_of(folder_name: &str) -> Option<PathBuf> {
+    static FOUND: std::sync::Mutex<Option<(std::time::Instant, String, Option<PathBuf>)>> = std::sync::Mutex::new(None);
     if !cfg!(windows) || folder_name.is_empty() {
         return None;
+    }
+    if let Some((at, name, found)) = FOUND.lock().unwrap().as_ref() {
+        if name == folder_name && at.elapsed() < Duration::from_secs(5 * 60) {
+            return found.clone();
+        }
     }
     let mut roots: Vec<PathBuf> = ('A'..='Z').map(|l| PathBuf::from(format!("{l}:\\"))).collect();
     if let Some(home) = std::env::var_os("USERPROFILE") {
         roots.push(PathBuf::from(home));
     }
-    roots.iter().flat_map(|r| ["내 드라이브", "My Drive"].map(|d| r.join(d).join(folder_name))).find(|p| p.is_dir())
+    let found = roots.iter().flat_map(|r| ["내 드라이브", "My Drive"].map(|d| r.join(d).join(folder_name))).find(|p| p.is_dir());
+    *FOUND.lock().unwrap() = Some((std::time::Instant::now(), folder_name.into(), found.clone()));
+    found
 }
 
 /// 폴더 안의 .md (메모킹 폴더 기준 경로 · 고친 때) — _memoking · 첨부 · 임시 파일은 빼고
