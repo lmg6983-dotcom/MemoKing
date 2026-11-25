@@ -1,6 +1,6 @@
 //! 기기 상태 (_memoking/기기/<이름> (<id>).md) — app/js/core/devices.js 와 같은 규칙 (tests/parity.rs devices)
 //!   기기마다 마지막 동기화 · 메모 폴더 · PC 다리 · 최근 오류를 적어 다른 기기 · AI 가 보게 하고,
-//!   받은 메모 빈 칸을 옮길 한 기기를 정한다 (켜져 있는 PC 먼저, 이름 차례로 첫째)
+//!   AI 받은함 시트를 처리할 한 기기를 정한다 (켜져 있는 PC 먼저, 이름 차례로 첫째)
 use crate::memo_file::title_to_file_name;
 use chrono::TimeZone;
 
@@ -74,7 +74,7 @@ pub fn parse_device(text: &str) -> Option<Seen> {
     })
 }
 
-/// 받은 메모 빈 칸을 이 기기가 옮길 차례인가 — others: (기기 파일 이름, kind, alive)
+/// AI 받은함 시트를 이 기기가 처리할 차례인가 — others: (기기 파일 이름, kind, alive)
 pub fn inbox_leader(others: &[(String, String, i64)], me_file: &str, me_kind: &str, now: i64) -> bool {
     let mut live: Vec<(&str, &str)> = others.iter().filter(|(f, _, a)| f != me_file && now - a <= ALIVE_MS).map(|(f, k, _)| (f.as_str(), k.as_str())).collect();
     live.push((me_file, me_kind));

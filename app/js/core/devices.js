@@ -1,7 +1,7 @@
 // 기기 상태 (_memoking/기기/<이름> (<id>).md) — 순수 함수 (Rust: core/src/devices.rs)
 //   기기마다 자기 파일에 마지막 동기화 · 메모 폴더 · PC 다리 · 최근 오류를 적는다 → 이 파일도 동기화되니
 //   다른 기기 · AI 가 "제1 PC 3분 전 동기화 · PC 다리 켜짐" 을 볼 수 있다.
-//   받은 메모 빈 칸은 한 기기만 옮긴다(inboxLeader): 켜져 있는 PC 가 먼저, 없으면 휴대폰 — 이름 차례로 첫째
+//   AI 받은함 시트는 한 기기만 처리한다(inboxLeader): 켜져 있는 PC 가 먼저, 없으면 휴대폰 — 이름 차례로 첫째
 import { titleToFileName } from './memo-file.js';
 
 export const DEVICES_DIR = '_memoking/기기';
@@ -58,7 +58,7 @@ export function parseDevice(text) {
 }
 
 /**
- * 받은 메모 빈 칸을 이 기기가 옮길 차례인가 — 켜져 있는(ALIVE_MS 안) 기기 가운데 PC 가 먼저, 이름 차례로 첫째.
+ * AI 받은함 시트를 이 기기가 처리할 차례인가 — 켜져 있는(ALIVE_MS 안) 기기 가운데 PC 가 먼저, 이름 차례로 첫째.
  *   me 도 늘 켜져 있는 것으로 넣는다 (내 파일이 아직 Drive 에 없어도)
  * @param {Array<{ file: string, kind: string, alive: number }>} devices file: 기기 파일 이름
  */

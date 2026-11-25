@@ -29,7 +29,6 @@ import { noThink, sseText, engineError, chatBody } from '../../app/js/core/llama
 import { spellMessages, styleMessages, draftMessages, cleanWriteOutput, plausibleFix } from '../../app/js/core/ai-write.js';
 import { aiTagRequest, aiTagResult } from '../../app/js/core/ai-tags.js';
 import { chunkMemo, askedPeriod, buildIndex as ragBuildIndex, retrieve as ragRetrieve, expandMessages, expandResult, ragMessages, finishAnswer } from '../../app/js/core/rag.js';
-import * as inbox from '../../app/js/core/inbox.js';
 import * as sheet from '../../app/js/core/sheet-inbox.js';
 import * as dev from '../../app/js/core/devices.js';
 import { corpus, yamlStrings, indexSets } from './corpus.mjs';
@@ -623,9 +622,6 @@ write('ai_events', aeBodies.flatMap((body) => aeNows.map((iso) => {
   };
 })));
 
-// 받은 메모 빈 칸 — 칸 글 → 옮길 메모
-const slotTexts = [inbox.SLOT_TEXT, '', '  \n', `${inbox.SLOT_TEXT}# 날씨\n맑음`, '# 회의\r\n본문 #업무', '---\ncolor: blue\nid: x\n---\n# 회의\n본문', '---\ncolor: red\n---\n본문만', '---\n---\n', '\ufeff# BOM 메모', `${inbox.SLOT_TEXT.trim()}\n\n  `];
-write('inbox', [...slotTexts.map((text) => ({ text, memo: inbox.slotMemo(text) })), ...[1, 7, 100].map((n) => ({ n, name: inbox.slotName(n) }))]);
 
 // AI 받은함 시트 — CSV 읽기 · 쓰기, 처리할 줄 고르기, 결과 적기 · 오래된 줄 정리, 한 번만 바꾸기 · 덧붙이기
 const sheetCsvs = [
@@ -653,7 +649,7 @@ write('sheet_inbox', [
   ...[['# 제목\n본문\n\n', '  더  '], ['', '첫 줄'], ['본문', '']].map(([body, add]) => ({ kind: 'append', body, add, out: sheet.appendText(body, add) })),
 ]);
 
-// 기기 상태 파일 · 빈 칸 담당
+// 기기 상태 파일 · 받은 메모(AI 받은함) 담당
 const devNow = 1_795_000_000_000;
 const devs = [
   { name: 'DESKTOP-AB12', kind: 'pc', alive: devNow - 60_000, lastSync: devNow - 120_000, folder: 'C:\\Users\\a\\Documents\\메모킹', bridge: 'G:\\내 드라이브\\메모킹 동기화', error: '' },
