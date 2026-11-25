@@ -1685,13 +1685,13 @@ mod tests {
             m.created = Some(if i == 2 { "2026-10-02T00:00:00Z" } else { "2026-10-01T00:00:00Z" }.into());
         }
         let order = |v: &Vault| v.list().iter().map(|m| m["id"].as_str().unwrap().to_string()).collect::<Vec<_>>();
-        let mut rest = vec![ids[0].clone(), ids[1].clone()];
+        let mut rest = [ids[0].clone(), ids[1].clone()];
         rest.sort();
         let want = vec![ids[2].clone(), rest[0].clone(), rest[1].clone()];
         for _ in 0..8 {
             assert_eq!(order(&v), want);
-            let rebuilt: HashMap<_, _> = v.entries.drain().collect(); // 다시 읽을 때처럼 새 HashMap
-            v.entries = rebuilt;
+            let old = std::mem::take(&mut v.entries);
+            v.entries = old.into_iter().collect(); // 다시 읽을 때처럼 새 HashMap
         }
         fs::remove_dir_all(root).unwrap();
     }
