@@ -415,8 +415,10 @@ impl Vault {
         // 날짜 읽기는 메모마다 한 번 (비교마다 읽으면 2,000개에 4만 번)
         // 상단 고정은 나중에 고정한 것이 위 (memo-sort.js 와 같음)
         let pinned_at = |e: &Entry| e.meta.extra.get("pinnedAt").and_then(Value::as_str).and_then(time::parse_js_date).map_or(0, |d| d.timestamp_millis());
-        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(if e.meta.pinned { pinned_at(e) } else { 0 }), std::cmp::Reverse(t(e)), e.id.clone()));
-        list // 수정 시각이 같아도 id 순으로 늘 같은 자리 (entries 는 HashMap 이라 다시 읽을 때마다 순서가 달라진다)
+        let created = |e: &Entry| e.meta.created.as_deref().and_then(time::parse_js_date).map_or(0, |d| d.timestamp_millis());
+        // 수정 시각이 같으면 만든 시각 · id 순으로 늘 같은 자리 (entries 는 HashMap 이라 다시 읽을 때마다 순서가 달라진다)
+        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(if e.meta.pinned { pinned_at(e) } else { 0 }), std::cmp::Reverse(t(e)), std::cmp::Reverse(created(e)), e.id.clone()));
+        list
     }
 
     pub fn entry(&self, id: &str) -> Option<&Entry> {
@@ -1663,6 +1665,34 @@ mod tests {
             assert!(v.entry(&a).is_some() && !changed.removed.contains(&a), "못 읽은 폴더의 메모는 그대로");
         }
         assert!(v.entry(&b).is_some());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    // 수정 시각이 같은 메모는 폴더를 다시 읽어도(HashMap 이 새로 만들어져도) 늘 같은 자리: 만든 시각이 늦은 것이 앞, 같으면 id 순
+    #[test]
+    fn same_updated_keeps_a_stable_order() {
+        let root = tmp();
+        let mut v = Vault::new(&root, "pc");
+        v.open().unwrap();
+        let ids: Vec<String> = ["가", "나", "다"].iter().map(|t| {
+            let id = v.create(None, None, "");
+            v.save(&id, &format!("# {t}")).unwrap();
+            id
+        }).collect();
+        for (i, id) in ids.iter().enumerate() {
+            let m = &mut v.entries.get_mut(id).unwrap().meta;
+            m.updated = Some("2026-10-01T00:00:00Z".into());
+            m.created = Some(if i == 2 { "2026-10-02T00:00:00Z" } else { "2026-10-01T00:00:00Z" }.into());
+        }
+        let order = |v: &Vault| v.list().iter().map(|m| m["id"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+        let mut rest = vec![ids[0].clone(), ids[1].clone()];
+        rest.sort();
+        let want = vec![ids[2].clone(), rest[0].clone(), rest[1].clone()];
+        for _ in 0..8 {
+            assert_eq!(order(&v), want);
+            let rebuilt: HashMap<_, _> = v.entries.drain().collect(); // 다시 읽을 때처럼 새 HashMap
+            v.entries = rebuilt;
+        }
         fs::remove_dir_all(root).unwrap();
     }
 
