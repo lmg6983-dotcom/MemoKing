@@ -532,7 +532,6 @@ body.is-dragging .folder-side .mf-more, body.is-dragging .folder-side .mf-new { 
 }
 .folder-side .mf-new:hover { background: color-mix(in srgb, var(--text) 6%, var(--bg)); color: var(--text); }
 .folder-side .mf-new:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.memos-col > .folder-chips { margin: 0 12px 6px; }
 .toolbar .folder-btn[hidden] { display: none; }
 .toolbar .folder-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); }
 /* 펴져 있을 때는 그림만 진하게 (큰 회색 바탕은 옆 단추들보다 무거웠다) */
@@ -853,7 +852,6 @@ body.is-dragging .card:hover { transform: none; }
 /* 글 왼쪽 · 단추 오른쪽 (스위치와 같은 자리) */
 .setting-row > .btn { flex: none; margin-left: auto; }
 div.setting-row { cursor: default; }
-.setting-row .inline-link { padding: 0 2px; font-size: inherit; color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 
 /* ---------- v0.18.0: 지운 뒤 되돌리기 (묻지 않고 바로 휴지통으로) ---------- */
 .undo-bar {
@@ -944,26 +942,11 @@ body:not([data-tab="memos"]) .fab, body:not([data-tab="memos"]) .fab-menu, body:
 button.noti-text { display: block; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .noti-meta, .noti-title { display: block; }
 
-/* 전역 단축키 바꾸기 (설정 › 매직 카피 · MagicKey 아래) */
-.shortcut-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -6px 0 14px 20px; font-size: 12.5px; color: var(--muted); }
-.kbd-btn {
-  min-width: 96px;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text-strong);
-  font: 600 12.5px/1 var(--font-sans);
-  cursor: pointer;
-}
-@media (hover: hover) and (pointer: fine) { .kbd-btn:hover { border-color: var(--text-strong); } }
-.kbd-btn.capturing { border-color: var(--brand-yellow); box-shadow: 0 0 0 2px var(--brand-yellow); color: var(--text); }
 .sc-note { flex-basis: 100%; font-size: 12px; color: var(--muted); }
 /* 이름 · 한 줄 설명 왼쪽, 단추 오른쪽 (단축키 › 메모 목록 열기 · 함께 쓰는 앱) */
 .setting-row.split { cursor: default; }
 .setting-row.split > span { flex: 1; min-width: 0; }
-.setting-row.split > :is(.kbd-btn, .btn) { flex: none; }
+.setting-row.split > .btn { flex: none; }
 .setting-row.split a.btn { color: var(--text); text-decoration: none; }
 .sc-note:empty { display: none; }
 .sc-note.warn { color: var(--danger); }

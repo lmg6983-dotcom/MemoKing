@@ -38,7 +38,7 @@ import { stepZoom, clampZoom, zoomLabel } from './core/zoom.js';
 import { attachSlider } from './seg-slider.js';
 import { reduceMotion, tabKeys, syncTabStops, radioGroups, stackCards, withViewTransition, setModeSwitch, swipeDismiss, EASE_OUT, slideSide, busyWhile, busyUntilBlur } from './dom.js';
 import { UI } from './core/ui-text.js';
-import { renderFolderList, askFolderName, pickFolder, createPickBar, openFolderSheet, pinItem } from './folder-ui.js';
+import { renderFolderList, askFolderName, pickFolder, createPickBar, pinItem } from './folder-ui.js';
 import { askSecretPassword, askNewSecretPassword, pickSecretFolder } from './secret-ui.js';
 import { folderList, movedText, UNFILED, UNFILED_LABEL, memosInFolder, withUnfiled } from './core/folders.js';
 
@@ -77,7 +77,6 @@ const el = {
   tagFilter: $('tag-filter'),
   folderSide: $('folder-side'),
   folderBtn: $('folder-btn'),
-  folderChips: $('folder-chips'),
   filterSummary: $('filter-summary'),
   filterSummaryText: $('filter-summary-text'),
 };
@@ -446,14 +445,6 @@ function applyFolderSide() {
   el.folderBtn.hidden = (document.body.dataset.tab ?? 'memos') !== 'memos'; // 폴더는 메모에만 (일정 · 보관함에는 쓸 데가 없다)
   el.folderBtn.setAttribute('aria-pressed', String(sideWanted));
   el.folderBtn.title = sideWanted ? '폴더 목록 접기' : '폴더 목록 펴기';
-}
-
-// anchor: 누른 단추 (그 바로 아래에 폴더 목록)
-async function openFolderPicker(anchor = el.folderBtn) {
-  const picked = await openFolderSheet({ folders: [...withUnfiled(currentFolders(), modeMemos()), ...secretFolders()], current: state.folder, onMenu: folderMenu, anchor });
-  if (picked == null) return;
-  if (typeof picked === 'object') return createAndOpenFolder(picked.create);
-  setFolder(picked);
 }
 
 // 접고 펼 때 목록이 옆에서 미끄러져 나오고 들어간다 (카드 자리도 함께 밀린다 — 툭 바뀌지 않게)

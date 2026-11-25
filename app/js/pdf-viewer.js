@@ -28,7 +28,6 @@ export const closePdfViewer = () => {
   current();
   return true;
 };
-export const pdfViewerOpen = () => Boolean(current);
 
 /**
  * @param {{ bytes: Uint8Array | ArrayBuffer | Promise<ArrayBuffer>, name?: string, onExternal?: () => void,
