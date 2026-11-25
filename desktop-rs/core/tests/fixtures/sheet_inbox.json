@@ -7,14 +7,13 @@
  },
  {
   "kind": "csv",
-  "csv": "req_id,action,memo_id,folder,color,body,find,status\r\n",
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n",
   "cells": [
    [
     "req_id",
     "action",
     "memo_id",
     "folder",
-    "color",
     "body",
     "find",
     "status"
@@ -41,7 +40,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": ""
@@ -50,14 +48,13 @@
  },
  {
   "kind": "csv",
-  "csv": "req_id,action,memo_id,folder,color,body,find,status\r\n1,create,,업무,blue,\"# 회의\n여러 줄, 쉼표 \"\"따옴표\"\"\",,pending\r\n2,append,m1,,,더,,done (m1)\r\n",
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n1,create,,업무,\"# 회의\n여러 줄, 쉼표 \"\"따옴표\"\"\",,pending\r\n2,append,m1,,더,,done (m1)\r\n",
   "cells": [
    [
     "req_id",
     "action",
     "memo_id",
     "folder",
-    "color",
     "body",
     "find",
     "status"
@@ -67,7 +64,6 @@
     "create",
     "",
     "업무",
-    "blue",
     "# 회의\n여러 줄, 쉼표 \"따옴표\"",
     "",
     "pending"
@@ -76,7 +72,6 @@
     "2",
     "append",
     "m1",
-    "",
     "",
     "더",
     "",
@@ -89,7 +84,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "업무",
-    "color": "blue",
     "body": "# 회의\n여러 줄, 쉼표 \"따옴표\"",
     "find": "",
     "status": "pending"
@@ -99,46 +93,9 @@
     "action": "append",
     "memo_id": "m1",
     "folder": "",
-    "color": "",
     "body": "더",
     "find": "",
     "status": "done (m1)"
-   }
-  ]
- },
- {
-  "kind": "csv",
-  "csv": "req_id,action,memo_id,folder,body,find,status\r\n1,create,,업무,# 예전 7열 시트,,pending\r\n",
-  "cells": [
-   [
-    "req_id",
-    "action",
-    "memo_id",
-    "folder",
-    "body",
-    "find",
-    "status"
-   ],
-   [
-    "1",
-    "create",
-    "",
-    "업무",
-    "# 예전 7열 시트",
-    "",
-    "pending"
-   ]
-  ],
-  "rows": [
-   {
-    "req_id": "1",
-    "action": "create",
-    "memo_id": "",
-    "folder": "업무",
-    "color": "",
-    "body": "# 예전 7열 시트",
-    "find": "",
-    "status": "pending"
    }
   ]
  },
@@ -174,7 +131,6 @@
     "action": "CREATE",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# 순서가 다른 열",
     "find": "",
     "status": " pending "
@@ -183,13 +139,12 @@
  },
  {
   "kind": "csv",
-  "csv": "1,trash,m2,,,,,pending",
+  "csv": "1,trash,m2,,,,pending",
   "cells": [
    [
     "1",
     "trash",
     "m2",
-    "",
     "",
     "",
     "",
@@ -202,7 +157,6 @@
     "action": "trash",
     "memo_id": "m2",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -229,7 +183,6 @@
     "action": "b\r\nc",
     "memo_id": "d",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": ""
@@ -239,7 +192,6 @@
     "action": "f",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": ""
@@ -260,7 +212,6 @@
     "action": "",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": ""
@@ -307,28 +258,7 @@
     "action": "create",
     "memo_id": "",
     "folder": "업무",
-    "color": "",
     "body": "# 새 메모",
-    "find": "",
-    "status": "pending"
-   },
-   {
-    "req_id": "1c",
-    "action": "create",
-    "memo_id": "",
-    "folder": "업무",
-    "color": " Blue ",
-    "body": "# 파랑 메모",
-    "find": "",
-    "status": "pending"
-   },
-   {
-    "req_id": "1bad",
-    "action": "create",
-    "memo_id": "",
-    "folder": "",
-    "color": "rainbow",
-    "body": "# 이상한 색",
     "find": "",
     "status": "pending"
    },
@@ -337,7 +267,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "../밖",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "pending"
@@ -347,7 +276,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "_MemoKing",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "pending"
@@ -357,7 +285,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "con",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "pending"
@@ -367,7 +294,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "   ",
     "find": "",
     "status": "pending"
@@ -379,22 +305,16 @@
     "job": {
      "action": "create",
      "folder": "업무",
-     "color": "yellow",
      "body": "# 새 메모"
     }
    },
    {
     "index": 1,
-    "job": {
-     "action": "create",
-     "folder": "업무",
-     "color": "blue",
-     "body": "# 파랑 메모"
-    }
+    "error": "쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)"
    },
    {
     "index": 2,
-    "error": "쓸 수 없는 color 예요 (yellow · green · pink · purple · blue · gray · charcoal 중 하나)"
+    "error": "쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)"
    },
    {
     "index": 3,
@@ -402,18 +322,10 @@
    },
    {
     "index": 4,
-    "error": "쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)"
-   },
-   {
-    "index": 5,
-    "error": "쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)"
-   },
-   {
-    "index": 6,
     "error": "body 가 비었어요"
    }
   ],
-  "csv": "req_id,action,memo_id,folder,color,body,find,status\r\n1,create,,업무,,# 새 메모,,pending\r\n1c,create,,업무,\" Blue \",# 파랑 메모,,pending\r\n1bad,create,,,rainbow,# 이상한 색,,pending\r\n2,create,,../밖,,# x,,pending\r\n3,create,,_MemoKing,,# x,,pending\r\n4,create,,con,,# x,,pending\r\n5,create,,,,\"   \",,pending\r\n"
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n1,create,,업무,# 새 메모,,pending\r\n2,create,,../밖,# x,,pending\r\n3,create,,_MemoKing,# x,,pending\r\n4,create,,con,# x,,pending\r\n5,create,,,\"   \",,pending\r\n"
  },
  {
   "kind": "plan",
@@ -423,7 +335,6 @@
     "action": "append",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "더",
     "find": "",
     "status": "pending"
@@ -433,7 +344,6 @@
     "action": "append",
     "memo_id": "m1",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -443,7 +353,6 @@
     "action": "append",
     "memo_id": "a/../b",
     "folder": "",
-    "color": "",
     "body": "x",
     "find": "",
     "status": "pending"
@@ -453,7 +362,6 @@
     "action": "append",
     "memo_id": " m1 ",
     "folder": "",
-    "color": "",
     "body": " 더 ",
     "find": "",
     "status": "pending"
@@ -481,7 +389,7 @@
     }
    }
   ],
-  "csv": "req_id,action,memo_id,folder,color,body,find,status\r\n6,append,,,,더,,pending\r\n7,append,m1,,,,,pending\r\n8,append,a/../b,,,x,,pending\r\n9,append,\" m1 \",,,\" 더 \",,pending\r\n"
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n6,append,,,더,,pending\r\n7,append,m1,,,,pending\r\n8,append,a/../b,,x,,pending\r\n9,append,\" m1 \",,\" 더 \",,pending\r\n"
  },
  {
   "kind": "plan",
@@ -491,7 +399,6 @@
     "action": "replace",
     "memo_id": "m1",
     "folder": "",
-    "color": "",
     "body": "새",
     "find": "",
     "status": "pending"
@@ -501,7 +408,6 @@
     "action": "replace",
     "memo_id": "m1",
     "folder": "",
-    "color": "",
     "body": "",
     "find": " 옛 ",
     "status": "pending"
@@ -511,7 +417,6 @@
     "action": "trash",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -521,7 +426,6 @@
     "action": "trash",
     "memo_id": "m1",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -531,7 +435,6 @@
     "action": "Dance",
     "memo_id": "m1",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -541,7 +444,6 @@
     "action": "",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -581,7 +483,7 @@
     "error": "action 이 비었어요"
    }
   ],
-  "csv": "req_id,action,memo_id,folder,color,body,find,status\r\n10,replace,m1,,,새,,pending\r\n11,replace,m1,,,,\" 옛 \",pending\r\n12,trash,,,,,,pending\r\n13,trash,m1,,,,,pending\r\n14,Dance,m1,,,,,pending\r\n15,,,,,,,pending\r\n"
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n10,replace,m1,,새,,pending\r\n11,replace,m1,,,\" 옛 \",pending\r\n12,trash,,,,,pending\r\n13,trash,m1,,,,pending\r\n14,Dance,m1,,,,pending\r\n15,,,,,,pending\r\n"
  },
  {
   "kind": "plan",
@@ -591,7 +493,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "pending"
@@ -601,7 +502,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# a",
     "find": "",
     "status": "pending"
@@ -611,7 +511,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# b",
     "find": "",
     "status": "pending"
@@ -621,7 +520,6 @@
     "action": "trash",
     "memo_id": "m2",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "error: 잠긴 메모"
@@ -631,7 +529,6 @@
     "action": "trash",
     "memo_id": "m2",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -641,7 +538,6 @@
     "action": "trash",
     "memo_id": "m3",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": " Pending "
@@ -657,7 +553,6 @@
     "job": {
      "action": "create",
      "folder": "",
-     "color": "yellow",
      "body": "# a"
     }
    },
@@ -677,7 +572,7 @@
     }
    }
   ],
-  "csv": "req_id,action,memo_id,folder,color,body,find,status\r\n,create,,,,# x,,pending\r\n1,create,,,,# a,,pending\r\n1,create,,,,# b,,pending\r\n2,trash,m2,,,,,error: 잠긴 메모\r\n2,trash,m2,,,,,pending\r\n3,trash,m3,,,,,\" Pending \"\r\n"
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n,create,,,# x,,pending\r\n1,create,,,# a,,pending\r\n1,create,,,# b,,pending\r\n2,trash,m2,,,,error: 잠긴 메모\r\n2,trash,m2,,,,pending\r\n3,trash,m3,,,,\" Pending \"\r\n"
  },
  {
   "kind": "plan",
@@ -687,7 +582,6 @@
     "action": "trash",
     "memo_id": "m0",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -697,7 +591,6 @@
     "action": "trash",
     "memo_id": "m1",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -707,7 +600,6 @@
     "action": "trash",
     "memo_id": "m2",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -717,7 +609,6 @@
     "action": "trash",
     "memo_id": "m3",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -727,7 +618,6 @@
     "action": "trash",
     "memo_id": "m4",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -737,7 +627,6 @@
     "action": "trash",
     "memo_id": "m5",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -747,7 +636,6 @@
     "action": "trash",
     "memo_id": "m6",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -757,7 +645,6 @@
     "action": "trash",
     "memo_id": "m7",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -767,7 +654,6 @@
     "action": "trash",
     "memo_id": "m8",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -777,7 +663,6 @@
     "action": "trash",
     "memo_id": "m9",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -787,7 +672,6 @@
     "action": "trash",
     "memo_id": "m10",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -797,7 +681,6 @@
     "action": "trash",
     "memo_id": "m11",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -807,7 +690,6 @@
     "action": "trash",
     "memo_id": "m12",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -817,7 +699,6 @@
     "action": "trash",
     "memo_id": "m13",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -827,7 +708,6 @@
     "action": "trash",
     "memo_id": "m14",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -837,7 +717,6 @@
     "action": "trash",
     "memo_id": "m15",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -847,7 +726,6 @@
     "action": "trash",
     "memo_id": "m16",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -857,7 +735,6 @@
     "action": "trash",
     "memo_id": "m17",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -867,7 +744,6 @@
     "action": "trash",
     "memo_id": "m18",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -877,7 +753,6 @@
     "action": "trash",
     "memo_id": "m19",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -887,7 +762,6 @@
     "action": "trash",
     "memo_id": "m20",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -897,7 +771,6 @@
     "action": "trash",
     "memo_id": "m21",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -907,7 +780,6 @@
     "action": "trash",
     "memo_id": "m22",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -917,7 +789,6 @@
     "action": "trash",
     "memo_id": "m23",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -927,7 +798,6 @@
     "action": "trash",
     "memo_id": "m24",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -1075,7 +945,7 @@
     }
    }
   ],
-  "csv": "req_id,action,memo_id,folder,color,body,find,status\r\nb0,trash,m0,,,,,pending\r\nb1,trash,m1,,,,,pending\r\nb2,trash,m2,,,,,pending\r\nb3,trash,m3,,,,,pending\r\nb4,trash,m4,,,,,pending\r\nb5,trash,m5,,,,,pending\r\nb6,trash,m6,,,,,pending\r\nb7,trash,m7,,,,,pending\r\nb8,trash,m8,,,,,pending\r\nb9,trash,m9,,,,,pending\r\nb10,trash,m10,,,,,pending\r\nb11,trash,m11,,,,,pending\r\nb12,trash,m12,,,,,pending\r\nb13,trash,m13,,,,,pending\r\nb14,trash,m14,,,,,pending\r\nb15,trash,m15,,,,,pending\r\nb16,trash,m16,,,,,pending\r\nb17,trash,m17,,,,,pending\r\nb18,trash,m18,,,,,pending\r\nb19,trash,m19,,,,,pending\r\nb20,trash,m20,,,,,pending\r\nb21,trash,m21,,,,,pending\r\nb22,trash,m22,,,,,pending\r\nb23,trash,m23,,,,,pending\r\nb24,trash,m24,,,,,pending\r\n"
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\nb0,trash,m0,,,,pending\r\nb1,trash,m1,,,,pending\r\nb2,trash,m2,,,,pending\r\nb3,trash,m3,,,,pending\r\nb4,trash,m4,,,,pending\r\nb5,trash,m5,,,,pending\r\nb6,trash,m6,,,,pending\r\nb7,trash,m7,,,,pending\r\nb8,trash,m8,,,,pending\r\nb9,trash,m9,,,,pending\r\nb10,trash,m10,,,,pending\r\nb11,trash,m11,,,,pending\r\nb12,trash,m12,,,,pending\r\nb13,trash,m13,,,,pending\r\nb14,trash,m14,,,,pending\r\nb15,trash,m15,,,,pending\r\nb16,trash,m16,,,,pending\r\nb17,trash,m17,,,,pending\r\nb18,trash,m18,,,,pending\r\nb19,trash,m19,,,,pending\r\nb20,trash,m20,,,,pending\r\nb21,trash,m21,,,,pending\r\nb22,trash,m22,,,,pending\r\nb23,trash,m23,,,,pending\r\nb24,trash,m24,,,,pending\r\n"
  },
  {
   "kind": "finish",
@@ -1085,7 +955,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m0)"
@@ -1095,7 +964,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m1)"
@@ -1105,7 +973,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m2)"
@@ -1115,7 +982,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m3)"
@@ -1125,7 +991,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m4)"
@@ -1135,7 +1000,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m5)"
@@ -1145,7 +1009,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m6)"
@@ -1155,7 +1018,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m7)"
@@ -1165,7 +1027,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m8)"
@@ -1175,7 +1036,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m9)"
@@ -1185,7 +1045,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m10)"
@@ -1195,7 +1054,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m11)"
@@ -1205,7 +1063,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m12)"
@@ -1215,7 +1072,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m13)"
@@ -1225,7 +1081,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m14)"
@@ -1235,7 +1090,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m15)"
@@ -1245,7 +1099,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m16)"
@@ -1255,7 +1108,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m17)"
@@ -1265,7 +1117,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m18)"
@@ -1275,7 +1126,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m19)"
@@ -1285,7 +1135,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m20)"
@@ -1295,7 +1144,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m21)"
@@ -1305,7 +1153,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m22)"
@@ -1315,7 +1162,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m23)"
@@ -1325,7 +1171,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m24)"
@@ -1335,7 +1180,6 @@
     "action": "trash",
     "memo_id": "m1",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -1345,7 +1189,6 @@
     "action": "trash",
     "memo_id": "m2",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -1367,7 +1210,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m7)"
@@ -1377,7 +1219,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m8)"
@@ -1387,7 +1228,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m9)"
@@ -1397,7 +1237,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m10)"
@@ -1407,7 +1246,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m11)"
@@ -1417,7 +1255,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m12)"
@@ -1427,7 +1264,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m13)"
@@ -1437,7 +1273,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m14)"
@@ -1447,7 +1282,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m15)"
@@ -1457,7 +1291,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m16)"
@@ -1467,7 +1300,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m17)"
@@ -1477,7 +1309,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m18)"
@@ -1487,7 +1318,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m19)"
@@ -1497,7 +1327,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m20)"
@@ -1507,7 +1336,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m21)"
@@ -1517,7 +1345,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m22)"
@@ -1527,7 +1354,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m23)"
@@ -1537,7 +1363,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m24)"
@@ -1547,7 +1372,6 @@
     "action": "trash",
     "memo_id": "m1",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "done (m1)"
@@ -1557,7 +1381,6 @@
     "action": "trash",
     "memo_id": "m2",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "error: 잠긴 메모는 고칠 수 없어요"
@@ -1572,7 +1395,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m0)"
@@ -1582,7 +1404,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m1)"
@@ -1592,7 +1413,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m2)"
@@ -1602,7 +1422,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "pending"
@@ -1620,7 +1439,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m0)"
@@ -1630,7 +1448,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m1)"
@@ -1640,7 +1457,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "# x",
     "find": "",
     "status": "done (m2)"
@@ -1650,7 +1466,6 @@
     "action": "create",
     "memo_id": "",
     "folder": "",
-    "color": "",
     "body": "",
     "find": "",
     "status": "done (new)"

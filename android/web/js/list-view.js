@@ -6,7 +6,6 @@ import { videoThumb } from '../../app/js/video-poster.js';
 import { setupRemindersTab } from '../../app/js/list-reminders.js';
 import { setupHistoryTab } from '../../app/js/list-history.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag, titleTagsOnly } from '../../app/js/core/tags.js';
-import { textMatcher } from '../../app/js/core/text-match.js';
 import { COLORS, COLOR_NAMES } from '../../app/js/core/memo-file.js';
 import { app } from './state.js';
 import { isAllClear } from '../../app/js/core/tasks.js';
@@ -278,8 +277,8 @@ function renderCard(memo) {
   const tags = document.createElement('div');
   tags.className = 'card-tags';
   if (workLifeOn()) tags.append(fillModeTag(document.createElement('span'), memo, true), ' ');
-  // 폴더 이름: 전체 보기에서만 (폴더 안에서는 다 같으니 빼서 조용하게)
-  if (memo.folder && !state.folder) {
+  // 폴더 이름: 전체 · 검색에서만 (폴더 안에서는 다 같으니 빼서 조용하게)
+  if (memo.folder && (!state.folder || state.query)) {
     const f = document.createElement('span');
     f.className = 'card-folder';
     f.append(icon('folder'), Object.assign(document.createElement('span'), { textContent: memo.folder })); // 이름은 따로 — 길면 … 로 (태그 자리를 남기게)
@@ -383,7 +382,7 @@ const cardCache = new Map(); // 메모 id → { key, li }
 // 메모 내용뿐 아니라 그릴 때 보는 것도 열쇠에: 폴더 이름을 보일지(전체 · 검색에서만) · Work/Life 표시
 //   (빠뜨리면 전체에서 만든 카드가 폴더 안에서도 폴더 이름을 달고, 폴더 안에서 만든 카드는 전체에서도 이름이 없었다)
 // 비밀 메모는 잠근 사진을 풀어 둔 주소까지 (뒤에서 풀리면 카드를 다시 — vault-secret.js prepareThumbs)
-const cardKey = (memo) => `${JSON.stringify(memo)}${memo.secret && memo.thumb ? vaultUrl(memo.thumb) : ''}|${friendlyTime(memo.updated)}|${workLifeOn() ? 1 : 0}|${!state.folder ? 1 : 0}`;
+const cardKey = (memo) => `${JSON.stringify(memo)}${memo.secret && memo.thumb ? vaultUrl(memo.thumb) : ''}|${friendlyTime(memo.updated)}|${workLifeOn() ? 1 : 0}|${!state.folder || state.query ? 1 : 0}`;
 function cardFor(memo) {
   const key = cardKey(memo);
   const hit = cardCache.get(memo.id);
@@ -466,16 +465,13 @@ export function render() {
   applyFolderSide();
   const narrowed = Boolean(state.query) || filterCount() > 0;
   const pick = { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] };
-  // 폴더: 고른 폴더의 메모만 (검색 중에도 고른 폴더 안에서 찾는다; 전체를 고르면 모든 폴더에서)
+  // 폴더: 고른 폴더의 메모만 (검색은 모든 폴더에서 — 카드에 폴더 이름이 보인다)
   const all = split(state.results ?? state.memos, state.mode).mine;
-  const searchText = parseQuery(state.query).text;
-  const secretPool = isSecretFolder(state.folder) ? (app.vault?.secretList(secretFolderId(state.folder)) ?? []) : null;
-  const source = secretPool
-    ? (searchText ? secretPool.filter((m) => textMatcher(searchText)(m.title, m.preview)) : secretPool)
-    : inFolder(all);
+  // 비밀 폴더: 그 폴더의 메모만 (전체 · 검색에는 들지 않는다 — vault-secret.js)
+  const source = state.query ? all : isSecretFolder(state.folder) ? (app.vault?.secretList(secretFolderId(state.folder)) ?? []) : inFolder(all);
   const memos = sortMemos(withViews(filterMemos(source, pick)), sort);
   // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
-  const elsewhere = state.query && workLifeOn() && !secretPool ? filterMemos(inFolder(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine), pick).length : 0;
+  const elsewhere = state.query && workLifeOn() ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, pick).length : 0;
   $('other-mode').hidden = !elsewhere || !memos.length; // 하나도 없으면 빈 화면 안내가 대신
   $('other-mode').textContent = elsewhere ? `${MODE_LABEL[otherMode(state.mode)]}에서 ${elsewhere}개 더 찾았어요` : '';
   // 다시 그려도 남은 카드는 옛 자리에서 새 자리로 미끄러진다 (지우기·되돌리기·필터 — 툭 끊겨 바뀌지 않게)

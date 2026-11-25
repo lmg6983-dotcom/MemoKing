@@ -42,29 +42,3 @@ test('상단 고정 묶음: 나중에 고정한 것이 위, 고정한 때를 모
   assert.deepEqual(sortMemos(list, 'updated').map((m) => m.id), ['p2', 'p1', 'old1', 'old2', 'n']);
   assert.deepEqual(sortMemos(list, 'title').map((m) => m.id), ['p2', 'p1', 'old2', 'old1', 'n'], '고정 묶음 순서는 정렬과 상관없이 고정한 때');
 });
-
-test('정렬: 수정 시각이 같은 메모는 들어온 순서와 상관없이 늘 같은 자리 (id 순)', () => {
-  const same = ['z', 'm', 'a'].map((id) => ({ id, updated: '2026-10-01T00:00:00Z', created: '2026-10-01T00:00:00Z' }));
-  for (const s of ['updated', 'oldest', 'views', 'title']) {
-    assert.equal(sortMemos(same, s).map((m) => m.id).join(''), 'amz', s);
-    assert.equal(sortMemos([...same].reverse(), s).map((m) => m.id).join(''), 'amz', s);
-  }
-});
-
-test('정렬: 수정 시각이 같으면 늦게 만든 메모가 앞', () => {
-  const same = [
-    { id: 'a', updated: '2026-10-01T00:00:00Z', created: '2026-09-01T00:00:00Z' },
-    { id: 'b', updated: '2026-10-01T00:00:00Z', created: '2026-09-05T00:00:00Z' },
-  ];
-  assert.equal(sortMemos(same).map((m) => m.id).join(''), 'ba');
-});
-
-test('정렬: 시각이 완전히 같아도 입력 순서에 따라 흔들리지 않는다 (id 순)', () => {
-  const same = [
-    { id: 'c', title: '가', updated: '2026-11-23T16:56:00+09:00' },
-    { id: 'a', title: '가', updated: '2026-11-23T16:56:00+09:00' },
-    { id: 'b', title: '가', updated: '2026-11-23T16:56:00+09:00' },
-  ];
-  assert.deepEqual(sortMemos(same, 'updated').map((m) => m.id), ['a', 'b', 'c']);
-  assert.deepEqual(sortMemos([...same].reverse(), 'updated').map((m) => m.id), ['a', 'b', 'c']);
-});

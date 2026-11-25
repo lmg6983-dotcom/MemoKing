@@ -159,8 +159,6 @@ body {
   overflow-wrap: anywhere;
 }
 .card-preview {
-  flex: none;
-  width: 100%;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;

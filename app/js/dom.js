@@ -205,10 +205,7 @@ export function stackCards(columns, items, { late, chunk = true } = {}) {
   // 한 묶음을 쌓는다: 높이를 모르는 카드만 첫 줄에 붙여 한 번에 재고(화면 배치 계산 한 번), 줄마다 한 번씩 붙인다
   const place = (batch) => {
     if (single) {
-      for (const it of batch) {
-        it.mkEpoch ??= stackEpoch; // 한 번 놓인 카드 (다시 그릴 때는 한 번에)
-        it.style.containIntrinsicBlockSize = ''; // 격자에서 잰 높이가 한 줄 보기에 남아 내용이 잘리지 않게
-      }
+      for (const it of batch) it.mkEpoch ??= stackEpoch; // 한 번 놓인 카드 (다시 그릴 때는 한 번에)
       return void columns[0].append(...batch);
     }
     const fresh = batch.filter((it) => !known(it));
@@ -218,10 +215,8 @@ export function stackCards(columns, items, { late, chunk = true } = {}) {
       columns[0].append(...fresh);
       const heights = fresh.map((it) => it.offsetHeight);
       fresh.forEach((it, i) => {
-        if (heights[i] > 0) {
-          Object.assign(it, { mkH: heights[i], mkW: width, mkEpoch: stackEpoch });
-          it.style.containIntrinsicBlockSize = `auto ${heights[i]}px`;
-        }
+        Object.assign(it, { mkH: heights[i], mkW: width, mkEpoch: stackEpoch });
+        it.style.containIntrinsicBlockSize = `auto ${heights[i]}px`;
         it.classList.remove('mk-measure');
       });
     }

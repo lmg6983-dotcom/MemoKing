@@ -145,7 +145,7 @@ class DriveApi(private val ctx: Context) : Remote {
         val boundary = "memoking${System.currentTimeMillis()}"
         val meta = JSONObject().put("name", SHEET_NAME).put("parents", JSONArray().put(parent)).put("mimeType", SHEET)
         val body = "--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$meta\r\n--$boundary\r\nContent-Type: text/csv; charset=utf-8\r\n\r\n" +
-            "req_id,action,memo_id,folder,color,body,find,status\r\n\r\n--$boundary--"
+            "req_id,action,memo_id,folder,body,find,status\r\n\r\n--$boundary--"
         return request("POST", "$UPLOAD/files?uploadType=multipart&fields=id", "multipart/related; boundary=$boundary", body.toByteArray()) { json(it).getString("id") }
     }
 

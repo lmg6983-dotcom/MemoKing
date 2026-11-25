@@ -18,7 +18,6 @@ import { setupRemindersTab } from './list-reminders.js';
 import { setupHistoryTab } from './list-history.js';
 import { renderReleaseNotes } from './release-notes-view.js';
 import { collectTags, filterMemos, parseQuery, KIND_FILTERS, sameTag, titleTagsOnly } from './core/tags.js';
-import { textMatcher } from './core/text-match.js';
 import { COLORS, COLOR_NAMES } from './core/memo-file.js';
 import { setupCoach } from './coach.js';
 import { hintOnce } from './hints.js';
@@ -184,24 +183,16 @@ function render() {
     }
   }
   const narrowed = !only && (Boolean(state.query) || filterCount() > 0);
-  // 폴더: 고른 폴더의 메모만 (검색 중에도 고른 폴더 안에서 찾는다; 전체를 고르면 모든 폴더에서)
+  // 폴더: 고른 폴더의 메모만 (검색은 모든 폴더에서 — 카드에 폴더 이름이 보인다)
   const all = split(state.results ?? state.memos, state.mode).mine;
-  const searchText = parseQuery(state.query).text;
-  const secretPool = isSecretFolder(state.folder) ? (state.secret.memos[secretFid(state.folder)] ?? []) : null;
-  const mine = secretPool
-    ? (searchText ? secretPool.filter((m) => textMatcher(searchText)(m.title, m.preview)) : secretPool)
-    : inFolder(all);
+  // 비밀 폴더: 그 폴더의 메모만 (전체 · 검색에는 들지 않는다 — desktop-rs secret_store.rs)
+  const mine = state.query ? all : isSecretFolder(state.folder) ? (state.secret.memos[secretFid(state.folder)] ?? []) : inFolder(all);
   const memos = only ?? sortMemos(filterMemos(mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }), sort);
   // 검색어가 다른 모드의 메모에도 걸리면 알려 준다 (누르면 그 모드로)
-  const elsewhere = !only && state.query && state.workLife && !secretPool ? filterMemos(inFolder(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine), { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }).length : 0;
-  const cols = columnsFor(el.cards.clientWidth || window.innerWidth);
-  const nextRenderKey = `${layout}|${cols}|${state.folder}|${state.query}|${state.picking ? 1 : 0}|${memos.map(cardKey).join('\n')}`;
-  if (nextRenderKey !== lastRenderKey || !el.cards.querySelector('.col')) {
-    const before = glide ? null : cardRects();
-    layoutCards(memos);
-    if (before) animateCards(before);
-    lastRenderKey = nextRenderKey;
-  }
+  const elsewhere = !only && state.query && state.workLife ? filterMemos(splitByMode(state.results ?? state.memos, otherMode(state.mode)).mine, { ...state.filter, tags: [...state.filter.tags, ...state.queryTags] }).length : 0;
+  const before = glide ? null : cardRects();
+  layoutCards(memos);
+  if (before) animateCards(before);
   el.empty.hidden = memos.length > 0;
   el.cards.classList.toggle('is-empty', !memos.length); // 빈 카드 칸이 자리를 반 나눠 가져 안내가 아래로 치우치지 않게
   if (!memos.length) renderEmpty(narrowed, elsewhere);
@@ -479,7 +470,6 @@ el.folderBtn?.addEventListener('click', async () => {
 const LAYOUT_KEY = 'memoking.layout';
 let layout = 'grid';
 let lastCols = 0;
-let lastRenderKey = '';
 let previewCap = Infinity;
 let previewCapFor = 0;
 
@@ -796,7 +786,7 @@ function renderEmpty(narrowed, elsewhere = 0) {
 // 바뀌지 않은 메모의 카드는 다시 만들지 않고 그대로 옮겨 쌓는다 (휴대폰과 같음)
 //   — 검색 · 필터 · 저장 때마다 모든 카드를 새로 만들고 높이를 다시 재서, 메모가 많으면 그때마다 화면이 멈칫했다
 const cardCache = new Map(); // 메모 id → { key, li }
-const cardKey = (memo) => `${JSON.stringify(memo)}|${friendlyTime(memo.updated)}|${state.workLife ? 1 : 0}|${!state.folder ? 1 : 0}|${previewCap}`;
+const cardKey = (memo) => `${JSON.stringify(memo)}|${friendlyTime(memo.updated)}|${state.workLife ? 1 : 0}|${!state.folder || state.query ? 1 : 0}|${previewCap}`;
 function cardFor(memo) {
   const key = cardKey(memo);
   const hit = cardCache.get(memo.id);
@@ -871,8 +861,8 @@ function renderCard(memo) {
   const tags = document.createElement('div');
   tags.className = 'card-tags';
   if (state.workLife) tags.append(fillModeTag(document.createElement('span'), memo, true));
-  // 폴더 이름: 전체 보기에서만 (폴더 안에서는 다 같으니 빼서 조용하게) — 누르면 그 폴더로
-  if (memo.folder && !state.folder) {
+  // 폴더 이름: 전체 · 검색에서만 (폴더 안에서는 다 같으니 빼서 조용하게) — 누르면 그 폴더로
+  if (memo.folder && (!state.folder || state.query)) {
     const f = document.createElement('span');
     f.className = 'card-folder';
     f.dataset.cardFolder = memo.folder;

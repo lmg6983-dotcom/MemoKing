@@ -15,6 +15,5 @@ test('목록 머리 한 줄: 검색 · 필터로 좁혔을 때는 찾은 수', (
   assert.equal(listContext({ query: '견적', shown: 2 }), "'견적' 찾은 메모 2개");
   assert.equal(listContext({ query: '견적', filters: 1, shown: 2 }), "'견적' 찾은 메모 2개 · 필터 1개");
   assert.equal(listContext({ folder: '업무', filters: 2, shown: 1 }), '업무 폴더 · 필터 2개로 1개');
-  assert.equal(listContext({ folder: '업무', query: '견적', shown: 2 }), "업무 폴더 · '견적' 찾은 메모 2개");
   assert.equal(listContext({ query: 'ㄱ'.repeat(30), shown: 0 }), `'${'ㄱ'.repeat(20)}…' 찾은 메모 0개`);
 });
