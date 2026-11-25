@@ -10,18 +10,19 @@
 - 시트의 머리 줄과 열 이름은 바꾸지 않는다. 이미 있는 줄은 고치지 않는다.
 - 첨부 파일(사진 · 동영상 · PDF)은 올리지 않는다. 본문에 인터넷 그림(`![설명](https://...)`)이나 Google Drive 링크(`[파일](https://drive.google.com/...)`)를 넣는다.
 
-## AI 받은함 시트 (7열)
+## AI 받은함 시트 (8열)
 | 열 | 쓰는 법 |
 |---|---|
 | `req_id` | 요청마다 새 값. 지금 시각 + 번호 (예: `20261125-124000-01`). 같은 값은 한 번만 처리된다 |
 | `action` | `create` · `append` · `replace` · `trash` 가운데 하나 |
 | `memo_id` | 고칠 메모 머리말의 `id` (create 는 비운다) |
 | `folder` | create 할 때 넣을 폴더 이름 (맨 위면 비운다. 한 단계, 40자 이내) |
+| `color` | create 할 때 메모 색 (비우면 기본값 `yellow`. `yellow` · `green` · `pink` · `purple` · `blue` · `gray` · `charcoal`) |
 | `body` | create: 첫 줄이 제목인 메모 전체 · append: 끝에 덧붙일 글 · replace: 바꿀 새 글 |
 | `find` | replace 할 때 바꿀 원래 글. **본문에 정확히 한 번 있는 글**로 적는다 |
 | `status` | 늘 `pending` 으로 적는다. 메모킹이 `done (<memo_id>)` 이나 `error: <까닭>` 으로 바꾼다 |
 
-- **create**: 새 메모. `body` 의 첫 줄이 제목, 본문에 `#태그`. 색은 맨 위 머리말 `---\ncolor: blue\n---` (yellow · green · pink · purple · blue · gray · charcoal).
+- **create**: 새 메모. `body` 의 첫 줄이 제목, 본문에 `#태그`. 색은 `color` 열에 적는다 (비우면 `yellow`).
 - **append**: 메모 끝에 줄을 바꿔 `body` 를 덧붙인다. 큰 메모에 글을 더할 때도 이것을 쓴다 (다시 쓰지 않는다).
 - **replace**: `find` 를 `body` 로 바꾼다. 태그를 바꿀 때도 이것을 쓴다 (예: find `#할일`, body `#끝냄`). `find` 가 없거나 두 번 이상 있으면 `error` 가 된다.
 - **trash**: 메모를 메모킹 휴지통으로 보낸다 (되살릴 수 있다).

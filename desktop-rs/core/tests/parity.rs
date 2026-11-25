@@ -1172,10 +1172,10 @@ fn ai_events() {
 #[test]
 fn sheet_inbox() {
     use memoking_core::sheet_inbox::{append_text, finish, parse_csv, plan, replace_once, rows_from_csv, rows_to_csv, to_csv, Job, Row};
-    let row_json = |r: &Row| json!({ "req_id": r.req_id, "action": r.action, "memo_id": r.memo_id, "folder": r.folder, "body": r.body, "find": r.find, "status": r.status });
+    let row_json = |r: &Row| json!({ "req_id": r.req_id, "action": r.action, "memo_id": r.memo_id, "folder": r.folder, "color": r.color, "body": r.body, "find": r.find, "status": r.status });
     let row_of = |v: &Value| {
         let s = |k: &str| v[k].as_str().unwrap_or_default().to_string();
-        Row { req_id: s("req_id"), action: s("action"), memo_id: s("memo_id"), folder: s("folder"), body: s("body"), find: s("find"), status: s("status") }
+        Row { req_id: s("req_id"), action: s("action"), memo_id: s("memo_id"), folder: s("folder"), color: s("color"), body: s("body"), find: s("find"), status: s("status") }
     };
     let cells = |v: &Value| -> Vec<Vec<String>> { v.as_array().unwrap().iter().map(|r| r.as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_string()).collect()).collect() };
     let cases = fixtures("sheet_inbox");
@@ -1194,7 +1194,7 @@ fn sheet_inbox() {
                         .into_iter()
                         .map(|(index, job)| match job {
                             Err(error) => json!({ "index": index, "error": error }),
-                            Ok(Job::Create { folder, body }) => json!({ "index": index, "job": { "action": "create", "folder": folder, "body": body } }),
+                            Ok(Job::Create { folder, color, body }) => json!({ "index": index, "job": { "action": "create", "folder": folder, "color": color, "body": body } }),
                             Ok(Job::Append { memo_id, body }) => json!({ "index": index, "job": { "action": "append", "memoId": memo_id, "body": body } }),
                             Ok(Job::Replace { memo_id, find, body }) => json!({ "index": index, "job": { "action": "replace", "memoId": memo_id, "find": find, "body": body } }),
                             Ok(Job::Trash { memo_id }) => json!({ "index": index, "job": { "action": "trash", "memoId": memo_id } }),

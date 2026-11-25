@@ -1,6 +1,6 @@
 // 메모 목록 정렬 (PC 목록 창 · 휴대폰 목록이 같이 쓴다, 순수 함수 — tests/memo-sort.test.js)
 //   상단 고정한 메모는 어떤 정렬이든 늘 맨 앞, 그 안에서는 나중에 고정한 것이 위 (고정한 때를 모르는 예전 고정은 그 아래, 고른 정렬로).
-//   같으면 최신순으로 (순서가 흔들리지 않게)
+//   같으면 최신순 → id 순으로 (같은 시각의 메모가 새로 그릴 때마다 순서가 흔들리지 않게)
 
 export const SORTS = [
   { id: 'updated', label: '최신순' }, // 최근에 고친 메모가 앞
@@ -14,6 +14,11 @@ export const validSort = (id) => (SORTS.some((s) => s.id === id) ? id : DEFAULT_
 
 const time = (v) => Date.parse(v) || 0;
 const collator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
+const byId = (a, b) => {
+  const ai = String(a.id ?? '');
+  const bi = String(b.id ?? '');
+  return ai < bi ? -1 : ai > bi ? 1 : 0;
+};
 
 const BY = {
   updated: (a, b) => time(b.updated) - time(a.updated),
@@ -22,9 +27,9 @@ const BY = {
   title: (a, b) => collator.compare(a.title ?? '', b.title ?? ''),
 };
 
-/** @param {{ pinned?: boolean, pinnedAt?: string|null, updated?: string, created?: string, views?: number, title?: string }[]} memos */
+/** @param {{ id?: string, pinned?: boolean, pinnedAt?: string|null, updated?: string, created?: string, views?: number, title?: string }[]} memos */
 export function sortMemos(memos, sort = DEFAULT_SORT) {
   const by = BY[sort] ?? BY.updated;
   const pinned = (a, b) => (a.pinned && b.pinned ? time(b.pinnedAt) - time(a.pinnedAt) : 0);
-  return [...memos].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || pinned(a, b) || by(a, b) || BY.updated(a, b));
+  return [...memos].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || pinned(a, b) || by(a, b) || BY.updated(a, b) || byId(a, b));
 }

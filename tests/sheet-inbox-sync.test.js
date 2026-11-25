@@ -9,8 +9,8 @@ register(`data:text/javascript,${encodeURIComponent(`export function resolve(s, 
   return next(s, c);
 }`)}`);
 
-const HEAD = 'req_id,action,memo_id,folder,body,find,status\r\n';
-const drive = { csv: `${HEAD}1,create,,,# 장보기,,pending\r\n`, version: 1, exports: 0, onUpdate: null };
+const HEAD = 'req_id,action,memo_id,folder,color,body,find,status\r\n';
+const drive = { csv: `${HEAD}1,create,,,,# 장보기,,pending\r\n`, version: 1, exports: 0, onUpdate: null };
 const stamp = () => `v${drive.version}`;
 const native = {
   sheetInbox({ op, since, stamp: seen, csv }) {
@@ -41,12 +41,12 @@ test('처리하는 사이 줄이 늘면 덮어쓰지 않고, 다음 차례에 �
   const vault = { applySheetJob: (job) => (made.push(job.body), { id: `m${made.length}` }) };
   // 1차례: 처리 · 결과를 적기 직전에 AI 가 줄을 더함 → 덮어쓰지 않는다
   drive.onUpdate = () => {
-    drive.csv += '2,create,,,# 할 일,,pending\r\n';
+    drive.csv += '2,create,,,,# 할 일,,pending\r\n';
     drive.version++;
   };
   await processSheet(vault);
   assert.deepEqual(made, ['# 장보기']);
-  assert.match(drive.csv, /1,create,,,# 장보기,,pending/, 'AI 가 더한 줄을 지우지 않게 덮어쓰지 않았다');
+  assert.match(drive.csv, /1,create,,,,# 장보기,,pending/, 'AI 가 더한 줄을 지우지 않게 덮어쓰지 않았다');
   // 2차례: 다시 읽어 1번은 기억한 결과만 적고(다시 만들지 않음) 2번은 처리
   assert.equal(await processSheet(vault), 2);
   assert.deepEqual(made, ['# 장보기', '# 할 일'], '같은 요청으로 메모가 둘 생기지 않는다');

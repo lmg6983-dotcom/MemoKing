@@ -10,11 +10,11 @@ impl Vault {
         let io = |e: std::io::Error| format!("저장하지 못했어요 ({e})");
         let refused = |s: &serde_json::Value| s["refused"] == true;
         match job {
-            Job::Create { folder, body } => {
+            Job::Create { folder, color, body } => {
                 if is_locked_body(body) {
                     return Err("잠금 형식 글은 만들 수 없어요".into());
                 }
-                let id = self.create(None, None, folder);
+                let id = self.create(Some(color.as_str()), None, folder);
                 let (summary, _) = self.save(&id, body).map_err(io)?;
                 if refused(&summary) {
                     self.entries.remove(&id);
@@ -64,8 +64,9 @@ mod tests {
         let root = tmp();
         let mut v = Vault::new(&root, "pc");
         v.open().unwrap();
-        let id = v.apply_sheet_job(&Job::Create { folder: "업무".into(), body: "# 회의\n월요일".into() }).unwrap();
+        let id = v.apply_sheet_job(&Job::Create { folder: "업무".into(), color: "blue".into(), body: "# 회의\n월요일".into() }).unwrap();
         assert!(root.join("업무/회의.md").exists(), "폴더 안에 첫 줄 제목으로");
+        assert_eq!(v.entries[&id].meta.color, "blue", "지정한 색으로 생성");
         v.apply_sheet_job(&Job::Append { memo_id: id.clone(), body: "화요일".into() }).unwrap();
         assert_eq!(v.entries[&id].body, "# 회의\n월요일\n화요일");
         v.apply_sheet_job(&Job::Replace { memo_id: id.clone(), find: "화요일".into(), body: "수요일".into() }).unwrap();

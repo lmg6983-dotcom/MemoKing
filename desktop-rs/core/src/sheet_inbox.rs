@@ -1,12 +1,13 @@
 //! AI 받은함 (_memoking/AI 받은함 Google 시트) — AI(Gemini 등)가 메모를 만들고 고치는 단 하나의 창구.
 //!   app/js/core/sheet-inbox.js 와 같은 규칙 (tests/parity.rs sheet_inbox). 시트는 CSV 로 내려받고 CSV 로 덮어쓴다 (drive.file 권한만)
-//!   7열: req_id · action(create · append · replace · trash) · memo_id · folder · body · find · status
+//!   8열: req_id · action(create · append · replace · trash) · memo_id · folder · color · body · find · status
 //!   AI 가 status 를 pending 으로 적으면, 켜져 있는 기기 한 대(devices::inbox_leader)가 처리하고 done (<memo_id>) · error: <까닭> 으로 바꾼다
 use crate::js;
+use crate::memo_file::{COLORS, DEFAULT_COLOR};
 
 /// 시트 이름 (_memoking 폴더 안)
 pub const SHEET_NAME: &str = "AI 받은함";
-pub const COLUMNS: [&str; 7] = ["req_id", "action", "memo_id", "folder", "body", "find", "status"];
+pub const COLUMNS: [&str; 8] = ["req_id", "action", "memo_id", "folder", "color", "body", "find", "status"];
 /// 한 차례에 처리하는 요청 수
 pub const BATCH: usize = 20;
 /// 처리를 마친 줄은 최근 이만큼만 남긴다
@@ -18,6 +19,7 @@ pub struct Row {
     pub action: String,
     pub memo_id: String,
     pub folder: String,
+    pub color: String,
     pub body: String,
     pub find: String,
     pub status: String,
@@ -26,7 +28,7 @@ pub struct Row {
 /// 처리할 일 하나
 #[derive(Clone, Debug, PartialEq)]
 pub enum Job {
-    Create { folder: String, body: String },
+    Create { folder: String, color: String, body: String },
     Append { memo_id: String, body: String },
     Replace { memo_id: String, find: String, body: String },
     Trash { memo_id: String },
@@ -82,7 +84,7 @@ pub fn to_csv(rows: &[Vec<String>]) -> String {
     rows.iter().map(|r| r.iter().map(cell).collect::<Vec<_>>().join(",") + "\r\n").collect()
 }
 
-/// 시트 CSV → 줄들. 첫 줄에 req_id 가 있으면 머리 줄로 보고 열 이름으로(열 차례가 바뀌어도), 아니면 7열 차례대로 읽는다 (모르는 열은 버린다)
+/// 시트 CSV → 줄들. 첫 줄에 req_id 가 있으면 머리 줄로 보고 열 이름으로(열 차례가 바뀌어도), 아니면 8열 차례대로 읽는다 (모르는 열은 버린다)
 pub fn rows_from_csv(text: &str) -> Vec<Row> {
     let mut cells = parse_csv(text);
     let header: Vec<String> = cells.first().map(|h| h.iter().map(|c| js::trim(c).to_lowercase()).collect()).unwrap_or_default();
@@ -96,7 +98,7 @@ pub fn rows_from_csv(text: &str) -> Vec<Row> {
         .filter(|c| c.iter().any(|v| !js::trim(v).is_empty())) // 빈 줄
         .map(|c| {
             let get = |i: usize| at[i].and_then(|j| c.get(j)).cloned().unwrap_or_default();
-            Row { req_id: get(0), action: get(1), memo_id: get(2), folder: get(3), body: get(4), find: get(5), status: get(6) }
+            Row { req_id: get(0), action: get(1), memo_id: get(2), folder: get(3), color: get(4), body: get(5), find: get(6), status: get(7) }
         })
         .collect()
 }
@@ -104,7 +106,7 @@ pub fn rows_from_csv(text: &str) -> Vec<Row> {
 /// 줄들 → 시트에 올릴 CSV (머리 줄 포함)
 pub fn rows_to_csv(rows: &[Row]) -> String {
     let mut cells = vec![COLUMNS.iter().map(|s| s.to_string()).collect::<Vec<_>>()];
-    cells.extend(rows.iter().map(|r| vec![r.req_id.clone(), r.action.clone(), r.memo_id.clone(), r.folder.clone(), r.body.clone(), r.find.clone(), r.status.clone()]));
+    cells.extend(rows.iter().map(|r| vec![r.req_id.clone(), r.action.clone(), r.memo_id.clone(), r.folder.clone(), r.color.clone(), r.body.clone(), r.find.clone(), r.status.clone()]));
     to_csv(&cells)
 }
 
@@ -160,7 +162,15 @@ fn job_of(r: &Row) -> Result<Job, String> {
             if raw.contains(['/', '\\']) || raw.contains("..") || lower.contains("_memoking") || (!raw.is_empty() && folder.is_empty()) {
                 return Err("쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)".into());
             }
-            Ok(Job::Create { folder, body })
+            let raw_color = js::trim(&r.color).to_lowercase();
+            let color = if raw_color.is_empty() {
+                DEFAULT_COLOR.to_string()
+            } else if COLORS.contains(&raw_color.as_str()) {
+                raw_color
+            } else {
+                return Err(format!("쓸 수 없는 color 예요 ({} 중 하나)", COLORS.join(" · ")));
+            };
+            Ok(Job::Create { folder, color, body })
         }
         "append" => {
             let memo_id = need_memo()?;
@@ -246,30 +256,34 @@ mod tests {
 
     #[test]
     fn plan_checks_each_action() {
-        let row = |id: &str, action: &str, memo: &str, folder: &str, body: &str, find: &str| Row {
+        let row = |id: &str, action: &str, memo: &str, folder: &str, color: &str, body: &str, find: &str| Row {
             req_id: id.into(),
             action: action.into(),
             memo_id: memo.into(),
             folder: folder.into(),
+            color: color.into(),
             body: body.into(),
             find: find.into(),
             status: "pending".into(),
         };
         let mut rows = vec![
-            row("1", "create", "", "업무", "# 새 메모", ""),
-            row("2", "create", "", "../밖", "# x", ""),
-            row("3", "create", "", "_memoking", "# x", ""),
-            row("4", "append", "", "", "더", ""),
-            row("5", "replace", "m1", "", "새", ""),
-            row("6", "trash", "../m", "", "", ""),
-            row("7", "dance", "m1", "", "", ""),
-            row("1", "create", "", "", "# 다시", ""),
+            row("1", "create", "", "업무", "", "# 새 메모", ""),
+            row("2", "create", "", "../밖", "", "# x", ""),
+            row("3", "create", "", "_memoking", "", "# x", ""),
+            row("4", "append", "", "", "", "더", ""),
+            row("5", "replace", "m1", "", "", "새", ""),
+            row("6", "trash", "../m", "", "", "", ""),
+            row("7", "dance", "m1", "", "", "", ""),
+            row("1", "create", "", "", "", "# 다시", ""),
+            row("9", "create", "", "업무", "blue", "# 파랑", ""),
+            row("10", "create", "", "", "rainbow", "# 이상한 색", ""),
         ];
-        rows.push(Row { status: "done (m9)".into(), ..row("8", "trash", "m9", "", "", "") });
-        rows.push(row("8", "trash", "m9", "", "", ""));
+        rows.push(Row { status: "done (m9)".into(), ..row("8", "trash", "m9", "", "", "", "") });
+        rows.push(row("8", "trash", "m9", "", "", "", ""));
         let got: Vec<bool> = plan(&rows).iter().map(|(_, j)| j.is_ok()).collect();
-        assert_eq!(got, vec![true, false, false, false, false, false, false, false, false]);
-        assert_eq!(plan(&rows)[0].1, Ok(Job::Create { folder: "업무".into(), body: "# 새 메모".into() }));
+        assert_eq!(got, vec![true, false, false, false, false, false, false, false, true, false, false]);
+        assert_eq!(plan(&rows)[0].1, Ok(Job::Create { folder: "업무".into(), color: "yellow".into(), body: "# 새 메모".into() }));
+        assert_eq!(plan(&rows)[8].1, Ok(Job::Create { folder: "업무".into(), color: "blue".into(), body: "# 파랑".into() }));
     }
 
     #[test]
@@ -283,7 +297,7 @@ mod tests {
 
     #[test]
     fn run_writes_results_and_never_twice() {
-        let csv = "req_id,action,memo_id,folder,body,find,status\r\n1,create,,,# 새,,pending\r\n2,trash,m9,,,,pending\r\n";
+        let csv = "req_id,action,memo_id,folder,color,body,find,status\r\n1,create,,,blue,# 새,,pending\r\n2,trash,m9,,,,,pending\r\n";
         let mut calls = 0;
         let (out, done) = run(csv, |_, job| {
             calls += 1;

@@ -361,6 +361,7 @@ pub const AGENT_GUIDE: &str = r##"# 메모킹 폴더 안내 (LLM 에이전트용
 | action | create · append · replace · trash 가운데 하나 |
 | memo_id | 고칠 메모의 머리말 id (create 는 비움) |
 | folder | create 할 때 넣을 폴더 (맨 위는 비움, 40자 이내) |
+| color | create 할 때 메모 색 (비우면 yellow · green · pink · purple · blue · gray · charcoal) |
 | body | create: 첫 줄이 제목인 마크다운 전체 · append: 끝에 덧붙일 글 · replace: 바꿀 새 글 |
 | find | replace 할 때 바꿀 원래 글 (본문에 정확히 한 번 있어야 함) |
 | status | 처음엔 `pending`. 메모킹이 처리하고 `done (<memo_id>)` 이나 `error: <까닭>` 으로 바꿉니다 |

@@ -415,7 +415,7 @@ impl Vault {
         // 날짜 읽기는 메모마다 한 번 (비교마다 읽으면 2,000개에 4만 번)
         // 상단 고정은 나중에 고정한 것이 위 (memo-sort.js 와 같음)
         let pinned_at = |e: &Entry| e.meta.extra.get("pinnedAt").and_then(Value::as_str).and_then(time::parse_js_date).map_or(0, |d| d.timestamp_millis());
-        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(if e.meta.pinned { pinned_at(e) } else { 0 }), std::cmp::Reverse(t(e))));
+        list.sort_by_cached_key(|e| (std::cmp::Reverse(e.meta.pinned), std::cmp::Reverse(if e.meta.pinned { pinned_at(e) } else { 0 }), std::cmp::Reverse(t(e)), e.id.as_str()));
         list
     }
 
