@@ -42,3 +42,11 @@ test('상단 고정 묶음: 나중에 고정한 것이 위, 고정한 때를 모
   assert.deepEqual(sortMemos(list, 'updated').map((m) => m.id), ['p2', 'p1', 'old1', 'old2', 'n']);
   assert.deepEqual(sortMemos(list, 'title').map((m) => m.id), ['p2', 'p1', 'old2', 'old1', 'n'], '고정 묶음 순서는 정렬과 상관없이 고정한 때');
 });
+
+test('정렬: 수정 시각이 같은 메모는 들어온 순서와 상관없이 늘 같은 자리 (id 순)', () => {
+  const same = ['z', 'm', 'a'].map((id) => ({ id, updated: '2026-10-01T00:00:00Z' }));
+  for (const s of ['updated', 'oldest', 'views', 'title']) {
+    assert.equal(sortMemos(same, s).map((m) => m.id).join(''), 'amz', s);
+    assert.equal(sortMemos([...same].reverse(), s).map((m) => m.id).join(''), 'amz', s);
+  }
+});
