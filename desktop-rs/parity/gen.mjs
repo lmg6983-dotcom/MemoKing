@@ -98,7 +98,7 @@ if (!fs.existsSync(lockFile)) {
 write('lock_ref', ['attachments/a.png', 'attachments/한글 사진.jpg'].map((src) => ({ src, salt: 'c2FsdHNhbHQ=', key: lockRefKey(src, 'c2FsdHNhbHQ=') })));
 
 // 열기 전에 물을 프로그램 파일
-const fileNames = ['a.exe', 'A.EXE', 'setup.msi', 'x.lnk', 'run.ps1', 'doc.pdf', 'photo.png', 'noext', '.exe', 'archive.tar.gz', 'dir/evil.bat', 'dir\\evil.CMD', 'q.url?x', 'page.html#a.exe', 'x.settingcontent-ms', 'x.appref-ms', 'x.js', 'x.json', 'a.exe.', 'a.exe ', 'a.EXE. .', 'doc.pdf.', 'x.diagcab', 'x.XLL', 'x.library-ms', 'x.search-ms', 'x.msp', 'x.mst', 'x.vsto'];
+const fileNames = ['a.exe', 'A.EXE', 'setup.msi', 'x.lnk', 'run.ps1', 'doc.pdf', 'photo.png', 'noext', '.exe', 'archive.tar.gz', 'dir/evil.bat', 'dir\\evil.CMD', 'q.url?x', 'page.html#a.exe', 'x.settingcontent-ms', 'x.appref-ms', 'x.js', 'x.json', 'a.exe.', 'a.exe ', 'a.EXE. .', 'doc.pdf.', 'x.diagcab', 'x.XLL', 'x.library-ms', 'x.search-ms', 'x.msp', 'x.mst', 'x.vsto', 'disk.ISO', 'x.vhdx', 'run.pyw', 'x.scf', 'x.jnlp', 'x.appinstaller'];
 write('program_files', fileNames.map((name) => ({ name, program: isProgramFile(name) })));
 
 // 알림이 울릴 때: 종류마다의 알림 × 정해 둔 "지금" (진짜 시계는 쓰지 않는다). 시각은 ms 숫자로

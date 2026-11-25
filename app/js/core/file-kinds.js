@@ -7,6 +7,8 @@ const PROGRAM_EXT = new Set([
   'inf', 'sct', 'chm', 'gadget', 'ws', 'settingcontent-ms',
   // 문제 해결사 · Excel 추가 기능 · 라이브러리 · 검색 바로가기 · 설치 패치 · Office 추가 기능 — 열면 코드가 돈다
   'diagcab', 'xll', 'library-ms', 'search-ms', 'msp', 'mst', 'vsto',
+  // 디스크 그림(열면 드라이브로 붙어 안의 파일이 인터넷 표시 없이 열린다) · 앱 설치 · 스크립트 · 바로가기
+  'iso', 'img', 'vhd', 'vhdx', 'appinstaller', 'msixbundle', 'py', 'pyw', 'wsc', 'scf', 'jnlp',
 ]);
 
 const KINDS = [
@@ -14,7 +16,7 @@ const KINDS = [
   ['doc', ['doc', 'docx', 'hwp', 'hwpx', 'odt', 'rtf', 'txt', 'md', 'pages']],
   ['sheet', ['xls', 'xlsx', 'xlsm', 'csv', 'ods', 'numbers', 'cell']],
   ['slide', ['ppt', 'pptx', 'odp', 'key', 'show']],
-  ['archive', ['zip', '7z', 'rar', 'alz', 'egg', 'tar', 'gz', 'tgz', 'bz2', 'xz', 'iso']],
+  ['archive', ['zip', '7z', 'rar', 'alz', 'egg', 'tar', 'gz', 'tgz', 'bz2', 'xz']],
   ['image', ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif', 'heic', 'ico', 'tif', 'tiff', 'psd', 'ai']],
   ['audio', ['mp3', 'wav', 'm4a', 'ogg', 'oga', 'flac', 'aac', 'opus', 'wma']],
   ['video', ['mp4', 'webm', 'mov', 'mkv', 'avi', 'wmv', 'm4v']],

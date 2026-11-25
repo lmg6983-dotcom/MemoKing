@@ -114,5 +114,29 @@
  {
   "name": "x.vsto",
   "program": true
+ },
+ {
+  "name": "disk.ISO",
+  "program": true
+ },
+ {
+  "name": "x.vhdx",
+  "program": true
+ },
+ {
+  "name": "run.pyw",
+  "program": true
+ },
+ {
+  "name": "x.scf",
+  "program": true
+ },
+ {
+  "name": "x.jnlp",
+  "program": true
+ },
+ {
+  "name": "x.appinstaller",
+  "program": true
  }
 ]

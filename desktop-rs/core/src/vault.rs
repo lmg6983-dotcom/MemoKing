@@ -1560,11 +1560,13 @@ impl Vault {
 
 /// 실행하면 프로그램이 도는 파일 (열기 전에 묻는다) — file-kinds.js isProgramFile
 pub fn is_program_file(name: &str) -> bool {
-    const PROGRAM_EXT: [&str; 40] = [
+    const PROGRAM_EXT: [&str; 51] = [
         "exe", "msi", "msix", "appx", "appxbundle", "bat", "cmd", "com", "scr", "pif", "cpl", "msc", "ps1", "psm1", "vbs", "vbe", "js", "jse", "wsf", "wsh", "hta", "lnk", "url", "reg", "jar",
         "application", "appref-ms", "inf", "sct", "chm", "gadget", "ws", "settingcontent-ms",
         // 문제 해결사 · Excel 추가 기능 · 라이브러리 · 검색 바로가기 · 설치 패치 · Office 추가 기능 — 열면 코드가 돈다
         "diagcab", "xll", "library-ms", "search-ms", "msp", "mst", "vsto",
+        // 디스크 그림(열면 드라이브로 붙어 안의 파일이 인터넷 표시 없이 열린다) · 앱 설치 · 스크립트 · 바로가기
+        "iso", "img", "vhd", "vhdx", "appinstaller", "msixbundle", "py", "pyw", "wsc", "scf", "jnlp",
     ];
     // 끝의 점 · 빈칸은 뗀다 — Windows 는 "a.exe." 를 a.exe 로 연다 (그대로 보면 확장자가 없어 실행 경고를 건너뛰었다)
     let base = name.rsplit(['/', '\\']).next().unwrap_or("").split(['?', '#']).next().unwrap_or("").trim_end_matches(['.', ' ']);
