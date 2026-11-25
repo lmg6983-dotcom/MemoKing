@@ -1168,21 +1168,60 @@ fn ai_events() {
     report("ai_events", fails, cases.len());
 }
 
+// AI 받은함 시트 (app/js/core/sheet-inbox.js ↔ core/src/sheet_inbox.rs)
 #[test]
-fn inbox() {
-    use memoking_core::inbox::{slot_memo, slot_name};
-    let cases = fixtures("inbox");
+fn sheet_inbox() {
+    use memoking_core::sheet_inbox::{append_text, finish, parse_csv, plan, replace_once, rows_from_csv, rows_to_csv, to_csv, Job, Row};
+    let row_json = |r: &Row| json!({ "req_id": r.req_id, "action": r.action, "memo_id": r.memo_id, "folder": r.folder, "body": r.body, "find": r.find, "status": r.status });
+    let row_of = |v: &Value| {
+        let s = |k: &str| v[k].as_str().unwrap_or_default().to_string();
+        Row { req_id: s("req_id"), action: s("action"), memo_id: s("memo_id"), folder: s("folder"), body: s("body"), find: s("find"), status: s("status") }
+    };
+    let cells = |v: &Value| -> Vec<Vec<String>> { v.as_array().unwrap().iter().map(|r| r.as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_string()).collect()).collect() };
+    let cases = fixtures("sheet_inbox");
     let fails = cases
         .iter()
         .filter_map(|c| {
-            let (got, want) = match c["n"].as_u64() {
-                Some(n) => (json!(slot_name(n as usize)), c["name"].clone()),
-                None => (json!(slot_memo(c["text"].as_str().unwrap()).map(|(body, color)| json!({ "body": body, "color": color }))), c["memo"].clone()),
+            let (got, want) = match c["kind"].as_str().unwrap() {
+                "csv" => {
+                    let csv = c["csv"].as_str().unwrap();
+                    (json!({ "cells": parse_csv(csv), "rows": rows_from_csv(csv).iter().map(row_json).collect::<Vec<_>>() }), json!({ "cells": c["cells"], "rows": c["rows"] }))
+                }
+                "write" => (json!(to_csv(&cells(&c["cells"]))), c["csv"].clone()),
+                "plan" => {
+                    let rows: Vec<Row> = c["rows"].as_array().unwrap().iter().map(row_of).collect();
+                    let plan: Vec<Value> = plan(&rows)
+                        .into_iter()
+                        .map(|(index, job)| match job {
+                            Err(error) => json!({ "index": index, "error": error }),
+                            Ok(Job::Create { folder, body }) => json!({ "index": index, "job": { "action": "create", "folder": folder, "body": body } }),
+                            Ok(Job::Append { memo_id, body }) => json!({ "index": index, "job": { "action": "append", "memoId": memo_id, "body": body } }),
+                            Ok(Job::Replace { memo_id, find, body }) => json!({ "index": index, "job": { "action": "replace", "memoId": memo_id, "find": find, "body": body } }),
+                            Ok(Job::Trash { memo_id }) => json!({ "index": index, "job": { "action": "trash", "memoId": memo_id } }),
+                        })
+                        .collect();
+                    (json!({ "plan": plan, "csv": rows_to_csv(&rows) }), json!({ "plan": c["plan"], "csv": c["csv"] }))
+                }
+                "finish" => {
+                    let rows: Vec<Row> = c["rows"].as_array().unwrap().iter().map(row_of).collect();
+                    let results: Vec<(usize, Result<String, String>)> = c["results"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|r| (r["index"].as_u64().unwrap() as usize, r["error"].as_str().map_or_else(|| Ok(r["id"].as_str().unwrap().to_string()), |e| Err(e.to_string()))))
+                        .collect();
+                    (json!(finish(rows, &results).iter().map(row_json).collect::<Vec<_>>()), c["out"].clone())
+                }
+                "replace" => {
+                    let out = replace_once(c["text"].as_str().unwrap(), c["find"].as_str().unwrap(), c["to"].as_str().unwrap());
+                    (out.map_or_else(|e| json!({ "error": e }), |t| json!({ "text": t })), c["out"].clone())
+                }
+                _ => (json!(append_text(c["body"].as_str().unwrap(), c["add"].as_str().unwrap())), c["out"].clone()),
             };
-            (got != want).then(|| format!("{}\n  JS  : {want}\n  Rust: {got}", c))
+            (got != want).then(|| format!("{}\n  JS  : {want}\n  Rust: {got}", c["kind"]))
         })
         .collect();
-    report("inbox", fails, cases.len());
+    report("sheet_inbox", fails, cases.len());
 }
 
 #[test]

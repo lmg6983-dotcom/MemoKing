@@ -1200,7 +1200,8 @@ function showHandoff(h) {
   handoffTimer = setTimeout(() => (bar.hidden = true), 120_000);
 }
 api.on('memo:handoff', showHandoff);
-api.on('inbox:taken', (count) => flashStatus(`AI 비서가 보낸 새 메모 ${count}개를 가져왔어요`)); // 받은 메모 빈 칸 (core/inbox.js)
+api.on('inbox:taken', (count) => flashStatus(`AI 비서가 보낸 새 메모 ${count}개를 가져왔어요`)); // PC 다리 (drive_bridge.rs)
+api.on('sheet:applied', (count) => flashStatus(`AI 비서가 보낸 요청 ${count}개를 메모에 반영했어요`)); // AI 받은함 시트 (drive.rs)
 api.memo.handoff().then(showHandoff).catch(() => {});
 
 el.useSuggested.addEventListener('click', async () => applyInfo(await api.vault.use(state.info.suggestedPath)));

@@ -7,6 +7,7 @@ use crate::memos::arg_str;
 use crate::state::State;
 use base64::Engine as _;
 use memoking_core::drive_sync::{self, inside_drive_for_desktop, Changes, RemoteItem, SyncState, FOLDER};
+use memoking_core::sheet_inbox;
 use memoking_core::time::now_ms;
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
@@ -411,6 +412,93 @@ impl Api {
         list.sort_by(|a, b| a.created.cmp(&b.created).then_with(|| a.id.cmp(&b.id)));
         Ok(list)
     }
+
+    // ---------- AI 받은함 시트 (drive.file 권한만: 메모킹이 만든 시트라 읽고 덮어쓸 수 있다) ----------
+
+    /// _memoking 폴더의 AI 받은함 시트 id — 없으면 머리 줄만 든 CSV 를 시트로 바꿔 만든다 (같은 이름이 여럿이면 먼저 만든 것)
+    fn ensure_sheet(&self, parent: &str) -> io::Result<String> {
+        let mut found = self.query(&format!("'{}' in parents and name = '{}' and mimeType = '{SHEET}' and trashed = false", quote(parent), quote(sheet_inbox::SHEET_NAME)), None)?;
+        found.sort_by(|a, b| a.created.cmp(&b.created).then_with(|| a.id.cmp(&b.id)));
+        if let Some(f) = found.into_iter().next() {
+            return Ok(f.id);
+        }
+        let boundary = format!("memoking{}", now_ms());
+        let meta = json!({ "name": sheet_inbox::SHEET_NAME, "parents": [parent], "mimeType": SHEET });
+        let body = format!("--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n--{boundary}\r\nContent-Type: text/csv; charset=utf-8\r\n\r\n{}\r\n--{boundary}--", sheet_inbox::rows_to_csv(&[]));
+        let mut res = self.request("POST", &format!("{UPLOAD}/files?uploadType=multipart&fields=id"), &[("Content-Type", format!("multipart/related; boundary={boundary}"))], Some(body.into_bytes()))?;
+        serde_json::from_str::<Value>(&read_text(&mut res)).ok().and_then(|v| v["id"].as_str().map(str::to_string)).ok_or_else(|| io::Error::other("AI 받은함 시트를 만들지 못했어요"))
+    }
+
+    /// 시트가 바뀌었는지 알아보는 값 (version — 고칠 때마다 커진다)
+    fn file_stamp(&self, id: &str) -> io::Result<String> {
+        let v = self.json("GET", &format!("{API}/files/{}?fields=version,modifiedTime", q(id)), None)?;
+        Ok(format!("{}:{}", v["version"].as_str().unwrap_or_default(), v["modifiedTime"].as_str().unwrap_or_default()))
+    }
+
+    fn export_csv(&self, id: &str) -> io::Result<String> {
+        let mut res = self.request("GET", &format!("{API}/files/{}/export?mimeType=text%2Fcsv", q(id)), &[], None)?;
+        Ok(read_text(&mut res))
+    }
+
+    fn update_csv(&self, id: &str, csv: &str) -> io::Result<()> {
+        self.request("PATCH", &format!("{UPLOAD}/files/{}?uploadType=media&fields=id", q(id)), &[("Content-Type", "text/csv; charset=utf-8".into())], Some(csv.as_bytes().to_vec())).map(|_| ())
+    }
+}
+
+const SHEET: &str = "application/vnd.google-apps.spreadsheet";
+
+/// AI 받은함 시트를 처리한다 (동기화를 마친 뒤, 받은 메모를 맡은 한 기기만 — devices::inbox_turn).
+///   ① 시트가 그대로면 끝 ② CSV 로 받아 pending 줄을 메모 폴더에 적용 ③ 그사이 시트가 그대로일 때만 결과를 적어 덮어쓴다 (아니면 다음 차례에)
+///   적용했지만 결과를 적지 못한 요청은 req_id 로 기억해 두었다가 다음 차례에 다시 적용하지 않고 그 결과만 적는다
+fn sheet_inbox(app: &AppHandle, memoking_id: &str) -> io::Result<usize> {
+    static SEEN: Mutex<Option<(String, String)>> = Mutex::new(None); // (시트 id, 지난번 본 값)
+    let id = match SEEN.lock().unwrap().clone() {
+        Some((id, _)) => id,
+        None => Api.ensure_sheet(memoking_id)?,
+    };
+    let stamp = match Api.file_stamp(&id) {
+        Ok(s) => s,
+        Err(e) => {
+            *SEEN.lock().unwrap() = None; // 시트를 지웠다 — 다음 차례에 다시 찾거나 만든다
+            return Err(e);
+        }
+    };
+    if SEEN.lock().unwrap().as_ref().is_some_and(|(i, s)| *i == id && *s == stamp) {
+        return Ok(0);
+    }
+    let csv = Api.export_csv(&id)?;
+    let file = d().dir.join("drive").join("sheet-applied.json");
+    let mut applied: Vec<(String, Result<String, String>)> = std::fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str::<Vec<(String, Option<String>, Option<String>)>>(&t).ok()).unwrap_or_default().into_iter().map(|(r, ok, err)| (r, ok.ok_or(err.unwrap_or_default()))).collect();
+    let before = applied.len();
+    let out = sheet_inbox::run(&csv, |req, job| {
+        if let Some((_, r)) = applied.iter().find(|(r, _)| r == req) {
+            return r.clone();
+        }
+        let r = crate::memos::with_vault(app, |v| Ok(v.apply_sheet_job(job))).unwrap_or_else(Err);
+        applied.push((req.to_string(), r.clone()));
+        r
+    });
+    if applied.len() != before {
+        let keep: Vec<_> = applied.iter().rev().take(200).rev().map(|(r, res)| (r, res.as_ref().ok(), res.as_ref().err())).collect();
+        let _ = serde_json::to_string(&keep).map(|t| memoking_core::vault::write_atomic(&file, t.as_bytes()));
+    }
+    let Some((out, done)) = out else {
+        *SEEN.lock().unwrap() = Some((id, stamp));
+        return Ok(0);
+    };
+    if done > 0 {
+        crate::memos::push_list(app);
+        let _ = app.emit_to("list", "sheet:applied", [done]); // "AI 비서가 보낸 요청 n개를 메모에 반영했어요" (휴대폰과 같게)
+        request(500); // 새로 만들고 고친 메모를 바로 Drive 에 올린다
+    }
+    // 낙관적 잠금: 읽은 뒤 AI 가 줄을 더했으면 덮어쓰지 않는다 (다음 차례에 다시 읽어 그 줄까지)
+    if Api.file_stamp(&id)? != stamp {
+        return Ok(done);
+    }
+    Api.update_csv(&id, &out)?;
+    // 바뀐 값은 기억하지 않는다 — 덮어쓴 바로 뒤에 AI 가 더한 줄까지 "본 것" 으로 치지 않게 다음 차례에 한 번 더 읽는다
+    *SEEN.lock().unwrap() = Some((id, String::new()));
+    Ok(done)
 }
 
 // ---------- Google Drive 로 공유 (share-drive.js) ----------
@@ -825,6 +913,14 @@ fn run_once(app: &AppHandle, full: bool) -> bool {
             // PC 다리: Drive 데스크탑 앱 폴더에 다른 앱(Gemini 등)이 새로 만든 메모를 가져온다 (drive_bridge.rs)
             let known: std::collections::HashSet<String> = state.files.keys().cloned().collect();
             crate::drive_bridge::run(app, &Api, &folder_id, &folder_name, &known);
+            // AI 받은함 시트: 켜져 있는 기기 가운데 한 대만 (받은 메모 담당 — devices.rs)
+            if let Some(memoking_id) = state.folders.as_ref().and_then(|f| f.get("_memoking")) {
+                if crate::devices::inbox_turn(app, &root) {
+                    if let Err(e) = sheet_inbox(app, memoking_id) {
+                        elog!("[AI 받은함] {e}");
+                    }
+                }
+            }
             false
         }
         Err(err) => {

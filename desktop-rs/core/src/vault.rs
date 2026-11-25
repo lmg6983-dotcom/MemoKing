@@ -73,8 +73,6 @@ pub struct Vault {
     /// 새 메모의 Work / Life
     pub default_mode: String,
     entries: HashMap<String, Entry>,
-    /// 받은 메모 빈 칸마다 마지막으로 본 (시각, 크기) — 바뀐 칸만 읽는다 (vault/inbox.rs)
-    inbox_seen: HashMap<usize, (SystemTime, u64)>,
     /// 다시 읽다 잠깐 사라진 메모의 머리말 (곧 같은 id 로 저장하면 그 머리말로)
     removed_meta: HashMap<String, (Meta, SystemTime)>,
     /// 이 기기가 되살린 파일 — "다른 기기에서 고침" 으로 알리지 않게
@@ -92,7 +90,8 @@ pub struct Vault {
     secret_alias: HashMap<String, (String, String)>,
 }
 
-mod inbox;
+mod relink;
+mod sheet_inbox;
 mod secret_store;
 
 /// 목록 카드 · 찾기가 본문에서 쓰는 것
@@ -153,7 +152,6 @@ impl Vault {
             device: device.into(),
             default_mode: "life".into(),
             entries: HashMap::new(),
-            inbox_seen: HashMap::new(),
             removed_meta: HashMap::new(),
             own_files: HashSet::new(),
             seen_dirs: None,
@@ -1637,7 +1635,7 @@ fn has_web_link(body: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn tmp() -> PathBuf {
+    pub(crate) fn tmp() -> PathBuf {
         let d = std::env::temp_dir().join(format!("mk-vault-{}", uuid::Uuid::new_v4().simple()));
         fs::create_dir_all(&d).unwrap();
         d

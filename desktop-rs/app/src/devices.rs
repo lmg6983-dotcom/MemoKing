@@ -1,5 +1,5 @@
 // 기기 상태 파일 (_memoking/기기/<이 PC> (<id>).md — core/src/devices.rs): 동기화를 마칠 때마다 적고(바뀐 것이 있거나 5분마다),
-//   다른 기기 파일을 읽어 설정의 Google Drive 칸에 보여 주고, 받은 메모 빈 칸을 이 PC 가 옮길 차례인지 정한다
+//   다른 기기 파일을 읽어 설정의 Google Drive 칸에 보여 주고, AI 받은함 시트를 이 PC 가 처리할 차례인지 정한다
 use crate::state::state;
 use memoking_core::devices::{device_file, device_text, inbox_leader, needs_write, parse_device, Device, DEVICES_DIR};
 use memoking_core::time::now_ms;
@@ -60,7 +60,7 @@ fn others(root: &Path) -> Vec<(String, memoking_core::devices::Seen)> {
         .collect()
 }
 
-/// 받은 메모 빈 칸을 이 PC 가 옮길 차례인가 (켜져 있는 PC 가 먼저, 이름 차례로 첫째)
+/// AI 받은함 시트를 이 PC 가 처리할 차례인가 (켜져 있는 PC 가 먼저, 이름 차례로 첫째)
 pub fn inbox_turn(app: &AppHandle, root: &Path) -> bool {
     let list: Vec<(String, String, i64)> = others(root).into_iter().map(|(f, s)| (f, s.kind, s.alive)).collect();
     inbox_leader(&list, &my_file(app), "pc", now_ms())

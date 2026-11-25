@@ -1,0 +1,1538 @@
+[
+ {
+  "kind": "csv",
+  "csv": "",
+  "cells": [],
+  "rows": []
+ },
+ {
+  "kind": "csv",
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n",
+  "cells": [
+   [
+    "req_id",
+    "action",
+    "memo_id",
+    "folder",
+    "body",
+    "find",
+    "status"
+   ]
+  ],
+  "rows": []
+ },
+ {
+  "kind": "csv",
+  "csv": "﻿req_id,action\r\n1,create\r\n",
+  "cells": [
+   [
+    "req_id",
+    "action"
+   ],
+   [
+    "1",
+    "create"
+   ]
+  ],
+  "rows": [
+   {
+    "req_id": "1",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": ""
+   }
+  ]
+ },
+ {
+  "kind": "csv",
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n1,create,,업무,\"# 회의\n여러 줄, 쉼표 \"\"따옴표\"\"\",,pending\r\n2,append,m1,,더,,done (m1)\r\n",
+  "cells": [
+   [
+    "req_id",
+    "action",
+    "memo_id",
+    "folder",
+    "body",
+    "find",
+    "status"
+   ],
+   [
+    "1",
+    "create",
+    "",
+    "업무",
+    "# 회의\n여러 줄, 쉼표 \"따옴표\"",
+    "",
+    "pending"
+   ],
+   [
+    "2",
+    "append",
+    "m1",
+    "",
+    "더",
+    "",
+    "done (m1)"
+   ]
+  ],
+  "rows": [
+   {
+    "req_id": "1",
+    "action": "create",
+    "memo_id": "",
+    "folder": "업무",
+    "body": "# 회의\n여러 줄, 쉼표 \"따옴표\"",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "2",
+    "action": "append",
+    "memo_id": "m1",
+    "folder": "",
+    "body": "더",
+    "find": "",
+    "status": "done (m1)"
+   }
+  ]
+ },
+ {
+  "kind": "csv",
+  "csv": "status,body,req_id,action,extra\n pending ,\"# 순서가 다른 열\",9,CREATE,x\n,,,,\n",
+  "cells": [
+   [
+    "status",
+    "body",
+    "req_id",
+    "action",
+    "extra"
+   ],
+   [
+    " pending ",
+    "# 순서가 다른 열",
+    "9",
+    "CREATE",
+    "x"
+   ],
+   [
+    "",
+    "",
+    "",
+    "",
+    ""
+   ]
+  ],
+  "rows": [
+   {
+    "req_id": "9",
+    "action": "CREATE",
+    "memo_id": "",
+    "folder": "",
+    "body": "# 순서가 다른 열",
+    "find": "",
+    "status": " pending "
+   }
+  ]
+ },
+ {
+  "kind": "csv",
+  "csv": "1,trash,m2,,,,pending",
+  "cells": [
+   [
+    "1",
+    "trash",
+    "m2",
+    "",
+    "",
+    "",
+    "pending"
+   ]
+  ],
+  "rows": [
+   {
+    "req_id": "1",
+    "action": "trash",
+    "memo_id": "m2",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   }
+  ]
+ },
+ {
+  "kind": "csv",
+  "csv": "a,\"b\r\nc\",d\r\n\"e\"\"\",f",
+  "cells": [
+   [
+    "a",
+    "b\r\nc",
+    "d"
+   ],
+   [
+    "e\"",
+    "f"
+   ]
+  ],
+  "rows": [
+   {
+    "req_id": "a",
+    "action": "b\r\nc",
+    "memo_id": "d",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": ""
+   },
+   {
+    "req_id": "e\"",
+    "action": "f",
+    "memo_id": "",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": ""
+   }
+  ]
+ },
+ {
+  "kind": "csv",
+  "csv": "\"끝 따옴표 없음,a\nb",
+  "cells": [
+   [
+    "끝 따옴표 없음,a\nb"
+   ]
+  ],
+  "rows": [
+   {
+    "req_id": "끝 따옴표 없음,a\nb",
+    "action": "",
+    "memo_id": "",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": ""
+   }
+  ]
+ },
+ {
+  "kind": "write",
+  "cells": [
+   [
+    "a,b",
+    "say \"hi\"",
+    "줄\n바꿈",
+    " 앞",
+    ""
+   ]
+  ],
+  "csv": "\"a,b\",\"say \"\"hi\"\"\",\"줄\n바꿈\",\" 앞\",\r\n"
+ },
+ {
+  "kind": "write",
+  "cells": [
+   [
+    "",
+    ""
+   ]
+  ],
+  "csv": ",\r\n"
+ },
+ {
+  "kind": "write",
+  "cells": [
+   [
+    "req_id"
+   ]
+  ],
+  "csv": "req_id\r\n"
+ },
+ {
+  "kind": "plan",
+  "rows": [
+   {
+    "req_id": "1",
+    "action": "create",
+    "memo_id": "",
+    "folder": "업무",
+    "body": "# 새 메모",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "2",
+    "action": "create",
+    "memo_id": "",
+    "folder": "../밖",
+    "body": "# x",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "3",
+    "action": "create",
+    "memo_id": "",
+    "folder": "_MemoKing",
+    "body": "# x",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "4",
+    "action": "create",
+    "memo_id": "",
+    "folder": "con",
+    "body": "# x",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "5",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "   ",
+    "find": "",
+    "status": "pending"
+   }
+  ],
+  "plan": [
+   {
+    "index": 0,
+    "job": {
+     "action": "create",
+     "folder": "업무",
+     "body": "# 새 메모"
+    }
+   },
+   {
+    "index": 1,
+    "error": "쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)"
+   },
+   {
+    "index": 2,
+    "error": "쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)"
+   },
+   {
+    "index": 3,
+    "error": "쓸 수 없는 folder 예요 (/ \\ .. _memoking 은 안 돼요)"
+   },
+   {
+    "index": 4,
+    "error": "body 가 비었어요"
+   }
+  ],
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n1,create,,업무,# 새 메모,,pending\r\n2,create,,../밖,# x,,pending\r\n3,create,,_MemoKing,# x,,pending\r\n4,create,,con,# x,,pending\r\n5,create,,,\"   \",,pending\r\n"
+ },
+ {
+  "kind": "plan",
+  "rows": [
+   {
+    "req_id": "6",
+    "action": "append",
+    "memo_id": "",
+    "folder": "",
+    "body": "더",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "7",
+    "action": "append",
+    "memo_id": "m1",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "8",
+    "action": "append",
+    "memo_id": "a/../b",
+    "folder": "",
+    "body": "x",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "9",
+    "action": "append",
+    "memo_id": " m1 ",
+    "folder": "",
+    "body": " 더 ",
+    "find": "",
+    "status": "pending"
+   }
+  ],
+  "plan": [
+   {
+    "index": 0,
+    "error": "memo_id 가 비었어요"
+   },
+   {
+    "index": 1,
+    "error": "body 가 비었어요"
+   },
+   {
+    "index": 2,
+    "error": "쓸 수 없는 memo_id 예요"
+   },
+   {
+    "index": 3,
+    "job": {
+     "action": "append",
+     "memoId": "m1",
+     "body": "더"
+    }
+   }
+  ],
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n6,append,,,더,,pending\r\n7,append,m1,,,,pending\r\n8,append,a/../b,,x,,pending\r\n9,append,\" m1 \",,\" 더 \",,pending\r\n"
+ },
+ {
+  "kind": "plan",
+  "rows": [
+   {
+    "req_id": "10",
+    "action": "replace",
+    "memo_id": "m1",
+    "folder": "",
+    "body": "새",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "11",
+    "action": "replace",
+    "memo_id": "m1",
+    "folder": "",
+    "body": "",
+    "find": " 옛 ",
+    "status": "pending"
+   },
+   {
+    "req_id": "12",
+    "action": "trash",
+    "memo_id": "",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "13",
+    "action": "trash",
+    "memo_id": "m1",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "14",
+    "action": "Dance",
+    "memo_id": "m1",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "15",
+    "action": "",
+    "memo_id": "",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   }
+  ],
+  "plan": [
+   {
+    "index": 0,
+    "error": "find 가 비었어요"
+   },
+   {
+    "index": 1,
+    "job": {
+     "action": "replace",
+     "memoId": "m1",
+     "find": " 옛 ",
+     "body": ""
+    }
+   },
+   {
+    "index": 2,
+    "error": "memo_id 가 비었어요"
+   },
+   {
+    "index": 3,
+    "job": {
+     "action": "trash",
+     "memoId": "m1"
+    }
+   },
+   {
+    "index": 4,
+    "error": "모르는 action 이에요 (dance). create · append · replace · trash 중 하나"
+   },
+   {
+    "index": 5,
+    "error": "action 이 비었어요"
+   }
+  ],
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n10,replace,m1,,새,,pending\r\n11,replace,m1,,,\" 옛 \",pending\r\n12,trash,,,,,pending\r\n13,trash,m1,,,,pending\r\n14,Dance,m1,,,,pending\r\n15,,,,,,pending\r\n"
+ },
+ {
+  "kind": "plan",
+  "rows": [
+   {
+    "req_id": "",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "1",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# a",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "1",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# b",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "2",
+    "action": "trash",
+    "memo_id": "m2",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "error: 잠긴 메모"
+   },
+   {
+    "req_id": "2",
+    "action": "trash",
+    "memo_id": "m2",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "3",
+    "action": "trash",
+    "memo_id": "m3",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": " Pending "
+   }
+  ],
+  "plan": [
+   {
+    "index": 0,
+    "error": "req_id 가 비었어요"
+   },
+   {
+    "index": 1,
+    "job": {
+     "action": "create",
+     "folder": "",
+     "body": "# a"
+    }
+   },
+   {
+    "index": 2,
+    "error": "이미 처리한 req_id 예요"
+   },
+   {
+    "index": 4,
+    "error": "이미 처리한 req_id 예요"
+   },
+   {
+    "index": 5,
+    "job": {
+     "action": "trash",
+     "memoId": "m3"
+    }
+   }
+  ],
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\n,create,,,# x,,pending\r\n1,create,,,# a,,pending\r\n1,create,,,# b,,pending\r\n2,trash,m2,,,,error: 잠긴 메모\r\n2,trash,m2,,,,pending\r\n3,trash,m3,,,,\" Pending \"\r\n"
+ },
+ {
+  "kind": "plan",
+  "rows": [
+   {
+    "req_id": "b0",
+    "action": "trash",
+    "memo_id": "m0",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b1",
+    "action": "trash",
+    "memo_id": "m1",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b2",
+    "action": "trash",
+    "memo_id": "m2",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b3",
+    "action": "trash",
+    "memo_id": "m3",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b4",
+    "action": "trash",
+    "memo_id": "m4",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b5",
+    "action": "trash",
+    "memo_id": "m5",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b6",
+    "action": "trash",
+    "memo_id": "m6",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b7",
+    "action": "trash",
+    "memo_id": "m7",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b8",
+    "action": "trash",
+    "memo_id": "m8",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b9",
+    "action": "trash",
+    "memo_id": "m9",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b10",
+    "action": "trash",
+    "memo_id": "m10",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b11",
+    "action": "trash",
+    "memo_id": "m11",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b12",
+    "action": "trash",
+    "memo_id": "m12",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b13",
+    "action": "trash",
+    "memo_id": "m13",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b14",
+    "action": "trash",
+    "memo_id": "m14",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b15",
+    "action": "trash",
+    "memo_id": "m15",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b16",
+    "action": "trash",
+    "memo_id": "m16",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b17",
+    "action": "trash",
+    "memo_id": "m17",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b18",
+    "action": "trash",
+    "memo_id": "m18",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b19",
+    "action": "trash",
+    "memo_id": "m19",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b20",
+    "action": "trash",
+    "memo_id": "m20",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b21",
+    "action": "trash",
+    "memo_id": "m21",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b22",
+    "action": "trash",
+    "memo_id": "m22",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b23",
+    "action": "trash",
+    "memo_id": "m23",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "b24",
+    "action": "trash",
+    "memo_id": "m24",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   }
+  ],
+  "plan": [
+   {
+    "index": 0,
+    "job": {
+     "action": "trash",
+     "memoId": "m0"
+    }
+   },
+   {
+    "index": 1,
+    "job": {
+     "action": "trash",
+     "memoId": "m1"
+    }
+   },
+   {
+    "index": 2,
+    "job": {
+     "action": "trash",
+     "memoId": "m2"
+    }
+   },
+   {
+    "index": 3,
+    "job": {
+     "action": "trash",
+     "memoId": "m3"
+    }
+   },
+   {
+    "index": 4,
+    "job": {
+     "action": "trash",
+     "memoId": "m4"
+    }
+   },
+   {
+    "index": 5,
+    "job": {
+     "action": "trash",
+     "memoId": "m5"
+    }
+   },
+   {
+    "index": 6,
+    "job": {
+     "action": "trash",
+     "memoId": "m6"
+    }
+   },
+   {
+    "index": 7,
+    "job": {
+     "action": "trash",
+     "memoId": "m7"
+    }
+   },
+   {
+    "index": 8,
+    "job": {
+     "action": "trash",
+     "memoId": "m8"
+    }
+   },
+   {
+    "index": 9,
+    "job": {
+     "action": "trash",
+     "memoId": "m9"
+    }
+   },
+   {
+    "index": 10,
+    "job": {
+     "action": "trash",
+     "memoId": "m10"
+    }
+   },
+   {
+    "index": 11,
+    "job": {
+     "action": "trash",
+     "memoId": "m11"
+    }
+   },
+   {
+    "index": 12,
+    "job": {
+     "action": "trash",
+     "memoId": "m12"
+    }
+   },
+   {
+    "index": 13,
+    "job": {
+     "action": "trash",
+     "memoId": "m13"
+    }
+   },
+   {
+    "index": 14,
+    "job": {
+     "action": "trash",
+     "memoId": "m14"
+    }
+   },
+   {
+    "index": 15,
+    "job": {
+     "action": "trash",
+     "memoId": "m15"
+    }
+   },
+   {
+    "index": 16,
+    "job": {
+     "action": "trash",
+     "memoId": "m16"
+    }
+   },
+   {
+    "index": 17,
+    "job": {
+     "action": "trash",
+     "memoId": "m17"
+    }
+   },
+   {
+    "index": 18,
+    "job": {
+     "action": "trash",
+     "memoId": "m18"
+    }
+   },
+   {
+    "index": 19,
+    "job": {
+     "action": "trash",
+     "memoId": "m19"
+    }
+   }
+  ],
+  "csv": "req_id,action,memo_id,folder,body,find,status\r\nb0,trash,m0,,,,pending\r\nb1,trash,m1,,,,pending\r\nb2,trash,m2,,,,pending\r\nb3,trash,m3,,,,pending\r\nb4,trash,m4,,,,pending\r\nb5,trash,m5,,,,pending\r\nb6,trash,m6,,,,pending\r\nb7,trash,m7,,,,pending\r\nb8,trash,m8,,,,pending\r\nb9,trash,m9,,,,pending\r\nb10,trash,m10,,,,pending\r\nb11,trash,m11,,,,pending\r\nb12,trash,m12,,,,pending\r\nb13,trash,m13,,,,pending\r\nb14,trash,m14,,,,pending\r\nb15,trash,m15,,,,pending\r\nb16,trash,m16,,,,pending\r\nb17,trash,m17,,,,pending\r\nb18,trash,m18,,,,pending\r\nb19,trash,m19,,,,pending\r\nb20,trash,m20,,,,pending\r\nb21,trash,m21,,,,pending\r\nb22,trash,m22,,,,pending\r\nb23,trash,m23,,,,pending\r\nb24,trash,m24,,,,pending\r\n"
+ },
+ {
+  "kind": "finish",
+  "rows": [
+   {
+    "req_id": "d0",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m0)"
+   },
+   {
+    "req_id": "d1",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m1)"
+   },
+   {
+    "req_id": "d2",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m2)"
+   },
+   {
+    "req_id": "d3",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m3)"
+   },
+   {
+    "req_id": "d4",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m4)"
+   },
+   {
+    "req_id": "d5",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m5)"
+   },
+   {
+    "req_id": "d6",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m6)"
+   },
+   {
+    "req_id": "d7",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m7)"
+   },
+   {
+    "req_id": "d8",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m8)"
+   },
+   {
+    "req_id": "d9",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m9)"
+   },
+   {
+    "req_id": "d10",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m10)"
+   },
+   {
+    "req_id": "d11",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m11)"
+   },
+   {
+    "req_id": "d12",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m12)"
+   },
+   {
+    "req_id": "d13",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m13)"
+   },
+   {
+    "req_id": "d14",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m14)"
+   },
+   {
+    "req_id": "d15",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m15)"
+   },
+   {
+    "req_id": "d16",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m16)"
+   },
+   {
+    "req_id": "d17",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m17)"
+   },
+   {
+    "req_id": "d18",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m18)"
+   },
+   {
+    "req_id": "d19",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m19)"
+   },
+   {
+    "req_id": "d20",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m20)"
+   },
+   {
+    "req_id": "d21",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m21)"
+   },
+   {
+    "req_id": "d22",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m22)"
+   },
+   {
+    "req_id": "d23",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m23)"
+   },
+   {
+    "req_id": "d24",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m24)"
+   },
+   {
+    "req_id": "p1",
+    "action": "trash",
+    "memo_id": "m1",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   },
+   {
+    "req_id": "p2",
+    "action": "trash",
+    "memo_id": "m2",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   }
+  ],
+  "results": [
+   {
+    "index": 25,
+    "id": "m1"
+   },
+   {
+    "index": 26,
+    "error": "잠긴 메모는 고칠 수 없어요"
+   }
+  ],
+  "out": [
+   {
+    "req_id": "d7",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m7)"
+   },
+   {
+    "req_id": "d8",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m8)"
+   },
+   {
+    "req_id": "d9",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m9)"
+   },
+   {
+    "req_id": "d10",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m10)"
+   },
+   {
+    "req_id": "d11",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m11)"
+   },
+   {
+    "req_id": "d12",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m12)"
+   },
+   {
+    "req_id": "d13",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m13)"
+   },
+   {
+    "req_id": "d14",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m14)"
+   },
+   {
+    "req_id": "d15",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m15)"
+   },
+   {
+    "req_id": "d16",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m16)"
+   },
+   {
+    "req_id": "d17",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m17)"
+   },
+   {
+    "req_id": "d18",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m18)"
+   },
+   {
+    "req_id": "d19",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m19)"
+   },
+   {
+    "req_id": "d20",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m20)"
+   },
+   {
+    "req_id": "d21",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m21)"
+   },
+   {
+    "req_id": "d22",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m22)"
+   },
+   {
+    "req_id": "d23",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m23)"
+   },
+   {
+    "req_id": "d24",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m24)"
+   },
+   {
+    "req_id": "p1",
+    "action": "trash",
+    "memo_id": "m1",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "done (m1)"
+   },
+   {
+    "req_id": "p2",
+    "action": "trash",
+    "memo_id": "m2",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "error: 잠긴 메모는 고칠 수 없어요"
+   }
+  ]
+ },
+ {
+  "kind": "finish",
+  "rows": [
+   {
+    "req_id": "d0",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m0)"
+   },
+   {
+    "req_id": "d1",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m1)"
+   },
+   {
+    "req_id": "d2",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m2)"
+   },
+   {
+    "req_id": "p",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "pending"
+   }
+  ],
+  "results": [
+   {
+    "index": 3,
+    "id": "new"
+   }
+  ],
+  "out": [
+   {
+    "req_id": "d0",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m0)"
+   },
+   {
+    "req_id": "d1",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m1)"
+   },
+   {
+    "req_id": "d2",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "# x",
+    "find": "",
+    "status": "done (m2)"
+   },
+   {
+    "req_id": "p",
+    "action": "create",
+    "memo_id": "",
+    "folder": "",
+    "body": "",
+    "find": "",
+    "status": "done (new)"
+   }
+  ]
+ },
+ {
+  "kind": "replace",
+  "text": "가 나 다",
+  "find": "나",
+  "to": "라",
+  "out": {
+   "text": "가 라 다"
+  }
+ },
+ {
+  "kind": "replace",
+  "text": "가 나 나",
+  "find": "나",
+  "to": "라",
+  "out": {
+   "error": "find 가 본문에 2번 있어요 (한 번만 있는 글로 적어 주세요)"
+  }
+ },
+ {
+  "kind": "replace",
+  "text": "가",
+  "find": "나",
+  "to": "라",
+  "out": {
+   "error": "find 가 본문에 없어요"
+  }
+ },
+ {
+  "kind": "replace",
+  "text": "$1 값",
+  "find": "$1",
+  "to": "$&$$",
+  "out": {
+   "text": "$&$$ 값"
+  }
+ },
+ {
+  "kind": "replace",
+  "text": "abab",
+  "find": "aba",
+  "to": "x",
+  "out": {
+   "text": "xb"
+  }
+ },
+ {
+  "kind": "append",
+  "body": "# 제목\n본문\n\n",
+  "add": "  더  ",
+  "out": "# 제목\n본문\n더"
+ },
+ {
+  "kind": "append",
+  "body": "",
+  "add": "첫 줄",
+  "out": "\n첫 줄"
+ },
+ {
+  "kind": "append",
+  "body": "본문",
+  "add": "",
+  "out": "본문\n"
+ }
+]

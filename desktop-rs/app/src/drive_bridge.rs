@@ -1,6 +1,6 @@
 // PC 다리 — Google Drive 데스크탑 앱이 받아 둔 메모킹 동기화 폴더(G:\내 드라이브\메모킹 동기화)에서,
 //   메모킹이 Drive 에서 볼 수 없는 메모(Gemini 등 다른 앱이 새로 만든 .md)를 찾아 메모킹 메모로 가져오고 원래 파일은 지운다(Drive 휴지통).
-//   메모킹은 drive.file 권한이라 다른 앱이 만든 파일이 보이지 않는다 — 받은 메모 빈 칸(core/inbox.rs)을 쓰지 않고 AI 가 새 파일을 만든 때의 안전망.
+//   메모킹은 drive.file 권한이라 다른 앱이 만든 파일이 보이지 않는다 — AI 받은함 시트(core/sheet_inbox.rs)를 쓰지 않고 AI 가 새 파일을 만든 때의 안전망.
 //   잘못 지우지 않게: ① 동기화 기록에 없고 ② 방금 Drive 에 물어 메모킹 눈에 없는 것만, 다 받은 지 30초 지난 것만.
 //   머리말 id 가 메모킹 메모와 같으면 새 메모가 아니라 그 메모를 고친 것 — 그 메모에 이어 쓴다 (휴지통에 갔으면 되살려)
 use crate::memos::{push_list, with_vault};
@@ -78,12 +78,6 @@ pub fn run(app: &AppHandle, remote: &dyn Remote, folder_id: &str, folder_name: &
     let Some(mirror) = mirror_of(folder_name) else { return };
     let mut found = vec![];
     mirror_memos(&mirror, "", &mut found);
-    // 받은 메모 폴더에 빈 칸을 덮어쓰지 않고 새로 만든 파일("빈 메모 007 (1).md" 등)도 — 빈 칸 이름 그대로인 것은 메모킹 칸
-    let inbox = format!("{}/", memoking_core::inbox::INBOX_DIR);
-    let mut extra = vec![];
-    mirror_memos(&mirror.join(memoking_core::inbox::INBOX_DIR.replace('/', "\\")), memoking_core::inbox::INBOX_DIR, &mut extra);
-    let slot = |rel: &str| rel.strip_prefix(inbox.as_str()).is_some_and(|n| (1..=memoking_core::inbox::INBOX_SLOTS).any(|i| memoking_core::inbox::slot_name(i) == n));
-    found.extend(extra.into_iter().filter(|(rel, _)| !slot(rel)));
     let picks = candidates(&found, known, SystemTime::now());
     if picks.is_empty() {
         return;
@@ -100,7 +94,7 @@ pub fn run(app: &AppHandle, remote: &dyn Remote, folder_id: &str, folder_name: &
         if body.trim().is_empty() {
             continue;
         }
-        let folder = if rel.starts_with("_memoking/") { String::new() } else { folder_of(&rel).to_string() }; // 받은 메모 폴더의 것은 맨 위로
+        let folder = folder_of(&rel).to_string();
         let done = with_vault(app, |v| {
             // 같은 id 의 메모가 있으면(다른 앱이 지우고 새로 만들어 고쳤다) 그 메모에 이어 쓴다 — 휴지통에 갔으면 되살려서 (vault/inbox.rs relink)
             if let Some(id) = meta.id.as_deref() {

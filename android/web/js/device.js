@@ -1,5 +1,5 @@
 // 이 휴대폰의 기기 상태 파일 (_memoking/기기/<이름> (<id>).md — app/js/core/devices.js, PC 는 desktop-rs/app/src/devices.rs)
-//   동기화를 마칠 때마다 적고(바뀐 것이 있거나 5분마다), 받은 메모 빈 칸을 이 휴대폰이 옮길 차례인지 정한다 (켜져 있는 PC 가 있으면 PC 가)
+//   동기화를 마칠 때마다 적고(바뀐 것이 있거나 5분마다), AI 받은함 시트를 이 휴대폰이 처리할 차례인지 정한다 (켜져 있는 PC 가 있으면 PC 가)
 import { DEVICES_DIR, deviceFile, deviceText, parseDevice, inboxLeader, needsWrite } from '../../app/js/core/devices.js';
 import { fs, native } from './native.js';
 
@@ -38,7 +38,7 @@ export function devices() {
     .filter((d) => d.name);
 }
 
-/** 받은 메모 빈 칸을 이 휴대폰이 옮길 차례인가 */
+/** AI 받은함 시트를 이 휴대폰이 처리할 차례인가 */
 export const inboxTurn = () => inboxLeader(devices(), { file: me().file, kind: 'phone' }, Date.now());
 /** 이 휴대폰의 파일 */
 export const myFile = () => me().file;

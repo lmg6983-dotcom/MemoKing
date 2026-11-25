@@ -19,6 +19,7 @@ import { matchesQuery } from '../../app/js/core/notifications.js';
 import { startConnect, renderStatus as renderDrive, syncNow } from './drive.js';
 import { Vault } from './vault.js';
 import { writeDevice, inboxTurn } from './device.js';
+import { processSheet } from './sheet-inbox.js';
 import { LinkPreviews } from './web-fetch.js';
 import { createAlarms } from './alarms.js';
 import { injectMobileIcons } from './m-icons.js';
@@ -1802,10 +1803,6 @@ function openVault() {
     showHandoff((detail.external ?? []).filter((id) => !detail.removed?.includes(id)));
   });
   vault.on('error', (err) => console.warn('[메모 폴더]', err));
-  // 받은 메모 빈 칸: Drive 와 맞추는 동안만 만들어 둔다 (AI 가 새 메모를 거기 써 넣는다 — core/inbox.js)
-  vault.inboxEnsure = () => Boolean(drive.status().connected && drive.status().active);
-  vault.inboxTurn = inboxTurn; // 받은 메모 칸은 한 기기만 (device.js)
-  vault.on('inbox', ({ count }) => toast(`AI 비서가 보낸 새 메모 ${count}개를 가져왔어요`));
   $('setup').hidden = true;
   list.refresh();
   list.show();
@@ -1894,6 +1891,12 @@ on('sync', (st) => {
   if (st.changed) app.vault?.scan();
   else if (app.vault && !app.vault.list().length) list.render(); // 빈 목록의 "받는 중" 안내를 맞춘다
   if (st.conflicts?.length) toast(`두 기기에서 동시에 고친 메모 ${st.conflicts.length}개는 사본으로 남겼어요`);
+  // AI 받은함 시트: 맞추기를 마치면 받은 메모 담당 기기만 (켜져 있는 PC 가 있으면 PC 가 — device.js)
+  if (st.state === 'idle' && app.vault && drive.status().active && inboxTurn()) {
+    processSheet(app.vault)
+      .then((n) => n && toast(`AI 비서가 보낸 요청 ${n}개를 메모에 반영했어요`))
+      .catch((err) => console.warn('AI 받은함', err?.message ?? err));
+  }
 });
 on('alarm', () => alarms.tick());
 // S펜 버튼을 누르고 있는지 (앱이 알려 줌) → 손 메모 그리기가 지우개로 (app/js/ink-editor.js)

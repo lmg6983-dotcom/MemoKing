@@ -667,6 +667,7 @@ class Bridge(private val activity: MainActivity) {
                 }
             }
             "driveSync" -> pool.execute { resolve(id) { DriveSync.syncBlocking(ctx, full = true).json() } } // 단추: 폴더를 처음부터
+            "sheetInbox" -> pool.execute { resolve(id) { DriveSync.sheetInbox(ctx, a) } } // AI 받은함 시트 (web/js/sheet-inbox.js)
             else -> resolve(id) { throw IllegalArgumentException("알 수 없는 기능: $method") }
         }
     }
