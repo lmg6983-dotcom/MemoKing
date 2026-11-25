@@ -822,9 +822,6 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
             job(label, &arg["id"], |cancel| agent(app, label, &arg["id"], &text, cancel))
         }
         "ai:agent-run" => Ok(run_agent_action(app, &arg)),
-        // AI 가 뒤에서 한 일 막대 (Electron 판의 MagicKey 다듬기) — 자동 태그 · 일정 자동 등록을 없애 이 판에는 알릴 것이 없다
-        "ai:notice" | "ai:notice-dismiss" => Ok(Value::Null),
-        "ai:notice-undo" => Ok(json!({ "ok": false, "message": "되돌릴 것이 없어요", "next": null })),
         "ai:cancel" => {
             if let Some(c) = JOBS.lock().unwrap().get(&format!("{label}:{}", memoking_core::js::string(&arg))) {
                 c.store(true, Ordering::Relaxed);

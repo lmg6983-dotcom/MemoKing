@@ -257,7 +257,7 @@ fn build_capture(app: &AppHandle, dir: &Path, info: &Value) -> Option<Value> {
     Some(json!({ "heading": heading, "html": html_out, "text": text_out, "items": items, "skipped": skipped, "source": source, "sourceMd": source_md }))
 }
 
-/// 클립보드의 "HTML Format"(CF_HTML, 위치 값은 UTF-8 바이트) → (선택한 조각, 원본 주소) — clipboard-html.js parseCfHtml
+/// 클립보드의 "HTML Format"(CF_HTML, 위치 값은 UTF-8 바이트) → (선택한 조각, 원본 주소)
 fn parse_cf_html(bytes: &[u8]) -> (Option<String>, Option<String>) {
     let text = String::from_utf8_lossy(bytes);
     let head: String = text.chars().take(2000).collect();

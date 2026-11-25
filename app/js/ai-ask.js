@@ -1,6 +1,6 @@
 // 매직 에이전트 (목록 › 검색창 안 오른쪽 ✦, 또는 검색창에서 Ctrl+Enter) — 검색창의 글로 묻거나 시키면 검색창 바로 아래에
 //   답(내 메모에서 찾아 출처를 단) · 요약 · 일정 / 메모 / 덧붙이기 확인 카드 (agent-view.js — 매직키와 같은 화면).
-//   찾기 · 답하기는 desktop (core/ai-tasks.js agent, 이 PC 안의 모델, 인터넷 없이). 글 모델을 넣은 PC 에서만 보인다.
+//   찾기 · 답하기는 PC (desktop-rs/app/src/ai.rs agent, 이 PC 안의 모델, 인터넷 없이). 글 모델을 넣은 PC 에서만 보인다.
 import { createAgentView } from './agent-view.js';
 
 /** @param {{ btn: HTMLButtonElement, box: HTMLElement, input: HTMLInputElement, api: any }} o */

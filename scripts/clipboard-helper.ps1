@@ -43,7 +43,7 @@ function Set-ClipboardData([System.Windows.Forms.DataObject]$data) {
 
 function New-Data { New-Object System.Windows.Forms.DataObject }
 
-# CF_HTML 의 본문 조각에 글자가 있는지 (app/js/core/clipboard-html.js 의 htmlHasText 와 같은 규칙) — 표시가 없으면 모른다($false)
+# CF_HTML 의 본문 조각에 글자가 있는지 — 표시가 없으면 모른다($false)
 function Test-HtmlText([byte[]]$bytes) {
   $s = $utf8.GetString($bytes)
   $a = $s.IndexOf('<!--StartFragment-->'); $b = $s.IndexOf('<!--EndFragment-->')

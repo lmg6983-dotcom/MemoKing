@@ -203,21 +203,6 @@ function isDirty() {
 }
 
 // ---------- 추천 태그 (휴대폰과 같음): 태그 없는 메모에 이 폴더의 태그 중 맞는 것을 아래 막대에 ----------
-// AI 가 뒤에서 한 일 (매직키 다듬기 · 일정 자동 등록): 알림을 눌러 열면 아래 막대에서 되돌리기 (메인 aiNotices)
-function showAiNotice(n) {
-  const bar = $('ai-notice-bar');
-  if (!bar) return;
-  bar.hidden = !n;
-  if (n) $('ai-notice-text').textContent = n.text;
-}
-api.ai?.notice(id).then(showAiNotice, () => {});
-api.on('ai:notice', showAiNotice);
-$('ai-notice-undo')?.addEventListener('click', async () => {
-  const r = await api.ai.noticeUndo(id).catch(() => null);
-  showAiNotice(r?.next ?? null);
-  if (r?.message) setStatus(r.message, !r.ok);
-});
-$('ai-notice-close')?.addEventListener('click', async () => showAiNotice(await api.ai.noticeDismiss(id).catch(() => null)));
 function onChange(md) {
   current = md;
   // 튜토리얼 따라 하기: 글을 쓰면 · 꾸미면 · 체크리스트 · 태그를 붙이면 (단계 시작 때보다 늘면) 다음 단계로

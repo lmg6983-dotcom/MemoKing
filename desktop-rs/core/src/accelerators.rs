@@ -2,7 +2,7 @@
 //!   저장: Electron accelerator ("Control+Alt+C") · 보이기: "Ctrl+Alt+C"
 use serde_json::{json, Map, Value};
 
-/// (이름, 기본 키, 보이는 이름) — DEFAULT_SHORTCUTS · SHORTCUT_NAMES 와 같은 차례
+/// (이름, 기본 키, 보이는 이름) — app/js/core/accelerators.js DEFAULT_SHORTCUTS 와 같은 차례
 pub const SHORTCUTS: [(&str, &str, &str); 3] = [("quickMemo", "Control+Alt+C", "매직 카피"), ("magic", "Control+Alt+Space", "매직키"), ("list", "Control+Alt+`", "메모 목록")];
 
 const PUNCT: [&str; 11] = ["-", "=", "[", "]", ";", "'", ",", ".", "/", "\\", "`"];
