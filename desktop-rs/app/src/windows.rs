@@ -2353,7 +2353,6 @@ pub fn handle(app: &AppHandle, label: &str, channel: &str, args: &[Value]) -> Op
         }
         "drag:end" => drag_end(app, at(0)),
         // 목록 창 제목 줄 어둡게(대화 상자 · 안내 뒤): Electron 은 Windows 가 그린 창 단추 색을 바꿨다. Tauri 는 화면이 단추를 그려(shim.js) 막이 함께 덮는다
-        "win:dim-titlebar" => Value::Null,
         "win:grow-width" => grow_width(app, label, args.first().unwrap_or(&Value::Null)),
         "app:restoring" => crate::os::RESTORING.load(std::sync::atomic::Ordering::SeqCst).into(),
         "win:hide-closing" => {

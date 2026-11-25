@@ -2,7 +2,7 @@
 
 `node desktop-rs/checklist.mjs` 가 만든다 (손으로 고치지 않음). 100% 가 되면 Electron(`desktop/`)을 걷어낸다.
 
-- 채널 (화면 → Rust): **186 / 186**
+- 채널 (화면 → Rust): **185 / 185**
 - 이벤트 (Rust → 화면): **61 / 61**
 
 ➖ 는 Rust 판에 일부러 두지 않은 것 (AI 비서 연결 MCP: AI 는 Google Drive 의 메모 폴더를 직접 읽고 쓴다)
@@ -187,7 +187,6 @@
 | ✅ | `vault:use` |
 | ✅ | `win:close` |
 | ✅ | `win:close-busy` |
-| ✅ | `win:dim-titlebar` |
 | ✅ | `win:fit-size` |
 | ✅ | `win:grow-width` |
 | ✅ | `win:hide-closing` |

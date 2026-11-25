@@ -278,7 +278,6 @@ contextBridge.exposeInMainWorld('memoking', {
     // 닫는 중인데 문서를 PDF 로 바꾸느라 숨은 채 기다린다 — 그사이 같은 메모를 열면 이 창을 다시 보인다 (close:cancel)
     closeBusy: invoke('win:close-busy'),
     hideForClose: invoke('win:hide-closing'), // 닫기 전에 창(스택이면 탭 모두)부터 숨긴다
-    dimTitlebar: invoke('win:dim-titlebar'),
     toggleListTop: invoke('list:toggle-top'),
     listOnTop: invoke('list:on-top'),
     listCrownDocked: invoke('list:crown-docked'), // 왕관이 스티커 대신 제목 줄 작은 왕관으로 들어가 있는가
