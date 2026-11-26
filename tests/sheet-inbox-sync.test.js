@@ -57,3 +57,33 @@ test('처리하는 사이 줄이 늘면 덮어쓰지 않고, 다음 차례에 �
   assert.equal(await processSheet(vault), 0);
   assert.equal(drive.exports, exports, '시트가 그대로면 CSV 를 다시 받지 않는다');
 });
+
+test('예전 7열 헤더 시트에 8열 pending 행이 들어와도 자동 보정하고 8열 헤더로 업그레이드한다', async () => {
+  const { rowsFromCsv, runSheet, needsHeaderUpgrade } = await import('../app/js/core/sheet-inbox.js');
+  const legacyCsv = [
+    'req_id,action,memo_id,folder,body,find,status',
+    '20261125-01,create,,할일,# 기존 메모,,done (old-1)',
+    '20261126-01,create,,AI 리포트(월드),green,# 새 리포트,,pending',
+  ].join('\n');
+  assert.equal(needsHeaderUpgrade(legacyCsv), true);
+  const parsed = rowsFromCsv(legacyCsv);
+  assert.equal(parsed[0].status, 'done (old-1)');
+  assert.equal(parsed[1].color, 'green');
+  assert.equal(parsed[1].body, '# 새 리포트');
+  assert.equal(parsed[1].status, 'pending');
+  const out = runSheet(legacyCsv, (job) => {
+    assert.equal(job.color, 'green');
+    return { id: 'new-1' };
+  });
+  assert.equal(out.done, 1);
+  assert.equal(needsHeaderUpgrade(out.csv), false);
+  assert.equal(rowsFromCsv(out.csv)[1].status, 'done (new-1)');
+});
+
+test('기기 충돌 사본은 inboxLeader 리더 선출에서 제외된다', async () => {
+  const { inboxLeader } = await import('../app/js/core/devices.js');
+  const now = 1_795_734_268_000;
+  const me = { file: '_memoking/기기/SM-F731N (9604).md', kind: 'phone' };
+  const conflict = { file: '_memoking/기기/SM-F731N (9604) (휴대폰 충돌 2026-11-27 0134).md', kind: 'phone', alive: now - 10_000 };
+  assert.equal(inboxLeader([conflict], me, now), true);
+});

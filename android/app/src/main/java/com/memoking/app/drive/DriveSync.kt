@@ -37,9 +37,12 @@ object DriveSync {
         val changed: Boolean = false,
         val conflicts: List<String> = emptyList(),
         val progress: JSONObject? = null, // 동기화하는 동안 { phase, done, total, since } (PC drive.rs 와 같은 모양 — app/js/core/sync-progress.js)
+        val sheetApplied: Int = 0, // 이번 동기화에서 네이티브로 반영한 AI 받은함 요청 수
+        val sheetError: String = "", // AI 받은함 처리 오류 (있으면 화면 토스트 · 기기 상태에 노출)
     ) {
         fun json(): JSONObject = JSONObject().put("state", state).put("lastSync", lastSync).put("error", error)
             .put("changed", changed).put("conflicts", org.json.JSONArray(conflicts)).put("progress", progress ?: JSONObject.NULL)
+            .put("sheetApplied", sheetApplied).put("sheetError", sheetError)
     }
 
     private val worker = Executors.newSingleThreadScheduledExecutor()
@@ -185,8 +188,38 @@ object DriveSync {
                 android.util.Log.w("MemoKing", "위젯 확인 실패", e)
             }
         }
+        // AI 받은함 시트: 포그라운드 · 백그라운드(SyncJobService) 모두 네이티브에서 직접 처리 (PC drive.rs 와 같음)
+        var sheetApplied = 0
+        var sheetError = ""
+        var localChanged = result.localChanged
+        val memokingId = state.optJSONObject("folders")?.optString("_memoking")?.takeIf { it.isNotEmpty() }
+        if (memokingId != null) {
+            val store = storage(ctx, folderId)
+            if (SheetInbox.isInboxLeader(ctx, store)) {
+                try {
+                    val sheetRes = SheetInbox.process(ctx, DriveApi(ctx), store, folderId, memokingId)
+                    sheetApplied = sheetRes.applied
+                    if (sheetRes.changedLocal) {
+                        localChanged = true
+                        // 새로 만들고 고친 메모를 바로 Drive 에 올린다 (백그라운드에서도 즉시 반영되도록)
+                        try {
+                            val push = SyncEngine(store, DriveApi(ctx), folderId, state, fileLock, ::onProgress).run(false)
+                            saveState(file, state)
+                            if (push.uploaded + push.downloaded + push.deletedLocal + push.deletedRemote > 0) {
+                                burstUntil = System.currentTimeMillis() + 120_000
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.w("MemoKing", "AI 받은함 반영 후 업로드 실패", e)
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("MemoKing", "AI 받은함 처리 실패", e)
+                    sheetError = e.message ?: "AI 받은함 시트를 처리하지 못했어요"
+                }
+            }
+        }
         GoogleAuth.ensureEmail(ctx)
-        return Status("idle", System.currentTimeMillis(), "", result.localChanged, result.conflicts).also(::publish)
+        return Status("idle", System.currentTimeMillis(), "", localChanged, result.conflicts, sheetApplied = sheetApplied, sheetError = sheetError).also(::publish)
     }
 
     private fun saveState(file: File, state: JSONObject) {

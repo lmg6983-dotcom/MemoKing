@@ -483,6 +483,14 @@ fn sheet_inbox(app: &AppHandle, memoking_id: &str) -> io::Result<usize> {
         let _ = serde_json::to_string(&keep).map(|t| memoking_core::vault::write_atomic(&file, t.as_bytes()));
     }
     let Some((out, done)) = out else {
+        if sheet_inbox::needs_header_upgrade(&csv) {
+            let upgraded = sheet_inbox::rows_to_csv(&sheet_inbox::rows_from_csv(&csv));
+            if Api.file_stamp(&id)? == stamp {
+                Api.update_csv(&id, &upgraded)?;
+                *SEEN.lock().unwrap() = Some((id, String::new()));
+                return Ok(0);
+            }
+        }
         *SEEN.lock().unwrap() = Some((id, stamp));
         return Ok(0);
     };
