@@ -56,16 +56,30 @@ export function toCsv(rows) {
   return rows.map((r) => `${r.map(cell).join(',')}\r\n`).join('');
 }
 
-/** 시트 CSV → 줄들 { req_id … status }. 첫 줄에 req_id 가 있으면 머리 줄로 보고 열 이름으로(열 차례가 바뀌어도), 아니면 8열 차례대로 (모르는 열은 버린다) */
+/** 예전 7열 헤더(color 열 누락)인지 확인 */
+export function needsHeaderUpgrade(text) {
+  const header = (parseCsv(text)[0] ?? []).map((c) => c.trim().toLowerCase());
+  return header.includes('req_id') && !header.includes('color');
+}
+
+/** 시트 CSV → 줄들 { req_id … status }. 첫 줄에 req_id 가 있으면 머리 줄로 보고 열 이름으로(열 차례가 바뀌어도), 아니면 8열 차례대로 (모르는 열은 버린다)
+ *  예전 7열 헤더(color 없음) 시트에 8열 형식 행(H열에 status, 기존 status 열은 빈 칸)이 들어온 경우 8열 위치로 자동 보정한다 */
 export function rowsFromCsv(text) {
   const cells = parseCsv(text);
   const header = (cells[0] ?? []).map((c) => c.trim().toLowerCase());
   const named = header.includes('req_id');
   const at = COLUMNS.map((name, i) => (named ? header.indexOf(name) : i));
+  const legacyNoColor = named && at[4] < 0 && at[7] >= 0;
   return cells
     .slice(named ? 1 : 0)
     .filter((c) => c.some((v) => v.trim()))
-    .map((c) => Object.fromEntries(COLUMNS.map((name, i) => [name, at[i] >= 0 ? c[at[i]] ?? '' : ''])));
+    .map((c) => {
+      const shifted8 = legacyNoColor && c.length >= 8 && !(c[at[7]] ?? '').trim() && Boolean((c[7] ?? '').trim());
+      return Object.fromEntries(COLUMNS.map((name, i) => {
+        const idx = shifted8 ? i : at[i];
+        return [name, idx >= 0 ? c[idx] ?? '' : ''];
+      }));
+    });
 }
 
 /** 줄들 → 시트에 올릴 CSV (머리 줄 포함) */

@@ -3,6 +3,7 @@
 //   다른 기기 · AI 가 "제1 PC 3분 전 동기화 · PC 다리 켜짐" 을 볼 수 있다.
 //   AI 받은함 시트는 한 기기만 처리한다(inboxLeader): 켜져 있는 PC 가 먼저, 없으면 휴대폰 — 이름 차례로 첫째
 import { titleToFileName } from './memo-file.js';
+import { CONFLICT_TAG } from './conflicts.js';
 
 export const DEVICES_DIR = '_memoking/기기';
 export const ALIVE_MS = 15 * 60_000; // 이만큼 소식이 없으면 꺼진 기기로 본다
@@ -63,7 +64,7 @@ export function parseDevice(text) {
  * @param {Array<{ file: string, kind: string, alive: number }>} devices file: 기기 파일 이름
  */
 export function inboxLeader(devices, me, now) {
-  const live = devices.filter((d) => d.file !== me.file && now - d.alive <= ALIVE_MS).concat([{ ...me, alive: now }]);
+  const live = devices.filter((d) => d.file !== me.file && !CONFLICT_TAG.test(d.file) && now - d.alive <= ALIVE_MS).concat([{ ...me, alive: now }]);
   const pcs = live.filter((d) => d.kind === 'pc');
   const pool = pcs.length ? pcs : live;
   const first = [...pool].sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))[0];

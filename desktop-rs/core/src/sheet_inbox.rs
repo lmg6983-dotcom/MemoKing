@@ -84,12 +84,20 @@ pub fn to_csv(rows: &[Vec<String>]) -> String {
     rows.iter().map(|r| r.iter().map(cell).collect::<Vec<_>>().join(",") + "\r\n").collect()
 }
 
+/// 예전 7열 헤더(color 열 누락)인지 확인
+pub fn needs_header_upgrade(text: &str) -> bool {
+    let header: Vec<String> = parse_csv(text).first().map(|h| h.iter().map(|c| js::trim(c).to_lowercase()).collect()).unwrap_or_default();
+    header.iter().any(|h| h == "req_id") && !header.iter().any(|h| h == "color")
+}
+
 /// 시트 CSV → 줄들. 첫 줄에 req_id 가 있으면 머리 줄로 보고 열 이름으로(열 차례가 바뀌어도), 아니면 8열 차례대로 읽는다 (모르는 열은 버린다)
+/// 예전 7열 헤더(color 없음) 시트에 8열 형식 행(H열에 status, 기존 status 열은 빈 칸)이 들어온 경우 8열 위치로 자동 보정한다
 pub fn rows_from_csv(text: &str) -> Vec<Row> {
     let mut cells = parse_csv(text);
     let header: Vec<String> = cells.first().map(|h| h.iter().map(|c| js::trim(c).to_lowercase()).collect()).unwrap_or_default();
     let named = header.iter().any(|h| h == "req_id");
     let at: Vec<Option<usize>> = COLUMNS.iter().enumerate().map(|(i, name)| if named { header.iter().position(|h| h == name) } else { Some(i) }).collect();
+    let legacy_no_color = named && at[4].is_none() && at[7].is_some();
     if named {
         cells.remove(0);
     }
@@ -97,7 +105,14 @@ pub fn rows_from_csv(text: &str) -> Vec<Row> {
         .into_iter()
         .filter(|c| c.iter().any(|v| !js::trim(v).is_empty())) // 빈 줄
         .map(|c| {
-            let get = |i: usize| at[i].and_then(|j| c.get(j)).cloned().unwrap_or_default();
+            let shifted8 = legacy_no_color
+                && c.len() >= 8
+                && at[7].and_then(|j| c.get(j)).map(|s| js::trim(s).is_empty()).unwrap_or(true)
+                && !js::trim(&c[7]).is_empty();
+            let get = |i: usize| {
+                let idx = if shifted8 { Some(i) } else { at[i] };
+                idx.and_then(|j| c.get(j)).cloned().unwrap_or_default()
+            };
             Row { req_id: get(0), action: get(1), memo_id: get(2), folder: get(3), color: get(4), body: get(5), find: get(6), status: get(7) }
         })
         .collect()

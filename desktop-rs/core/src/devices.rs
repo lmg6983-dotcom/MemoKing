@@ -74,9 +74,18 @@ pub fn parse_device(text: &str) -> Option<Seen> {
     })
 }
 
+/// 동기화 충돌 사본("(PC 충돌 …).md", "(휴대폰 충돌 …).md")인지 확인
+fn is_conflict_device(file: &str) -> bool {
+    file.ends_with(").md") && (file.contains(" (PC 충돌 ") || file.contains(" (휴대폰 충돌 "))
+}
+
 /// AI 받은함 시트를 이 기기가 처리할 차례인가 — others: (기기 파일 이름, kind, alive)
 pub fn inbox_leader(others: &[(String, String, i64)], me_file: &str, me_kind: &str, now: i64) -> bool {
-    let mut live: Vec<(&str, &str)> = others.iter().filter(|(f, _, a)| f != me_file && now - a <= ALIVE_MS).map(|(f, k, _)| (f.as_str(), k.as_str())).collect();
+    let mut live: Vec<(&str, &str)> = others
+        .iter()
+        .filter(|(f, _, a)| f != me_file && !is_conflict_device(f) && now - a <= ALIVE_MS)
+        .map(|(f, k, _)| (f.as_str(), k.as_str()))
+        .collect();
     live.push((me_file, me_kind));
     let pcs: Vec<(&str, &str)> = live.iter().copied().filter(|(_, k)| *k == "pc").collect();
     let pool = if pcs.is_empty() { live } else { pcs };

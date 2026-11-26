@@ -1887,15 +1887,22 @@ on('history', () => list.refreshHistory());
 // Google Drive 동기화 소식: 내려받은 게 있으면 메모 폴더를 바로 다시 읽는다
 on('sync', (st) => {
   renderDrive();
-  if (app.vault && drive.status().active) writeDevice(st, app.vaultInfo?.label ?? ''); // 기기 상태 파일 (다른 기기 · AI 가 본다 — device.js)
+  const deviceSt = !st.error && st.sheetError ? { ...st, error: `AI 받은함: ${st.sheetError}` } : st;
+  if (app.vault && drive.status().active) writeDevice(deviceSt, app.vaultInfo?.label ?? ''); // 기기 상태 파일 (다른 기기 · AI 가 본다 — device.js)
   if (st.changed) app.vault?.scan();
   else if (app.vault && !app.vault.list().length) list.render(); // 빈 목록의 "받는 중" 안내를 맞춘다
   if (st.conflicts?.length) toast(`두 기기에서 동시에 고친 메모 ${st.conflicts.length}개는 사본으로 남겼어요`);
-  // AI 받은함 시트: 맞추기를 마치면 받은 메모 담당 기기만 (켜져 있는 PC 가 있으면 PC 가 — device.js)
-  if (st.state === 'idle' && app.vault && drive.status().active && inboxTurn()) {
+  if (st.sheetApplied > 0) toast(`AI 비서가 보낸 요청 ${st.sheetApplied}개를 메모에 반영했어요`);
+  if (st.sheetError) toast(`AI 받은함 오류: ${st.sheetError}`, true);
+  // 구 네이티브 앱(sheetApplied 필드 미지원) 호환 폴백 — 신 네이티브(DriveSync.kt)가 직접 처리하면 건너뛴다
+  if (st.sheetApplied === undefined && st.state === 'idle' && app.vault && drive.status().active && inboxTurn()) {
     processSheet(app.vault)
       .then((n) => n && toast(`AI 비서가 보낸 요청 ${n}개를 메모에 반영했어요`))
-      .catch((err) => console.warn('AI 받은함', err?.message ?? err));
+      .catch((err) => {
+        const msg = err?.message ?? String(err);
+        console.warn('AI 받은함', msg);
+        toast(`AI 받은함 오류: ${msg}`, true);
+      });
   }
 });
 on('alarm', () => alarms.tick());
